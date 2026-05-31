@@ -1,0 +1,1962 @@
+{
+  "_meta": {
+    "created": "2026-03-24T16:55:53.203553+00:00",
+    "hub_repo": "abhayla/claude-best-practices",
+    "last_sync": "2026-05-01T10:15:45.392+00:00",
+    "version": "1.0.0"
+  },
+  "files": {
+    "agents/anthropic-multi-agent-reviewer-agent.md": {
+      "hub_hash": "sha256:fe205027d4e9f8ed2a7be1fbbc79cba5eccf0742957d196195563f526e196380",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "agents/code-reviewer-agent.md": {
+      "hub_hash": "sha256:5ded87d1620ad3001d5eca19785ba462d43506f150aea0fb27c39dce9d0e75b4",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "agents/context-reducer-agent.md": {
+      "hub_hash": "sha256:7aec493ed04530091188afd14cc021d89c2b4fc11f54bdb9a641aac3d9a83932",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "agents/debugger-agent.md": {
+      "hub_hash": "sha256:bca16d31495c0d380979b0508ea0c43cc22dc1a886891afe00175218f893f8d9",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "agents/docs-manager-agent.md": {
+      "hub_hash": "sha256:8e03be4d7c9f7629de93308363c9149b280db85ac027caaadec2aa88b5f56b53",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "agents/git-manager-agent.md": {
+      "hub_hash": "sha256:a78d87193ac8ee2818df83ef117875a72fa6b1971710e9f0f78be9411b1ab0ad",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "agents/github-issue-manager-agent.md": {
+      "hub_hash": "sha256:1ab79abfa3ddbd9f9e282c6733eaab1ca10cf02aa336ed99efacb56487736ee0",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "agents/parallel-worktree-orchestrator-agent.md": {
+      "hub_hash": "sha256:009f4a5e962b9fef84eedbccde498c119ea65486c15b154da19f651438bc5837",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "agents/plan-executor-agent.md": {
+      "hub_hash": "sha256:8a2ef741e19db8bc95b5976bd813d91f94f9addd5a74d106cb67229e48699970",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "agents/planner-researcher-agent.md": {
+      "hub_hash": "sha256:be5041fdd1b72a2b493c2bd9a314794e065f887bbe07cc87aa4bf1625c634920",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "agents/project-manager-agent.md": {
+      "hub_hash": "sha256:e3d4196a0a2ea96a0442e9fc4cba6edfd4aae647a9f52dad5347bf59da259697",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "agents/quality-gate-evaluator-agent.md": {
+      "hub_hash": "sha256:edb2e4c8a470da866663b8eeec7560ac884b0272bd06ada53dee6cba4c532f3f",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "agents/security-auditor-agent.md": {
+      "hub_hash": "sha256:941d6631abf86b1f56f4bf4c9f04f2b2a86fe0f4975d08a1e6db4beea76129c3",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "agents/session-summarizer-agent.md": {
+      "hub_hash": "sha256:a8ea8c84f73022e3fc4bb213ca692db33ea588266d5f926dd5a792620e5554e7",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "agents/skill-author-agent.md": {
+      "hub_hash": "sha256:6468fceb82f958c9efd58beaf59f160f15b98263b97e65105eeeed067a7c3218",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "agents/test-failure-analyzer-agent.md": {
+      "hub_hash": "sha256:91dd4449e2bbaf7f6dcb5c77f8430e1753ef8328d5c214b4b24fa2293a54bfb9",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "agents/test-healer-agent.md": {
+      "hub_hash": "sha256:03bae7b0c142514670b59b0159819e8eb36937d038da842bf18f5afbcb7f7a75",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "agents/test-scout-agent.md": {
+      "hub_hash": "sha256:afcaaa4e0e54f2500436703d846786ec28669b2a063318a636621a783ba38714",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "agents/tester-agent.md": {
+      "hub_hash": "sha256:efb0fa4bfad66f3043910155adf2d7e170c7c7e63f272e06c73f1d40e3e79571",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "agents/visual-inspector-agent.md": {
+      "hub_hash": "sha256:db8d9a819cb09692ce07980bb6547aacc3e850cf5de8089bce4029f581ccafe2",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "agents/web-research-specialist-agent.md": {
+      "hub_hash": "sha256:8b6df4fa5107cdd13f84c5a2d87e173af3e38c8c564be6c407e5fabcfc3076b6",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "agents/workflow-master-template.md": {
+      "hub_hash": "sha256:7188dbbf5b71f84047d12e339bcf470ba16981e9e6ff709dc9d5cc4fe0050d45",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "config/e2e-pipeline.yml": {
+      "hub_hash": "sha256:3f99d9af1414c3b663537b9ba88a955da23db69adf920ef230f8d5b2c7e97d97",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "config/orchestrator-responsibility-allowlist.yml": {
+      "hub_hash": "sha256:ada479986414e04fcef229ee64cf50378bdb0c37cae387eb6e6669a438a8d2e1",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "hooks/auto-format.sh": {
+      "hub_hash": "sha256:38eada51305fc1fdc36c605654561bc16fc6669f4f4111226ddeeadd5887ad19",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "hooks/context-window-monitor.sh": {
+      "hub_hash": "sha256:7799602ae43339e36cf751cc22081b9fa9ad1efd3e54aec32c61530b5da7871c",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "hooks/context-window-statusline-hook.sh": {
+      "hub_hash": "sha256:772034653bff267371b0d74c85efae8fd9046fbe2ab2d608e6eacc17dbf1b5f8",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "hooks/context-window-statusline.sh": {
+      "hub_hash": "sha256:e6e5b5661dd757f5e95e8ac8af3c8bd6f098936f11b17cdf6af52b017a847366",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "hooks/dangerous-command-blocker.sh": {
+      "hub_hash": "sha256:9f4859cc78c2abad1a169a00fda3b33f21988366f832649ce56689d7611fc226",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "hooks/prompt-enhance-reminder.sh": {
+      "hub_hash": "sha256:2d1c1e8a05c3c25cd01990094d4922843930b290457998f61a619923be69a5c2",
+      "synced_at": "2026-05-01T10:15:45.392+00:00"
+    },
+    "hooks/prompt-logger.sh": {
+      "hub_hash": "sha256:9e8af3ce108efc9acb61ff6126c7abd64c2a034b8d2239f92d7f1f08e35bc1d2",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "hooks/secret-scanner.sh": {
+      "hub_hash": "sha256:c1fb0666ca8c5942ff391cd0bf1120ac223ce6d18575e43d3fda8566087701af",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "hooks/session-reminder.sh": {
+      "hub_hash": "sha256:97dc8ffa553ff1b0f08234549c4d8bad107a31bdc643beec637dc82738ff3cde",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "rules/agent-orchestration.md": {
+      "hub_hash": "sha256:01fd7bc1aa9e8fd2f51d1dbfcdb78378b9366133a8637425efafc6f4c5d69c93",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "rules/claude-behavior.md": {
+      "hub_hash": "sha256:f15c54cfd7b7f734f33a1be18eaa9c7ea7904abc3204e7694dfdb3da2f6c2921",
+      "synced_at": "2026-05-01T10:15:45.392+00:00"
+    },
+    "rules/code-readability.md": {
+      "hub_hash": "sha256:81f236c7f2b47e86e4f0bb0983399cf0beed57b3bbbd109d8d691c67c526d965",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "rules/configuration-ssot.md": {
+      "hub_hash": "sha256:2836d182e7206906a7454026dba5255d7517033d6e5dd7e6367b83b4fc372759",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "rules/context-management.md": {
+      "hub_hash": "sha256:dec59cad8ecc1381fc7b7c3468a655031fdbd4b78d4f5caabaa8c36a484165b0",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "rules/design-principles.md": {
+      "hub_hash": "sha256:555feb71136a5bc1cfaf2315e77c56ac261efa21570e923e915e5f5afbd9eed5",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "rules/e2e-test-writing.md": {
+      "hub_hash": "sha256:1723f9489d0ba48e0f2121adb5739ea2e056802b266c8ea6b6795bfbafe176f7",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "rules/error-handling.md": {
+      "hub_hash": "sha256:be8fc6427420d12d592c1037400ff1b7ec57babcc57e9fd2f066e87129bcf181",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "rules/git-collaboration.md": {
+      "hub_hash": "sha256:0257afb4c4326dc74c97b04aa672c1627ca9d71e36f21d9ccec10ad44beb5da4",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "rules/pattern-portability.md": {
+      "hub_hash": "sha256:052a3192d0ccb8c3aeb3c01dec2b54f24401b47a61b5e8cb74706b072fdc18f9",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "rules/pattern-self-containment.md": {
+      "hub_hash": "sha256:03d4ba7aa83406623d7f53fff7561ac048544b6fbe56a8fbfe9eb020e94a9a0a",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "rules/pattern-structure.md": {
+      "hub_hash": "sha256:6b0ccc7c302c03ed548320668ead03196c9134e2623e1e645b3c2457ffaff6c4",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "rules/prompt-auto-enhance-rule.md": {
+      "hub_hash": "sha256:9dc0872c1c0c9def615946973777b9e7a64216de7a3c2176ec3dd5ccd6abe616",
+      "synced_at": "2026-05-01T10:15:45.392+00:00"
+    },
+    "rules/rule-curation.md": {
+      "hub_hash": "sha256:df857bb4afb3fd7531fc1d393848c53010bc6ab11d2c5f0ae4c2b12886d1fcb2",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "rules/rule-writing-meta.md": {
+      "hub_hash": "sha256:0b95e0286ef63c46f93e21e0e31d9ac853ba1a91f50e80df77b1a177ba0187a1",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "rules/security-baseline.md": {
+      "hub_hash": "sha256:c410e31b70b74c30be00989660ff9a66626f14e84648f756ecf98756ccabe0c9",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "rules/tdd-rule.md": {
+      "hub_hash": "sha256:6f67acb5642edf356d1130f2d8d4b553d58b15116950b871742e97681814522c",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "rules/testing.md": {
+      "hub_hash": "sha256:85d2c6d52e8214d8f4bb70232ae91f1b91e6b1a19db4bc2d9bbd217b7a7ff6b5",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "rules/vue.md": {
+      "hub_hash": "sha256:7887a375c5954f4ce4acdc3c60f3daa1b512dcd7247f186c131e3527800bc0d9",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "rules/workflow.md": {
+      "hub_hash": "sha256:ff80a950e0d9d23cb723ffde736e104871091d5c33eab386ba702e08448852f4",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/a11y-audit/SKILL.md": {
+      "hub_hash": "sha256:d58c6e73b7d3b9658664716d7932624b04781bbb6e01e2f0785ee31e92d58854",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/adr/SKILL.md": {
+      "hub_hash": "sha256:0e30f106c824787afae6a8f9945e4773963f42f572bfae10e8e28c9fe0f2cb1a",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/adversarial-review/SKILL.md": {
+      "hub_hash": "sha256:0778a0bd401e39b14fab8de42ffd6fb1ef26eb173c6df5144826f66aff6dd2c5",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/adversarial-review/references/generate-review-report.md": {
+      "hub_hash": "sha256:d107dbd48da93a3baccd26d69fc6f6133ef98f7863eff405544f2595f415933a",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/adversarial-review/references/launch-adversarial-reviewer-subagent.md": {
+      "hub_hash": "sha256:e5872d2e9d7ae498650f1ae5adb53114e460df7d161872dd652046c67bd496a5",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/adversarial-review/references/round-1-reviewer-critique.md": {
+      "hub_hash": "sha256:7a0d9477c5fa6c339bc138e998621f4ad1baabd4f5243dd6b8fdac4320e3dc02",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/adversarial-review/references/round-2-author-response.md": {
+      "hub_hash": "sha256:4d835f4068cdce70323bd04507478ed08859055d3996b93fb035c584fa9927ca",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/adversarial-review/references/round-2-reviewer-follow-up.md": {
+      "hub_hash": "sha256:3b9fbdbac61e8950acef2741f8c7fb5a79f9d4738cccaed484b7ba1c4b1bb81c",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/adversarial-review/references/round-3-final-resolution-if-needed.md": {
+      "hub_hash": "sha256:c24cb5212eec2ede96c235eba21ba589db5f7cfdc637b8bf18d859ddebbe7dee",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/agent-evaluator/SKILL.md": {
+      "hub_hash": "sha256:521bd9df9d493357a4263ca904556a73960d0a2595479eab038e5689d1f47bcb",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/ai-gemini-api/SKILL.md": {
+      "hub_hash": "sha256:cecec051a4655c1a2e62bafd61c6469bea44a2de8bbd599d9de743c9738ee8ed",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/anthropic-agent-orchestration-guide/SKILL.md": {
+      "hub_hash": "sha256:3d00e0fd06b096bf9b15293640e62cfd747dbc06a46c132a16cf0f5aaa36965d",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/anthropic-multi-agent-research-system-skill/SKILL.md": {
+      "hub_hash": "sha256:c00b8affa9182d8604a6d950a6e546302086a3f418a4a80f9880ccb1c4b84283",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/api-docs-generator/SKILL.md": {
+      "hub_hash": "sha256:c3f22589268242c93c86d6c42033884a30d52e68fe0e850833b260df6698ddc8",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/api-docs-generator/references/22-express-swagger-jsdoc.md": {
+      "hub_hash": "sha256:f935e4c95f0c1497b5ca9e7d95a4405ac9efe9ba823fc60994f7ad973f7ec814",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/api-docs-generator/references/api-documentation-summary.md": {
+      "hub_hash": "sha256:baacc5d64b819eaa9ebd8346d61e74bd1bade8445816a4ad75d05a0bcbfdbb28",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/api-docs-generator/references/api-versioning.md": {
+      "hub_hash": "sha256:5e52cb1c1ee87abe5d5fd1d6de410be4fc98ffca1fc3f4cdb00d9a2a1659c64c",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/api-docs-generator/references/endpoints.md": {
+      "hub_hash": "sha256:57c0d1cf1a2d9e687319bf610b2b0ae4cb9b1ef83f0c8ba4831dcbcb2c3357e8",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/apply-selections/SKILL.md": {
+      "hub_hash": "sha256:d3d4b6eda987c0fb42111c3edc81d7fd93a6e1c952ac751452da31cbe6a9fc7e",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/architecture-fitness/SKILL.md": {
+      "hub_hash": "sha256:a36604fc1be8158ab84273bf9aa9c2085c37e320a76dfcf6247289dcd72e24d6",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/auto-verify/SKILL.md": {
+      "hub_hash": "sha256:60da526cd8cc12d72a4cc183d9f30ea4baaff12235cead0ab32a82ad10f70717",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/batch/SKILL.md": {
+      "hub_hash": "sha256:a5abebc995484db64eed0c2ab8776c795e0d6570e8b102e3edae016bc22521c1",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/batch/references/12-categorize-affected-files.md": {
+      "hub_hash": "sha256:6ddc8d88ebeea0ef3da8f35f460e1b2d9ea2c7e0b6f252846d709fd4c0016019",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/batch/references/14-flag-ambiguous-matches.md": {
+      "hub_hash": "sha256:808219f7133c02bbf89211d555f9f6c78aebfbb19ae033831eb6e779e5b621b7",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/batch/references/55-final-lint-pass.md": {
+      "hub_hash": "sha256:6fc20a589f218ba3425e8a85f3077ccd31c89daa581db2e62718ba93a4f80a4a",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/batch/references/61-single-pr-small-changes-under-50-files.md": {
+      "hub_hash": "sha256:5d254b287ccbccec75bb3979970af5ffb2c3d1f853d64353160acc5a4b66dedf",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/batch/references/63-split-by-change-type-api-migrations.md": {
+      "hub_hash": "sha256:5321c2b1afccefa917a2581643abc23ad78f478a0c61512faf5516b99293849b",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/batch/references/auto-simplify.md": {
+      "hub_hash": "sha256:4d32bcaaa243ba06fdbe9a32559a7a4a29765094efd6f8be07d2ed58c87acd94",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/batch/references/change-decomposition.md": {
+      "hub_hash": "sha256:3b5e7935b2aa252818336db3603f565b5229d64422ece7f232ed1e61e10cde67",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/batch/references/change-patterns.md": {
+      "hub_hash": "sha256:fcdebf23a9c409cb900bc0f7cde6941add66b5af346eb8226bc7d0a62e3d44df",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/batch/references/consistency-verification.md": {
+      "hub_hash": "sha256:abd8e5a93cc19b0f474fc642216a4e6e526632cfd671659dbd7a7661364bb968",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/batch/references/dry-run.md": {
+      "hub_hash": "sha256:ee2bee4fc3c33ef58ab93f902aaf322e0ce7ccf95b7e91b58a53eeed5ee2d508",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/batch/references/parallel-execution.md": {
+      "hub_hash": "sha256:e2e5a93938368cc948b7cee37faf3ce7a9d0468f56726422f34d5356ad9e1a9b",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/batch/references/pr-strategy.md": {
+      "hub_hash": "sha256:aee998fd0b0b71e13ea1f03a8be0201efb845e3ee8cd47b4294567ab84b4ef83",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/batch/references/rollback-safety.md": {
+      "hub_hash": "sha256:b86a4ee53f87a7514d03895ba7d7c1089a5971521cc2269516fcdac3ff64a10f",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/batch/references/verification.md": {
+      "hub_hash": "sha256:b0090346fdf881437de54b0eb48c65f256e94d999b96b395bf34297e0d2d2657",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/brainstorm/SKILL.md": {
+      "hub_hash": "sha256:10031c3d1e10c93a9aca5c4f37ebfe58cb42ec21bd5a643c3174e302de48def4",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/branching/SKILL.md": {
+      "hub_hash": "sha256:666d32dad58a08e07cd04fdbc67645e36d78346a3da95bdad633db690fa99749",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/branching/references/02-determine-branch-name.md": {
+      "hub_hash": "sha256:1d5a6a3117a579a72e8b2d6383a5de4d4919269e4eed9d8449d940a9cfac4e12",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/branching/references/03-create-the-branch.md": {
+      "hub_hash": "sha256:5553920227e164029cf56bdf3301caeda802714c3f0f28828473a33d84d58dd6",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/branching/references/05-branch-creation-summary.md": {
+      "hub_hash": "sha256:144603f77df67e904b2cbfe25eefce66e28e834ffc2a857e4254fd00e865e0ef",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/branching/references/17-checklist-summary.md": {
+      "hub_hash": "sha256:a5c6584f7aaf40468e8f2db8dd4206b80984e48264c06178c047db2567a2a9eb",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/branching/references/22-categorize-commits.md": {
+      "hub_hash": "sha256:72fdd9f6681574c8b623815a07b09e605d4e325f87de436ed2f8f0aa11e82078",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/branching/references/24-generate-clean-commit-message.md": {
+      "hub_hash": "sha256:e0ed36ec689abde9bf06474faff016cd049b1aac3b434a7042db49f4cf15935d",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/branching/references/32-categorize-the-change.md": {
+      "hub_hash": "sha256:16c7ca8a632cfde3200396271955500ce363be0761575be380ac285afea76d0b",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/branching/references/34-insert-into-changelogmd.md": {
+      "hub_hash": "sha256:9ea51fee27b53a7784cab61e01f4ce1bb94b0ab4b027851448fa8e764c2d47b1",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/branching/references/42-ensure-work-is-committed.md": {
+      "hub_hash": "sha256:7b1de4412d5728380e866d6fed61467be009a99a100167c3c2a8e65f666fa381",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/branching/references/43-clean-up-worktree-specific-files.md": {
+      "hub_hash": "sha256:ad7f760c2eb443a643a996f9b5d3fce51a9aa1506559e8c55ebbfdbe13f71f55",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/branching/references/44-navigate-to-main-repo-and-remove-worktree.md": {
+      "hub_hash": "sha256:d8927d2432f06dbede11d392c86f9897974fa9062f68439c20030eb694ffcb44",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/branching/references/64-handle-verification-failures.md": {
+      "hub_hash": "sha256:f224f4adf595a4a4d29c27164ea85d5be78101bf9e7152372d705f7db1b10449",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/branching/references/66-verification-report.md": {
+      "hub_hash": "sha256:10ec397ef33e1bfcaaf40de5d2c3b4b84af418d0c50c21bf5b56861cfd86c427",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/branching/references/additional-rollback-steps.md": {
+      "hub_hash": "sha256:0ff908bf805141be5f4b9b7ad31a8fa5f7cdb78ccf34ea92f1d8712779e6590c",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/branching/references/changelog-generation.md": {
+      "hub_hash": "sha256:1e66911952339a684520edae276f51c7ccc7a015d256c8ec7ce4ff615f6c32f9",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/branching/references/commit-history-cleanup.md": {
+      "hub_hash": "sha256:74493c3c5238a9bdc7a370aa9d7818398ba6b512e059ce797d52fea15ae1ca22",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/branching/references/cross-pr-dependencies.md": {
+      "hub_hash": "sha256:1c00d15b23873c448cdc2b6c168e04332062161042501357b5876d6ca38dbfeb",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/branching/references/deployment-awareness.md": {
+      "hub_hash": "sha256:086540f71fd890e61187cee20875e5cbe5c34e87693dea544481e2e9b9eff822",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/branching/references/merge-execution.md": {
+      "hub_hash": "sha256:ac60096950aa77e5185e44edd3e72b0c5f9a54cc92b6d3582ac319afd5c63bbf",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/branching/references/post-merge-verification.md": {
+      "hub_hash": "sha256:0374cfa287227f8d4cb71dc11c411c299e78e3f69114649d79e1c3e3298f6f83",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/branching/references/pre-merge-checklist.md": {
+      "hub_hash": "sha256:1ca32468005b63a8a051736fc1edeb4d35d701b37fd5d59d082de101c22a47b8",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/branching/references/release-tagging.md": {
+      "hub_hash": "sha256:d07186af4d7cb18f0d087156d4b1ff7a7c71ccf4388987729615e133f56c8141",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/branching/references/revert-command-if-needed.md": {
+      "hub_hash": "sha256:af4af48fc33792264e767462c5a55a6d80626a627c33eaa760ae01b2619d699b",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/change-risk-scoring/SKILL.md": {
+      "hub_hash": "sha256:0ee7825de55c68cb532feb6b2091f77bc5f96724af46eefa7627d93cc2cbb7bb",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/changelog-contributing/SKILL.md": {
+      "hub_hash": "sha256:934fc57b04efb346df539615d135c382c00aba21ab6e108092f0fa2aa524b170",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/ci-cd-setup/SKILL.md": {
+      "hub_hash": "sha256:8f08ff9470e6743c1f27d12792426293ecd086eabb1e0663c7341fae6f24cdaa",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/ci-cd-setup/references/github-actions-reference.md": {
+      "hub_hash": "sha256:beb8c9899befe4861233e056356f3844b1219acb5f36224422c7a84597accd43",
+      "synced_at": "2026-04-17T10:38:22.216801+00:00"
+    },
+    "skills/ci-cd-setup/references/gitlab-ci-reference.md": {
+      "hub_hash": "sha256:ceabc6d7cce47577a6b5b5dcd6d8bfd495bfce4a4070dea3fcf002b778d2bc2a",
+      "synced_at": "2026-04-17T10:38:22.216801+00:00"
+    },
+    "skills/ci-cd-setup/references/optimization-and-anti-patterns.md": {
+      "hub_hash": "sha256:d98e39a9c2566451d6e9fc1e668b737c1571dd4dd1d19a5bedb641b7db2367af",
+      "synced_at": "2026-04-17T10:38:22.216801+00:00"
+    },
+    "skills/ci-cd-setup/references/pipeline-stages-and-caching.md": {
+      "hub_hash": "sha256:cf06b946ddbdd83003c91475886e640a78264b1987b800c112ffc697728cd940",
+      "synced_at": "2026-04-17T10:38:22.216801+00:00"
+    },
+    "skills/ci-cd-setup/references/secrets-and-deployment.md": {
+      "hub_hash": "sha256:984e9e98a766670b4a3b0cb8544459a74f11b94c523e872a1e0394f1c03ecfa2",
+      "synced_at": "2026-04-17T10:38:22.216801+00:00"
+    },
+    "skills/claude-guardian/SKILL.md": {
+      "hub_hash": "sha256:b563e718b08644d845d2fcc24a732910cab247cb26fb106f92502d5d6212acdf",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/code-quality-gate/SKILL.md": {
+      "hub_hash": "sha256:fd881794cc1f54f3fc86cd7d430cc9cfa296b5c1a9e5c0a82fd804a51256d2d2",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/code-quality-gate/references/dead-code-detection.md": {
+      "hub_hash": "sha256:fada4f2510dbf9d06ca8fbdc199c80d88326c495512235a3a5f690788dbc3d40",
+      "synced_at": "2026-04-17T10:38:22.216801+00:00"
+    },
+    "skills/code-quality-gate/references/error-handling-audit.md": {
+      "hub_hash": "sha256:63d09667abdf4086a6fa535744b62b77790dd193f584b6c41100d63f2619ab8d",
+      "synced_at": "2026-04-17T10:38:22.216801+00:00"
+    },
+    "skills/code-quality-gate/references/mutation-testing.md": {
+      "hub_hash": "sha256:1da1c108c8db0bbc7237a5464879b3becf1131fcdef6374f658230b92855efa6",
+      "synced_at": "2026-04-17T10:38:22.216801+00:00"
+    },
+    "skills/code-review-workflow/SKILL.md": {
+      "hub_hash": "sha256:0478cd9226b5b11c96860dea2c3e1d92af28085109de65d7cd2e088f5e571691",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/continue/SKILL.md": {
+      "hub_hash": "sha256:bc9236c4180d3622b15a3704d04500edf68562ef05addd45ec0a95087c698480",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/contract-test/SKILL.md": {
+      "hub_hash": "sha256:c7e2a7df3828e08d001b27f4911fa8fc5f31482c81203bab64566c54af8c3a76",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/contract-test/references/breaking-change-rules.md": {
+      "hub_hash": "sha256:a17d065579d580db052c54cc68a871fb851df64f2db90c9f93711057f8ce8be4",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/contract-test/references/breaking-vs-non-breaking-changes.md": {
+      "hub_hash": "sha256:c23a629516c8fc5e774de3b4a3b522d146be380fdb364a593280898d63dc3a30",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/contract-test/references/bufyaml-configuration.md": {
+      "hub_hash": "sha256:dd7243ae61dd17a9bd1ae4fe03087709680f8c834d9c4454021075ac06625d0e",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/contract-test/references/ci-integration-1.md": {
+      "hub_hash": "sha256:959e941d65edcba91a9794153323c6a107aefcd38f20a47aa1ac3b03bec44a03",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/contract-test/references/ci-integration.md": {
+      "hub_hash": "sha256:b8e1a81e4c6cbf19212ca74de32dc06c479282884aee2b545ee828c4a7858f43",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/contract-test/references/contract-evolution-handling-breaking-changes.md": {
+      "hub_hash": "sha256:acaf29c9603190dabd3fe105a110a820705cef0566d4d62fe4ff5df58229ead7",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/contract-test/references/generate-pact-files.md": {
+      "hub_hash": "sha256:3b830d29facb1ef200ddd47da6e3022be2ca1e71df6285b9cc26507efa77972c",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/contract-test/references/language-selection.md": {
+      "hub_hash": "sha256:4a5e065c7486b790d4f7331dc0fbbc35bd8244049b2bed0e84956f75d81c27b0",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/contract-test/references/pipeline-flow.md": {
+      "hub_hash": "sha256:f46994299022aa594ab99d1501f175678bbcace8a0b1e94a89ed0de941a0a807",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/contract-test/references/run-provider-verification.md": {
+      "hub_hash": "sha256:7d9c7b7e98a7232f03ae4aea4c53101745f2ffd4a7aab89cf369babd4e849842",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/contract-test/references/stale-mock-checklist.md": {
+      "hub_hash": "sha256:7771b748b72cb93a795c5631789325ffc1631320452b065f2692632f6c69ec64",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/contract-test/references/verification-checklist.md": {
+      "hub_hash": "sha256:b8fb323374bcb16de30b3b18156786dbb3734b3360823d826379c3bd89504620",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/contract-test/references/when-to-use-specmatic-vs-pact.md": {
+      "hub_hash": "sha256:3d0c12471dd8cb4b6052078fc5406bd590000423767c869878163dc05242755c",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/contract-test/references/write-consumer-contract-tests.md": {
+      "hub_hash": "sha256:329f4da066347f0553f0a863e0e05c38f9cb2a3d1f764688f55b6d41bab01886",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/contribute-practice/SKILL.md": {
+      "hub_hash": "sha256:846f08afd6a5ffe90d2aa80a4f24c3f2cf6faa452d9fc16ea199b880f8655113",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/coverage-analysis/SKILL.md": {
+      "hub_hash": "sha256:8d5655ccc00d75ad7f9b532b3de3544b3004219557f4fb6404c5dc5bb88e720d",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/create-github-issue/SKILL.md": {
+      "hub_hash": "sha256:154bf1c04c2a4f7ecba231f771c3e414d3cdef6cb5032e682e8b81065f53d24e",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/db-migrate-verify/SKILL.md": {
+      "hub_hash": "sha256:c2cde662e6525b33ea2872b3218c15006d7ad95f364b116e178567df59f2fe3c",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/db-migrate/SKILL.md": {
+      "hub_hash": "sha256:ea68c8aa074b059c61fae3cdb2451a1c7d31121b7d926c1362d469c5ae272087",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/debugging-loop/SKILL.md": {
+      "hub_hash": "sha256:4c8c4d49e68318cc3532f492e37504736d6905d8d94fd7c80fdf4b8788e2d3f1",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/deploy-strategy/SKILL.md": {
+      "hub_hash": "sha256:21023ec63f543eef2938e490e3863455ad52dd0571367f12df61b78262f3ccae",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/deploy-strategy/references/24-gitops-workflow.md": {
+      "hub_hash": "sha256:f3c4023422b56746e3a7651791bf69ead4075c050ceb077a26fcc368001128d1",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/deploy-strategy/references/43-migration-safety-rules.md": {
+      "hub_hash": "sha256:42e63c392f78b23b236b4edc8f04830eeafdf3ea55f146d860d5276f95a8f5c8",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/deploy-strategy/references/74-zero-downtime-secret-rotation.md": {
+      "hub_hash": "sha256:820594132a07bca96a9c151b9f7c8796f0be31aaa340511c6500107e76d35b53",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/deploy-strategy/references/75-secret-hygiene-checklist.md": {
+      "hub_hash": "sha256:d57a81d3f64fbf5530c12e25e4a552a0e32919d594a4506d862aca88d8fbc9f4",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/deploy-strategy/references/84-edge-functions-optional.md": {
+      "hub_hash": "sha256:20841e06480635bb307a1b8265bb1bc3dcba031df792b3025248277096a10ecc",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/deploy-strategy/references/93-versioning-strategy.md": {
+      "hub_hash": "sha256:2dd4d262ec0972b6da963020a63a8b4d86bbd9b72d5e2ad94a0600543db0b56d",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/deploy-strategy/references/94-signing-key-management.md": {
+      "hub_hash": "sha256:2f5025c6e8fcc431cf8cb2f4b699697067c0331176022dca90530ec9679bfe96",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/deploy-strategy/references/95-staged-rollout.md": {
+      "hub_hash": "sha256:25d4643882ecb33203e4a635a483b02d644fb01028fac4652cc15d8e7b267ab6",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/deploy-strategy/references/cdn-edge-caching-strategy.md": {
+      "hub_hash": "sha256:86149964d4df8c07603ce6d047902f280143b58dcfe1775494eceeebbc9e0c9a",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/deploy-strategy/references/current-deployment-state.md": {
+      "hub_hash": "sha256:7f67a457119757c954f89324da76bdb06db7fb6f6e2f913cda9e0b3b529f786f",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/deploy-strategy/references/deployment-runbook-service.md": {
+      "hub_hash": "sha256:63b5291d03b9e96a2cd5008bceba53ee6cca1cd6f7ca02260583e01e97a903f6",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/deploy-strategy/references/migration-rollback-plan.md": {
+      "hub_hash": "sha256:61d9ede6335aa55985abca7e1540e7b862239e118eb563643f12f8a556707f4f",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/deploy-strategy/references/production-readiness-review-prr.md": {
+      "hub_hash": "sha256:dd47d2dd19ce48cea63b9bc32c795ee6b13d6ea47d3b4bb9407e37c34ad1b319",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/deploy-strategy/references/production-readiness-review.md": {
+      "hub_hash": "sha256:fd910d1edcfbd8da45a4d719ea19f08755189962cde8b689735466d386bcc1fd",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/deploy-strategy/references/secret-rotation-strategy.md": {
+      "hub_hash": "sha256:ed4693e75b18aee4c0dcaf803ac6c7f1d318ce5d73ef836202d86755adf0ca0a",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/deploy-strategy/references/zero-downtime-database-migrations.md": {
+      "hub_hash": "sha256:4a09bfa04932f2b48bdeabbc0f176742ff25f3cedee8ab18e2837c1718a0f28f",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/development-loop/SKILL.md": {
+      "hub_hash": "sha256:1d9fa7c288e2c7f66cecb486fb53c5683d011ec24a71b5e2fbfbce6acd212712",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/diataxis-docs/SKILL.md": {
+      "hub_hash": "sha256:f529e2ba1d9261d63021fbed4796c2aceb3f39edb7b49d0c518020b23c6803e0",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/disaster-recovery/SKILL.md": {
+      "hub_hash": "sha256:e27314a8c4d64310049662f1720ec0c503e883c280cdbe9da5fe466614526a2a",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/doc-staleness/SKILL.md": {
+      "hub_hash": "sha256:0b278635a9fb5f0d695c96e47793343f3018f6aecb92ff21b59e9b6ef2475666",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/doc-structure-enforcer/SKILL.md": {
+      "hub_hash": "sha256:3beb753346639ef6ff892592c53c6aec2238c57708587a71fec48934e05d2f91",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/doc-structure-enforcer/templates/.doc-structure.yml": {
+      "hub_hash": "sha256:db186f1f3304f609d30f9732561a28cd652d4fb8e16f9469e2c430917a475c8f",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/docker-optimize/SKILL.md": {
+      "hub_hash": "sha256:dddfb491b02ea13a13e91a2c1adf01cb78b6903145275326241d302c35bcb41f",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/docker-optimize/references/base-image-selection.md": {
+      "hub_hash": "sha256:9ffc5a92847562aea9b108f1c87ae1873eecee528bf92857764cd4ad3711fcbd",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/docker-optimize/references/build-args-multiplatform.md": {
+      "hub_hash": "sha256:7e9c03321d1c2cc88661f523880fa3637fe287af18e0aa12a9cef520a861c8cf",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/docker-optimize/references/common-anti-patterns.md": {
+      "hub_hash": "sha256:349216354de4686427ec2ad9a0ba1e65c1c8ed2d982cef63648b3972d645f536",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/docker-optimize/references/docker-compose.md": {
+      "hub_hash": "sha256:610b810863a8590d6df2cbbb2ca74312637d72f85b696646a92ea76bb2676d52",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/docker-optimize/references/health-checks.md": {
+      "hub_hash": "sha256:8cb94e21f225cc8f0cef773e2cda788218b7f0a093acf93a1e2e30774690118f",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/docker-optimize/references/image-size-reduction.md": {
+      "hub_hash": "sha256:04e78789396ed33012f1e9a3dfe01ef0305ba293ee317178b2498e330c1b510c",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/docker-optimize/references/java-spring-boot.md": {
+      "hub_hash": "sha256:a6b26edf3d6e4acbd2572404774a80686679443d1c0c08007dd9e0f1ac7d0702",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/docker-optimize/references/language-patterns.md": {
+      "hub_hash": "sha256:2ca746f8d787f8c803bcd86fea7a67393f17a4632bd4043c23f8c390a134985e",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/docker-optimize/references/layer-caching.md": {
+      "hub_hash": "sha256:aa75b3841351626aee81766a11478a1fc9bbd341c8b620135f8467b2e5a2923a",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/docker-optimize/references/logging-configuration.md": {
+      "hub_hash": "sha256:4917f5b3156ee2c74261246605d505d1f8c1856a14fdd4d9bc9aee424c9b215d",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/docker-optimize/references/multi-stage-builds.md": {
+      "hub_hash": "sha256:fd625498be86650606b5064f4d7f6eea9c25f0d56b39c043f956ad3317b6b706",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/docker-optimize/references/networking-best-practices.md": {
+      "hub_hash": "sha256:0a2c3732b76953944eb3b7c4d4c96cd3b0f1edd6a130ec6f5fcd9826dfae38eb",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/docker-optimize/references/performance-tuning.md": {
+      "hub_hash": "sha256:8add8bcfac526497b9bb97f82abb3aec860fe1f8186d4207b3f827dfd5ed0756",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/docker-optimize/references/security-hardening.md": {
+      "hub_hash": "sha256:c75d2c788defd2d5ef1c5cac31b2c3549b549c228640c0de9cc979327eadc7e8",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/docker-optimize/references/verification-checklist.md": {
+      "hub_hash": "sha256:7fcd8accd2baecc9d06e85fa523baaa18df6188e1c367fe96d593707e09ac6bd",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/documentation-workflow/SKILL.md": {
+      "hub_hash": "sha256:ce9c2ae2ab24301d1f6dfdc0115a851f6b6014b55dae48c29e4aaae16a50cf38",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/e2e-best-practices/SKILL.md": {
+      "hub_hash": "sha256:f893f2925244a923c8476608dd1f3375b0207c1a2d0c3e5a1f2c7b59b51a3c47",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/e2e-visual-run/SKILL.md": {
+      "hub_hash": "sha256:001c1047c4ab778afb51ff81602c2c6a90589434aa41f8fdee4d67d054f76aec",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/e2e-visual-run/references/healing-phase.md": {
+      "hub_hash": "sha256:0944b814044f74192f66d633694982a3428487a9f91b9c17324b861fe9a57ad7",
+      "synced_at": "2026-04-17T10:38:22.216801+00:00"
+    },
+    "skills/e2e-visual-run/references/inspection-phase.md": {
+      "hub_hash": "sha256:ae77245cffd185b1dab2f146435cba02ffa554165978b6cabb35d3f1b3cfa529",
+      "synced_at": "2026-04-17T10:38:22.216801+00:00"
+    },
+    "skills/e2e-visual-run/references/scout-phase.md": {
+      "hub_hash": "sha256:9006126749b483b53d7282dfd59a8fc0a160b875c434d5dd77eea8e1ac1b7292",
+      "synced_at": "2026-04-17T10:38:22.216801+00:00"
+    },
+    "skills/escalation-report/SKILL.md": {
+      "hub_hash": "sha256:78977adb3f0bcf497b0457afabf92e1f17460afa670bc4f7d3d78e64106e3218",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/executing-plans/SKILL.md": {
+      "hub_hash": "sha256:14dd076032cc4502937814860ebbec939f878f641f8935235300785ea6fd0772",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/executing-plans/references/completion-summary.md": {
+      "hub_hash": "sha256:2641def1360a60fbf4815878cad5ee21d684746c265227be00e281848d3390fa",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/executing-plans/references/execute-tasks.md": {
+      "hub_hash": "sha256:b1784124cbc8f0f49fbf815638f522d47b8bc66fe37a0ff81d3f62978bedb235",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/feature-flag/SKILL.md": {
+      "hub_hash": "sha256:91605c6d99d5172eff2e8b481ddff097d3ad8e92fa04d5f17e54ecba65917c15",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/five-advisors/SKILL.md": {
+      "hub_hash": "sha256:61a81205b7361b0a5caa16d67e4dd3f9020a8a3d26122fc0f885a98b5f8a1bbd",
+      "synced_at": "2026-05-01T10:15:45.392+00:00"
+    },
+    "skills/fix-issue/SKILL.md": {
+      "hub_hash": "sha256:c71d0109c4413c9ec9e347c55525299f43ab2a339710c152e9caca94f26d1bcb",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/fix-loop/SKILL.md": {
+      "hub_hash": "sha256:f5c8399879ebc3d90871f55071e7d71ced185f8e4bb12b012e9b13552cd6f966",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/git-worktrees/SKILL.md": {
+      "hub_hash": "sha256:93164fc36e691921771d3fb4d85f7781af50b10e799cea175df0285a4252670b",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/git-worktrees/references/112-forgetting-cleanup.md": {
+      "hub_hash": "sha256:09daa73dde8fb073b62fbd06ea24ae96e50aba59a00eda72034208c3d693012c",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/git-worktrees/references/116-long-lived-worktrees.md": {
+      "hub_hash": "sha256:e0ba5d8d04362e47e5e2552dab08e25b85ed947ee3eaf0465b1632530d6163ac",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/git-worktrees/references/33-branch-strategies.md": {
+      "hub_hash": "sha256:4b3998f320c3f201a8f0021c83311885890d84969c5eb576c14a0acfc8422513",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/git-worktrees/references/42-when-to-use-isolation-worktree.md": {
+      "hub_hash": "sha256:39a7a94734ce2fc1cba0b9d182aed73c1681a1ad235c360ead6be25b716d75ba",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/git-worktrees/references/61-choosing-a-merge-strategy.md": {
+      "hub_hash": "sha256:4f9b7167405c7c1b181610785ce36fb1aab1bfd8cc4a04b6e50ae5af42c233cd",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/git-worktrees/references/64-sequential-merge-order.md": {
+      "hub_hash": "sha256:49d330b9a84cd9d5498f960cf229c8951560a2cde7b649dc73106aafc12ced24",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/git-worktrees/references/71-planning-phase.md": {
+      "hub_hash": "sha256:3a4cb345409b3fa28bc4b5d4015d98cb4e3c837dee8ce142e9b944ce55a8f8f2",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/git-worktrees/references/anti-patterns.md": {
+      "hub_hash": "sha256:ae970c54707675c26e6a6272b86a2d4d76cb02252edb3f15c6a41850508266fa",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/git-worktrees/references/claude-code-isolation.md": {
+      "hub_hash": "sha256:718ec6b0be7bfaea65c6ececcc557dddd2b3d86a082161f39c6d11dab82105cf",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/git-worktrees/references/cleanup-hygiene.md": {
+      "hub_hash": "sha256:b5aea447218d7b71ff39a043b9dc2ed51727e80cae0235a22727b33ef60643ff",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/git-worktrees/references/common-pitfalls.md": {
+      "hub_hash": "sha256:e19d505c511fda96f79f610faa25d44f79779013656aaa3ef2f316c61058626b",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/git-worktrees/references/decide-when-to-use-worktrees.md": {
+      "hub_hash": "sha256:f3c867226a38f31eb11bd33fb58e02e96433edc34b0fc5aee7fc94c5a09c78a1",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/git-worktrees/references/manual-worktree-management.md": {
+      "hub_hash": "sha256:bab4706add95e16ab7dbffe50db3b198512f019ba60a0d7c35abb8971b32c50a",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/git-worktrees/references/parallel-agent-workflow.md": {
+      "hub_hash": "sha256:f87af047640f715996d40abb410abe539372daa9fc137bcc20f26ef5d57ea67c",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/git-worktrees/references/understand-git-worktrees.md": {
+      "hub_hash": "sha256:1b6c792e6d7ff07c872bce2fd40e020a5762d23a6d8e96ed7e42e330f230d881",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/git-worktrees/references/verification.md": {
+      "hub_hash": "sha256:3a0068a2e348448306d4ef12add6074c87c416c84d9200c7bd885537c138b619",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/git-worktrees/references/worktree-patterns.md": {
+      "hub_hash": "sha256:b6c56260de69c6baebc38541a4c64aa311902e05258f41eea3f43e95879f69b8",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/github/SKILL.md": {
+      "hub_hash": "sha256:b7ebc3a39b0334afce9a55f1faa3af9a76c173c407c017f3208e9b2b95088be2",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/handover/SKILL.md": {
+      "hub_hash": "sha256:006c635be599c94015a375586494825b391817c69b834d5f5e1f3d1d48f5efe0",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/handover/references/103-resumption-protocol.md": {
+      "hub_hash": "sha256:65381a7744a1c85d48717ed1ae3c2c6fc96a5eb8174df3584994c6d4389337d5",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/handover/references/104-stale-handover-detection.md": {
+      "hub_hash": "sha256:76ee03835be7a68f3e7e0193c90c000da1b8631e1f6f0f88d6da760ce1cc0b45",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/handover/references/105-multi-developer-handover.md": {
+      "hub_hash": "sha256:4ecc4aa63ad79cbedb1d28dcd0a141a4c430b319639155c02aa5a35591d48611",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/handover/references/14-auto-detection-of-session-end.md": {
+      "hub_hash": "sha256:f53fbb710a4ae9582040b416aa51a2294e69ac694aed8c7953ee043e5be4ddd3",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/handover/references/54-uncommitted-work-assessment.md": {
+      "hub_hash": "sha256:6e9557ccc14e308a6d25f588ce73e1912275488104488c1f6dd99841c69f7fce",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/handover/references/build-next-steps-queue.md": {
+      "hub_hash": "sha256:5798d41654c2f57dcda9c2d4c4fe63148ae63f4608a62782589eb9b8ccd52166",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/handover/references/build-the-decision-log.md": {
+      "hub_hash": "sha256:a8c960cf28d9d3246578362e20b287c8c5f538084a9a3cd16a535e6c5861fcb8",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/handover/references/consequences.md": {
+      "hub_hash": "sha256:5e4c1e53dba4aa17f55740015fc8e765aa3ac8fd20b7f17bf18df72fe296a9ba",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/handover/references/document-pitfalls.md": {
+      "hub_hash": "sha256:b8a29d751e992cb48f7ac199eb8fe15cffc96b29f14dbde6061c1d205ba8e78f",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/handover/references/format-rules.md": {
+      "hub_hash": "sha256:9e8de5763acfd92cb279b4616a52733bcadd36ea550eefafd20c1f13ad19cf25",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/handover/references/git-state.md": {
+      "hub_hash": "sha256:6a7485bd356f2013126b4122dc589274b8cce585fb61b7cb46a196572a5ffd0f",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/handover/references/integrate-external-sources.md": {
+      "hub_hash": "sha256:ae12909304255e1f9964adb1b308042c08c73641e9f24595eb48a929e040208d",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/handover/references/pitfalls-discovered-1.md": {
+      "hub_hash": "sha256:3cec3871aec7f331535b19596a03a1b5e3f870def80a29b43f6c110a1787238e",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/handover/references/pitfalls-discovered.md": {
+      "hub_hash": "sha256:3cec3871aec7f331535b19596a03a1b5e3f870def80a29b43f6c110a1787238e",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/handover/references/references.md": {
+      "hub_hash": "sha256:64d819f512541ba0e5245510979f2d15c04de030fca6ab88a257cf2164feb5e0",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/handover/references/review-the-session.md": {
+      "hub_hash": "sha256:48e06a07d317890294aec720ede648fb4cd1420a67fd9d7cd9ac2e848e7bf580",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/handover/references/since-last-handover-previousdate.md": {
+      "hub_hash": "sha256:64efda963518ac8201f1e7a842cf1f31f4eb2eeba39ac40149a87546f59a0e32",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/handover/references/test-status.md": {
+      "hub_hash": "sha256:cdd13e852a794f7773826df52475947e1805e8ac0de8fde86738c70117387692",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/hono-backend/SKILL.md": {
+      "hub_hash": "sha256:b68e588a62aed476db95a79b4c2b221d46f447c6c5d03f10d7b33b0621662edb",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/implement/SKILL.md": {
+      "hub_hash": "sha256:1e9470229be30d633eb005fcb67f592961399552248a2e340daf48a36a30714d",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/incident-response/SKILL.md": {
+      "hub_hash": "sha256:557880deaeb72684dc51b52f804270d7c4033d5e61a05085134c2b7edaed7d24",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/incident-response/references/33-blast-radius-assessment.md": {
+      "hub_hash": "sha256:38080e06f26ebf79c29f606210ebca239cdf6f08ad558f5c9e046da7a1cd7e66",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/incident-response/references/62-common-runbook-categories.md": {
+      "hub_hash": "sha256:202ecaa638914cc47e6f2ec7dfa376cefabb6a00f09e8913a64a29bf4a8323ec",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/incident-response/references/75-blameless-post-mortem-principles.md": {
+      "hub_hash": "sha256:ac6217da29cf28afc152d3fb1afd5f04b9f41f3956e67c964c72bdb7524ea611",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/incident-response/references/84-data-recovery.md": {
+      "hub_hash": "sha256:dd2fd9dc1cf272f2222785ec5ef7bf63b3818dcb19fd202eaa3ca20f5cb106b9",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/incident-response/references/92-handoff-best-practices.md": {
+      "hub_hash": "sha256:09993a5182618fb5def87adfda1168e7f67d0b7c981684daea14917e82433eea",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/incident-response/references/phase-1-incident-detection-and-triage.md": {
+      "hub_hash": "sha256:2ada18a066f9d935b9bcbf822eeb616ad019aea21abf0fb109f748ecc6c543a6",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/incident-response/references/phase-10-incident-tracking-and-metrics.md": {
+      "hub_hash": "sha256:8c4b801e7bcfdfdaf7bb5f38b8010e38cf509fef56f45fd0f32a1e225828d605",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/incident-response/references/phase-11-anti-patterns.md": {
+      "hub_hash": "sha256:9b95aea223997b0d8c1f7b87e5ecdf157393250ea8f0e2cefe43f8446a5d8d51",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/incident-response/references/phase-2-immediate-response.md": {
+      "hub_hash": "sha256:b360d63abe9461d09abcf84d92e2406e59220e16c4ea7970095106c8fc00009c",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/incident-response/references/phase-3-diagnosis-workflow.md": {
+      "hub_hash": "sha256:677d1bbdf7c7be076e69fd4ad81c2b670614143d20cbc66ce9506046d4bdc6de",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/incident-response/references/phase-5-communication.md": {
+      "hub_hash": "sha256:bea8d66d940039b83c4b3e5ebfb21c1a4531c6cf1b79f8d35d001ae7e3a1c64a",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/incident-response/references/phase-7-post-mortem.md": {
+      "hub_hash": "sha256:58add8ad973590fe8a84d3e4741771a024f36b4f2a5c3587e006cc4b294a4ea5",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/integration-test/SKILL.md": {
+      "hub_hash": "sha256:f4f46b20a8c7c07e06295d31f88a99891cbbb9205a8e65708c73bfb3abed638e",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/learn-n-improve/SKILL.md": {
+      "hub_hash": "sha256:3d9ccf5a56cbcdc4cb6499173f7765f0a7e1724aff9c38efa117722f9446c6eb",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/learn-n-improve/references/self-improving-skill-design.md": {
+      "hub_hash": "sha256:fa35509359a3a17de0dbd9a6f750c7cff30e4a54638c7433d610a2d62a6a30ea",
+      "synced_at": "2026-04-17T10:38:22.216801+00:00"
+    },
+    "skills/learning-self-improvement/SKILL.md": {
+      "hub_hash": "sha256:11f7ee88c29b8dc09dd7d779a4ede6066bc97e9694b7926ea95eabe8a30ca2e4",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/merge-strategy/SKILL.md": {
+      "hub_hash": "sha256:cbd44cf05cc2c293063542f6f140099f135dd0262943489b1e9e23442ecb3843",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/middleware-test/SKILL.md": {
+      "hub_hash": "sha256:ba3f587d07a10aeff74c6606836160db1836297d97c3b9b84b57a2df734c4724",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/mock-server/SKILL.md": {
+      "hub_hash": "sha256:6660051f763120e6dc8957c4fd64f4afc544a730ca085bbecbe8cbf455e536c8",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/monitoring-setup/SKILL.md": {
+      "hub_hash": "sha256:3df218890c163f09c1d799df8d9820de8c4b4c19a4ce4c1a867a8076339acb0f",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/monitoring-setup/references/21-metric-types.md": {
+      "hub_hash": "sha256:77ff350bdeebf96be0beebe881e83c3fdca47a1659ea0ecad3727a2b8e1f4386",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/monitoring-setup/references/65-standard-service-dashboard-layout.md": {
+      "hub_hash": "sha256:bdfc15182e97445d7b03b337b6a7bb297ceebde408ac035be69d5568fc0874eb",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/monitoring-setup/references/alerting-rules.md": {
+      "hub_hash": "sha256:a75bb1ec6d3b0c932aece0779e79d7d519756092590c1c8566cad5ef4fb63ecc",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/monitoring-setup/references/anti-patterns-to-avoid.md": {
+      "hub_hash": "sha256:b3985c5f91333e893b0cc18b3e73dcd70caa40738d473db0c4fe807d2250dfb9",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/monitoring-setup/references/dashboard-templates.md": {
+      "hub_hash": "sha256:67703bcfd93988e315f6f8adf63d31361257b60e9555ddf80f42a6252393b243",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/monitoring-setup/references/grafana-dashboards.md": {
+      "hub_hash": "sha256:86a5fed94bf6c607c7d5f85ed5e3ad1082885cab7ca02ce8fece20b4c2ec0a87",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/monitoring-setup/references/infrastructure-monitoring.md": {
+      "hub_hash": "sha256:43b2d33940a3beb905898b6f3e01ed155dfd4ae1932531470886dd8a132d959c",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/monitoring-setup/references/instrumentation-examples.md": {
+      "hub_hash": "sha256:ce4eb8a858c99fd2ff4f9e8ae27f977eb7152d77868a04e3e3d8a0043d34703a",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/monitoring-setup/references/log-aggregation.md": {
+      "hub_hash": "sha256:2f23aa99c1d96cfb89227e13b2fb37b659287fc7e2f65c4b8031d8bd47e6c1ac",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/monitoring-setup/references/slosli-definition.md": {
+      "hub_hash": "sha256:0480eac35190efc4e00991f99f3b0d706d6593d7ade0c3e50825b6f7d0a4ccae",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/monitoring-setup/references/tracing-reference.md": {
+      "hub_hash": "sha256:0be8f842b9da10187ca8c611786072a98c417c103199b2090c74dd34e6a54920",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/monitoring-setup/references/verification-checklist-1.md": {
+      "hub_hash": "sha256:4ca570412e18c3b62b8a16fb85b86716e844037130d0fd4d5450f85647114611",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/monitoring-setup/references/verification-checklist.md": {
+      "hub_hash": "sha256:4ca570412e18c3b62b8a16fb85b86716e844037130d0fd4d5450f85647114611",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/perf-test/SKILL.md": {
+      "hub_hash": "sha256:8ea91b0b580d94bd35f3214c387411b5544c8ddfc837d34243cbefa9d9b8d1c2",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/perf-test/references/performance-test-summary.md": {
+      "hub_hash": "sha256:1160274581a3826bff0ea514708f70b2714cbfafac012b6fa67beaaa400ab588",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/perf-test/references/write-k6-scripts.md": {
+      "hub_hash": "sha256:1ff604544c389690e9df99abc3a08d73e5722e62be5dcf3f516e799a0e762cde",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/pg-query/SKILL.md": {
+      "hub_hash": "sha256:271b09ff3373b6985bbe59e82b6096dc14fc2984269e3a2d5a1c3d7105fe5d2d",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/pg-query/references/common-query-patterns.md": {
+      "hub_hash": "sha256:b6f5ef767cbece8671ccf95496eb3cccc78539ff79b62bbb01d735d20183419b",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/pg-query/references/connection-management.md": {
+      "hub_hash": "sha256:201458661f507a9beebc35660b9a1b39c2831d2b346ec8c1ac6417418341bb20",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/pg-query/references/index-analysis.md": {
+      "hub_hash": "sha256:ce2aa4d48974208b3d806697a77e806f4138d7130f24dff2cf846a739d433578",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/pipeline-fix-pr/SKILL.md": {
+      "hub_hash": "sha256:7cb81ca3b56d36057450d764e14aa1febc6bf58cd702f6237608a293563fff62",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/pipeline-orchestrator/SKILL.md": {
+      "hub_hash": "sha256:1c3e867e7cfba0250e9013ca2192f597fe065ce32b535cdc57b8385e3c41c2b2",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/plan-to-issues/SKILL.md": {
+      "hub_hash": "sha256:f44e3dd3bf80d00a5a5a0624253c6fa40039642bcd25dc0d0dbcb5b88f2d69ac",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/playwright/SKILL.md": {
+      "hub_hash": "sha256:5938c4e03ddd0a80527d8797e058a1614297609f3f25d0dde4ba1bcafcee8ad7",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/playwright/references/advanced-capabilities.md": {
+      "hub_hash": "sha256:bd3e77833729f956d5d89156982e4bf675440f9bb01f6d73ca0f42c5fddfae4f",
+      "synced_at": "2026-04-17T10:38:22.216801+00:00"
+    },
+    "skills/playwright/references/api-ui-combined-testing.md": {
+      "hub_hash": "sha256:e7e037af94662289afde66414284ffea2a2a39b76de32804679c6ab14ab0fd9b",
+      "synced_at": "2026-04-17T10:38:22.216801+00:00"
+    },
+    "skills/playwright/references/browser-automation-fundamentals.md": {
+      "hub_hash": "sha256:9963ee96f79fa0081d3b64be43d57515a6c64c3e94524bbd88419f68bfdebb5c",
+      "synced_at": "2026-04-17T10:38:22.216801+00:00"
+    },
+    "skills/playwright/references/common-patterns.md": {
+      "hub_hash": "sha256:d9798c3c0ad3b42579b1dc05e5625154f387737af9ea13354896bcbc0b9960fb",
+      "synced_at": "2026-04-17T10:38:22.216801+00:00"
+    },
+    "skills/playwright/references/content-assertions-beyond-visual.md": {
+      "hub_hash": "sha256:3cb8adc377190a740454c76028448345740c8d7a5d0903200049f2e4cccd9278",
+      "synced_at": "2026-04-17T10:38:22.216801+00:00"
+    },
+    "skills/playwright/references/debugging.md": {
+      "hub_hash": "sha256:9ced6fa676546b749a201a98676231d9f4c5c52b114bc84bc75e9ca42a760e79",
+      "synced_at": "2026-04-17T10:38:22.216801+00:00"
+    },
+    "skills/playwright/references/e2e-test-generation-from-user-flows.md": {
+      "hub_hash": "sha256:150f1793099b15d2710c27829b37f105ca4cb3402862d41cbdc7182d628ad9c0",
+      "synced_at": "2026-04-17T10:38:22.216801+00:00"
+    },
+    "skills/playwright/references/page-object-model-pom.md": {
+      "hub_hash": "sha256:e63252f7b11520994f3f0bb3a72dc6cc29357d418ac5e77e5dacc30faa035715",
+      "synced_at": "2026-04-17T10:38:22.216801+00:00"
+    },
+    "skills/post-fix-pipeline/SKILL.md": {
+      "hub_hash": "sha256:6db86dcc06444323d59f70565c6876989031f7e96b500ad9b9f67e09fe4a94dc",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/pr-standards/SKILL.md": {
+      "hub_hash": "sha256:676c9131243cbdbf8ab9a0b5407eb1f1c538304bc22cda253c76ccc30b9a2f37",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/pr-standards/references/13-build-the-analysis-manifest.md": {
+      "hub_hash": "sha256:232102d5788c592b0422afb640f054f0245a23117c4af767a725957fc7623112",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/pr-standards/references/24-rule-schema.md": {
+      "hub_hash": "sha256:859e24a75074a6ca8820751d367c9a11c5068f94c5dc36041a1805edb276ae24",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/pr-standards/references/45-track-violations.md": {
+      "hub_hash": "sha256:b25da2f9cdee43121ed2dcb6e98c6043ef1acdce30f298e7f2fc8631e36150ee",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/pr-standards/references/built-in-default-rules.md": {
+      "hub_hash": "sha256:48ac34760a46b9c3e4291681b2301510187368b3b52ba1126a73502294bcbd23",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/pr-standards/references/classify-violations-by-severity.md": {
+      "hub_hash": "sha256:0c70c6b71c7f97a6ed335bc01430cdeaf46e20d6e21b73f70bb2bea27765ee20",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/pr-standards/references/common-scenarios.md": {
+      "hub_hash": "sha256:5784b10ce37c6c5872fd7a63f07f9723034957962895a9b74b4e4913cb10c61d",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/pr-standards/references/diff-aware-analysis-patterns.md": {
+      "hub_hash": "sha256:bf3c5845168a84241fe7edf242c84a7f0c5354e18a50650792f1d7876f42bee9",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/pr-standards/references/generate-auto-fixes.md": {
+      "hub_hash": "sha256:1bfdf8e367ecc82a8ca55cc72c7e3216b69ed1ceb677430ea99ed60f9c7786ec",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/pr-standards/references/generate-standards-report.md": {
+      "hub_hash": "sha256:0f59bad0363bdc4a22424bc0722c02740e1d9c1ceeaaded21ad84b527e7c423c",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/pr-standards/references/pipeline-integration.md": {
+      "hub_hash": "sha256:1bf1b588bfa03c08573905fa26e67974695f90f01d9501463b4ff40c55a0c677",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/pr-standards/references/team-standards-evolution.md": {
+      "hub_hash": "sha256:401512f543ebeada0c94fa9a61f0e2cd67c6f2b3e6605b4f4015e95031ca624c",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/prd-parser/SKILL.md": {
+      "hub_hash": "sha256:a31b1c858e1eab8c956c9bd4f44fb184320b72fa49f24ee54342c15c589bdbb6",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/prisma-orm/SKILL.md": {
+      "hub_hash": "sha256:6cb871452e04228bae25ee149598b87a68e5d1f85b3aca6911555b3b549dc1c8",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/project-scaffold/SKILL.md": {
+      "hub_hash": "sha256:5b7d030cb7194cda8b556035916f7215cd04c6c76326eacfa506abb971c6f636",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/project-scaffold/references/ci-pipeline-github-actions.md": {
+      "hub_hash": "sha256:d3cf8ebbbbea54f7dd145ecf6059c9c3e85f84556f7b92b832832b8711dad7e9",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/project-scaffold/references/determine-stack-scope.md": {
+      "hub_hash": "sha256:b472cf4cf92add45f34dd600b597a29864b70dfee02f610670eee02a4feaf563",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/project-scaffold/references/generate-project-structure.md": {
+      "hub_hash": "sha256:3060b25aebd82b7261a440668e7c9ceac0d97d4a30a56c0a1e5953ee5a418e0e",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/project-scaffold/references/git-hooks-conventional-commits.md": {
+      "hub_hash": "sha256:ab946ad438c864e7850c46f16f62337bc0edb8986396dc0ce16894eded695188",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/project-scaffold/references/health-endpoint.md": {
+      "hub_hash": "sha256:afaf262b42d95a6bf962eb5ef3018543a0375586f98e77813358fa6e8e51fda8",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/prompt-auto-enhance/SKILL.md": {
+      "hub_hash": "sha256:a8a3ed306c1751387cba68dfc36ddac4ef395f312be0e7dbbca9a50c8c73c104",
+      "synced_at": "2026-05-01T10:15:45.392+00:00"
+    },
+    "skills/prompt-auto-enhance/references/constraint-engineering.md": {
+      "hub_hash": "sha256:c01f76b5af36eb4dd424f488e5e4677f7b35fc9ac3efabff7d8d938300aae88d",
+      "synced_at": "2026-04-30T12:46:47.399172+00:00"
+    },
+    "skills/prompt-auto-enhance/references/format-locking.md": {
+      "hub_hash": "sha256:debaa171eb2b92f11475c2c54434df9bcf80365caa73f1f02c1b58a9012b76a5",
+      "synced_at": "2026-04-30T12:46:47.399172+00:00"
+    },
+    "skills/prompt-auto-enhance/references/grading-rubric.md": {
+      "hub_hash": "sha256:d81dc67640e32d6e21456a163d1c9d1583904165f537953e033ec2fb5a135fe6",
+      "synced_at": "2026-04-30T12:46:47.399172+00:00"
+    },
+    "skills/prompt-auto-enhance/references/prompt-pruning.md": {
+      "hub_hash": "sha256:57ba6f57544859a73c88b817e81c24ac72981c5930790fb3fcc9ed45b183869b",
+      "synced_at": "2026-04-30T12:46:47.399172+00:00"
+    },
+    "skills/prompt-auto-enhance/references/prompt-reliability-scoring.md": {
+      "hub_hash": "sha256:57e8cebea36f387a0ae1d33f35e25240810aee71aec96b4e7b72ac5a3c3e067c",
+      "synced_at": "2026-04-30T12:46:47.399172+00:00"
+    },
+    "skills/receive-code-review/SKILL.md": {
+      "hub_hash": "sha256:14fef9d674050c8acc588e55dc84963a447cb65f21ab9f992e2a683dc9bc3f25",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/receive-code-review/references/03-identify-reviewers.md": {
+      "hub_hash": "sha256:b9e6d5815d6f72c4bef4e6bbc1a8509d240f60c7e6621ad6d80620cf84d6106d",
+      "synced_at": "2026-04-17T10:38:22.216801+00:00"
+    },
+    "skills/receive-code-review/references/14-handle-edge-cases.md": {
+      "hub_hash": "sha256:f33f1f42b6e2996a96f18142b3119a14a850b71b99c121ddf2abf3af123ddfb8",
+      "synced_at": "2026-04-17T10:38:22.216801+00:00"
+    },
+    "skills/receive-code-review/references/24-commit-strategy-for-must-fixes.md": {
+      "hub_hash": "sha256:dcb46068fe6e7b33f24795ffcc860be6ff1b76743eeba3e8aa24127b73c3a42f",
+      "synced_at": "2026-04-17T10:38:22.216801+00:00"
+    },
+    "skills/receive-code-review/references/address-must-fix-comments-p0.md": {
+      "hub_hash": "sha256:918a9fddfa451198f2722bec1b39fcfea59513b99552f3664861219300d05e81",
+      "synced_at": "2026-04-17T10:38:22.216801+00:00"
+    },
+    "skills/receive-code-review/references/answer-questions-p2.md": {
+      "hub_hash": "sha256:b0c9eba92db30c61e9a41d90839dc17f0f84f55bd3eb9d07b5f2f3cea47119b8",
+      "synced_at": "2026-04-17T10:38:22.216801+00:00"
+    },
+    "skills/receive-code-review/references/batch-nits-p3.md": {
+      "hub_hash": "sha256:cb8a7de988df632d8e97607c9be1e9fb4e1fd422d4c4c619f77a39267c732140",
+      "synced_at": "2026-04-17T10:38:22.216801+00:00"
+    },
+    "skills/receive-code-review/references/common-scenarios.md": {
+      "hub_hash": "sha256:260d8e65e35e01ed9e6fac7bde2c8f7b3b0c1d2b18526ac32ab1bc08822a5b0f",
+      "synced_at": "2026-04-17T10:38:22.216801+00:00"
+    },
+    "skills/receive-code-review/references/evaluate-suggestions-p1.md": {
+      "hub_hash": "sha256:e42b3eec4bc79f18f116cca187d7fd7345258e2747a2a572750a5e7906754d81",
+      "synced_at": "2026-04-17T10:38:22.216801+00:00"
+    },
+    "skills/receive-code-review/references/handle-disagreements.md": {
+      "hub_hash": "sha256:c433696aab70228fe5f01eeca2029fcb665ee7e7dee7fd2396c8e71a2d95b8eb",
+      "synced_at": "2026-04-17T10:38:22.216801+00:00"
+    },
+    "skills/receive-code-review/references/re-review-summary-pr-prnumber.md": {
+      "hub_hash": "sha256:b29cf6147088a60fe0fef6d7a056c1fcfd271c4a4e1922c97d451ef2d5154443",
+      "synced_at": "2026-04-17T10:38:22.216801+00:00"
+    },
+    "skills/receive-code-review/references/review-iteration-log-pr-prnumber.md": {
+      "hub_hash": "sha256:6029aec8580438adfec3944c5865eb53ee366974ff42dfc8e68f9f3dc202ba19",
+      "synced_at": "2026-04-17T10:38:22.216801+00:00"
+    },
+    "skills/receive-code-review/references/review-learning-report-pr-prnumber.md": {
+      "hub_hash": "sha256:80e8adef720d61bef27272e362bdc932e15cf811935264b61e5f04fa87e77b62",
+      "synced_at": "2026-04-17T10:38:22.216801+00:00"
+    },
+    "skills/receive-code-review/references/reviewer-conflicts-detected.md": {
+      "hub_hash": "sha256:23fc41dab01300c0473e9a81ac26e4a803560e3da4d7a24f7cf7bc57d63f02eb",
+      "synced_at": "2026-04-17T10:38:22.216801+00:00"
+    },
+    "skills/receive-code-review/references/scenario-3-reviewer-requests-major-redesign.md": {
+      "hub_hash": "sha256:b4ac48a7aacff38bf86698ba9b7347bbbb8889dddf9420c98420e417fc64e0d4",
+      "synced_at": "2026-04-17T10:38:22.216801+00:00"
+    },
+    "skills/receive-code-review/references/triage-comments.md": {
+      "hub_hash": "sha256:f5b09320d5bf8c9705eb2bad03534c516ce36f1b8604fb613f708d521ea0a998",
+      "synced_at": "2026-04-17T10:38:22.216801+00:00"
+    },
+    "skills/regression-test/SKILL.md": {
+      "hub_hash": "sha256:e8cd80048dea92d0d4914338fb9b96d1c08fba6cf4abe26e4b44d60fae6c66b8",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/request-code-review/SKILL.md": {
+      "hub_hash": "sha256:3add2d9fc77827de378e3f5e0eb8e34a4f27fc0da506e48718e2b9a4d1ce8d8b",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/request-code-review/references/102-impact-matrix.md": {
+      "hub_hash": "sha256:8c61bb1577bf913056ae956c601ea319e02ad86a4b7767d33dbb48d7b75e99ac",
+      "synced_at": "2026-04-17T10:38:22.216801+00:00"
+    },
+    "skills/request-code-review/references/13-splitting-strategy-if-pr-is-too-large.md": {
+      "hub_hash": "sha256:8e2559360caab582d6c4385b66e0162f214512e79ffbe21ae83a50dfa58904dd",
+      "synced_at": "2026-04-17T10:38:22.216801+00:00"
+    },
+    "skills/request-code-review/references/annotate-diff-with-intent.md": {
+      "hub_hash": "sha256:db8aa6adc92c5a5c4528087d4aa7d7e79a621735813c4505e920cc9951fa7936",
+      "synced_at": "2026-04-17T10:38:22.216801+00:00"
+    },
+    "skills/request-code-review/references/classify-changes-by-risk-level.md": {
+      "hub_hash": "sha256:77e9d216005bd5cafc4aa760023b561c4653356609de2803678babcb91df7da2",
+      "synced_at": "2026-04-17T10:38:22.216801+00:00"
+    },
+    "skills/request-code-review/references/detect-breaking-changes.md": {
+      "hub_hash": "sha256:bf2c4a941c80538d47f3017b31dee4847829485d39035ad833dc12ae4d76e22a",
+      "synced_at": "2026-04-17T10:38:22.216801+00:00"
+    },
+    "skills/request-code-review/references/generate-review-questions.md": {
+      "hub_hash": "sha256:74b5b4a1ae815ef02171e8a1145795dbd29e9b7916740aaaef5e7f478749e281",
+      "synced_at": "2026-04-17T10:38:22.216801+00:00"
+    },
+    "skills/request-code-review/references/review-readiness-summary-1.md": {
+      "hub_hash": "sha256:34eb57ca3d47b69bb27aefd9023bd2bb17db3a44ede39f789d8a6e7d237957c4",
+      "synced_at": "2026-04-17T10:38:22.216801+00:00"
+    },
+    "skills/request-code-review/references/review-readiness-summary.md": {
+      "hub_hash": "sha256:34eb57ca3d47b69bb27aefd9023bd2bb17db3a44ede39f789d8a6e7d237957c4",
+      "synced_at": "2026-04-17T10:38:22.216801+00:00"
+    },
+    "skills/research-mode/SKILL.md": {
+      "hub_hash": "sha256:909004f127a2a5560d1f7e5a70f494630a26119079a82def89af383b498a99e1",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/review-gate/SKILL.md": {
+      "hub_hash": "sha256:87c49ccc621189020d560ecd11f5a470fa12fe34525fbe9bdcddd1105baf2f70",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/review-gate/references/batch-b-security-risk-scoring-parallel.md": {
+      "hub_hash": "sha256:31ffd86338f75144f883a9b31687367f2cfeb59966e70e70078a9c047e4b748b",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/review-gate/references/batch-c-adversarial-review-pr-standards-sequential.md": {
+      "hub_hash": "sha256:72dc354587e2fb2799b88a20be8d8b96aedb090ff81ffc772cf4be637175a59d",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/review-gate/references/batch-d-test-health-audit-optional.md": {
+      "hub_hash": "sha256:b72110dbc586fae6c56f4f2c9e993e3813b8fb59f8f799d2858a52d3d036304c",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/review-gate/references/fix-loop-conditional.md": {
+      "hub_hash": "sha256:4c38abf1f3d5f0e3034ff53af0dc971367ff45600fbb9aa66f458bc429107fb8",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/review-gate/references/pipeline-flow-summary.md": {
+      "hub_hash": "sha256:51f5ea9399b112002811117faafe1f5b2127fcd4bee7ac436b8f0c81b2765c7a",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/review-gate/references/recommendations.md": {
+      "hub_hash": "sha256:f644da6138903559d43e1556027a727091c7d59fc6d36a1af38e13151a627fb8",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/save-session/SKILL.md": {
+      "hub_hash": "sha256:84968a24254301d21b202d8ce0816c2e96f5424737cf1c895876f70fa8f207ce",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/save-session/references/session-template.md": {
+      "hub_hash": "sha256:de8c2608168a802b962678ceb5f50e14fc74e5961d8bb2816c5eefeb8a1cbb9f",
+      "synced_at": "2026-04-17T10:38:22.216801+00:00"
+    },
+    "skills/scan-discovery-report/SKILL.md": {
+      "hub_hash": "sha256:57d962a7c6b648b88427a3c7949580f4b5d7f6e6106703e61aef96f0cc72ee1e",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/scan-discovery-report/references/generate-the-report.md": {
+      "hub_hash": "sha256:c1702e09d4f155ba26709ce1c9812d2d50f96186ad086baf3accbb2d342669d9",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/scan-discovery-report/references/output-format-selection.md": {
+      "hub_hash": "sha256:cca6410fdb54cda58813aacbe1d0a5266f561432304939b21f0369eac4b56e2a",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/schema-designer/SKILL.md": {
+      "hub_hash": "sha256:9c1d65b7a56face0d0d8b39ff3d5f86b5033851f0ce20250c3689013d3b1eb0d",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/schema-designer/references/entity-relationship-design.md": {
+      "hub_hash": "sha256:36a120a9b98dbe8f4300d573a605c68030b3e8185ea498fb0946cfb9bb8d9adf",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/schema-designer/references/evolution-strategy.md": {
+      "hub_hash": "sha256:632388a28c6592a72a52822d82a1c9d8f8ef3c03c5824b61c18903bd1e160d16",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/schema-designer/references/multi-tenancy-design.md": {
+      "hub_hash": "sha256:097dbbbf190446cc3ca80d9cda333ad80248cc3e2e68d165c51099d0fae89ec8",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/security-audit/SKILL.md": {
+      "hub_hash": "sha256:48004ab0dde5eaab251f644de946845f14eba888733858d82172564f1601a24a",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/serialize-fixes/SKILL.md": {
+      "hub_hash": "sha256:04528780dd8084aa1d047dc4aaa7bcd115bc23f7a396427c8e6ee6e8015932e6",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/session-continuity/SKILL.md": {
+      "hub_hash": "sha256:128c9fd539b4efa17f1d0a0cf42057bc6e89b8eb5c4943ffe950031c83a8f6b6",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/skill-authoring-workflow/SKILL.md": {
+      "hub_hash": "sha256:2818c83d8ca018860d79b6ea06d2b0f84ddc2f0c7580fbc7fa970be2d3c2d39f",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/skill-evaluator/SKILL.md": {
+      "hub_hash": "sha256:b0e1de7dd514666a6a8698ad7d4ba1f68b9d634263bce702502f618644934d38",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/skill-factory/SKILL.md": {
+      "hub_hash": "sha256:64362bee6104875ae486d7e68f42f733ab403ea43a490b12071410b6b0652075",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/skill-master/SKILL.md": {
+      "hub_hash": "sha256:ed870df0772c812b4772c2f06dfe7e7a62a86d1f6b70e9e96e033453caf012d3",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/skill-master/references/chain-skills-in-sequence.md": {
+      "hub_hash": "sha256:dd8459dd2627b4e564f553271a53eb4898117b949a61c2a18462281d9db400c7",
+      "synced_at": "2026-04-17T10:38:22.216801+00:00"
+    },
+    "skills/skill-master/references/display-skill-catalog.md": {
+      "hub_hash": "sha256:61db9e9882960e0b782e74f46d14f3fc5e061da639bbaa0762d7af77c6f86e54",
+      "synced_at": "2026-04-17T10:38:22.216801+00:00"
+    },
+    "skills/skill-master/references/match-intent-to-skill.md": {
+      "hub_hash": "sha256:f910cec2dc9ee5ee493a1277fce7152aa14c1b56f96204bde28477d9f66fd4e1",
+      "synced_at": "2026-04-17T10:38:22.216801+00:00"
+    },
+    "skills/skill-master/references/routing-decision-examples.md": {
+      "hub_hash": "sha256:90a9b149192253630564e85138e935ba9d70873891711da19ae347606a4cac89",
+      "synced_at": "2026-04-17T10:38:22.216801+00:00"
+    },
+    "skills/skill-master/references/suggest-adaptive-workflow.md": {
+      "hub_hash": "sha256:0e36ab3d5c9a9401553ce5b1d478fa7c31bf240d35750b659dd2999a45f62192",
+      "synced_at": "2026-04-17T10:38:22.216801+00:00"
+    },
+    "skills/ssot-audit/SKILL.md": {
+      "hub_hash": "sha256:dac5b69e7c8e649f3112cff2f5b03b8ea4e0b99003c8d0cf3c42d5b9f98ffd54",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/start-session/SKILL.md": {
+      "hub_hash": "sha256:6671b604f5d244122080be82c6b5cfb9a41e16477a2980ba605a3e09b8e3480e",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/status/SKILL.md": {
+      "hub_hash": "sha256:2ff7318f8e2c2c2e74b24b565ff40f31d26e86278c1faef669a7b8559452eda4",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/strategic-architect/SKILL.md": {
+      "hub_hash": "sha256:f2d7c1ccc997dfae9cb1d7b6916b05e0a6cacd0b0b109ebf1a814afcf2aaa87e",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/subagent-driven-dev/SKILL.md": {
+      "hub_hash": "sha256:807a1ddf15ea70a53d3108b26345c3b61dc4cf475a94d2e7abe1c913cc5f32b9",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/subagent-driven-dev/references/completion-summary.md": {
+      "hub_hash": "sha256:73da6521017719fb9576743aa7f5a7f33893955b8ed858b79b5a853e47a9fec2",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/subagent-driven-dev/references/decide-whether-to-use-subagents.md": {
+      "hub_hash": "sha256:c233fade6a6918bad570de300d7026b57be2d0ddb08bae7dd5f2b4c3f54c06cf",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/subagent-driven-dev/references/decompose-the-task.md": {
+      "hub_hash": "sha256:6f0ff0833307ecc326a119e313eec515862d7f738e6c740c223e666525d9f474",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/subagent-driven-dev/references/dispatch-strategy.md": {
+      "hub_hash": "sha256:c9edcdf0a6ee99070553d06372406a8e881cf7f06a21cc1481be3d0c40cc47ed",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/subagent-driven-dev/references/orchestration-patterns.md": {
+      "hub_hash": "sha256:ab4df29a4ffec3a8678bcda99941cd8e4b5a08fd859d6cfa251020aabd47e4cd",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/subagent-driven-dev/references/verification.md": {
+      "hub_hash": "sha256:fd05780b61cc312ab7b4f6236c729412bc6b862a9fd90e9915669398919edf96",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/supply-chain-audit/SKILL.md": {
+      "hub_hash": "sha256:d4cd17e7624c1b82638156e0283b4337a744692d9c7ad79e495a15168cbc168b",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/synthesize-project/SKILL.md": {
+      "hub_hash": "sha256:c8867f4405b631b4328418b133e685a5e0b6248c42b836b45d8cce2b7c441025",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/synthesize-project/references/identify-conventions-with-dedup-against-hub.md": {
+      "hub_hash": "sha256:29fef9ccaf261a4feb7cf2ed821641b538cc7c398e9fa2a0720ce7309eda502c",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/synthesize-project/references/summary.md": {
+      "hub_hash": "sha256:b487648097d2e2ef04f8260cdf9c46a7f012f386b3a33690cbca224db098670e",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/synthesize-project/references/validate-and-write.md": {
+      "hub_hash": "sha256:34532baf4e21762af56725db26e959b69aae98a41b06596eeff2640f903d393c",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/systematic-debugging/SKILL.md": {
+      "hub_hash": "sha256:937d25537aa4932215fdbf2ac4b85dc95794e0eeecb9a333d622514d1ca3c19f",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/systematic-debugging/references/anti-patterns-to-avoid.md": {
+      "hub_hash": "sha256:f63e116ab3f1d74ae129100aeee3ba060969c375a4fc8f9553f063b96edff25d",
+      "synced_at": "2026-04-17T10:38:22.216801+00:00"
+    },
+    "skills/systematic-debugging/references/apply-a-targeted-fix.md": {
+      "hub_hash": "sha256:d7523501edd28568ea75ad20d9848903ff778ea82acde433c2cb5cadd2f4bfc1",
+      "synced_at": "2026-04-17T10:38:22.216801+00:00"
+    },
+    "skills/systematic-debugging/references/common-debugging-patterns.md": {
+      "hub_hash": "sha256:061c40f853912767840bbf1dbfb633152ea982e7cf85b31b053d5fb58afc7ea5",
+      "synced_at": "2026-04-17T10:38:22.216801+00:00"
+    },
+    "skills/systematic-debugging/references/debugging-report-template-1.md": {
+      "hub_hash": "sha256:3c1963dbff159b5a5dc6fd2bfc76864d509b20ae9ebe7cd821ee1621e90a8dbb",
+      "synced_at": "2026-04-17T10:38:22.216801+00:00"
+    },
+    "skills/systematic-debugging/references/debugging-report-template.md": {
+      "hub_hash": "sha256:3c1963dbff159b5a5dc6fd2bfc76864d509b20ae9ebe7cd821ee1621e90a8dbb",
+      "synced_at": "2026-04-17T10:38:22.216801+00:00"
+    },
+    "skills/systematic-debugging/references/form-hypotheses.md": {
+      "hub_hash": "sha256:a61ebb17ca7db717aea350fb73affb314c00384b2aa2dcb47ad79658fcba2fb6",
+      "synced_at": "2026-04-17T10:38:22.216801+00:00"
+    },
+    "skills/systematic-debugging/references/prevent-recurrence.md": {
+      "hub_hash": "sha256:ebe43160df774bed40c0f3c2f576d3de8a1dffd5be97256d6cedc172488e102b",
+      "synced_at": "2026-04-17T10:38:22.216801+00:00"
+    },
+    "skills/systematic-debugging/references/reproduce-the-failure.md": {
+      "hub_hash": "sha256:db6910a18a51f45bb6b1dee0fa364e9bb7e8dbb41397daddaa09904f22d8e6dc",
+      "synced_at": "2026-04-17T10:38:22.216801+00:00"
+    },
+    "skills/systematic-debugging/references/root-cause-analysis.md": {
+      "hub_hash": "sha256:6dd0a575aed5a3b37cf941f49ba40bb456d0ad01cd2c480962de9ad73f46f4b8",
+      "synced_at": "2026-04-17T10:38:22.216801+00:00"
+    },
+    "skills/tdd-failing-test-generator/SKILL.md": {
+      "hub_hash": "sha256:40ab98da1f8f4cfe1d93e03e566802a19a9a78e5715d0eebd2106b4b8c094269",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/tdd/SKILL.md": {
+      "hub_hash": "sha256:558f8f1810e5e241fca67569ba0e26f7ced52072a6e6dba5528735dba105ebe3",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/tdd/references/green-minimal-implementation.md": {
+      "hub_hash": "sha256:da94220ee64dfdf1f24271a8940f7bf4e3257ac7951403dfa809b40127b1f6ec",
+      "synced_at": "2026-04-17T10:38:22.216801+00:00"
+    },
+    "skills/tdd/references/red-write-a-failing-test.md": {
+      "hub_hash": "sha256:bc5fe966a4b5741a17c9646ee29e941eee6ec38d386bc74449ff808c5209156d",
+      "synced_at": "2026-04-17T10:38:22.216801+00:00"
+    },
+    "skills/tdd/references/tdd-patterns.md": {
+      "hub_hash": "sha256:9ef4ffa7d33323c22514a2a333758e3eb568da82ba2b20dac42fd594518eac4f",
+      "synced_at": "2026-04-17T10:38:22.216801+00:00"
+    },
+    "skills/test-data-management/SKILL.md": {
+      "hub_hash": "sha256:2ce78eb94d30afca07a90946e7ab446d90b40b98ecdcec3e51e9b8907b82479d",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/test-generator/SKILL.md": {
+      "hub_hash": "sha256:1cf8f38eabd633d61166d946cc5f643b2d81f52e98da8db624b6d7c3005dfe6a",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/test-generator/references/102-javascripttypescript-stryker.md": {
+      "hub_hash": "sha256:b93e573ae50b34c30ac9bb3d083128caf3699c29ffd7c41630b1065cc34bc07c",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/test-generator/references/103-interpreting-results.md": {
+      "hub_hash": "sha256:3b47914e3b7802fdf7197862d2865214c37d9c1eeccc8bc836c0ff4880abfc2b",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/test-generator/references/113-when-to-use-snapshot-tests.md": {
+      "hub_hash": "sha256:2a13d20804939c10e8ba77d31bf31bd7e17b7d44fd8f09007d1d8b901196c710",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/test-generator/references/133-gate-decision.md": {
+      "hub_hash": "sha256:b0ee43aeac353c882f39f67a2b20ea510db50d1cf2e36e216811773891b77e84",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/test-generator/references/63-rules.md": {
+      "hub_hash": "sha256:414bab4d6cc03fb928725b693f3d48b0fe9bb4e0139476cab9551ad440796d4e",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/test-generator/references/73-framework-setup.md": {
+      "hub_hash": "sha256:6233f236e28c057c2f5915fed930fc273bb6272f4919a905ea74ef9effa993a9",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/test-generator/references/74-when-bdd-is-required.md": {
+      "hub_hash": "sha256:bf62dc6832e8893aa7852ab7db327c9477c43f20438c88fc4e0fe64d10bfefb9",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/test-generator/references/82-javascripttypescript-fast-check.md": {
+      "hub_hash": "sha256:1bc1b63fb19e5202e645ca3e8402d1f8b2a65c1d4ebfb126cad8a68fbc7f3c14",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/test-generator/references/83-when-property-based-tests-are-required.md": {
+      "hub_hash": "sha256:af07a0990849e7233eeae71fc9e3b4bb9dcbef331d080757a89ea16fff0e6e89",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/test-generator/references/accessibility-test-stubs.md": {
+      "hub_hash": "sha256:f2d96a7f7b2779558de073d2575ab6ba7a21c1f3a94a467aeacca0e5496defd4",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/test-generator/references/contract-test-decision-criteria.md": {
+      "hub_hash": "sha256:809c26d943116009b5a60a62e0378126ee3ad9389d714fca9b62cb2cf054635c",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/test-generator/references/coverage-configuration.md": {
+      "hub_hash": "sha256:95b892c4508ca72c96800ded446d0b40cde92a2e229cac02451b0a69511591af",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/test-generator/references/snapshot-test-stubs.md": {
+      "hub_hash": "sha256:5caa32041f96e0fc152a5d97023638d545274670631f430336b9dfb1aa391d98",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/test-generator/references/test-file-naming-convention.md": {
+      "hub_hash": "sha256:2a5251a0df3b2f62601153c9dff0ccf6023368f1da5d90491b8737ab7ea94c3e",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/test-generator/references/test-generation-summary-1.md": {
+      "hub_hash": "sha256:1efd287adfbf9c0200b5babaddc9502fb4f5369066f43fc070d31a9326b371c5",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/test-generator/references/test-generation-summary.md": {
+      "hub_hash": "sha256:794adc3dee7ada8c87c3c6c1d3fb03f9746dd2f15e82469f0cda4936a2007b18",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/test-generator/references/test-matrix.md": {
+      "hub_hash": "sha256:989e01e71a9d45d805d49b88ddceffa5bc3ccb6aba9d697d1c04635b0aab658c",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/test-knowledge/SKILL.md": {
+      "hub_hash": "sha256:c1ab55b5ed5674311785a9f9409a7185a82199bafd78c1565542f184e6724d71",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/test-maintenance/SKILL.md": {
+      "hub_hash": "sha256:3a8b53daeb3231a94e32ce3b3193c3c6165d226429112cf6bde09b49073bbabb",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/test-maintenance/references/detect-duplicates.md": {
+      "hub_hash": "sha256:4da766c0a23fc747dd77072cbb86f63357c42b7455c3d82482ec081370884e47",
+      "synced_at": "2026-04-17T10:38:22.216801+00:00"
+    },
+    "skills/test-maintenance/references/improve-readability.md": {
+      "hub_hash": "sha256:1c6b1af23fad297d762845a09d1be38a3e7ca60f1f6253943972d8d35c0bfd92",
+      "synced_at": "2026-04-17T10:38:22.216801+00:00"
+    },
+    "skills/test-maintenance/references/optimize-execution.md": {
+      "hub_hash": "sha256:6c1627ef85cc372c403f0475a26c1c062b49b0cbfa2a86b6b4e1fb1043bb3ced",
+      "synced_at": "2026-04-17T10:38:22.216801+00:00"
+    },
+    "skills/test-maintenance/references/report.md": {
+      "hub_hash": "sha256:25313f84c5add8e588e8dfbc5d73bde22cd3f053020eac66a80a263de2b58593",
+      "synced_at": "2026-04-17T10:38:22.216801+00:00"
+    },
+    "skills/test-pipeline/SKILL.md": {
+      "hub_hash": "sha256:303a287f590eb8561cc4011a194dc0913ebde90c5cd1442f3fce43d5b60868eb",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/trace-test/SKILL.md": {
+      "hub_hash": "sha256:dbf4a700c41c687c1317c6272f93e728cc31992b1ed724fed9b0216301218516",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/ui-ux-pro-max/SKILL.md": {
+      "hub_hash": "sha256:2df4842f3cb08b52b96b2a37bcaf9576c26a1ac9174453ddd6db452ae4faae1d",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/ui-ux-pro-max/data/charts.csv": {
+      "hub_hash": "sha256:77d32cf4d9e78f80795baf391e1cc8f9ee137351aab29ca682938ec9d8ebe7e4",
+      "synced_at": "2026-03-26T17:23:22.264243+00:00"
+    },
+    "skills/ui-ux-pro-max/data/colors.csv": {
+      "hub_hash": "sha256:19a74a1fe858f92dc9213553bb6b8326b7f32dc6bfc0857668e2b4da32322f8a",
+      "synced_at": "2026-03-26T17:23:22.264243+00:00"
+    },
+    "skills/ui-ux-pro-max/data/icons.csv": {
+      "hub_hash": "sha256:351fe61ba45b8146c66de6ea7d67297654639d79a94f537b4d0bad570058c28f",
+      "synced_at": "2026-03-26T17:23:22.264243+00:00"
+    },
+    "skills/ui-ux-pro-max/data/landing.csv": {
+      "hub_hash": "sha256:51021dbadc40b0305c42f80c270eb515420440afe9f3482dfd048dc2475dbfbd",
+      "synced_at": "2026-03-26T17:23:22.264243+00:00"
+    },
+    "skills/ui-ux-pro-max/data/products.csv": {
+      "hub_hash": "sha256:6f9c9be6fdb53a415af273dac6221e87a418d1600da2ee39f974b997e880050e",
+      "synced_at": "2026-03-26T17:23:22.264243+00:00"
+    },
+    "skills/ui-ux-pro-max/data/react-performance.csv": {
+      "hub_hash": "sha256:904c8afcda229629545912dde0e8ac37503757131f0169f80b016f1f58c4fd3f",
+      "synced_at": "2026-03-26T17:23:22.264243+00:00"
+    },
+    "skills/ui-ux-pro-max/data/stacks/astro.csv": {
+      "hub_hash": "sha256:ad18dae3ab6d148d37d144592df80dc1825b6c9e86d9d2d68fdda77434206a37",
+      "synced_at": "2026-03-26T17:23:22.264243+00:00"
+    },
+    "skills/ui-ux-pro-max/data/stacks/flutter.csv": {
+      "hub_hash": "sha256:fe36d404c799781e8ba6e9a8179b45799ed5126a545528550cd2eb0f2346e8c5",
+      "synced_at": "2026-03-26T17:23:22.264243+00:00"
+    },
+    "skills/ui-ux-pro-max/data/stacks/html-tailwind.csv": {
+      "hub_hash": "sha256:7aef38e75c53559470afcfa91580a9917ca8b7dbf8b92110389e23e93703ac52",
+      "synced_at": "2026-03-26T17:23:22.264243+00:00"
+    },
+    "skills/ui-ux-pro-max/data/stacks/jetpack-compose.csv": {
+      "hub_hash": "sha256:6c8fd4b0391c342c12b0af15610cd5becbeccaef0bbe8dcfc01d928c3195d93e",
+      "synced_at": "2026-03-26T17:23:22.264243+00:00"
+    },
+    "skills/ui-ux-pro-max/data/stacks/nextjs.csv": {
+      "hub_hash": "sha256:e828ccc04843742f52f545a068e8a9ab0d2b97c0e771f7e93bf0cef74da05554",
+      "synced_at": "2026-03-26T17:23:22.264243+00:00"
+    },
+    "skills/ui-ux-pro-max/data/stacks/nuxt-ui.csv": {
+      "hub_hash": "sha256:05d6e74501b2b6a636faed32450622759f49a5bcafad971f5f4e7eba0eb7be71",
+      "synced_at": "2026-03-26T17:23:22.264243+00:00"
+    },
+    "skills/ui-ux-pro-max/data/stacks/nuxtjs.csv": {
+      "hub_hash": "sha256:f7a3f2d9542856d00199f85c6c023b7c284cc698e2e6e12d61afce2edacb24d6",
+      "synced_at": "2026-03-26T17:23:22.264243+00:00"
+    },
+    "skills/ui-ux-pro-max/data/stacks/react-native.csv": {
+      "hub_hash": "sha256:077aefc81d194895ecf7936b3ed298b978e36961f183e3a275f8acda19b5f621",
+      "synced_at": "2026-03-26T17:23:22.264243+00:00"
+    },
+    "skills/ui-ux-pro-max/data/stacks/react.csv": {
+      "hub_hash": "sha256:e5624ab41d33427d88e41d07581ce4eca59b37b36ab72a6ad43a9c8e2d0a1c72",
+      "synced_at": "2026-03-26T17:23:22.264243+00:00"
+    },
+    "skills/ui-ux-pro-max/data/stacks/shadcn.csv": {
+      "hub_hash": "sha256:395c2e415ef6f48a474acccdc8eb2c7258a6ed751a5037ba171a2d8823e02ded",
+      "synced_at": "2026-03-26T17:23:22.264243+00:00"
+    },
+    "skills/ui-ux-pro-max/data/stacks/svelte.csv": {
+      "hub_hash": "sha256:71af52d64f266c88070b91dbbaa900c2f8074b6baae9f35eaea6ba9cec6fd803",
+      "synced_at": "2026-03-26T17:23:22.264243+00:00"
+    },
+    "skills/ui-ux-pro-max/data/stacks/swiftui.csv": {
+      "hub_hash": "sha256:c9c2d2510f8e66281a2514e8dd0125a6b653b9ef53a71281b5e7dfe003d5b569",
+      "synced_at": "2026-03-26T17:23:22.264243+00:00"
+    },
+    "skills/ui-ux-pro-max/data/stacks/vue.csv": {
+      "hub_hash": "sha256:c2724915d3c11cd67263f25896cff721f787a0fdd8326002d31e9f5806dfd8f8",
+      "synced_at": "2026-03-26T17:23:22.264243+00:00"
+    },
+    "skills/ui-ux-pro-max/data/styles.csv": {
+      "hub_hash": "sha256:663ac9775e6f5b874b32d930fa0951591c45e39cde8ac7033278f42a0881c037",
+      "synced_at": "2026-03-26T17:23:22.264243+00:00"
+    },
+    "skills/ui-ux-pro-max/data/typography.csv": {
+      "hub_hash": "sha256:64695e05ac335ba534aff396c4ba9241c642f80ea53b424251d2669b71c4772b",
+      "synced_at": "2026-03-26T17:23:22.264243+00:00"
+    },
+    "skills/ui-ux-pro-max/data/ui-reasoning.csv": {
+      "hub_hash": "sha256:58fc52fff69f62709f8c7dd460de6f6693699ea820f24287f3301a427c2b554e",
+      "synced_at": "2026-03-26T17:23:22.264243+00:00"
+    },
+    "skills/ui-ux-pro-max/data/ux-guidelines.csv": {
+      "hub_hash": "sha256:e01943c433b2cad3040f19389b3b0455673758a569b7a927b5bedf65c989cb96",
+      "synced_at": "2026-03-26T17:23:22.264243+00:00"
+    },
+    "skills/ui-ux-pro-max/data/web-interface.csv": {
+      "hub_hash": "sha256:10bfc24e09a6a15db8309e6ef9b6881e1d4af97dffb7c99418aefb8e30df7d54",
+      "synced_at": "2026-03-26T17:23:22.264243+00:00"
+    },
+    "skills/ui-ux-pro-max/scripts/core.py": {
+      "hub_hash": "sha256:5459d1f04eea03dfb913742d0c03edc5065ac67f6227e4807fa87699662588cb",
+      "synced_at": "2026-03-26T17:23:22.264243+00:00"
+    },
+    "skills/ui-ux-pro-max/scripts/design_system.py": {
+      "hub_hash": "sha256:cd59a11dac93d06b8d33e724b156c5c30b46fef951bb7c2a7810b7c5bfe36a48",
+      "synced_at": "2026-03-26T17:23:22.264243+00:00"
+    },
+    "skills/ui-ux-pro-max/scripts/search.py": {
+      "hub_hash": "sha256:126cb38b67fd8158a245fafab734b641795905313c84f08761c199d507a176a3",
+      "synced_at": "2026-03-26T17:23:22.264243+00:00"
+    },
+    "skills/update-practices/SKILL.md": {
+      "hub_hash": "sha256:83fd93613050c9fb10ec89c8ef8c97f55e507a09e04a10e44acf0a5c2a9fecd0",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/verify-screenshots/SKILL.md": {
+      "hub_hash": "sha256:8ab20f3da5ed2e6fbb0c56e4ce9a4d2cf0812f937566a6e2efcf492d62b7440f",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/verify-screenshots/references/anti-flake-checklist.md": {
+      "hub_hash": "sha256:383e61f056435ab69cb9d8eb60d029cdf18c1885c72aa54ce5ba768c8f7d8245",
+      "synced_at": "2026-04-17T10:38:22.216801+00:00"
+    },
+    "skills/verify-screenshots/references/baseline-management.md": {
+      "hub_hash": "sha256:1702ef89211a5bc86e1035e40c86bb030fb3b2d7ab79b7a8231883d96530a349",
+      "synced_at": "2026-04-17T10:38:22.216801+00:00"
+    },
+    "skills/verify-screenshots/references/ci-integration.md": {
+      "hub_hash": "sha256:6034041d1136bc139ce12ab33a258cc2ed36217c228353075cf9be1b7ad092a7",
+      "synced_at": "2026-04-17T10:38:22.216801+00:00"
+    },
+    "skills/verify-screenshots/references/configurable-thresholds.md": {
+      "hub_hash": "sha256:3b2cb6805b2e731fc2978361619db5f4d0c0da3edde0a8d3cbd1202cdcdd8144",
+      "synced_at": "2026-04-17T10:38:22.216801+00:00"
+    },
+    "skills/verify-screenshots/references/cross-browser-baseline-variants.md": {
+      "hub_hash": "sha256:04ef50dba3d0d96c175f1ed624e11b051a63ab612cbb385a11059db387d95657",
+      "synced_at": "2026-04-17T10:38:22.216801+00:00"
+    },
+    "skills/vitest-dev/SKILL.md": {
+      "hub_hash": "sha256:1540521791e39ab81a50b127a5e73d3f5c0b63809ec426eecfe684453032fdc3",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/vue-dev/SKILL.md": {
+      "hub_hash": "sha256:4dbae3acf182a41c51845dd7a6398ce0a4ef90030aa562c84d797176736a62b9",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/vue-dev/references/component-patterns.md": {
+      "hub_hash": "sha256:8fd5de9152aec523f1a9a4f610a28a77e3f1e226dcfd2b549cf20680aff89372",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/vue-dev/references/composables.md": {
+      "hub_hash": "sha256:aa7f9d6dc6f1d72fca42194c08fb9eb46fc7a59ce782e7bd9036beef2d2c34e8",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/vue-dev/references/reactivity-and-composition-api.md": {
+      "hub_hash": "sha256:9e7e8702f93fb4fbffca7664e19d357345d0c3c9d3f14e09aeac0902990e1ebe",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/vue-dev/references/reka-ui-headless-components.md": {
+      "hub_hash": "sha256:ea55cbc78712e92f5e161d5b437152df668e0f8c5cb5e1e6da6da41fa1190547",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/vue-dev/references/testing.md": {
+      "hub_hash": "sha256:0ea1098c401b6746388afb3e7578c34aa1fce9c38be3a377de668e91b66bcf0b",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/vue-test/SKILL.md": {
+      "hub_hash": "sha256:d5a8970e63bd31b6ab2f44f332a1fea3d0f215813b656484fb0984a45c3e94d6",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/web-quality/SKILL.md": {
+      "hub_hash": "sha256:7ab5ed263119a04bfbb97c4f62097fd0c7830528f1e41dbdbb3c9c61cf1ca7db",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/web-quality/references/accessibility-audit-wcag-21-aa.md": {
+      "hub_hash": "sha256:70bcf759e93a3be18a40bf56d6214d6cc37921f525d97681d6a35635a99b81ad",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/web-quality/references/core-web-vitals-audit.md": {
+      "hub_hash": "sha256:947785c37bd049f26eca0925a649d18213c82b6fa26b15362bcc968720252921",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/web-quality/references/responsive-design-audit.md": {
+      "hub_hash": "sha256:8b0669b793f5d92b73f103ccbb0facfaf8e87dc84486d25ef07046d8bdb3827e",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/web-quality/references/seo-audit.md": {
+      "hub_hash": "sha256:eeb3200b07d37fe58495421e3ee8fa729c52b935a1362777e1c469c15cf12d84",
+      "synced_at": "2026-03-24T16:55:53.865361+00:00"
+    },
+    "skills/web-scraper/SKILL.md": {
+      "hub_hash": "sha256:d3abd173cb3be1bd8b75283a84faea99becd25e3310cc70474a40ac6a95a1022",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/websocket-patterns/SKILL.md": {
+      "hub_hash": "sha256:8f823b06700e351995427b46e8fb6d11350516259cb487bf28331ef9584f28b2",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/writing-plans/SKILL.md": {
+      "hub_hash": "sha256:efb7375ee614c7a407902c2b052e12f02589c3dbb055742977926d3bac376b2b",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/writing-skills/SKILL.md": {
+      "hub_hash": "sha256:9a74fdc785df99886576a9a40985e80e9c5fe45e9f193a8bea3d50d311f6d546",
+      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    }
+  }
+}

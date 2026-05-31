@@ -1,0 +1,36 @@
+{
+  "name": "firekaro-v6-server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "v6 backend for the mvp/ FIRE Planner — Hono + Prisma + Better Auth against firekaro_v6.",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "NODE_ENV=production tsx src/index.ts",
+    "type-check": "tsc --noEmit",
+    "test:unit": "vitest run",
+    "test:unit:watch": "vitest",
+    "prisma:generate": "prisma generate",
+    "prisma:validate": "prisma validate",
+    "prisma:migrate:create": "prisma migrate dev --create-only",
+    "prisma:migrate:deploy": "prisma migrate deploy"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.13.7",
+    "@prisma/client": "^5.22.0",
+    "better-auth": "^1.4.10",
+    "dotenv": "^17.4.2",
+    "hono": "^4.11.3",
+    "hono-pino": "^0.7.0",
+    "pino": "^9.5.0",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "pino-pretty": "^13.0.0",
+    "prisma": "^5.22.0",
+    "tsx": "^4.19.2",
+    "typescript": "~5.6.3",
+    "vitest": "^2.1.9"
+  }
+}

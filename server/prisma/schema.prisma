@@ -1,0 +1,526 @@
+// ============================================================================
+// firekaro_v6 — the v6 backend schema for the mvp/ FIRE Planner.
+//
+// DERIVED 1:1 from the planner's Zod schemas (mvp/src/types/household.ts +
+// assumptions.ts). The Zod schemas stay the runtime-validation contract;
+// Prisma mirrors them. NO tracker DNA — this is ONLY the planner's domain.
+//
+// Design decisions (docs/v6-fire-planner-product-plan.md Phase 1 + the
+// 2026-05-31 goal contract):
+//   - table-per-entity; JSONB for per-variant fields (investments.subtypeData,
+//     scenarios.leverValues, user_features.flags, user_ui_prefs.prefs).
+//   - aggregated arrays -> child tables (recurring/planned expense lines,
+//     liability co-borrowers).
+//   - ownerId is plain TEXT, NO FK to members (the literal "Joint" sentinel
+//     would break a real FK); validated by Zod at the API boundary.
+//   - every table carries userId + updatedAt (updatedAt now => P2 ETag locking
+//     is a 3-line change, not a migration).
+//   - the household document's entity ids are stored in `entityId` columns with
+//     @@unique([userId, entityId]) — a surrogate cuid PK keeps rows globally
+//     collision-safe (member id "you" can recur across users), while the diff
+//     engine still matches incoming rows by (userId, entityId) within scope.
+//
+// Persistence is document-style: GET/PUT per entityKey. The server-side diff
+// engine (src/lib/household-diff.ts) maps an incoming `Household` to per-table
+// insert/update/delete plans inside one transaction. Calc stays client-side.
+// ============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// Better Auth (auth tables — Better Auth's own schema shape)
+// ============================================================================
+
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  emailVerified Boolean  @default(false)
+  name          String?
+  image         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  accounts Account[]
+  sessions Session[]
+
+  @@map("user")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id @default(cuid())
+  userId                String
+  accountId             String
+  providerId            String
+  accessToken           String?
+  refreshToken          String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  idToken               String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("verification")
+}
+
+// ============================================================================
+// Household — the `household` entityKey. household_config is the per-user
+// singleton; the arrays below it become child tables.
+// ============================================================================
+
+// householdSchema scalars. Arrays (members, businesses, otherIncome,
+// investments, liabilities, insurance, expenses.recurring,
+// expenses.plannedFuture, estateChecklist) -> child tables.
+model HouseholdConfig {
+  id              String  @id @default(cuid())
+  userId          String  @unique
+  name            String  @default("")
+  // setupModeSchema: Solo | Couple | Couple+Children | Custom
+  setupMode       String
+  profileComplete Boolean @default(false)
+  wizardCompleted Boolean @default(false)
+
+  // expensesSchema.avgMonthly (the scalar; recurring/plannedFuture are children).
+  expensesAvgMonthly Float @default(0)
+
+  // householdSchema optionals (nullable; consumer-side fallbacks in the store).
+  extendedFamilyContingencyPercent   Float?
+  healthcareCorpusReservationPercent Float?
+
+  // glidePathConfigSchema — nested object, server never queries inside -> JSON.
+  glidePath Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("household_config")
+}
+
+// memberSchema
+model Member {
+  id       String @id @default(cuid())
+  userId   String
+  entityId String // household-document member id (e.g. "you")
+
+  name                 String
+  dateOfBirth          String // ISO YYYY-MM-DD
+  role                 String // EARNER | DEPENDENT
+  targetRetirementAge  Int?
+  planToAge            Int?
+  relation             String?
+
+  // memberSalarySchema (optional) -> flat columns, nullable.
+  salaryAnnualCTC        Float?
+  salaryHikePercent      Float?
+  salaryVpfTopUpPercent  Float?
+
+  // Q2.1 onboarding fields.
+  city            String  @default("Metro")
+  health          String  @default("Healthy")
+  educationStage  String? // dependents only
+  riskAppetite    String  @default("Moderate")
+  marital         String  @default("Married")
+  employmentStatus String? // earners only
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, entityId])
+  @@index([userId])
+  @@map("members")
+}
+
+// businessSchema
+model Business {
+  id       String @id @default(cuid())
+  userId   String
+  entityId String
+
+  name         String
+  legalKind    String // SoleProp | FreelanceProf | Partnership | LLP | PvtLtd | HUF | Other
+  annualProfit Float
+  frequency    String // M | Q | A
+  sharePercent Float
+  ownerId      String // member id OR "Joint" — plain TEXT, NO FK
+  isOperated   Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, entityId])
+  @@index([userId])
+  @@map("businesses")
+}
+
+// otherIncomeLineSchema
+model OtherIncomeLine {
+  id       String @id @default(cuid())
+  userId   String
+  entityId String
+
+  type          String // Rental | Dividend | Interest | CapitalGains | Other
+  source        String
+  sourceEntityId String?
+  label         String?
+  amount        Float
+  frequency     String // M | Q | A
+  ownerId       String // member id OR "Joint" — plain TEXT, NO FK
+  isTaxExempt   Boolean
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, entityId])
+  @@index([userId])
+  @@map("other_income_lines")
+}
+
+// investmentSchema — FLAT at runtime. Shared columns typed; the long tail of
+// per-subtype fields lives in subtypeData JSONB (the union is read-time only).
+model Investment {
+  id       String @id @default(cuid())
+  userId   String
+  entityId String
+
+  type                String // investmentTypeSchema (12 kinds)
+  label               String?
+  value               Float
+  monthlyContribution Float?
+  ownerId             String // member id OR "Joint" — plain TEXT, NO FK
+
+  // Per-subtype natural-granularity fields (qty/price, units/nav, grams, ESOP
+  // grant details, NPS tier, RealEstate role, bucket, etc.) — JSONB.
+  subtypeData Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, entityId])
+  @@index([userId])
+  @@map("investments")
+}
+
+// liabilitySchema — coBorrowers[] -> liability_co_borrowers child table.
+model Liability {
+  id       String @id @default(cuid())
+  userId   String
+  entityId String
+
+  name               String
+  type               String // HomeLoan | PersonalLoan | CarLoan | EducationLoan | CreditCard | Other
+  outstandingBalance Float
+  monthlyEMI         Float
+  interestRate       Float
+  ownerId            String // member id OR "Joint" — plain TEXT, NO FK
+  isSharedWithSpouse Boolean @default(false)
+  derivedEndYear     Int?
+
+  coBorrowers LiabilityCoBorrower[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, entityId])
+  @@index([userId])
+  @@map("liabilities")
+}
+
+// liabilitySchema.coBorrowers — junction; the tax module's 2x Sec-24 query reads
+// it. Real FK to liabilities.id (CASCADE); memberId is a soft TEXT ref.
+model LiabilityCoBorrower {
+  id          String @id @default(cuid())
+  userId      String
+  liabilityId String
+  memberId    String // soft ref to a member's document id — plain TEXT, NO FK
+
+  liability Liability @relation(fields: [liabilityId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([liabilityId, memberId])
+  @@index([userId])
+  @@index([liabilityId])
+  @@map("liability_co_borrowers")
+}
+
+// insurancePolicySchema
+model InsurancePolicy {
+  id       String @id @default(cuid())
+  userId   String
+  entityId String
+
+  type            String // Vehicle | Health | Life
+  provider        String
+  sumAssured      Float
+  annualPremium   Float
+  insuredPersonId String // member id — plain TEXT, NO FK
+  renewalMonth    Int?
+  renewalYear     Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, entityId])
+  @@index([userId])
+  @@map("insurance_policies")
+}
+
+// recurringExpenseLineSchema. Auto-flow rows (source='auto-loan'/'auto-insurance')
+// carry a sourceRefId -> @@unique([userId, sourceRefId]) so the diff upserts them
+// (ON CONFLICT) instead of duplicating. Manual rows (sourceRefId null) match by
+// (userId, entityId). Postgres allows multiple NULLs so manual rows don't collide.
+model RecurringExpenseLine {
+  id       String @id @default(cuid())
+  userId   String
+  entityId String
+
+  label           String
+  amount          Float
+  frequency       String // M | Q | A
+  endYear         Int?
+  source          String // manual | auto-insurance | auto-loan
+  sourceRefId     String?
+  inflationBucket String? // general | healthcare | education | housing
+  kind            String? // general | parents | extended-contingency | medical
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, entityId])
+  @@unique([userId, sourceRefId])
+  @@index([userId])
+  @@map("recurring_expense_lines")
+}
+
+// plannedFutureLineSchema. NOTE: the Zod schema has NO sourceRefId (planned
+// lines are user-authored goals, never auto-flow) -> matched by (userId,
+// entityId) only. (The contract's mention of sourceRefId here does not match
+// the Zod model; the Zod model wins — see the goal report.)
+model PlannedFutureLine {
+  id       String @id @default(cuid())
+  userId   String
+  entityId String
+
+  label           String
+  todayAmount     Float
+  targetYear      Int
+  isMultiYear     Boolean @default(false)
+  durationYears   Int?
+  inflationBucket String? // general | healthcare | education | housing
+  kind            String? // general | education | marriage | medical
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, entityId])
+  @@index([userId])
+  @@map("planned_future_lines")
+}
+
+// estateChecklistItemSchema — keyed by the checklist key (one row per key/user).
+model EstateChecklistItem {
+  id     String @id @default(cuid())
+  userId String
+
+  key       String // will | nominees | powerOfAttorney | jointAccounts | digitalEstate | hufKarta | termLifeBypass
+  completed Boolean @default(false)
+  date      String?
+  notes     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, key])
+  @@index([userId])
+  @@map("estate_checklist_items")
+}
+
+// ============================================================================
+// Expense history — the SEPARATE `expense-history` entityKey (NOT in the
+// household blob). ExpenseSnapshot, de-duped by (userId, period).
+// ============================================================================
+
+model ExpenseSnapshot {
+  id     String @id @default(cuid())
+  userId String
+
+  period     String // YYYY-MM (the de-dup key)
+  fy         String // YYYY-YY
+  capturedAt String // ISO timestamp (stored as captured)
+  totalAnnual Float
+
+  // byBucket: Record<InflationBucket, number> — nested -> JSON.
+  byBucket Json
+
+  fireTargetYear Int?
+  fireNumber     Float?
+  netWorth       Float?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, period])
+  @@index([userId])
+  @@map("expense_snapshots")
+}
+
+// ============================================================================
+// Config entityKeys — assumptions, scenarios, features, ui.
+// ============================================================================
+
+// assumptionsSchema — singleton per user. Scalars typed; inflationWeights nested
+// object -> JSON. (NOT a whole-blob: scalars stay queryable for future analytics.)
+model UserAssumptions {
+  id     String @id @default(cuid())
+  userId String @unique
+
+  inflation           Float
+  equityReturn        Float
+  debtReturn          Float
+  realEstateReturn    Float
+  goldReturn          Float
+  npsReturn           Float
+  ppfReturn           Float
+  epfReturn           Float
+  internationalReturn Float @default(0.1)
+  reitReturn          Float @default(0.08)
+  cryptoReturn        Float @default(0)
+  healthcareInflation Float
+  educationInflation  Float
+  housingInflation    Float
+
+  // inflationWeights { general, healthcare, education, housing } -> JSON.
+  inflationWeights Json
+
+  swrOverride    Float?
+  leanMultiplier Float  @default(0.6)
+  fatMultiplier  Float  @default(1.5)
+  withdrawalRule String @default("Constant") // Constant | FloorCeiling
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("user_assumptions")
+}
+
+// Scenario — named What-If scenarios. leverValues is a partial lever map -> JSON.
+model Scenario {
+  id       String @id @default(cuid())
+  userId   String
+  entityId String
+
+  name        String
+  leverValues Json
+  // Scenario.createdAt is a numeric epoch in the document model; keep it as a
+  // distinct column so PUT round-trips it faithfully (DB createdAt is separate).
+  docCreatedAt BigInt
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, entityId])
+  @@index([userId])
+  @@map("scenarios")
+}
+
+// features entityKey — FeaturesPersistedShape { flags, wizardCompleted, userId }.
+// flags is an open record -> JSON (whole-blob per the design).
+model UserFeatures {
+  id     String @id @default(cuid())
+  userId String @unique
+
+  flags           Json    @default("{}")
+  wizardCompleted Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("user_features")
+}
+
+// ui entityKey — UiPersistedShape { isFamilyView, viewingMemberId, currentFY }.
+// Whole-blob -> JSON (no server-side queries inside it).
+model UserUiPrefs {
+  id     String @id @default(cuid())
+  userId String @unique
+
+  prefs Json @default("{}")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("user_ui_prefs")
+}
+
+// ============================================================================
+// Deferred (created now, no Phase-1 writers — YAGNI guard so P2/P4 are
+// migrations-free additions).
+// ============================================================================
+
+// data_sync_log — P2: multi-device sync / conflict audit.
+model DataSyncLog {
+  id        String   @id @default(cuid())
+  userId    String
+  entityKey String
+  action    String
+  detail    Json?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@map("data_sync_log")
+}
+
+// migration_audit — P4: old-app -> v6 data migration provenance.
+model MigrationAudit {
+  id          String   @id @default(cuid())
+  userId      String
+  sourceTable String
+  sourceId    String
+  targetTable String
+  targetId    String
+  migratedAt  DateTime @default(now())
+
+  @@index([userId])
+  @@map("migration_audit")
+}

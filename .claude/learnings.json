@@ -1,0 +1,72 @@
+{
+  "learnings": [
+    {
+      "id": "L001",
+      "date": "2026-04-18",
+      "error": {
+        "message": "alerts.value.filter is not a function",
+        "file": "src/stores/notifications.ts",
+        "context": "useNotificationsStore.fetchAlerts assigned the raw envelope { success, data } to alerts.value; computed unreadCount then called .filter on an object"
+      },
+      "fix": {
+        "description": "Apply the same envelope-unwrap rule that composables follow: import unwrapResponse / unwrapArrayResponse from @/utils/api-helpers and unwrap inside fetchAlerts, fetchPreferences, updatePreferences, checkBudgetAlerts.",
+        "diff": "import { unwrapArrayResponse, unwrapResponse } from '@/utils/api-helpers'\\n- alerts.value = await res.json()\\n+ alerts.value = unwrapArrayResponse<Alert>(await res.json())"
+      },
+      "lesson": "Pinia stores in this repo MUST follow the same envelope-unwrap rule as composables (api-response-unwrapping.md). Any store hitting /api/** must use unwrapResponse / unwrapArrayResponse — pinia-store-conventions.md should be amended to make this explicit.",
+      "tags": ["pinia", "api-envelope", "unwrap", "app-login", "notifications"],
+      "reuse_count": 0,
+      "hub_pattern_link": "rules/api-response-unwrapping.md"
+    },
+    {
+      "id": "L002",
+      "date": "2026-04-18",
+      "error": {
+        "message": "/dashboard rendered for unauthenticated session — Step 7 verification was about to false-pass",
+        "file": ".claude/skills/app-login/SKILL.md",
+        "context": "MCP Playwright browser carried a stale Better Auth cookie across runs; signin page detected the cookie and redirected to /dashboard, but /api/auth/get-session returned data:null"
+      },
+      "fix": {
+        "description": "In app-login Step 5, when --fresh is set, clear browser cookies (or open a fresh context) before navigating to /auth/signin. Otherwise Step 3's session-reuse fast path can be silently triggered by a server-invalidated cookie that the browser still carries.",
+        "diff": "// before browser_navigate to /auth/signin under --fresh\\nawait context.clearCookies()"
+      },
+      "lesson": "MCP Playwright persists cookies across skill invocations. A stale Better Auth cookie can mask the unauthenticated path because the signin page redirects on cookie presence, not validity. --fresh must clear cookies, not just skip the on-disk session-reuse check.",
+      "tags": ["mcp-playwright", "cookies", "session", "app-login", "fresh-flag"],
+      "reuse_count": 0,
+      "hub_pattern_link": null
+    },
+    {
+      "id": "L003",
+      "date": "2026-05-23",
+      "error": {
+        "message": "L-003 in references/learnings.md documents an outdated /api/auth/get-session response shape",
+        "file": ".claude/skills/app-login/references/learnings.md",
+        "context": "Direct probe via mcp__playwright__browser_evaluate against /api/auth/get-session on a session-reuse run returned body keys [\"session\", \"user\"] at the top level — not the {data: {user, session}} shape L-003 claims. Step 7's prescribed verification (look at body.data.user) would have read undefined and false-rejected a valid session."
+      },
+      "fix": {
+        "description": "Update L-003 in references/learnings.md: the response shape is {user, session} at the top level. Step 7 verification must read body.user (truthy) and body.session.expiresAt — not body.data.user.",
+        "diff": "- body.data.user truthy\\n+ body.user truthy AND body.session truthy"
+      },
+      "lesson": "Better Auth's /api/auth/get-session response in this repo (better-auth ^1.4.x) returns {user, session} directly at the root — no data wrapper. L-003's old shape is stale and supersedes-worthy. Future verification code reading body.data.user will silently false-reject every valid session.",
+      "tags": ["better-auth", "get-session", "response-shape", "app-login", "supersedes-L-003"],
+      "reuse_count": 0,
+      "hub_pattern_link": null
+    },
+    {
+      "id": "L004",
+      "date": "2026-05-23",
+      "error": {
+        "message": "e2e/.auth/user.json is empty (36 bytes, 0 cookies) after a confirmed-authenticated app-login session-reuse run",
+        "file": ".claude/skills/app-login/SKILL.md",
+        "context": "Session reuse via the MCP browser succeeded — /api/auth/get-session returned 200 with valid user + session expiring 2026-05-29. But the persisted file at e2e/.auth/user.json had cookie_count=0. The MCP browser context holds the cookies in memory; the file is never populated by the skill because MCP Playwright's tool surface does not expose context.storageState() serialization."
+      },
+      "fix": {
+        "description": "Document in SKILL.md Step 8 that the MCP-driven path does NOT populate e2e/.auth/user.json. The Playwright E2E suite (which reads storageState from that file per playwright.config.ts) needs a separate Node-script auth seed; the app-login skill only authenticates the MCP browser. Either: (a) Step 8 invokes a CDP-based Node script to serialize storageState, or (b) Step 8's contract is explicit that the persisted file is best-effort and may be empty on MCP-driven runs.",
+        "diff": "// Step 8 currently claims to 'Export the current browser storage state to e2e/.auth/user.json' but MCP cannot do this directly. Make the limitation explicit or implement the CDP fallback."
+      },
+      "lesson": "The MCP Playwright server does not expose context.storageState() serialization. Step 8's session-cookie persistence to e2e/.auth/user.json is aspirational — the file stays empty after MCP-driven auth. Step 3's session reuse still works on subsequent runs because MCP keeps cookies in its own long-lived context, NOT because the file has anything in it. The Playwright E2E suite that depends on storageState gets nothing from this skill.",
+      "tags": ["mcp-playwright", "storage-state", "e2e-auth-seed", "app-login", "step-8-gap"],
+      "reuse_count": 0,
+      "hub_pattern_link": null
+    }
+  ]
+}

@@ -1,0 +1,127 @@
+/**
+ * Derived family-layer records — read-time derivation for the NEW v5
+ * family-layer kinds (parents / education / marriage / extended-contingency).
+ *
+ * Phase 2 Stage E per docs/goals/build-firekaro-mvp-v5.md §5.
+ * Audit Entry #6 + #10. Resolves Concern #5 (autoFlow* in store) per
+ * Q3 split-by-vintage: NEW family-layer flows are derived at read time
+ * here; EXISTING v4 autoFlow paths stay as store mutators in
+ * stores/household.ts (no behavior change for v4 surfaces).
+ *
+ * Why derive at read time instead of mutating the store: the family
+ * layer composites multiple sources (Member.relation=Parent + healthcare
+ * inflation; PlannedFutureLine kind=education with target year; etc.)
+ * and changing any source should immediately reflect downstream without
+ * a "re-flow" step. Pure read-time derivation makes the dataflow
+ * single-direction and testable.
+ */
+
+import type {
+  Household,
+  RecurringExpenseLine,
+  PlannedFutureLine,
+} from "@/types/household";
+
+export interface DerivedFamilyLayer {
+  /** Parents bucket lines (recurring expenses kind='parents'). */
+  parentsRecurring: RecurringExpenseLine[];
+  /** Children's education goals (planned-future kind='education'). */
+  educationGoals: PlannedFutureLine[];
+  /** Marriage events (planned-future kind='marriage'). */
+  marriageEvents: PlannedFutureLine[];
+  /** Extended-family contingency line (synthesized from household %). */
+  extendedContingency: RecurringExpenseLine | null;
+  /**
+   * Aggregate annual cost of the entire family layer in today's rupees.
+   * Used by Dashboard FamilyLayerCard (Stage I).
+   */
+  totalAnnualCost: number;
+  /**
+   * Whether the household has ANY family-layer commitments. Drives the
+   * "show this card / nudge" gate.
+   */
+  hasFamilyLayer: boolean;
+}
+
+/**
+ * Derive the family-layer records from the current household snapshot.
+ * Pure function — no mutation, no side effects.
+ *
+ * The extendedContingency line is synthesized (not stored) — it's a
+ * percentage of total annual expenses computed at read time. Storing it
+ * would invite drift; deriving it keeps the source of truth in the
+ * household.extendedFamilyContingencyPercent field.
+ */
+export function derivedFamilyLayer(household: Household): DerivedFamilyLayer {
+  const recurring = household.expenses.recurring;
+  const planned = household.expenses.plannedFuture;
+
+  const parentsRecurring = recurring.filter((r) => r.kind === "parents");
+  const educationGoals = planned.filter((p) => p.kind === "education");
+  const marriageEvents = planned.filter((p) => p.kind === "marriage");
+
+  // Synthesized extended-contingency line — applied as a flat monthly
+  // line equal to (household.extendedFamilyContingencyPercent * total
+  // annual non-contingency expenses) / 12.
+  const contingencyPct = household.extendedFamilyContingencyPercent ?? 0.075;
+  const baseAnnual = annualNonContingencyExpenses(household);
+  const contingencyAnnual = baseAnnual * contingencyPct;
+  const extendedContingency: RecurringExpenseLine | null = contingencyAnnual > 0
+    ? {
+        id: "synth-extended-contingency",
+        label: "Extended-family contingency",
+        amount: Math.round(contingencyAnnual / 12),
+        frequency: "M",
+        source: "manual",
+        kind: "extended-contingency",
+        inflationBucket: "general",
+      }
+    : null;
+
+  // Aggregate annual cost.
+  const parentsAnnual = parentsRecurring.reduce(
+    (s, r) => s + monthlyEquivalent(r) * 12,
+    0,
+  );
+  // Planned-future goals: amortize todayAmount over yearsToTarget.
+  const today = new Date().getFullYear();
+  const educationAnnual = educationGoals.reduce((s, g) => {
+    const yrs = Math.max(1, g.targetYear - today);
+    return s + g.todayAmount / yrs;
+  }, 0);
+  const marriageAnnual = marriageEvents.reduce((s, g) => {
+    const yrs = Math.max(1, g.targetYear - today);
+    return s + g.todayAmount / yrs;
+  }, 0);
+  const totalAnnualCost = Math.round(
+    parentsAnnual + educationAnnual + marriageAnnual + contingencyAnnual,
+  );
+
+  const hasFamilyLayer =
+    parentsRecurring.length > 0 ||
+    educationGoals.length > 0 ||
+    marriageEvents.length > 0 ||
+    (contingencyAnnual > 0 && contingencyPct > 0);
+
+  return {
+    parentsRecurring,
+    educationGoals,
+    marriageEvents,
+    extendedContingency,
+    totalAnnualCost,
+    hasFamilyLayer,
+  };
+}
+
+function monthlyEquivalent(r: RecurringExpenseLine): number {
+  if (r.frequency === "M") return r.amount;
+  if (r.frequency === "Q") return r.amount / 3;
+  return r.amount / 12;
+}
+
+function annualNonContingencyExpenses(h: Household): number {
+  const recurringAnnual = h.expenses.recurring
+    .filter((r) => r.kind !== "extended-contingency")
+    .reduce((s, r) => s + monthlyEquivalent(r) * 12, 0);
+  return h.expenses.avgMonthly * 12 + recurringAnnual;
+}

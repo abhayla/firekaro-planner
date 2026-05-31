@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx vitest *)",
+      "Bash(mkdir -p \"D:/Abhay/VibeCoding/FIREKaro-Vue/.claude/skills/skill-evaluator\")",
+      "Bash(cp -r \"D:/Abhay/VibeCoding/claude-best-practices/.claude/skills/skill-evaluator/\"* \"D:/Abhay/VibeCoding/FIREKaro-Vue/.claude/skills/skill-evaluator/\")",
+      "Bash(rm -f .claude/skills/e2e-visual-run/SKILL.md)",
+      "Bash(curl -sSL --ssl-no-revoke --max-time 60 -w '%{http_code}' -o .claude/skills/e2e-visual-run/SKILL.md __TRACKED_VAR__/skills/e2e-visual-run/SKILL.md)",
+      "Bash(cp .claude/config/test-pipeline.yml .claude/config/test-pipeline.yml.bak)",
+      "Bash(python -c ' *)",
+      "Bash(echo \"stage_2_passed=$\\(date -u +%FT%TZ\\)\")",
+      "Bash(mv .claude/config/test-pipeline.yml.bak .claude/config/test-pipeline.yml)",
+      "Bash(python)",
+      "Bash(echo \"stage_4_done=$\\(date -u +%FT%TZ\\)\")",
+      "Bash(mkdir -p .claude/skills/update-practices)",
+      "Bash(cp D:/Abhay/VibeCoding/claude-best-practices/core/.claude/skills/update-practices/SKILL.md .claude/skills/update-practices/SKILL.md)"
+    ]
+  }
+}

@@ -1,0 +1,104 @@
+/**
+ * Pure-kernel tests for derive() (Stage-T0 B-1).
+ *
+ * Exercises the kernel directly with plain inputs AND proves the wrapper
+ * (useFireDerive) and the kernel agree byte-for-byte on the Sharmas headline —
+ * the behaviour lock for the extraction.
+ */
+import { describe, it, expect, beforeEach } from "vitest";
+import { setActivePinia, createPinia } from "pinia";
+import { useHouseholdStore } from "@/stores/household";
+import { useAssumptionsStore } from "@/stores/assumptions";
+import { useUiStore } from "@/stores/ui";
+import { loadSeedPersona } from "@/lib/seed-persona";
+import { useFireDerive } from "@/lib/useFireDerive";
+import { derive } from "@/lib/derive";
+
+describe("derive() — pure kernel", () => {
+  beforeEach(() => setActivePinia(createPinia()));
+
+  it("the wrapper and the kernel produce a byte-identical Sharmas headline", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    const ui = useUiStore();
+    loadSeedPersona(h, a);
+
+    const wrapper = useFireDerive();
+    const kernel = derive(h.data, a.values, {
+      isFamilyView: ui.isFamilyView,
+      viewingMemberId: ui.viewingMemberId,
+      currentFY: ui.currentFY,
+    });
+
+    // Headline + every load-bearing aggregate must match exactly.
+    expect(kernel.fireNumber).toBe(wrapper.fireNumber.value);
+    expect(kernel.baseFireNumber).toBe(wrapper.baseFireNumber.value);
+    expect(kernel.familyLayerCorpus).toBe(wrapper.familyLayerCorpus.value);
+    expect(kernel.healthcareReservation).toBe(wrapper.healthcareReservation.value);
+    expect(kernel.effectiveSWR).toBe(wrapper.effectiveSWR.value);
+    expect(kernel.totalCorpus).toBe(wrapper.totalCorpus.value);
+    expect(kernel.annualTax).toBe(wrapper.annualTax.value);
+    expect(kernel.progressPercent).toBe(wrapper.progressPercent.value);
+    expect(kernel.projection.length).toBe(wrapper.projection.value.length);
+  });
+
+  it("the Sharmas headline includes family layer + healthcare reservation on top of base", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    loadSeedPersona(h, a);
+    const k = derive(h.data, a.values, { isFamilyView: false, viewingMemberId: null, currentFY: "2025-26" });
+    expect(k.fireNumber).toBeGreaterThan(k.baseFireNumber);
+    expect(k.fireNumber).toBeCloseTo(
+      k.baseFireNumber + k.familyLayerCorpus + k.baseFireNumber * k.healthcareReservationPercent,
+      0,
+    );
+  });
+
+  it("is pure — same inputs yield an equal headline across repeated calls", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    loadSeedPersona(h, a);
+    const lens = { isFamilyView: false, viewingMemberId: null, currentFY: "2025-26" };
+    const first = derive(h.data, a.values, lens).fireNumber;
+    const second = derive(h.data, a.values, lens).fireNumber;
+    expect(first).toBe(second);
+  });
+
+  it("an empty household yields a zero corpus and zero progress (defensive)", () => {
+    const a = useAssumptionsStore();
+    const h = useHouseholdStore();
+    // Empty household from the store's default shape.
+    const k = derive(h.data, a.values, { isFamilyView: false, viewingMemberId: null, currentFY: "2025-26" });
+    expect(k.totalCorpus).toBe(0);
+    expect(k.progressPercent).toBe(0);
+  });
+
+  it("A14.2 — the Sharmas' ₹4L NPS (below the ₹5L threshold) yields no annuity → headline unchanged", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    loadSeedPersona(h, a);
+    const k = derive(h.data, a.values, { isFamilyView: false, viewingMemberId: null, currentFY: "2025-26" });
+    expect(k.npsAnnuityIncome).toBe(0);
+    expect(k.fireWithdrawableCorpus).toBe(k.totalCorpus);
+  });
+
+  it("A14.2 — an NPS corpus above ₹5L lowers the required FIRE number vs the same household without NPS", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    loadSeedPersona(h, a);
+    const lens = { isFamilyView: false, viewingMemberId: null, currentFY: "2025-26" };
+
+    const withoutNps = derive(h.data, a.values, lens).fireNumber;
+
+    // Add a large NPS holding (> ₹5L) so the mandatory 40% annuity kicks in.
+    h.addInvestment({ type: "NPS", label: "NPS top-up", value: 5_000_000, monthlyContribution: 0, ownerId: "rohit" });
+    const withNps = derive(h.data, a.values, lens);
+
+    // Annuity income is positive (40% × 50L × 6% = ₹1.2L/yr).
+    expect(withNps.npsAnnuityIncome).toBeGreaterThan(0);
+    // The FIRE number drops by ~ annuityIncome / SWR (the annuity's present value).
+    expect(withNps.fireNumber).toBeLessThan(withoutNps);
+    // The withdrawable corpus excludes the annuitised 40% (no double-count).
+    expect(withNps.fireWithdrawableCorpus).toBeLessThan(withNps.totalCorpus);
+  });
+});

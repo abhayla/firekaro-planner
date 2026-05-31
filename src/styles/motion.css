@@ -1,0 +1,122 @@
+/* motion.css — v5 transition + reduced-motion system (inherited from v4) */
+/* Original lock: docs/goals/build-firekaro-demo-v4.md §1.2 */
+/* Continued in v5: docs/goals/build-firekaro-mvp-v5.md §1.1 Decision 7 */
+
+:root {
+  /* === Timing functions === */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-linear: linear;
+
+  /* === Durations (all under 200ms per §1.2) === */
+  --duration-instant: 100ms;
+  --duration-fast: 150ms;
+  --duration-base: 200ms;
+  --duration-slow: 300ms;
+}
+
+/* === Universal interactive transition === */
+.interactive,
+.v-btn,
+.v-card,
+.v-chip,
+.v-list-item {
+  transition:
+    transform var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out),
+    background-color var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out),
+    opacity var(--duration-fast) var(--ease-out);
+}
+
+/* === Card hover lift (Linear-anchor) === */
+.v-card.interactive-card:hover,
+.lift-on-hover:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+/* === Button press feedback === */
+.v-btn:active,
+.interactive:active {
+  transform: scale(0.98);
+}
+
+/* === Universal focus ring (overrides Vuetify defaults) === */
+*:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+  border-radius: var(--radius-xs);
+}
+
+/* === Page transition (used with @vueuse/motion) === */
+.page-enter-active,
+.page-leave-active {
+  transition: opacity var(--duration-base) var(--ease-out),
+              transform var(--duration-base) var(--ease-out);
+}
+
+.page-enter-from {
+  opacity: 0;
+  transform: translateY(8px);
+}
+
+.page-leave-to {
+  opacity: 0;
+  transform: translateY(-4px);
+}
+
+/* === prefers-reduced-motion override (a11y mandatory) === */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .v-card.interactive-card:hover,
+  .lift-on-hover:hover {
+    transform: none;
+  }
+
+  .v-btn:active,
+  .interactive:active {
+    transform: none;
+  }
+
+  .v-input.v-input--error :deep(.v-field__outline) {
+    animation: none !important;
+  }
+}
+
+/* === VeeValidate inline error polish — applies generically to every form field === */
+.v-input.v-input--error :deep(.v-field__outline) {
+  animation: errorOutlineShake var(--duration-base) var(--ease-out);
+}
+.v-input.v-input--error :deep(.v-messages) {
+  color: var(--color-error);
+  font-family: var(--font-mono);
+  font-size: var(--type-xs);
+  font-weight: var(--weight-medium);
+  letter-spacing: -0.01em;
+}
+
+@keyframes errorOutlineShake {
+  0% { transform: translateX(0); }
+  20% { transform: translateX(-2px); }
+  40% { transform: translateX(2px); }
+  60% { transform: translateX(-1px); }
+  80% { transform: translateX(1px); }
+  100% { transform: translateX(0); }
+}
+
+/* Required asterisk — apply via .v-label asterisk styling */
+.v-input :deep(.v-label .v-icon),
+.v-input :deep(label .v-icon) {
+  color: var(--color-error);
+}

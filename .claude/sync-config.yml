@@ -1,0 +1,137 @@
+# Sync configuration for /update-practices skill.
+#
+# Tells the hub-sync skill which patterns this project consumes from
+# `abhayla/claude-best-practices` and — critically — which ones to NEVER
+# pull, even when present in the hub registry.
+#
+# Created 2026-05-19 to fix the "106 skill descriptions dropped" Claude Code
+# status-line warning. The pre-prune catalog (166 skills + 39 agents + 69
+# rules) exceeded Claude Code's available-skills context budget. This file
+# documents the pruned-out items so the next /update-practices run does not
+# silently re-pull them.
+
+hub_repo: abhayla/claude-best-practices
+last_sync: "2026-05-01T10:15:45+00:00"  # carry forward from sync-manifest.json
+
+# Stacks this project actively uses. Future hub-side stack-aware filtering
+# can use these tags to scope pattern selection.
+selected_stacks:
+  - vue
+  - vuetify
+  - hono
+  - prisma
+  - postgres
+  - vitest
+  - playwright
+  - better-auth
+  - tanstack-query
+  - pinia
+
+# Explicit exclusion list. The next `/update-practices` MUST NOT re-pull these
+# even if they appear in the hub registry. Items removed because they cover
+# stacks not used here (mobile, Firebase, FastAPI, Bun, Solidity, etc.) or
+# are alternatives to the chosen toolchain (Drizzle vs Prisma, Jest vs
+# Vitest, Tailwind vs Vuetify, etc.).
+#
+# IMPORTANT: If a project ever adds one of these stacks, REMOVE its entries
+# here and run `/update-practices` to pull the pattern back from the hub.
+# The patterns are never lost — they live unchanged in the hub repo.
+
+exclude:
+  skills:
+    # Mobile / cross-platform
+    - android-adb-test
+    - android-arch
+    - android-gradle
+    - android-mvi-scaffold
+    - android-run-e2e
+    - android-run-tests
+    - android-test-patterns
+    - compose-ui
+    - xml-to-compose
+    - flutter-dev
+    - flutter-e2e-test
+    - expo-dev
+    - react-native-dev
+    - react-native-e2e
+    - mobile-a11y-test
+    - cross-platform-visual
+
+    # Different backend stacks
+    - fastapi-db-migrate
+    - fastapi-deploy
+    - fastapi-run-backend-tests
+    - pytest-dev
+    - bun-elysia-test
+    - node-backend-dev
+    - firebase-ai
+    - firebase-data-connect
+    - firebase-dev
+    - firebase-test
+
+    # Different frontend frameworks / test runners
+    - nextjs-dev
+    - nuxt-dev
+    - react-test-patterns
+    - tailwind-dev
+    - jest-dev
+
+    # Infrastructure / specialty domains not used here
+    - solidity-audit
+    - remotion-video
+    - obsidian
+    - reddit
+    - twitter-x
+    - html-prototype
+    - pm2-deploy
+    - k8s-deploy
+    - iac-deploy
+    - drizzle-orm
+    - d3-viz
+    - chaos-resilience
+    - dast-scan
+    - semgrep-rules
+    - redis-patterns
+    - monorepo
+    - mcp-server-builder
+
+    # Deprecated at hub
+    - testing-pipeline-workflow
+
+  agents:
+    # Stack-specific worker agents (orchestrators were also removed)
+    - android-build-fixer-agent
+    - android-compose-agent
+    - android-kotlin-reviewer-agent
+    - fastapi-api-tester-agent
+    - fastapi-database-admin-agent
+    - flutter-dart-agent
+
+    # Deprecated master orchestrators (Phase 3.x of subagent-dispatch-platform-limit
+    # remediation — see hub commits 2026-04-24 onward). The corresponding
+    # skill-at-T0 replacements (/code-review-workflow, /debugging-loop,
+    # /development-loop, /documentation-workflow, /test-pipeline, etc.) are
+    # retained.
+    - code-review-master-agent
+    - debugging-loop-master-agent
+    - development-loop-master-agent
+    - documentation-master-agent
+    - e2e-conductor-agent
+    - failure-triage-agent
+    - learning-self-improvement-master-agent
+    - session-continuity-master-agent
+    - skill-authoring-master-agent
+    - testing-pipeline-master-agent
+    - test-pipeline-agent
+
+  rules:
+    # Stack-specific rule files
+    - android.md
+    - android-compose-ui.md
+    - android-kotlin.md
+    - firebase.md
+    - fastapi-backend.md
+    - fastapi-database.md
+    - flutter.md
+    - react-nextjs.md
+    - bun-elysia.md

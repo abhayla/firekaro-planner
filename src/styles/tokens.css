@@ -1,0 +1,196 @@
+/* tokens.css — v5 design tokens (inherited from v4 demo per Decision 7: inherit UI/UX fully) */
+/* Original lock: docs/goals/build-firekaro-demo-v4.md §1.2 (PL light base, Linear-anchored) */
+/* Continued in v5: docs/goals/build-firekaro-mvp-v5.md §1.1 Decision 7 — only audit-mandated changes apply */
+
+:root {
+  /* === Typography scale === */
+  --type-xs: 12px;
+  --type-sm: 14px;
+  --type-base: 16px;
+  --type-md: 18px;
+  --type-lg: 20px;
+  --type-xl: 24px;
+  --type-2xl: 32px;
+  --type-3xl: 48px;
+  --type-4xl: 64px;
+
+  --leading-tight: 1.2;
+  --leading-snug: 1.35;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.65;
+
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+
+  --tracking-tight: -0.02em;
+  --tracking-normal: 0;
+  --tracking-wide: 0.04em;
+
+  /* === Spacing scale (4-64px) === */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+
+  /* === Radii (Linear sharp aesthetic) === */
+  --radius-xs: 4px;   /* chips */
+  --radius-sm: 6px;   /* buttons, inputs */
+  --radius-md: 8px;   /* cards */
+  --radius-lg: 12px;  /* dialogs */
+  --radius-full: 9999px;
+
+  /* === Shadows (Linear subtle) === */
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04), 0 0 1px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 4px 8px rgba(0, 0, 0, 0.08), 0 0 1px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 8px 16px rgba(0, 0, 0, 0.10), 0 0 1px rgba(0, 0, 0, 0.06);
+  --shadow-xl: 0 16px 32px rgba(0, 0, 0, 0.12), 0 0 1px rgba(0, 0, 0, 0.06);
+
+  /* === Color: PL light primary === */
+  --color-primary-50: #eff6ff;
+  --color-primary-100: #dbeafe;
+  --color-primary-200: #bfdbfe;
+  --color-primary-300: #93c5fd;
+  --color-primary-400: #60a5fa;
+  --color-primary-500: #3b82f6;
+  --color-primary-600: #2563eb;
+  --color-primary-700: #1d4ed8;
+  --color-primary-800: #1e40af;
+  --color-primary-900: #1e3a8a;
+  --color-primary: var(--color-primary-600);
+
+  /* === Semantic accents (PL palette) === */
+  --color-success: #10b981;
+  --color-success-bg: #d1fae5;
+  --color-success-fg: #065f46;
+  --color-error: #ef4444;
+  --color-error-bg: #fee2e2;
+  --color-error-fg: #991b1b;
+  --color-warning: #f59e0b;
+  --color-warning-bg: #fef3c7;
+  --color-warning-fg: #92400e;
+  --color-info: #6366f1;
+  --color-info-bg: #e0e7ff;
+  --color-info-fg: #3730a3;
+
+  /* === Neutral gray scale (Linear 11-stop) === */
+  --color-gray-50: #fafafa;
+  --color-gray-100: #f4f4f5;
+  --color-gray-200: #e4e4e7;
+  --color-gray-300: #d4d4d8;
+  --color-gray-400: #a1a1aa;
+  --color-gray-500: #71717a;
+  --color-gray-600: #52525b;
+  --color-gray-700: #3f3f46;
+  --color-gray-800: #27272a;
+  --color-gray-900: #18181b;
+  --color-gray-950: #09090b;
+
+  /* === Surfaces === */
+  --surface-base: #ffffff;
+  --surface-elevated: #ffffff;
+  --surface-muted: var(--color-gray-50);
+  --surface-subtle: var(--color-gray-100);
+  --surface-overlay: rgba(0, 0, 0, 0.04);
+
+  /* === Text === */
+  --text-primary: var(--color-gray-900);
+  --text-secondary: var(--color-gray-600);
+  --text-muted: var(--color-gray-500);
+  --text-disabled: var(--color-gray-400);
+  --text-inverse: #ffffff;
+
+  /* === Borders === */
+  --border-subtle: var(--color-gray-200);
+  --border-default: var(--color-gray-300);
+  --border-strong: var(--color-gray-400);
+
+  /* === Focus ring === */
+  --focus-ring-color: var(--color-primary-500);
+  --focus-ring-width: 2px;
+  --focus-ring-offset: 2px;
+
+  /* === Typography stacks === */
+  --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  --font-display: 'Inter', system-ui, sans-serif;
+}
+
+/* === Global application font (overrides Vuetify's .v-application Roboto default) === */
+html,
+body,
+.v-application,
+.v-application .v-btn,
+.v-application .v-card,
+.v-application .v-list,
+.v-application input,
+.v-application textarea,
+.v-application select {
+  font-family: var(--font-sans);
+}
+
+.v-application .text-h1,
+.v-application .text-h2,
+.v-application .text-h3,
+.v-application .text-h4,
+.v-application .text-h5,
+.v-application .text-h6 {
+  font-family: var(--font-display);
+  letter-spacing: var(--tracking-tight);
+}
+
+/* === Utility classes === */
+.font-mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.font-display {
+  font-family: var(--font-display);
+  letter-spacing: var(--tracking-tight);
+}
+
+.text-currency {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+}
+
+/* Section label above a group of cards. Promoted to a global utility per the
+   Screen Standard (was copy-pasted scoped CSS in 6 screens). See
+   mvp/SCREEN-STANDARD.md §5 + changelog. */
+.section-eyebrow {
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: rgba(var(--v-theme-on-surface), 0.55);
+  margin: 22px 4px 12px;
+}
+.section-eyebrow:first-child {
+  margin-top: 0;
+}
+
+/* WCAG AA contrast — Vuetify default text-medium-emphasis is rgba(0,0,0,0.6) ≈ #767d88
+   which falls just short of 4.5:1 on white. Bump to a darker token-driven gray. */
+.v-application .text-medium-emphasis {
+  color: var(--text-secondary) !important;
+  opacity: 1 !important;
+}
+
+/* Toggle rows: a v-switch inside a list row must stay self-sized so it never
+   overlaps the row's label/subtitle. Toggles belong on the trailing (#append)
+   side — see SCREEN-STANDARD.md §5c. This guard makes any toggle list safe. */
+.v-list-item .v-switch {
+  flex: 0 0 auto;
+}
+.v-list-item .v-switch .v-selection-control {
+  min-height: 0;
+  min-width: 0;
+}

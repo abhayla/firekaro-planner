@@ -1,0 +1,37 @@
+# dependencies
+node_modules/
+server/node_modules/
+
+# build output
+dist/
+server/dist/
+*.tsbuildinfo
+
+# env / secrets (NEVER commit)
+.env
+.env.local
+.env.*.local
+server/.env
+server/.env.local
+
+# test / e2e artifacts
+coverage/
+playwright-report/
+test-results/
+test-evidence/
+e2e/.auth/
+
+# run artifacts
+docs/goals/.run/
+
+# prisma generated client (regenerated via prisma generate)
+server/node_modules/.prisma/
+
+# logs / os
+*.log
+.DS_Store
+Thumbs.db
+
+# editor
+.idea/
+*.swp

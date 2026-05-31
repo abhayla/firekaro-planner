@@ -1,0 +1,29 @@
+{"id":"L-001","ts":"2026-04-17T00:00:00Z","action":"SEED","file":"references/learnings.md","confidence":0.95,"source":"app-login-bootstrap"}
+{"id":"L-002","ts":"2026-04-17T00:00:00Z","action":"SEED","file":"references/learnings.md","confidence":0.85,"source":"app-login-bootstrap"}
+{"id":"L-003","ts":"2026-04-17T00:00:00Z","action":"SEED","file":"references/learnings.md","confidence":0.92,"source":"app-login-bootstrap"}
+{"id":"L-004","ts":"2026-04-17T00:00:00Z","action":"SEED","file":"references/learnings.md","confidence":0.98,"source":"app-login-bootstrap"}
+{"id":"L-005","ts":"2026-04-17T00:00:00Z","action":"SEED","file":"references/learnings.md","confidence":0.80,"source":"app-login-bootstrap"}
+{"ts":"2026-04-17T00:00:00Z","action":"FIX","file":"SKILL.md","field":"allowed-tools","detail":"added mcp__playwright__browser_evaluate (used by Step 7, previously undeclared)","source":"skill-evaluator"}
+{"ts":"2026-04-17T00:00:00Z","action":"VERSION_BUMP","file":"SKILL.md","from":"1.0.0","to":"1.0.1","source":"skill-evaluator"}
+{"ts":"2026-04-17T00:00:00Z","action":"FIX","file":"SKILL.md","field":"steps","detail":"inserted STEP 2 Prerequisites Check (dev server 5173 + 3000); renumbered downstream steps 2->3, 3->4, 4->5, 5->6, 6->7, 7->8, 8->9; fixed all internal cross-references","source":"user-request"}
+{"ts":"2026-04-17T00:00:00Z","action":"VERSION_BUMP","file":"SKILL.md","from":"1.0.1","to":"1.0.2","source":"user-request"}
+{"ts":"2026-04-18T03:25:00Z","action":"FIX","file":"SKILL.md","field":"step-2","detail":"replaced HALT-on-server-down with auto-start npm run dev as background process; poll 5173 + 3000 every 2s up to 90s; do not kill on exit","source":"user-request"}
+{"ts":"2026-04-18T03:25:00Z","action":"VERSION_BUMP","file":"SKILL.md","from":"1.0.2","to":"1.1.0","source":"user-request"}
+{"id":"L001","ts":"2026-04-18T03:55:00Z","action":"CREATE","file":".claude/learnings.json","confidence":0.92,"source":"app-login","detail":"pinia stores must use envelope unwrap helpers — discovered via alerts.value.filter crash"}
+{"id":"L002","ts":"2026-04-18T03:55:00Z","action":"CREATE","file":".claude/learnings.json","confidence":0.88,"source":"app-login","detail":"mcp playwright cookies persist across runs — --fresh must clear cookies"}
+{"ts":"2026-04-18T04:10:00Z","action":"FIX","file":"SKILL.md","field":"step-5","detail":"added sub-step 5.0: when --fresh is passed, clear browser cookies via about:blank + /api/auth/sign-out POST on both origins + document.cookie sweep before navigating to /auth/signin; verify get-session returns null before proceeding","source":"user-request"}
+{"id":"L-006","ts":"2026-04-18T04:10:00Z","action":"CREATE","file":"references/learnings.md","confidence":0.92,"source":"app-login","detail":"MCP Playwright persists cookies across skill runs; stale Better Auth cookie triggers false-positive /dashboard landing"}
+{"ts":"2026-04-18T04:10:00Z","action":"VERSION_BUMP","file":"SKILL.md","from":"1.1.0","to":"1.1.1","source":"user-request"}
+{"ts":"2026-04-18T09:20:00Z","action":"FIX","file":"SKILL.md","field":"step-5.0","detail":"corrected sign-out call example: requires Content-Type: application/json + '{}' body (without both Better Auth returns 415); navigate to localhost:5173 not about:blank (cookie-access denied); session cookie is HTTP-only so document.cookie sweep is redundant","source":"runtime-discovery"}
+{"id":"L-007","ts":"2026-04-18T09:30:00Z","action":"CREATE","file":"references/learnings.md","confidence":0.95,"source":"app-login","detail":"better-auth v1.4 Vue client returns {url, redirect:true} but does not auto-navigate; caller must set window.location.href manually"}
+{"id":"L-008","ts":"2026-04-18T09:30:00Z","action":"CREATE","file":"references/learnings.md","confidence":0.95,"source":"app-login","detail":"src/router/index.ts has dev-mode auth bypass; URL on /dashboard does not prove login success — must verify via get-session"}
+{"id":"L-007","ts":"2026-05-18T13:30:00Z","action":"APPLY","file":"references/learnings.md","confidence":0.97,"source":"app-login","note":"Applied-In bumped after textbook reproduction"}
+{"id":"version","ts":"2026-05-18T13:30:00Z","action":"VERSION_BUMP","file":"SKILL.md","from":"1.1.1","to":"1.1.2","source":"app-login"}
+{"id":"L003","ts":"2026-05-23T06:30:00Z","action":"CREATE","file":".claude/learnings.json","confidence":0.95,"source":"app-login","detail":"get-session returns {user,session} at root in better-auth ^1.4.x — L-003 references/learnings.md shape is stale; supersedes-L-003"}
+{"id":"L004","ts":"2026-05-23T06:30:00Z","action":"CREATE","file":".claude/learnings.json","confidence":0.95,"source":"app-login","detail":"MCP Playwright does not expose storageState() — e2e/.auth/user.json stays empty after MCP-driven login; Step 8 persistence is aspirational"}
+{"id":"SKILL-UPDATE","ts":"2026-05-23T18:40:14Z","action":"UPDATE","file":"SKILL.md","change":"Step 4 confirmation gate -> announcement (no wait); version 1.1.2 -> 1.1.3","source":"app-login","approver":"user-runtime"}
+{"id":"L-009","ts":"2026-05-23T18:51:15Z","action":"CREATE","file":"references/learnings.md","confidence":0.90,"source":"app-login","approver":"abhay"}
+{"id":"SKILL-VERSION","ts":"2026-05-23T18:51:31Z","action":"VERSION_BUMP","file":"SKILL.md","change":"1.1.3 -> 1.1.4 for L-009 capture","source":"app-login"}
+{"id":"L-009","ts":"2026-05-24T10:21:38Z","action":"UPDATE","file":"references/learnings.md","confidence":0.95,"source":"app-login","note":"CANDIDATE->ACTIVE, Applied-In +1 (2026-05-24 verbatim repro), Supersedes:L-007"}
+{"id":"L-007","ts":"2026-05-24T10:21:38Z","action":"UPDATE","file":"references/learnings.md","confidence":0.97,"source":"app-login","note":"Added Superseded-By:L-009 + HISTORICAL NOTE for better-auth >=1.4.x"}
+{"id":"SKILL-VERSION","ts":"2026-05-24T10:22:22Z","action":"VERSION_BUMP","file":"SKILL.md","change":"1.1.4 -> 1.1.5 for L-009 promotion + L-007 historical note","source":"app-login"}
