@@ -9,6 +9,24 @@ The hook (`prompt-enhance-reminder.sh`) gates triggering: prompts ≤15 chars
 and known continuation phrases skip injection at the deterministic layer,
 so the strengthening pipeline only runs on substantive prompts.
 
+## The unified per-prompt pipeline (0 → 6)
+
+Every substantive prompt runs ONE process. Stages 0–4.6 strengthen the prompt;
+4.7–6 govern how it is carried out. Each governance stage is summarised here and
+detailed in its SSOT rule — pointer pattern, no duplication (`configuration-ssot.md`):
+
+| Stage | What happens | SSOT detail |
+|---|---|---|
+| **0–4.6** | Grade → diagnose → strengthen → show grade card + step transcript + final prompt | `/prompt-auto-enhance` |
+| **4.7 Role** | Infer the role, state `Role: <name> — <why>`, dispatch its backing agents/skills | `engineering-roles.md` |
+| **4.8 Gate** | Resolve intent (tiered): 1–2 gaps → one targeted question; consequential fork & confidence <~95% → `/grill-me` or `/grill-with-docs` | `decision-authority.md` → "Confidence gate" |
+| **5 Execute** | Act under DACI: **decide** reversible/internal; **inform** on tactical product calls; **escalate** irreversible/outward in one line + keep working | `decision-authority.md` |
+| **6 Git** | Only if the turn produced committable changes: stage → secret-scan → commit → (branch/merge) → push via `git-manager-agent` + `.githooks/pre-commit` | `decision-authority.md` → "Git authority" |
+
+**Verbosity (chosen 2026-06-01): FULL.** Render the grade card + step transcript +
+final strengthened prompt on **every** non-trivial prompt — not a lean one-liner.
+Stage 6 is conditional (skip on Q&A / read-only turns).
+
 ## Tier 1 — Always (every prompt that reaches this rule)
 
 1. Existing `.claude/` patterns — know what exists, do not duplicate
@@ -36,7 +54,19 @@ After strengthening, render every time:
 The final prompt is shown for transparency, not approval — execution
 proceeds in the same response.
 
-## Clarification Gate — Ask Until Confident
+## Clarification & Confidence Gate — Ask/Grill Until Confident (stage 4.8)
+
+This is the merged intent-resolution gate (lightweight clarification + the
+`decision-authority.md` confidence gate, tiered):
+
+- **1–2 small gaps** → the Clarification Gate below (one targeted question at a time).
+- **Consequential fork** (expensive to reverse, materially changes the product, no
+  clear best-practice winner) **and confidence < ~95%** → converge via **`/grill-me`**
+  or **`/grill-with-docs`** before building — do not guess at WHAT to build.
+- **"You take a call" / pre-authorized** → gate waived; proceed on best judgment,
+  stating one-line assumptions.
+
+Confidence is about **intent**, never reversible execution detail — those just get decided (stage 5).
 
 **Trigger:** the prompt is > 15 characters (the only floor — handled
 deterministically by the hook). Every prompt that reaches this skill is
@@ -72,8 +102,15 @@ These are the load-bearing contracts:
 - Strengthening runs for any non-trivial prompt that the hook did not filter
 - The grade card, step transcript, and final prompt preview are shown for
   every non-trivial prompt — even Grade A
-- The Clarification Gate runs until confidence is reached, not until a
-  question count is hit
+- The Clarification & Confidence Gate runs until confidence is reached, not
+  until a question count is hit; consequential forks under ~95% confidence go
+  to `/grill-me` / `/grill-with-docs`, not a guess
+- After the final prompt: state the role (`Role: <name> — <why>`,
+  `engineering-roles.md`), then execute under decision-authority — decide
+  reversible/internal work, escalate only the gated items in one line
+  (`decision-authority.md`)
+- If the turn produced committable changes, run stage 6 git via
+  `git-manager-agent` + `.githooks/pre-commit`; skip git on Q&A / read-only turns
 - Resource CRUD requires the batch approval table — no creates / updates
   / deletes happen without explicit user approval
 - Code is read before asking a clarification question

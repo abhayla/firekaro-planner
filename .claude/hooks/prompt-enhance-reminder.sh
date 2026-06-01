@@ -44,7 +44,7 @@ if ! command -v jq >/dev/null; then
   emit_reminder() {
     echo "REMINDER: Start your response with *Enhanced: <what context was checked>* (under 15 words)."
     echo "Gather Tier 1 context (patterns, CLAUDE.md, git state) before responding."
-    echo "For non-trivial prompts (ambiguous, multi-file, multi-step): run the Grade → Diagnose → Fix pipeline from /prompt-auto-enhance. Grade on 6 dimensions first — only fix dimensions scoring below 4. Skip for direct instructions, single-file changes, and questions."
+    echo "For non-trivial prompts (ambiguous, multi-file, multi-step): run the Grade → Diagnose → Fix pipeline from /prompt-auto-enhance, then the governance tail — role (engineering-roles.md), gate (grill-me if a consequential fork is unclear), execute under decision-authority, git via git-manager-agent if changes. Skip for direct instructions, single-file changes, and questions."
   }
   emit_reminder
   exit 0
@@ -85,4 +85,5 @@ fi
 echo "REMINDER: Start your response with *Enhanced: <what context was checked>* (under 15 words)."
 echo "Gather Tier 1 context (patterns, CLAUDE.md, git state) before responding."
 echo "For non-trivial prompts (>15 chars, not a continuation): run the Grade → Diagnose → Fix pipeline from /prompt-auto-enhance. Show the step transcript and the final strengthened prompt before executing. Clarification Gate: ask one question at a time, no upper limit, until you have full confidence in user intent."
+echo "Then the governance tail: state Role: <name> — <why> (engineering-roles.md); gate intent (grill-me/grill-with-docs if a consequential fork is <~95% clear); execute under decision-authority (decide reversible, escalate irreversible in one line); and if the turn produced changes, do git via git-manager-agent + the secret-scan hook."
 exit 0

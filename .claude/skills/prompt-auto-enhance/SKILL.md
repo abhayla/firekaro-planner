@@ -479,11 +479,36 @@ prompt block ends and STEP 5 runs. The user is not interrupted with a
 suggestion to use `/tdd` or `/development-loop` — those are direct-action
 intents the user already framed clearly.
 
-## STEP 5: Execute
+## STEP 4.7: Route to a role
+
+Infer the engineering/PM role from the strengthened prompt and state it in one
+line: `Role: <name> — <why>`. Dispatch that role's backing agents/skills; sequence
+roles for multi-part work. Full router + role list: `engineering-roles.md`
+(pointer pattern — do not duplicate the table here).
+
+## STEP 5: Execute (under decision-authority)
 
 Proceed with the strengthened prompt as if the user had entered it directly.
 The rest of the auto-enhance pipeline (Tier 1/2 context, CRUD detection)
 applies to the strengthened version, not the original.
+
+Classify each decision under DACI (`decision-authority.md`):
+- **DECIDE** reversible / internal / best-practice-clear work — just do it, report after
+- **DECIDE + INFORM** tactical product calls — do it, drop a one-line note
+- **ESCALATE** irreversible / outward-facing / financially-material / strategic /
+  genuine-fork — one line with a recommended option, and keep working every non-gated item
+
+## STEP 6: Git (conditional)
+
+If the turn produced committable changes, dispatch `git-manager-agent` to
+stage → secret-scan → commit (conventional + the Co-Authored-By trailer) → push;
+`.githooks/pre-commit` is the deterministic secret gate. Branch + `--no-ff` merge
+for cohesive multi-file work; gate scaled to the change (code → type-check + tests,
+docs → cross-ref check). **Skip git entirely on Q&A / read-only turns.** Escalate
+only destructive history ops (force-push, rewrite of pushed commits, hard reset or
+deletion of `main`). Detail: `decision-authority.md` → "Git authority".
+
+### When NOT to Strengthen
 
 ### When NOT to Strengthen
 
@@ -496,10 +521,21 @@ Most filtering happens at the hook layer. Within the skill, additional skips:
 | Pure knowledge question (not an action request) | Skip strengthening; just answer |
 | Action-oriented question ("how should I test this?") | Strengthen before answering |
 
-## Clarification Gate
+## Clarification & Confidence Gate
 
-The Clarification Gate runs AFTER strengthening and BEFORE STEP 4.6 (final
-prompt preview), so the previewed prompt reflects the resolved intent.
+The gate runs AFTER strengthening and BEFORE STEP 4.6 (final prompt preview),
+so the previewed prompt reflects the resolved intent. It is tiered (merges the
+lightweight clarification gate with the `decision-authority.md` confidence gate):
+
+- **1–2 small gaps** → the Clarification Gate below (one targeted question at a time, locked format).
+- **Consequential fork** (expensive to reverse, materially changes the product, no clear
+  best-practice winner) **and confidence < ~95%** → converge via **`/grill-me`** or
+  **`/grill-with-docs`** before building — do not guess at WHAT to build. (`grill-with-docs`
+  preferred when the decision should be recorded into CONTEXT/ADRs.)
+- **"You take a call" / pre-authorized** → gate waived; proceed on best judgment, stating
+  one-line assumptions.
+
+Confidence is about **intent**, never a reversible execution detail (those are just decided in STEP 5).
 
 **Trigger:** the prompt is > 15 characters (the only floor — handled
 deterministically by the hook). For every prompt that reaches this skill,
