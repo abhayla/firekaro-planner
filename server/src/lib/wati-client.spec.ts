@@ -40,6 +40,14 @@ describe("getWatiConfig / isWhatsAppEnabled", () => {
     expect(isWhatsAppEnabled(env)).toBe(true);
   });
 
+  it("strips a leading 'Bearer ' from the token (Wati shows it with the prefix)", () => {
+    const env = {
+      WATI_API_ENDPOINT: "https://x.wati.io",
+      WATI_API_TOKEN: "Bearer abc.def.ghi",
+    } as NodeJS.ProcessEnv;
+    expect(getWatiConfig(env)?.token).toBe("abc.def.ghi");
+  });
+
   it("treats whitespace-only / partial config as unconfigured", () => {
     expect(getWatiConfig({ WATI_API_ENDPOINT: "  ", WATI_API_TOKEN: "tok" } as NodeJS.ProcessEnv)).toBeNull();
     expect(getWatiConfig({ WATI_API_ENDPOINT: "https://x.wati.io" } as NodeJS.ProcessEnv)).toBeNull();

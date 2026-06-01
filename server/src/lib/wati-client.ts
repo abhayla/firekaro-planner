@@ -45,7 +45,9 @@ export interface WatiSendResult {
  */
 export function getWatiConfig(env: NodeJS.ProcessEnv = process.env): WatiConfig | null {
   const endpoint = env.WATI_API_ENDPOINT?.trim();
-  const token = env.WATI_API_TOKEN?.trim();
+  // Wati shows the token WITH a leading "Bearer " — strip it so we don't emit
+  // "Bearer Bearer ..." (the adapter adds the scheme itself).
+  const token = env.WATI_API_TOKEN?.trim().replace(/^Bearer\s+/i, "");
   if (!endpoint || !token) return null;
   return { endpoint, token };
 }
