@@ -49,8 +49,11 @@ team-PR clauses in `git-collaboration.md` (there is no second human reviewer —
 + automated gates ARE the reviewer).
 
 **How — route through `git-manager-agent` (haiku):** dispatch `git-manager-agent` for the
-stage → secret-scan → commit → push steps. It is the **secret-scan gate** (no pre-commit hook
-exists in this repo yet — see below), applies conventional standards, and is cheap. Orchestrate
+stage → secret-scan → commit → push steps — it applies conventional standards and adds an
+advisory secret scan. A **deterministic** secret-scan also runs on every commit via
+`.githooks/pre-commit` (wired by the `prepare` npm script → `core.hooksPath=.githooks`); that hook
+is the zero-exception gate, the agent is the complementary advisory layer (defense in depth).
+Orchestrate
 branch/merge decisions at T0 (the agent reports merge conflicts, it does not resolve them); plain
 **read-only git** (`status`/`log`/`diff`) stays inline — no dispatch needed.
 

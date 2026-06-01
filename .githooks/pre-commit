@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+# Secret-scan gate — blocks commits whose staged changes contain credential-shaped
+# VALUES. Defense-in-depth complement to git-manager-agent (which is advisory; this
+# is deterministic — it runs on every commit regardless of who/what makes it).
+#
+# Tuned to high-confidence secret FORMATS, not bare words, so docs that merely
+# mention "secret"/"token"/"auth" in prose do NOT trip it. Wired via:
+#   git config core.hooksPath .githooks   (auto-set by the package.json "prepare" script)
+#
+# Last resort for a genuine false positive: git commit --no-verify (discouraged; say why).
+
+set -uo pipefail
+
+fail=0
+
+# 1) Block staging real env files (allow templates: .env.example/.sample/.template)
+staged=$(git diff --cached --name-only --diff-filter=ACM)
+while IFS= read -r f; do
+  [ -z "$f" ] && continue
+  case "$f" in
+    .env|.env.*|*.env)
+      case "$f" in
+        *.example|*.sample|*.template) ;;
+        *) echo "BLOCKED: staging an env file (likely holds secrets): $f"; fail=1 ;;
+      esac
+      ;;
+  esac
+done <<< "$staged"
+
+# 2) Scan ADDED lines for credential-shaped values
+added=$(git diff --cached --diff-filter=ACM -U0 | grep -E '^\+' | grep -vE '^\+\+\+' || true)
+
+patterns=(
+  '-----BEGIN [A-Z ]*PRIVATE KEY-----'
+  'eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.'
+  'AKIA[0-9A-Z]{16}'
+  'sk-[A-Za-z0-9]{20,}'
+  'postgres(ql)?://[^:@/ ]+:[^@/ ]+@'
+  '(BETTER_AUTH_SECRET|DATABASE_URL|SECRET_KEY|ACCESS_TOKEN|API_KEY|APIKEY)[[:space:]]*[:=][[:space:]]*["'"'"']?[A-Za-z0-9/_+=.-]{16,}'
+)
+
+for p in "${patterns[@]}"; do
+  hits=$(echo "$added" | grep -nE -e "$p" | grep -viE 'your[-_]|placeholder|example|changeme|xxxx+|process\.env|import\.meta\.env|<[a-zA-Z]|REPLACE|redacted' || true)
+  if [ -n "$hits" ]; then
+    echo "BLOCKED: staged change matches secret pattern /$p/:"
+    echo "$hits" | head -5
+    fail=1
+  fi
+done
+
+if [ "$fail" -ne 0 ]; then
+  echo ""
+  echo "Commit blocked by .githooks/pre-commit (secret-scan). Remove the credential value."
+  echo "Real false positive? Re-run with --no-verify and note why."
+  exit 1
+fi
+exit 0
