@@ -1,37 +1,51 @@
 ---
-description: Backend pure calculation functions and India-specific financial constants
-globs: ["server/lib/calculations/**/*.ts"]
+description: Frontend pure calculation modules and India-specific financial constants
+globs: ["src/lib/**/*.ts"]
 ---
 
 # Calculation Module Conventions
 
+> **Repo note (extraction, 2026-05-31):** this rule was inherited from the retired `FIREKaro-Vue`
+> monorepo, where calculations lived in a `server/lib/calculations/` Hono backend. In this
+> extracted `firekaro-planner` repo, **all calculation math lives in `src/lib/*.ts`** and is
+> consumed directly by the Vue planner (Pinia stores + composables) — there is no calc backend.
+> The `server/` here is only the thin Hono/Prisma document API (`household-diff.ts`). Paths and
+> the module inventory below reflect THIS repo; `CLAUDE.md` → "Calculations" is the SSOT.
+
 ## Architecture
 
-Pure calculation functions live in `server/lib/calculations/*.ts`. These modules MUST NOT import Prisma, access the database, or perform any IO. Route handlers fetch data from Prisma, then pass it to calculation functions.
+Pure calculation functions live in `src/lib/*.ts` with a colocated `*.spec.ts`. These modules MUST
+be pure: **no Pinia store access, no DOM, no IO, no network**. Stores and composables fetch/hold
+the data, then pass plain inputs to these functions and persist the results via the storage
+adapter. Keep the calculation layer free of framework concerns so the specs can test pure
+input → output.
 
 ## Module Inventory
 
-13 calculation modules exist:
+Calculation modules in `src/lib/` (see `CLAUDE.md` for the authoritative list):
 
 | Module | Purpose |
 |--------|---------|
-| `advance-tax.ts` | Quarterly advance tax estimation |
-| `business-income.ts` | Presumptive and regular business income |
-| `capital-gains.ts` | LTCG/STCG with CII indexation |
-| `esop.ts` | ESOP taxation and vesting calculations |
-| `expense-coverage.ts` | How long savings cover expenses |
-| `fire-crossover.ts` | Passive income vs expenses crossover point |
-| `fire-metrics.ts` | FIRE number, savings rate, years to FIRE |
-| `fire-projections.ts` | Year-by-year corpus projection |
-| `freedom-score.ts` | 0-100 financial independence score |
-| `goals.ts` | Goal funding and gap analysis |
-| `monte-carlo.ts` | Monte Carlo retirement simulation |
-| `rental-income.ts` | Rental yield and net income |
-| `withdrawal-strategy.ts` | SWR-based withdrawal planning |
+| `fire-math.ts` | FIRE number, savings rate, horizon-driven SWR; exports `INDIA_SWR`/`INDIA_INFLATION`/`DEFAULT_RETURNS` |
+| `coast-fire.ts` | Coast / Barista FIRE crossover |
+| `glide-path.ts` | Equity→debt glide path over the horizon |
+| `withdrawal-strategy.ts` | SWR-based + Floor/Ceiling withdrawal planning |
+| `adequacy.ts` | Corpus adequacy vs target |
+| `tax.ts` | Old/new regime slabs, surcharge, cess, rebate, marginal relief, CII |
+| `tax-deductions.ts` | 80C / 80D / 80CCD deduction caps |
+| `tax-cliff.ts` | Regime break-even / cliff analysis |
+| `esop-tax.ts` | ESOP/RSU perquisite + vesting taxation |
+| `epf-vpf.ts` | EPF/VPF accrual and employer split |
+| `nps-withdrawal.ts` | NPS 60/40 lump-sum + annuity withdrawal |
+| `amortization.ts` | Loan EMI / amortization schedule |
+| `cashflow.ts` | Monthly/annual cashflow derivation |
+| `freedom-score.ts` | 0–100 financial-independence score |
+| `assumption-math.ts` | Resolves research-default + override assumptions |
+| `derived-records.ts` · `nudge-engine.ts` · `expense-history.ts` · `investment-traits.ts` | Derived records, nudges, expense history, instrument traits |
 
 ## Colocated Tests
 
-Tests live next to their module: `fire-metrics.spec.ts` alongside `fire-metrics.ts`. MUST NOT place calculation tests in a separate test directory.
+Tests live next to their module: `fire-metrics.spec.ts` alongside `fire-math.ts`. MUST NOT place calculation tests in a separate test directory. Run a single module's spec with `npm run test:unit -- src/lib/<module>.spec.ts`.
 
 ## TypeScript Interfaces
 
@@ -56,7 +70,7 @@ interface CapitalGainResult {
 
 ## India-Specific Financial Constants
 
-Named constant exports used across calculation modules:
+Research-default constants are exported from `src/lib/fire-math.ts`:
 
 ```ts
 export const INDIA_SWR = 0.035          // Safe Withdrawal Rate for India
@@ -65,7 +79,13 @@ export const INDIA_HEALTHCARE_INFLATION = 0.08
 export const DEFAULT_RETURNS = 0.12     // Equity returns assumption
 ```
 
+User-facing assumptions (with per-household overrides such as `swrOverride`) resolve through
+`src/types/assumptions.ts` (`DEFAULT_ASSUMPTIONS`) + `src/lib/assumption-math.ts` in the order
+scenario → household → global (see `docs/adr/0002-retire-layered-assumption-resolver.md`).
+
 ### Cost Inflation Index (CII)
+
+The `CII_INDEX` map (for LTCG indexation) lives in `src/lib/tax.ts`:
 
 ```ts
 export const CII_INDEX: Record<string, number> = {
@@ -77,12 +97,10 @@ export const CII_INDEX: Record<string, number> = {
 
 ### Tax Rates and Thresholds
 
-Tax rates defined by asset type. LTCG thresholds vary by holding period (1 year for equity, 2 years for debt, 3 years for real estate). These constants MUST be kept current with Indian tax law changes.
-
-## Shared Utilities
-
-- `roundPercent(value, decimals=1)` from `server/lib/validators.ts` — used across multiple calculation modules for consistent percentage formatting
-- `financialYearSchema` from `server/lib/validators.ts` — validates `YYYY-YY` format ensuring end year equals start year + 1
+Tax rates and thresholds live in `src/lib/tax.ts`. LTCG holding-period thresholds vary by asset
+(1 year for equity, 2 years for debt, 3 years for real estate). These constants MUST be kept
+current with Indian tax law changes — see `.claude/rules/indian-financial-context.md` for the
+authoritative values.
 
 ## Monetary Output Rounding
 
@@ -93,20 +111,14 @@ All monetary outputs MUST be rounded to integers using `Math.round()`. Do not re
 Tests use describe/it structure with pure input/output assertions:
 
 ```ts
-describe('calculateFireMetrics', () => {
-  it('should compute correct FIRE number for given expenses', () => {
-    const result = calculateFireMetrics({
-      monthlyExpenses: 100000,
-      currentCorpus: 5000000,
-      expectedReturns: 0.12
-    })
-    expect(result.fireNumber).toBe(34285714)
-    expect(result.savingsRate).toBeCloseTo(45.2, 1)
+describe('fireNumber', () => {
+  it('computes the FIRE number for given expenses and SWR', () => {
+    const result = fireNumber({ annualExpenses: 1200000, swr: INDIA_SWR })
+    expect(result).toBeCloseTo(34285714, -2)
   })
 
-  it('should handle zero expenses', () => {
-    const result = calculateFireMetrics({ monthlyExpenses: 0, ... })
-    expect(result.fireNumber).toBe(0)
+  it('handles zero expenses', () => {
+    expect(fireNumber({ annualExpenses: 0, swr: INDIA_SWR })).toBe(0)
   })
 })
 ```

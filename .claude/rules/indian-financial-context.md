@@ -21,11 +21,17 @@
 
 ## Tax Config Source of Truth
 
-- Backend: `server/lib/tax-config.ts` — covers FY 2022-23 through 2025-26
-- Frontend: `src/types/tax.ts` — mirrors backend config
-- FY 2025-26 new regime includes marginal relief (tax cannot exceed income above ₹12L rebate limit)
+> **Repo note (extraction, 2026-05-31):** the old monorepo split tax config across a
+> `server/lib/tax-config.ts` backend + `src/types/tax.ts` mirror. In this extracted
+> `firekaro-planner` repo there is no tax backend — tax math is client-side.
+
+- `src/lib/tax.ts` — single SSOT for tax slabs, old/new regime, surcharge, cess, rebate, CII (FY 2022-23 → 2025-26)
+- `src/lib/tax-deductions.ts` — 80C / 80D / 80CCD deduction caps
+- FY 2025-26 new regime includes marginal relief (tax cannot exceed income above the ₹12L rebate limit)
 
 ## Constants Used in Calculations
+
+Exported from `src/lib/fire-math.ts`:
 
 ```ts
 INDIA_SWR = 0.035           // 3.5% Safe Withdrawal Rate for India
