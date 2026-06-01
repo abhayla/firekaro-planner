@@ -17,9 +17,9 @@ detailed in its SSOT rule — pointer pattern, no duplication (`configuration-ss
 
 | Stage | What happens | SSOT detail |
 |---|---|---|
-| **0–4.6** | Grade → diagnose → strengthen → show grade card + step transcript + final prompt | `/prompt-auto-enhance` |
+| **0–4.5** | Grade → diagnose → strengthen — with the **intent gate** woven in (1–2 gaps → one targeted question; consequential fork & confidence <~95% → `/grill-me` or `/grill-with-docs`) → step transcript | `/prompt-auto-enhance` + `decision-authority.md` → "Confidence gate" |
+| **4.6** | Show the final strengthened prompt (reflects the gate-resolved intent) | `/prompt-auto-enhance` |
 | **4.7 Role** | Infer the role, state `Role: <name> — <why>`, dispatch its backing agents/skills | `engineering-roles.md` |
-| **4.8 Gate** | Resolve intent (tiered): 1–2 gaps → one targeted question; consequential fork & confidence <~95% → `/grill-me` or `/grill-with-docs` | `decision-authority.md` → "Confidence gate" |
 | **5 Execute** | Act under DACI: **decide** reversible/internal; **inform** on tactical product calls; **escalate** irreversible/outward in one line + keep working | `decision-authority.md` |
 | **6 Git** | Only if the turn produced committable changes: stage → secret-scan → commit → (branch/merge) → push via `git-manager-agent` + `.githooks/pre-commit` | `decision-authority.md` → "Git authority" |
 
@@ -54,7 +54,7 @@ After strengthening, render every time:
 The final prompt is shown for transparency, not approval — execution
 proceeds in the same response.
 
-## Clarification & Confidence Gate — Ask/Grill Until Confident (stage 4.8)
+## Clarification & Confidence Gate — Ask/Grill Until Confident (runs before STEP 4.6)
 
 This is the merged intent-resolution gate (lightweight clarification + the
 `decision-authority.md` confidence gate, tiered):
@@ -83,10 +83,9 @@ Each question must be unanswerable from Tier 1/2 context.
 **Sequencing:**
 1. Strengthening runs first (Steps 0-3)
 2. Grade card (Step 4)
-3. Clarification Gate runs here, if ambiguity remains
-4. Step transcript (Step 4.5) and final prompt preview (Step 4.6) reflect
-   the resolved intent
-5. Execution (Step 5)
+3. Clarification & Confidence Gate runs here, if ambiguity/consequential fork remains
+4. Step transcript (Step 4.5) and final prompt preview (Step 4.6) reflect the resolved intent
+5. Role (4.7) → Execute under decision-authority (5) → Git if the turn produced changes (6)
 
 ## Resource CRUD Detection
 

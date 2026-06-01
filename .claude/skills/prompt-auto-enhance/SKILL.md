@@ -580,10 +580,12 @@ Rules for this format:
 **Sequencing summary:**
 1. STEP 0-3: grade, diagnose, rewrite (internal)
 2. STEP 4: show grade card + Changes Applied (metadata only — no prompt text)
-3. **Clarification Gate** (if ambiguity remains, ask until confident, locked format)
+3. **Clarification & Confidence Gate** (if ambiguity/consequential fork remains — ask one question, or `/grill-me` for a consequential fork under ~95% confidence)
 4. STEP 4.5: show step transcript (counts and deltas only — no per-dim or per-fix lists)
 5. STEP 4.6: show original → final strengthened prompt; OPTIONALLY append a one-line italic skill hint when the prompt clearly fits a non-direct-execution workflow (advisory only, never gating)
-6. STEP 5: execute the strengthened prompt directly
+6. STEP 4.7: state `Role: <name> — <why>` and dispatch its agents/skills (`engineering-roles.md`)
+7. STEP 5: execute the strengthened prompt under decision-authority (decide reversible; escalate irreversible in one line)
+8. STEP 6: if the turn produced committable changes, git via `git-manager-agent` + the secret-scan hook (skip on Q&A / read-only turns)
 
 ---
 
