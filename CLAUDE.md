@@ -115,7 +115,7 @@ Prisma scripts hitting Supabase while the dev server holds connections MUST appe
 - **Household diff engine** (`server/src/lib/household-diff.ts`): a pure function that maps an
   incoming `Household` to per-table insert/update/delete; `PUT /household` applies it in ONE Prisma
   `$transaction`. Auto-flow recurring rows upsert by `(userId, sourceRefId)`; `"Joint"` ownerId is
-  plain TEXT (no FK). TDD red-first; 15 unit tests are the no-DB correctness proof. The Prisma
+  plain TEXT (no FK). TDD red-first; the colocated `household-diff.spec.ts` units are the no-DB correctness proof. The Prisma
   read/write layer the diff engine drives is `server/src/lib/household-repo.ts`.
 - **Auth:** Better Auth (Google OAuth + sessions) + the **3-factor dev-bypass** (`NODE_ENV` is an
   explicit `development`/`test` + `DEV_BYPASS_AUTH==='true'` + `x-dev-bypass` header), dev user
