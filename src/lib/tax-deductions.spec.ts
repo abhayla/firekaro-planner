@@ -102,6 +102,15 @@ describe("deriveDeductions — 80CCD(2) employer NPS", () => {
     expect(deriveDeductions(hh).section80CCD2).toBe(200_000);
   });
 
+  it("sums members' basicAnnual into employerNpsBasicTotal (gh-issue #3 — drives the cap)", () => {
+    const hh = emptyHH();
+    hh.members = [
+      { id: "a", salary: { annualCTC: 2_000_000, hikePercent: 8, basicAnnual: 800_000 } },
+      { id: "b", salary: { annualCTC: 1_500_000, hikePercent: 8, basicAnnual: 600_000 } },
+    ] as Household["members"];
+    expect(deriveDeductions(hh).employerNpsBasicTotal).toBe(1_400_000);
+  });
+
   it("EXCLUDES section80CCD2 from totalDeductions (it is applied separately in both regimes)", () => {
     const hh = emptyHH();
     hh.members = [

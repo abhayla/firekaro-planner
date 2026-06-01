@@ -41,6 +41,11 @@ export interface DeductionBreakdown {
    * NOT included in `totalDeductions` below.
    */
   section80CCD2: number;
+  /**
+   * Sum of members' basic salary (Basic+DA). Pass to computeTax as `employerNpsBasic`
+   * so it can cap section80CCD2 at the regime ceiling (10% old / 14% new). gh-issue #3.
+   */
+  employerNpsBasicTotal: number;
   /** Sec 80D — health insurance premium (self + parents). */
   section80D: number;
   /** Sec 24 — home loan interest. */
@@ -99,6 +104,11 @@ export function deriveDeductions(
     (s, m) => s + (m.salary?.employerNpsAnnual ?? 0),
     0,
   );
+  // Basic-salary total feeds the regime-aware 80CCD(2) cap in computeTax (gh-issue #3).
+  const employerNpsBasicTotal = household.members.reduce(
+    (s, m) => s + (m.salary?.basicAnnual ?? 0),
+    0,
+  );
 
   // ---- 80D — health insurance ----
   const healthSelfPremium = sumHealthPremium(insurance, "self");
@@ -132,6 +142,7 @@ export function deriveDeductions(
     section80C,
     section80CCD1B,
     section80CCD2,
+    employerNpsBasicTotal,
     section80D,
     section24,
     // 80CCD(2) is deliberately excluded — it applies in both regimes and is passed to

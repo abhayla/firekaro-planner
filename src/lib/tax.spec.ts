@@ -48,6 +48,43 @@ describe("computeTax — 80CCD(2) employer NPS (gh-issue #2 finding #2)", () => 
     const b = computeTax({ grossIncome: 1_500_000, regime: "NEW", fy: "2025-26", employerNps: 0 });
     expect(a.totalTax).toBe(b.totalTax);
   });
+
+  // gh-issue #3: 80CCD(2) is capped at 14% of basic (NEW) / 10% (OLD). When the basic
+  // is provided via employerNpsBasic, the deduction is the LEAST of (entered, ceiling×basic).
+  it("NEW regime: caps the deduction at 14% of basic", () => {
+    const base = computeTax({ grossIncome: 2_000_000, regime: "NEW", fy: "2025-26" });
+    const capped = computeTax({ grossIncome: 2_000_000, regime: "NEW", fy: "2025-26", employerNps: 200_000, employerNpsBasic: 800_000 });
+    // 14% of ₹8L = ₹1.12L; entered ₹2L is clamped to ₹1.12L.
+    expect(capped.taxableIncome).toBe(base.taxableIncome - 112_000);
+  });
+
+  it("OLD regime: caps the deduction at 10% of basic", () => {
+    const base = computeTax({ grossIncome: 2_000_000, regime: "OLD", fy: "2025-26", deductions: 0 });
+    const capped = computeTax({ grossIncome: 2_000_000, regime: "OLD", fy: "2025-26", deductions: 0, employerNps: 200_000, employerNpsBasic: 800_000 });
+    // 10% of ₹8L = ₹80k.
+    expect(capped.taxableIncome).toBe(base.taxableIncome - 80_000);
+  });
+
+  it("does not cap when employerNpsBasic is absent (entered figure trusted)", () => {
+    const noBasic = computeTax({ grossIncome: 2_000_000, regime: "NEW", fy: "2025-26", employerNps: 200_000 });
+    const withBasic = computeTax({ grossIncome: 2_000_000, regime: "NEW", fy: "2025-26", employerNps: 200_000, employerNpsBasic: 800_000 });
+    // Uncapped subtracts the full ₹2L; capped subtracts only ₹1.12L → ₹88k difference.
+    expect(withBasic.taxableIncome).toBe(noBasic.taxableIncome + 88_000);
+  });
+
+  it("employerNpsBasic of 0 (the common blank-basic path) trusts the entered figure uncapped", () => {
+    const base = computeTax({ grossIncome: 2_000_000, regime: "NEW", fy: "2025-26" });
+    const r = computeTax({ grossIncome: 2_000_000, regime: "NEW", fy: "2025-26", employerNps: 200_000, employerNpsBasic: 0 });
+    // basic === 0 → no cap → full ₹2L applies (matches callers' `?? 0` default when basic is blank).
+    expect(r.taxableIncome).toBe(base.taxableIncome - 200_000);
+  });
+
+  it("entered figure below the cap is used as-is", () => {
+    const base = computeTax({ grossIncome: 2_000_000, regime: "NEW", fy: "2025-26" });
+    const r = computeTax({ grossIncome: 2_000_000, regime: "NEW", fy: "2025-26", employerNps: 50_000, employerNpsBasic: 800_000 });
+    // ₹50k < ₹1.12L cap → full ₹50k applies.
+    expect(r.taxableIncome).toBe(base.taxableIncome - 50_000);
+  });
 });
 
 describe("computeTax — Old Regime", () => {

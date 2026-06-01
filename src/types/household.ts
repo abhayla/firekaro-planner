@@ -14,6 +14,10 @@ export const memberSalarySchema = z.object({
   // (the statutory 10%/14%-of-basic cap is the employer's concern; we lack a basic-salary
   // field to enforce it). gh-issue #2 findings #1/#2.
   employerNpsAnnual: z.number().min(0).optional(),
+  // Basic salary (Basic + DA) per year. Used ONLY to cap the 80CCD(2) deduction at the
+  // statutory ceiling (10% of basic old regime / 14% new). Optional — when absent the
+  // employer-NPS figure is trusted uncapped (we don't derive basic from CTC). gh-issue #3.
+  basicAnnual: z.number().min(0).optional(),
 });
 export type MemberSalary = z.infer<typeof memberSalarySchema>;
 

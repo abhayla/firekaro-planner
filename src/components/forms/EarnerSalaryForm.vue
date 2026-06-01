@@ -13,16 +13,17 @@ const props = defineProps<{ earner: Member }>();
 const household = useHouseholdStore();
 const ui = useUiStore();
 
-function deriveTakeHomeFor(ctc: number, employerNps: number) {
+function deriveTakeHomeFor(ctc: number, employerNps: number, employerNpsBasic: number) {
   if (!ctc) return null;
   const oldDed = 175000;
-  const rec = recommendRegime({ grossIncome: ctc, fy: ui.currentFY, deductions: oldDed, employerNps });
+  const rec = recommendRegime({ grossIncome: ctc, fy: ui.currentFY, deductions: oldDed, employerNps, employerNpsBasic });
   const result = computeTax({
     grossIncome: ctc,
     regime: rec.recommended,
     fy: ui.currentFY,
     deductions: rec.recommended === "OLD" ? oldDed : 0,
     employerNps,
+    employerNpsBasic,
   });
   const annual = ctc - result.totalTax;
   return {
@@ -41,11 +42,12 @@ function projectedCTC(ctc: number, hike: number, years = 20): number {
 const ctc = computed(() => props.earner.salary?.annualCTC ?? 0);
 const hike = computed(() => props.earner.salary?.hikePercent ?? 8);
 const employerNps = computed(() => props.earner.salary?.employerNpsAnnual ?? 0);
-const takeHome = computed(() => deriveTakeHomeFor(ctc.value, employerNps.value));
+const basicAnnual = computed(() => props.earner.salary?.basicAnnual ?? 0);
+const takeHome = computed(() => deriveTakeHomeFor(ctc.value, employerNps.value, basicAnnual.value));
 
 // Q4 (v3) + ISSUES-v2 #1: salary fields are no longer inline-editable. Pencil opens
 // a focused dialog. Read-only summary card outside.
-const editing = ref<{ annualCTC: number; hikePercent: number; vpfTopUpPercent: number | null; employerNpsAnnual: number | null } | null>(null);
+const editing = ref<{ annualCTC: number; hikePercent: number; vpfTopUpPercent: number | null; employerNpsAnnual: number | null; basicAnnual: number | null } | null>(null);
 const showEdit = computed({
   get: () => !!editing.value,
   set: (v) => { if (!v) editing.value = null; },
@@ -56,6 +58,7 @@ function startEdit() {
     hikePercent: hike.value,
     vpfTopUpPercent: props.earner.salary?.vpfTopUpPercent ?? null,
     employerNpsAnnual: props.earner.salary?.employerNpsAnnual ?? null,
+    basicAnnual: props.earner.salary?.basicAnnual ?? null,
   };
 }
 
@@ -64,12 +67,18 @@ const positiveCTCRules = [(v: number) => (v > 0) || "CTC must be > 0"];
 const hikeRules = [(v: number) => (v >= 0 && v <= 25) || "0-25%"];
 const vpfRules = [(v: number | null) => v === null || (v >= 0 && v <= 50) || "0-50%"];
 const employerNpsRules = [(v: number | null) => v === null || v >= 0 || "Must be ≥ 0"];
+const basicRules = [
+  (v: number | null) => v === null || v >= 0 || "Must be ≥ 0",
+  (v: number | null) =>
+    v === null || v <= Number(editing.value?.annualCTC ?? 0) || "Basic cannot exceed CTC",
+];
 const isEditValid = computed(() =>
   !!editing.value && Number(editing.value.annualCTC) > 0 &&
   Number(editing.value.hikePercent) >= 0 && Number(editing.value.hikePercent) <= 25 &&
   (editing.value.vpfTopUpPercent === null ||
     (Number(editing.value.vpfTopUpPercent) >= 0 && Number(editing.value.vpfTopUpPercent) <= 50)) &&
-  (editing.value.employerNpsAnnual === null || Number(editing.value.employerNpsAnnual) >= 0),
+  (editing.value.employerNpsAnnual === null || Number(editing.value.employerNpsAnnual) >= 0) &&
+  (editing.value.basicAnnual === null || Number(editing.value.basicAnnual) >= 0),
 );
 function saveEdit() {
   if (!editing.value) return;
@@ -81,6 +90,8 @@ function saveEdit() {
         editing.value.vpfTopUpPercent === null ? undefined : Number(editing.value.vpfTopUpPercent),
       employerNpsAnnual:
         editing.value.employerNpsAnnual === null ? undefined : Number(editing.value.employerNpsAnnual),
+      basicAnnual:
+        editing.value.basicAnnual === null ? undefined : Number(editing.value.basicAnnual),
     },
   });
   editing.value = null;
@@ -179,6 +190,20 @@ function saveEdit() {
                 step="0.5"
                 placeholder="0"
                 :rules="vpfRules"
+              />
+            </v-col>
+            <v-col cols="12" md="6">
+              <v-text-field
+                v-model.number="editing.basicAnnual"
+                type="number"
+                label="Basic salary / yr (Basic + DA)"
+                prefix="₹"
+                density="comfortable"
+                min="0"
+                placeholder="0"
+                hint="Used to cap the 80CCD(2) employer-NPS deduction at 10%/14% of basic. Optional."
+                persistent-hint
+                :rules="basicRules"
               />
             </v-col>
             <v-col cols="12" md="6">

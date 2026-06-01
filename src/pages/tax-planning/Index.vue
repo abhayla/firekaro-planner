@@ -136,6 +136,7 @@ const oldResult = computed(() =>
     fy: ui.currentFY,
     deductions: derivedDeductions.value.totalDeductions,
     employerNps: derivedDeductions.value.section80CCD2,
+    employerNpsBasic: derivedDeductions.value.employerNpsBasicTotal,
   }),
 );
 const newResult = computed(() =>
@@ -144,6 +145,7 @@ const newResult = computed(() =>
     regime: "NEW",
     fy: ui.currentFY,
     employerNps: derivedDeductions.value.section80CCD2,
+    employerNpsBasic: derivedDeductions.value.employerNpsBasicTotal,
   }),
 );
 const activeResult = computed(() => (effectiveRegime.value === "OLD" ? oldResult.value : newResult.value));
@@ -177,8 +179,9 @@ const perEarner = computed(() => {
   return household.earners.map((m) => {
     const gross = m.salary?.annualCTC ?? 0;
     const earnerNps = m.salary?.employerNpsAnnual ?? 0;
-    const earnerOld = computeTax({ grossIncome: gross, regime: "OLD", fy: ui.currentFY, deductions: derivedDeductions.value.totalDeductions, employerNps: earnerNps });
-    const earnerNew = computeTax({ grossIncome: gross, regime: "NEW", fy: ui.currentFY, employerNps: earnerNps });
+    const earnerBasic = m.salary?.basicAnnual ?? 0;
+    const earnerOld = computeTax({ grossIncome: gross, regime: "OLD", fy: ui.currentFY, deductions: derivedDeductions.value.totalDeductions, employerNps: earnerNps, employerNpsBasic: earnerBasic });
+    const earnerNew = computeTax({ grossIncome: gross, regime: "NEW", fy: ui.currentFY, employerNps: earnerNps, employerNpsBasic: earnerBasic });
     const rec = earnerOld.totalTax <= earnerNew.totalTax ? "OLD" : "NEW";
     const active = effectiveRegime.value === "OLD" ? earnerOld : earnerNew;
     return {

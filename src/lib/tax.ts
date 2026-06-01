@@ -239,6 +239,10 @@ export interface ComputeTaxArgs {
   // BOTH regimes, so it is a separate input and is subtracted in both. Pass it separately
   // (it is NOT inside `deductions`) to avoid double-counting in the old regime. gh-issue #2.
   employerNps?: number;
+  // Member basic salary (Basic+DA) used to cap 80CCD(2) at the statutory ceiling
+  // (10% basic OLD / 14% basic NEW). When omitted, `employerNps` is used uncapped
+  // (we do not fabricate basic from CTC). gh-issue #3.
+  employerNpsBasic?: number;
   isSalaried?: boolean;
 }
 
@@ -254,7 +258,18 @@ export function computeTax(args: ComputeTaxArgs): FullTaxResult {
   // Old regime allows chapter VI-A; New regime ignores them — EXCEPT 80CCD(2) employer
   // NPS, which is deductible under both regimes and is passed separately (gh-issue #2).
   const ded = regime === "OLD" ? Math.max(0, args.deductions ?? 0) : 0;
-  const employerNps = Math.max(0, args.employerNps ?? 0);
+  // 80CCD(2): cap the employer-NPS deduction at the statutory ceiling — 14% of basic in
+  // the NEW regime, 10% in the OLD — when a basic salary is supplied. Absent a basic we
+  // trust the entered figure rather than fabricate basic from CTC (gh-issue #3).
+  // TODO(gh-issue #4): central/state GOVERNMENT employees get 14% under the OLD regime too;
+  // we under-cap them here (conservative — never over-deducts). Needs an employer-sector
+  // field on Member to branch on.
+  const rawEmployerNps = Math.max(0, args.employerNps ?? 0);
+  const basicForCap = Math.max(0, args.employerNpsBasic ?? 0);
+  const employerNps =
+    basicForCap > 0
+      ? Math.min(rawEmployerNps, (regime === "NEW" ? 0.14 : 0.1) * basicForCap)
+      : rawEmployerNps;
 
   const taxableIncome = Math.max(0, grossIncome - sd - ded - employerNps);
 
