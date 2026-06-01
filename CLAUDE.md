@@ -205,4 +205,5 @@ division-by-zero guards); three-state render (content / loading / empty); Indian
 **Conventional commits** `feat(scope): …`. **Verify UI changes** (screenshot + ARIA + console at
 :5175) and run `npm run type-check && npm run test:unit` (both trees) before committing. The standing
 behavioral rules (incl. rules 24/25/26 UI+persistence verification, 27 SSOT discipline, 28
-goal-contract offer) live in `.claude/rules/claude-behavior.md`.
+goal-contract offer, 29 independent post-implementation verification) live in
+`.claude/rules/claude-behavior.md`.

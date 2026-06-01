@@ -11,18 +11,20 @@ standalone personas: each role's real work is done by the named agents/skills (p
 
 ## Current project stage → default role (update as the stage moves)
 
-> **Now (v6 Phase 1, 2026-05-31):** Phase 0 shipped (mvp planner live on GitHub Pages). Active
-> work is **designing the v6 backend**. The schema architecture is LOCKED (21 tables, via the
-> Architect pass — see `docs/v6-fire-planner-product-plan.md`). Role sequence for v6:
-> **Architect** (design — schema done ✅, API + adapter next) → **DBA** (provision `firekaro_v6`
-> on the VPS: database, roles/grants, `pg_hba`, pooling, backups; run migrations; execute the
-> old-DB→v6 data migration) → **Full-Stack** (build the Hono/Prisma backend + ServerAdapter) →
-> **Frontend** (polish) → **Performance + Debugging** (ship-hardening). The pg_hba/role work this
-> session flailed at is exactly **DBA** scope — route it there, with the right playbook.
+> **Now (production-live, 2026-06-01):** FireKaro is LIVE at https://firekaro.com (Hostinger VPS,
+> PM2 + nginx → Supabase; Google OAuth working). The v6 backend (Hono/Prisma document API +
+> ServerAdapter) shipped. **Primary target persona is LOCKED: the urban salaried accumulator**
+> (`docs/v6-fire-planner-product-plan.md` §9). Focus has shifted from "ship it" to **make it
+> correct, sticky, and friction-free for that wedge**:
+> - **Tier 0 — correctness/honesty (do now):** tax-config staleness guard + Monte Carlo confidence
+>   bands → **FinTech Domain Analyst** validates, **Full-Stack** builds.
+> - **Tier 1 — retention + onboarding:** lifecycle digests/nudges + Form16/CAS import + persona
+>   onboarding templates → **Growth / Lifecycle & Retention** leads, **Frontend** + **Full-Stack**
+>   build, **Data / Analytics** measures, **Privacy / Compliance (DPDP)** gates any user comms.
+> - **Tier 2 — adjacent personas (later):** freelancer → NRI → HUF.
 
-As the build nears the Hostinger prod deploy + `firekaro.com` cutover, the **Security / DevSecOps**,
-**DevOps / Release**, and **QA / Test Automation** roles become primary (OAuth hardening → CI/CD +
-VPS bring-up → full green-suite sweep). The **FinTech Domain Analyst** is always-on background
+The **Security / DevSecOps**, **DevOps / Release**, and **QA / Test Automation** roles stay primary
+around any redeploy / `firekaro.com` change. The **FinTech Domain Analyst** is always-on background
 validation whenever calculation or tax-config code is touched.
 
 When the stage changes, update this block (rule 27 — the SSOT must not lag the work).
@@ -45,6 +47,9 @@ When the stage changes, update this block (rule 27 — the SSOT must not lag the
 | Is this financial math correct? new calc module, tax FY update, FIRE/SWR assumption, Indian-tax treatment | **FinTech Domain Analyst** | `Agent(fintech-domain-analyst)` — validates `src/lib/*.ts` (tax, fire-math, epf-vpf, withdrawal…) + `src/types/assumptions.ts` against Indian tax law / FIRE research and the colocated `*.spec.ts`. Domain correctness, not engineering. |
 | What should we build next / is this scope right / good enough to ship / turn this idea into a spec | **Product Manager** | `/brainstorm` (intent) → `/to-prd` or `/prd-parser` → `goal-creator` (contract). Owns the product call per `decision-authority.md`; portfolio-strategic (kill/promote, pricing, legal entity) → `TODO(5W):` (L-042), NOT decided here. |
 | Plan/sequence multi-step delivery, break into tasks/issues, track progress, decide proceed-vs-escalate | **Delivery / Project Manager** | `/writing-plans` → `/plan-to-issues` → `/executing-plans`; full PRD→prod via `project-manager-agent`; `/status` + `/handover`. Owns proceed-vs-escalate per `decision-authority.md`; keeps the backlog moving (rule 23), no comfort-stops. |
+| Keep registered users coming back — activation, onboarding completion, retention loops, lifecycle digests/nudges (email/WhatsApp), milestone celebrations, re-engagement/churn-win-back | **Growth / Lifecycle & Retention Engineer** | `/brainstorm` (loop design) → `goal-creator` (contract) → `/feature-flag` (staged rollout) → `/ui-ux-pro-max` (notification/digest UX). **Reuse `src/lib/nudge-engine.ts`** — the trigger logic exists; what's missing is a delivery channel + cadence. Outbound sends = spend + outward-facing → escalate per `decision-authority.md`. |
+| Measure it — instrumentation, activation/funnel metrics, cohort retention, drop-off analysis, A/B experiments. "Why are users churning / where do they drop off?" | **Data / Analytics & Experimentation Engineer** | `/monitoring-setup` (telemetry plumbing) → `/perf-test` (perf signals). No dedicated product-analytics skill yet → `/brainstorm` + `goal-creator` to design the event schema. **Privacy-first** (finance PII) — coordinate with the DPDP role; what's tracked is a `TODO(5W):` posture call. |
+| Regulatory/data-protection — India **DPDP Act 2023** consent for comms, data-rights (access/erasure/portability), data minimisation, retention/consent records, AA-consent flows | **Privacy / Compliance (DPDP) Engineer** | `/security-audit` (data-flow + PII map) → `/change-risk-scoring` (gate). No DPDP-checklist skill yet → author one via `/writing-skills` when the first comms/AA feature lands. Distinct from Security/DevSecOps (OWASP/threat-model) — this is **regulatory consent + data-rights**, the prerequisite for any email/WhatsApp/AA feature. |
 
 ## Role mandates (condensed — the WHEN is the table above)
 
@@ -62,6 +67,11 @@ When the stage changes, update this block (rule 27 — the SSOT must not lag the
 - **FinTech Domain Analyst** — validate **correctness against Indian tax law + FIRE research**, not code quality: tax regimes (old/new, marginal relief, deduction caps), EPF/VPF/PPF/NPS rules, CII indexation, SWR + 4-bucket inflation, variant multipliers. Cross-references `indian-financial-context.md` + the calc modules' colocated specs and flags misalignment with reasoning. The one role that catches "the code runs but the math is wrong."
 - **Product Manager** — own WHAT/WHY at the **repo** level: which problem is worth solving next, acceptance criteria, "good enough to ship", scope cuts that preserve the goal. **Make tactical product calls — don't ask** (DACI Driver, single-point accountable). Route **portfolio**-strategic calls (kill/promote, commercialization, pricing, legal entity) to 5Wealths as `TODO(5W):` per L-042. This role exists so product decisions stop bouncing to Abhay daily.
 - **Delivery / Project Manager** — own HOW work flows: decompose, sequence, track, and **decide proceed-vs-escalate per `decision-authority.md`**. Keep the task list moving to completion (rule 23); commit checkpoints to a feature branch autonomously; escalate only the gated items, in one line with a recommended option. Predictable delivery, no comfort-stops.
+- **Growth / Lifecycle & Retention Engineer** — own **what happens AFTER signup**: turn a registered user into a returning one. Activation (did they reach their first FIRE number?), onboarding completion, habit/retention loops, lifecycle messaging (weekly/monthly digest, milestone celebrations, event-triggered nudges, dormant win-back), and churn reduction. Builds on the existing `nudge-engine.ts` (generation) by adding **channels** (email/WhatsApp) + **triggers** + **cadence**. Folds in lightweight **UX-research** (where users drop) and **financial-education content** (the trust layer for an unfamiliar FIRE concept) rather than spinning those into separate roles. The role that catches "we ship features but nobody comes back." Outbound comms touch spend + consent → coordinate with DevOps (sends) + DPDP (consent).
+- **Data / Analytics & Experimentation Engineer** — the **measurement backbone** under Growth and UX: instrument events, build activation/funnel/cohort-retention views, find drop-off, run A/B experiments to settle UX/growth forks with data not opinion (mirrors rule 22 for product). Without this role, retention is unimprovable because it's unmeasured. Strictly privacy-first for a finance app — *what* is collected is a `TODO(5W):` posture decision, not a silent default.
+- **Privacy / Compliance (DPDP) Engineer** — own **legal data-protection** for a finance app holding PAN/salary/family data under India's **DPDP Act 2023**: lawful consent for marketing/comms (the gate on the weekly-email/WhatsApp idea), data-rights (access, correction, erasure, portability), data minimisation, consent + retention records, and Account-Aggregator consent flows. Distinct from Security/DevSecOps (which owns OWASP/threat-model/secrets) — this owns *regulatory* consent and user data-rights. The prerequisite, not an afterthought, for any outbound-comms or data-import feature.
+
+> **Deliberately NOT separate roles (kept lean per `configuration-ssot.md`):** **Monetization / Pricing** is portfolio-strategic → 5Wealths (`TODO(5W):`, L-042), never a repo role. **UX Researcher** and **Financial-Education / Content** fold into Growth + Frontend. **Customer Success / Support** is premature at current scale — revisit when there's a real support load.
 
 ## Non-negotiables (all roles)
 
