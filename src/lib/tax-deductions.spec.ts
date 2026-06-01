@@ -110,8 +110,12 @@ describe("deriveDeductions — Sec 24 home loan interest", () => {
     expect(result.section24).toBe(LIMIT_SECTION_24);
   });
 
-  it("doubles cap when joint home loan with coBorrowers", () => {
-    const hh = emptyHH();
+  // gh-issue #2 finding #3 (Abhay's NISM-XV ruling, 2026-06-01): a joint loan only
+  // doubles the Sec 24 cap to ₹4L when ≥2 co-borrowers are TRACKED members of this
+  // household (their income is in the same computation). A single filer whose spouse
+  // is not a tracked member claims only their own ₹2L share.
+  it("caps at the filer's ₹2L share when co-borrowers are NOT tracked members", () => {
+    const hh = emptyHH(); // members: []
     hh.liabilities = [{
       id: "l1",
       name: "Joint Home Loan",
@@ -123,7 +127,27 @@ describe("deriveDeductions — Sec 24 home loan interest", () => {
       isSharedWithSpouse: true,
       coBorrowers: ["self", "spouse"],
     }];
-    // interest = 4L; cap doubles to 4L; uses full interest
+    // interest = 4L, but neither co-borrower is a tracked member → only the ₹2L share.
+    const result = deriveDeductions(hh);
+    expect(result.section24).toBe(LIMIT_SECTION_24);
+  });
+
+  it("doubles to ₹4L only when ≥2 co-borrowers are tracked household members", () => {
+    const hh = emptyHH();
+    // Only `id` is read by deriveDeductions; cast a minimal member array.
+    hh.members = [{ id: "ashwin" }, { id: "lakshmi" }] as Household["members"];
+    hh.liabilities = [{
+      id: "l1",
+      name: "Joint Home Loan",
+      type: "HomeLoan",
+      outstandingBalance: 5_000_000,
+      monthlyEMI: 50_000,
+      interestRate: 8.0,
+      ownerId: "ashwin",
+      isSharedWithSpouse: true,
+      coBorrowers: ["ashwin", "lakshmi"],
+    }];
+    // interest = 4L; both co-borrowers tracked → cap doubles to 4L.
     const result = deriveDeductions(hh);
     expect(result.section24).toBe(400_000);
   });

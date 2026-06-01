@@ -105,15 +105,20 @@ export function deriveDeductions(
     Math.min(cap80Dself, healthSelfPremium) +
     Math.min(cap80Dparents, healthParentsPremium);
 
-  // ---- Sec 24 — home loan interest (audit Entry #23 doubles for joint) ----
+  // ---- Sec 24 — home loan interest (audit Entry #23; NISM-XV ruling gh-issue #2 #3) ----
+  // Each co-borrower can claim ₹2L on their interest share, but only members whose
+  // income is in THIS household's computation should contribute to this return's
+  // deduction. So the cap doubles to ₹4L only when ≥2 co-borrowers are TRACKED
+  // household members; a single filer on a joint loan whose spouse is not tracked
+  // claims only their own ₹2L share (not the spouse's).
+  const memberIds = new Set(household.members.map((m) => m.id));
   let section24 = 0;
   for (const l of liabilities) {
     if (l.type !== "HomeLoan") continue;
     const annualInterest = estimateAnnualInterest(l);
     const coBorrowers = l.coBorrowers ?? [];
-    // Joint home loan -> each co-borrower can claim ₹2L. We surface the user's
-    // share + the spouse's share when applicable.
-    const multiplier = coBorrowers.length >= 2 ? 2 : 1;
+    const trackedCoBorrowers = new Set(coBorrowers.filter((id) => memberIds.has(id)));
+    const multiplier = trackedCoBorrowers.size >= 2 ? 2 : 1;
     section24 += Math.min(LIMIT_SECTION_24 * multiplier, annualInterest);
   }
 
