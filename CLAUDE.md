@@ -56,6 +56,8 @@ both `.` (root) and `server/`.
 ```bash
 npm run dev               # Vite dev server on http://localhost:5175
 npm run test:unit         # vitest run (one-shot)
+npm run test:unit -- src/lib/tax.spec.ts   # single spec file
+npm run test:unit -- -t "marginal relief"  # filter by test name (vitest -t)
 npm run type-check        # vue-tsc --build --force  (banner: firekaro-mvp)
 npm run build             # vue-tsc -b && vite build
 npm run test:e2e          # playwright
@@ -66,6 +68,7 @@ npm run test:e2e          # playwright
 npm run dev               # tsx watch src/index.ts on http://localhost:3100
 npm run type-check        # tsc --noEmit
 npm run test:unit         # vitest — diff-engine units (no DB) + live integration (gated on DATABASE_URL)
+npm run test:unit -- household-diff.spec.ts   # single spec file (no-DB units)
 npm run prisma:generate   # prisma generate
 npm run prisma:validate   # prisma validate (static)
 npm run prisma:migrate:deploy   # apply migrations to the DB
