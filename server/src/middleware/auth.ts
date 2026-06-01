@@ -43,9 +43,14 @@ async function getOrCreateDevUser() {
 }
 
 export async function authMiddleware(c: Context, next: Next) {
-  const isProduction = process.env.NODE_ENV === "production";
+  // Defense in depth: the bypass requires an EXPLICIT dev/test NODE_ENV, not
+  // merely "not production". An unset NODE_ENV (the VPS misconfig) must NOT
+  // enable the bypass. validate-env.ts refuses to even boot in that case; this
+  // is the belt to that suspenders. (rules/dev-bypass-auth.md)
+  const nodeEnv = process.env.NODE_ENV;
+  const isDevOrTest = nodeEnv === "development" || nodeEnv === "test";
   const devBypass =
-    !isProduction &&
+    isDevOrTest &&
     process.env.DEV_BYPASS_AUTH === "true" &&
     c.req.header("x-dev-bypass") === "true";
 

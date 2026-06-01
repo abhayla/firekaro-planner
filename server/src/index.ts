@@ -6,11 +6,14 @@ import { Hono } from "hono";
 import { serve } from "@hono/node-server";
 import { cors } from "hono/cors";
 import { secureHeaders } from "hono/secure-headers";
+import { bodyLimit } from "hono/body-limit";
 import { pinoLogger } from "hono-pino";
 import { logger } from "./lib/logger";
 import { auth } from "./lib/auth";
-import { apiSuccess } from "./lib/api-utils";
+import { apiSuccess, apiError, ErrorCode } from "./lib/api-utils";
 import { prisma } from "./lib/prisma";
+import { requestId } from "./middleware/request-id";
+import { rateLimit } from "./middleware/rate-limit";
 import plannerRoutes from "./routes/planner";
 
 /**
@@ -21,14 +24,33 @@ import plannerRoutes from "./routes/planner";
 const app = new Hono();
 const isProduction = process.env.NODE_ENV === "production";
 
+app.use("*", requestId);
 app.use("*", pinoLogger({ pino: logger }));
 app.use("*", secureHeaders());
+// Cap request bodies (the largest legitimate payload is a full Household doc).
+app.use("*", bodyLimit({ maxSize: 1024 * 1024 })); // 1 MB
 
 const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(",").map((o) => o.trim())
   : ["http://localhost:5175"];
 
 app.use("*", cors({ origin: allowedOrigins, credentials: true }));
+
+// Convert any uncaught error to the standard envelope, tagged with the traceId
+// so a client-reported failure maps to a server log line. Routes still own
+// their own try/catch; this is the backstop for throws outside them
+// (middleware, the Better Auth handler, body-limit overflow).
+app.onError((err, c) => {
+  const traceId = c.get("traceId");
+  logger.error({ err, traceId, path: c.req.path }, "Unhandled error");
+  return apiError(c, "Internal server error", 500, ErrorCode.INTERNAL_ERROR);
+});
+
+// Rate-limit auth endpoints (brute-force / OAuth abuse). Tightened in prod;
+// relaxed in dev/test so the E2E suite isn't throttled. Single-node store —
+// see rate-limit.ts for the multi-node caveat.
+const authMax = isProduction ? 20 : 2000;
+app.use("/api/auth/*", rateLimit({ windowMs: 60_000, max: authMax, prefix: "auth" }));
 
 // Health check with DB connectivity probe.
 app.get("/api/health", async (c) => {

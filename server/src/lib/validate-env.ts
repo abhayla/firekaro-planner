@@ -21,7 +21,8 @@ export function validateEnv(): void {
     throw new Error(`Missing required environment variables: ${missing.join(", ")}`);
   }
 
-  const isProduction = process.env.NODE_ENV === "production";
+  const nodeEnv = process.env.NODE_ENV;
+  const isProduction = nodeEnv === "production";
 
   if (isProduction && PLACEHOLDER_SECRETS.includes(process.env.BETTER_AUTH_SECRET ?? "")) {
     throw new Error(
@@ -29,9 +30,16 @@ export function validateEnv(): void {
     );
   }
 
-  // 3-factor dev-bypass MUST NOT be active in production (rules/dev-bypass-auth.md).
-  if (isProduction && process.env.DEV_BYPASS_AUTH === "true") {
-    throw new Error("DEV_BYPASS_AUTH=true is forbidden in production — refusing to boot.");
+  // The 3-factor dev-bypass (rules/dev-bypass-auth.md) MUST require an EXPLICIT
+  // dev/test NODE_ENV. Riding on `!== 'production'` alone is a deploy footgun:
+  // an unset NODE_ENV on the VPS would leave the bypass live on real user data.
+  // Refuse to boot whenever the bypass is opted in but NODE_ENV is not an
+  // explicit "development" or "test" — this covers production AND unset.
+  if (process.env.DEV_BYPASS_AUTH === "true" && nodeEnv !== "development" && nodeEnv !== "test") {
+    throw new Error(
+      `DEV_BYPASS_AUTH=true requires NODE_ENV to be explicitly "development" or "test" ` +
+        `(got: ${nodeEnv ? `"${nodeEnv}"` : "unset"}) — refusing to boot.`,
+    );
   }
 
   if (isProduction && !process.env.ALLOWED_ORIGINS) {
