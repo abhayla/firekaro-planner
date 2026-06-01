@@ -62,6 +62,22 @@ vs **MARKETING** (promotional/engagement). Variables are positional `{{n}}`.
 
 Start with #1–#3 (UTILITY) — fastest approval and the highest-signal moments; layer MARKETING after.
 
+## ⚠️ Delivery gotcha — Meta marketing cap + "200 ≠ delivered" (found 2026-06-02)
+Wati `sendTemplateMessage` returns **HTTP 200 on ACCEPT, not on delivery**. Real status is async —
+verify via `GET /api/v1/getMessages/{number}` → `statusString` + `failedDetail` (see
+`scripts/wati-diagnose.ts`).
+
+First live test to `917972672473` returned 200 but the message **FAILED**:
+`"Message undeliverable as Meta has restricted it for higher quality messaging - retry again in a
+few days"` — and so did the PIFS broker MARKETING broadcasts to that number going back to April. Cause:
+**Meta's per-recipient MARKETING-template frequency cap** (quality throttle). Implications:
+- **Prefer UTILITY templates** for FireKaro lifecycle (welcome/milestone/off-track are legitimately
+  account-update/utility) — utility is NOT subject to the marketing cap and delivers reliably.
+- **Session messages** (free text, within 24h of the user messaging the business) bypass template
+  limits — the most reliable way to verify the pipe.
+- The send-log/adapter MUST record **actual delivery status** (poll getMessages or consume the
+  `Template Message Sent`/`…DELIVERED`/`…FAILED` webhooks) — never treat the 200 as proof.
+
 ## Architecture (FireKaro v6 backend — Hono/Prisma)
 1. **Schema (Prisma, new):** `CommsConsent` (per-user/channel/purpose) + `WhatsAppSendLog`
    (userId, template, params hash, status, providerMessageId, sentAt) for idempotency + audit.
