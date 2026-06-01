@@ -71,6 +71,21 @@ npm run prisma:validate   # prisma validate (static)
 npm run prisma:migrate:deploy   # apply migrations to the DB
 ```
 
+**Run the full v6 stack locally (frontend → backend → Supabase):** the frontend defaults to
+`LocalStorageAdapter` (demo). To exercise the real `ServerAdapter` → `/api/planner/*` → Supabase path,
+create **`.env.local`** at the repo root BEFORE starting Vite (Vite only reads env at boot — a server
+started first will silently stay on localStorage):
+```bash
+# .env.local (gitignored)
+VITE_USE_SERVER_ADAPTER=on
+VITE_API_BASE_URL=http://localhost:3100
+VITE_DEV_BYPASS=true            # sends the x-dev-bypass header so no Google OAuth is needed
+```
+Then run `server/` (`npm run dev`) and root (`npm run dev`) together. Verify a write persisted with an
+independent read: `curl -H "x-dev-bypass: true" http://localhost:3100/api/planner/household`. Standalone
+Prisma scripts hitting Supabase while the dev server holds connections MUST append `?connection_limit=1`
+(session pooler caps at 15 clients → `EMAXCONNSESSION`).
+
 ## Backend (`server/`) — Hono + Prisma + Better Auth → Supabase
 
 - **DB: Supabase project `firekaro-planner`** (ap-south-1, Postgres 17). Connect via the **session
