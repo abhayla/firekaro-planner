@@ -153,6 +153,7 @@ model Member {
   salaryAnnualCTC        Float?
   salaryHikePercent      Float?
   salaryVpfTopUpPercent  Float?
+  salaryEmployerNpsAnnual Float? // Sec 80CCD(2) employer NPS (gh-issue #2)
 
   // Q2.1 onboarding fields.
   city            String  @default("Metro")

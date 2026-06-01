@@ -35,15 +35,20 @@ export interface DeductionBreakdown {
   section80C: number;
   /** Sec 80CCD(1B) — additional NPS contribution above 80C ceiling. */
   section80CCD1B: number;
-  /** Sec 80CCD(2) — employer NPS contribution (up to 10% of basic). */
+  /**
+   * Sec 80CCD(2) — employer NPS contribution. Deductible under BOTH regimes, so it is
+   * reported here but applied separately by computeTax (its `employerNps` arg) and is
+   * NOT included in `totalDeductions` below.
+   */
   section80CCD2: number;
   /** Sec 80D — health insurance premium (self + parents). */
   section80D: number;
   /** Sec 24 — home loan interest. */
   section24: number;
   /**
-   * Total Chapter VI-A + Sec 24 deductions. Standard deduction is
-   * applied separately by computeTax (it depends on isSalaried).
+   * Old-regime-only Chapter VI-A + Sec 24 deductions (80C + 80CCD(1B) + 80D + 24).
+   * EXCLUDES 80CCD(2) (applied in both regimes — passed to computeTax as `employerNps`)
+   * and the standard deduction (applied separately by computeTax via isSalaried).
    */
   totalDeductions: number;
 }
@@ -85,14 +90,15 @@ export function deriveDeductions(
   const npsAnnual = sumAnnual(investments, "NPS");
   const section80CCD1B = Math.min(LIMIT_80CCD_1B, npsAnnual);
 
-  // ---- 80CCD(2) — employer NPS contribution ----
-  // 80CCD(2) is the EMPLOYER's NPS contribution (deductible up to 10% of basic,
-  // 14% for the new regime), NOT a function of the member's own NPS. This app
-  // does not yet track employer NPS, so we claim 0 rather than fabricate a figure
-  // (the prior `npsAnnual * 0.5` heuristic was not grounded in law — gh-issue #2
-  // finding #1). When a Member.salary employer-NPS field lands, derive it here and
-  // also apply it in the NEW regime (gh-issue #2 finding #2 — see tax.ts computeTax).
-  const section80CCD2 = 0;
+  // ---- 80CCD(2) — employer NPS contribution (gh-issue #2 findings #1/#2) ----
+  // The actual employer NPS contribution entered per member (Member.salary.employerNpsAnnual),
+  // summed across the household. Deductible under BOTH regimes, so it is reported here but
+  // applied SEPARATELY by computeTax (via its `employerNps` arg) and is intentionally kept
+  // OUT of totalDeductions below to avoid double-counting in the old regime.
+  const section80CCD2 = household.members.reduce(
+    (s, m) => s + (m.salary?.employerNpsAnnual ?? 0),
+    0,
+  );
 
   // ---- 80D — health insurance ----
   const healthSelfPremium = sumHealthPremium(insurance, "self");
@@ -128,7 +134,9 @@ export function deriveDeductions(
     section80CCD2,
     section80D,
     section24,
-    totalDeductions: section80C + section80CCD1B + section80CCD2 + section80D + section24,
+    // 80CCD(2) is deliberately excluded — it applies in both regimes and is passed to
+    // computeTax separately as `employerNps` (gh-issue #2). Folding it in would double-count.
+    totalDeductions: section80C + section80CCD1B + section80D + section24,
   };
 }
 

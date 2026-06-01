@@ -87,6 +87,7 @@ function rowToMember(row: {
   salaryAnnualCTC: number | null;
   salaryHikePercent: number | null;
   salaryVpfTopUpPercent: number | null;
+  salaryEmployerNpsAnnual: number | null;
   city: string;
   health: string;
   educationStage: string | null;
@@ -114,6 +115,7 @@ function rowToMember(row: {
       annualCTC: row.salaryAnnualCTC,
       hikePercent: row.salaryHikePercent ?? 0,
       vpfTopUpPercent: row.salaryVpfTopUpPercent ?? undefined,
+      employerNpsAnnual: row.salaryEmployerNpsAnnual ?? undefined,
     };
   }
   return m;
@@ -132,6 +134,7 @@ function memberToRow(m: Member, userId: string) {
     salaryAnnualCTC: m.salary?.annualCTC ?? null,
     salaryHikePercent: m.salary?.hikePercent ?? null,
     salaryVpfTopUpPercent: m.salary?.vpfTopUpPercent ?? null,
+    salaryEmployerNpsAnnual: m.salary?.employerNpsAnnual ?? null,
     city: m.city,
     health: m.health,
     educationStage: m.educationStage ?? null,

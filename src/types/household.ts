@@ -8,6 +8,12 @@ export const memberSalarySchema = z.object({
   annualCTC: z.number().min(0),
   hikePercent: z.number().min(0).max(25),
   vpfTopUpPercent: z.number().min(0).max(100).optional(),
+  // Employer's annual NPS contribution (₹). Deductible under Sec 80CCD(2) in BOTH
+  // tax regimes (the one Chapter VI-A deduction the new regime keeps). Entered as the
+  // actual employer contribution from the salary slip / Form 16 — we do not derive it
+  // (the statutory 10%/14%-of-basic cap is the employer's concern; we lack a basic-salary
+  // field to enforce it). gh-issue #2 findings #1/#2.
+  employerNpsAnnual: z.number().min(0).optional(),
 });
 export type MemberSalary = z.infer<typeof memberSalarySchema>;
 

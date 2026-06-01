@@ -151,17 +151,21 @@ export function derive(household: Household, assumptions: Assumptions, lens: Der
 
   // Single source of truth for deductions — audit-grounded deriveDeductions()
   // over the LENSED subset so the recommendation + fyTax match /tax-planning.
-  const estimatedDeductionsForOld = deriveDeductions({
+  const lensedDeductions = deriveDeductions({
     ...household,
     investments: lensedInvestments,
     liabilities: lensedLiabilities,
     insurance: lensedInsurance,
-  }).totalDeductions;
+  });
+  const estimatedDeductionsForOld = lensedDeductions.totalDeductions;
+  // 80CCD(2) employer NPS — applies in both regimes, passed separately (gh-issue #2).
+  const employerNps = lensedDeductions.section80CCD2;
 
   const householdTaxRecommendation = recommendRegime({
     grossIncome: annualIncome.salaryIncome + annualIncome.businessShare + annualIncome.otherTaxable,
     fy: lens.currentFY,
     deductions: estimatedDeductionsForOld,
+    employerNps,
   });
 
   const fyTax = computeTax({
@@ -169,6 +173,7 @@ export function derive(household: Household, assumptions: Assumptions, lens: Der
     regime: householdTaxRecommendation.recommended,
     fy: lens.currentFY,
     deductions: estimatedDeductionsForOld,
+    employerNps,
   });
   const annualTax = fyTax.totalTax;
 

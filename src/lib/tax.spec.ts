@@ -27,6 +27,29 @@ describe("computeTax — New Regime FY 2024-25", () => {
   });
 });
 
+describe("computeTax — 80CCD(2) employer NPS (gh-issue #2 finding #2)", () => {
+  // 80CCD(2) is the one Chapter VI-A deduction allowed in the NEW regime too. The
+  // engine must subtract `employerNps` from taxable income in BOTH regimes.
+  it("NEW regime: employerNps reduces taxable income and total tax", () => {
+    const without = computeTax({ grossIncome: 2_000_000, regime: "NEW", fy: "2025-26" });
+    const withNps = computeTax({ grossIncome: 2_000_000, regime: "NEW", fy: "2025-26", employerNps: 200_000 });
+    expect(withNps.taxableIncome).toBe(without.taxableIncome - 200_000);
+    expect(withNps.totalTax).toBeLessThan(without.totalTax);
+  });
+
+  it("OLD regime: employerNps stacks on top of other deductions", () => {
+    const base = computeTax({ grossIncome: 2_000_000, regime: "OLD", fy: "2025-26", deductions: 150_000 });
+    const withNps = computeTax({ grossIncome: 2_000_000, regime: "OLD", fy: "2025-26", deductions: 150_000, employerNps: 100_000 });
+    expect(withNps.taxableIncome).toBe(base.taxableIncome - 100_000);
+  });
+
+  it("defaults to no employer-NPS deduction when the field is absent", () => {
+    const a = computeTax({ grossIncome: 1_500_000, regime: "NEW", fy: "2025-26" });
+    const b = computeTax({ grossIncome: 1_500_000, regime: "NEW", fy: "2025-26", employerNps: 0 });
+    expect(a.totalTax).toBe(b.totalTax);
+  });
+});
+
 describe("computeTax — Old Regime", () => {
   it("applies ₹50K standard deduction + deductions", () => {
     const r = computeTax({

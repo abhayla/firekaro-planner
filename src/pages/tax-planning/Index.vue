@@ -95,11 +95,13 @@ const totalTaxable = computed(() =>
 
 // Phase 4 Stage J — marginal-relief band detection (audit Entry #13 A13.2-4).
 const marginalReliefActive = computed(() => {
-  const taxableIncome = totalTaxable.value - derivedDeductions.value.totalDeductions;
+  const taxableIncome =
+    totalTaxable.value - derivedDeductions.value.totalDeductions - derivedDeductions.value.section80CCD2;
   return isInMarginalReliefBand(taxableIncome, ui.currentFY);
 });
 const marginalReliefSuggestions = computed(() => {
-  const taxableIncome = totalTaxable.value - derivedDeductions.value.totalDeductions;
+  const taxableIncome =
+    totalTaxable.value - derivedDeductions.value.totalDeductions - derivedDeductions.value.section80CCD2;
   return marginalReliefMitigations(taxableIncome, ui.currentFY);
 });
 
@@ -134,6 +136,7 @@ const oldResult = computed(() =>
     regime: "OLD",
     fy: ui.currentFY,
     deductions: derivedDeductions.value.totalDeductions,
+    employerNps: derivedDeductions.value.section80CCD2,
   }),
 );
 const newResult = computed(() =>
@@ -141,6 +144,7 @@ const newResult = computed(() =>
     grossIncome: totalTaxable.value,
     regime: "NEW",
     fy: ui.currentFY,
+    employerNps: derivedDeductions.value.section80CCD2,
   }),
 );
 const activeResult = computed(() => (effectiveRegime.value === "OLD" ? oldResult.value : newResult.value));
@@ -173,8 +177,9 @@ const monthlyTakeHome = computed(() => {
 const perEarner = computed(() => {
   return household.earners.map((m) => {
     const gross = m.salary?.annualCTC ?? 0;
-    const earnerOld = computeTax({ grossIncome: gross, regime: "OLD", fy: ui.currentFY, deductions: derivedDeductions.value.totalDeductions });
-    const earnerNew = computeTax({ grossIncome: gross, regime: "NEW", fy: ui.currentFY });
+    const earnerNps = m.salary?.employerNpsAnnual ?? 0;
+    const earnerOld = computeTax({ grossIncome: gross, regime: "OLD", fy: ui.currentFY, deductions: derivedDeductions.value.totalDeductions, employerNps: earnerNps });
+    const earnerNew = computeTax({ grossIncome: gross, regime: "NEW", fy: ui.currentFY, employerNps: earnerNps });
     const rec = earnerOld.totalTax <= earnerNew.totalTax ? "OLD" : "NEW";
     const active = effectiveRegime.value === "OLD" ? earnerOld : earnerNew;
     return {

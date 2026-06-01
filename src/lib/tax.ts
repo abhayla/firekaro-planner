@@ -232,8 +232,13 @@ export interface ComputeTaxArgs {
   grossIncome: number;
   regime: "OLD" | "NEW";
   fy: string;
-  // Pre-computed deductions (auto-resolved in demo: EPF + PPF + ELSS + life premium + 80D)
+  // Pre-computed deductions (auto-resolved in demo: EPF + PPF + ELSS + life premium + 80D).
+  // OLD regime only — the new regime ignores these.
   deductions?: number;
+  // Sec 80CCD(2) employer-NPS contribution. Unlike `deductions`, this is allowed under
+  // BOTH regimes, so it is a separate input and is subtracted in both. Pass it separately
+  // (it is NOT inside `deductions`) to avoid double-counting in the old regime. gh-issue #2.
+  employerNps?: number;
   isSalaried?: boolean;
 }
 
@@ -246,10 +251,12 @@ export function computeTax(args: ComputeTaxArgs): FullTaxResult {
   // for the simplified UI; per D17 the user never sees this knob).
   const sd = isSalaried ? regimeConfig.standardDeduction : 0;
 
-  // Old regime allows chapter VI-A; New regime ignores them (except 80CCD(2) employer NPS — not modeled).
+  // Old regime allows chapter VI-A; New regime ignores them — EXCEPT 80CCD(2) employer
+  // NPS, which is deductible under both regimes and is passed separately (gh-issue #2).
   const ded = regime === "OLD" ? Math.max(0, args.deductions ?? 0) : 0;
+  const employerNps = Math.max(0, args.employerNps ?? 0);
 
-  const taxableIncome = Math.max(0, grossIncome - sd - ded);
+  const taxableIncome = Math.max(0, grossIncome - sd - ded - employerNps);
 
   const slabTax = calculateSlabTax(taxableIncome, regimeConfig.slabs);
 

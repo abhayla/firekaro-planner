@@ -90,6 +90,31 @@ describe("deriveDeductions — 80CCD(2) employer NPS", () => {
   it("returns 0 when there is no NPS at all", () => {
     expect(deriveDeductions(emptyHH()).section80CCD2).toBe(0);
   });
+
+  // gh-issue #2 finding #2: 80CCD(2) is now sourced from the actual employer-NPS
+  // contribution entered per member, summed across the household.
+  it("sums members' salary.employerNpsAnnual into section80CCD2", () => {
+    const hh = emptyHH();
+    hh.members = [
+      { id: "a", salary: { annualCTC: 2_000_000, hikePercent: 8, employerNpsAnnual: 120_000 } },
+      { id: "b", salary: { annualCTC: 1_500_000, hikePercent: 8, employerNpsAnnual: 80_000 } },
+    ] as Household["members"];
+    expect(deriveDeductions(hh).section80CCD2).toBe(200_000);
+  });
+
+  it("EXCLUDES section80CCD2 from totalDeductions (it is applied separately in both regimes)", () => {
+    const hh = emptyHH();
+    hh.members = [
+      { id: "a", salary: { annualCTC: 2_000_000, hikePercent: 8, employerNpsAnnual: 120_000 } },
+    ] as Household["members"];
+    hh.investments = [
+      { id: "i1", type: "PPF", value: 0, ownerId: "a", monthlyContribution: 12_500 }, // 1.5L → 80C max
+    ];
+    const r = deriveDeductions(hh);
+    expect(r.section80CCD2).toBe(120_000);
+    // totalDeductions = 80C only (150k); 80CCD(2) is NOT folded in.
+    expect(r.totalDeductions).toBe(150_000);
+  });
 });
 
 describe("deriveDeductions — Sec 24 home loan interest", () => {
