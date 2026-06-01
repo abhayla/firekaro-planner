@@ -22,6 +22,7 @@ function realRoute(
 const routes: RouteRecordRaw[] = [
   // ---- Public routes (no sidebar layout) ----
   { path: "/", name: "splash", component: () => import("@/pages/Splash.vue") },
+  { path: "/login", name: "login", component: () => import("@/pages/Login.vue") },
   { path: "/wizard", redirect: "/wizard/profile" },
   {
     path: "/wizard/:step",
