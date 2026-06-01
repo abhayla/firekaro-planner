@@ -85,12 +85,14 @@ export function deriveDeductions(
   const npsAnnual = sumAnnual(investments, "NPS");
   const section80CCD1B = Math.min(LIMIT_80CCD_1B, npsAnnual);
 
-  // ---- 80CCD(2) — employer NPS contribution (audit Entry #12 A12.6) ----
-  // v4 doesn't store employer NPS explicitly. Conservative MVP-1 stub:
-  // assume 10% of total basic when NPS exists — Stage K will refine via
-  // explicit employer-NPS field on Member.salary.
-  const totalNps = sumValue(investments, "NPS");
-  const section80CCD2 = totalNps > 0 ? Math.min(npsAnnual * 0.5, 100_000) : 0;
+  // ---- 80CCD(2) — employer NPS contribution ----
+  // 80CCD(2) is the EMPLOYER's NPS contribution (deductible up to 10% of basic,
+  // 14% for the new regime), NOT a function of the member's own NPS. This app
+  // does not yet track employer NPS, so we claim 0 rather than fabricate a figure
+  // (the prior `npsAnnual * 0.5` heuristic was not grounded in law — gh-issue #2
+  // finding #1). When a Member.salary employer-NPS field lands, derive it here and
+  // also apply it in the NEW regime (gh-issue #2 finding #2 — see tax.ts computeTax).
+  const section80CCD2 = 0;
 
   // ---- 80D — health insurance ----
   const healthSelfPremium = sumHealthPremium(insurance, "self");
@@ -134,20 +136,24 @@ export function deriveDeductions(
  * into the tax engine to soften this; this detector identifies when a
  * user is INSIDE the band so the UI can render the warning chip.
  *
- * Per Entry #13 A13.2, the band spans roughly ₹12,00,001 → ₹12,75,000
- * (the exact upper bound depends on FY slab rates; for FY 2025-26 it
- * sits at ~₹12.75L where the relief stops being needed).
+ * The band spans ₹12,00,001 → ₹12,70,588. The upper bound is the exact point
+ * where new-regime marginal relief stops being needed: tax at ₹12L taxable is
+ * ₹60,000 (5% of 4–8L + 10% of 8–12L) and the marginal slab above ₹12L is 15%,
+ * so relief applies until 60,000 + 0.15·d = d ⇒ d = 60,000/0.85 = ₹70,588 over
+ * ₹12L (gh-issue #2 finding #4 — was previously an approximate ₹12,75,000).
  */
 export const MARGINAL_RELIEF_BAND_FY_2025_26 = {
   fy: "2025-26",
   lower: 1_200_001,
-  upper: 1_275_000,
+  upper: 1_270_588,
 } as const;
 
+// FY 2026-27 new-regime slabs are modelled identically to 2025-26, so the
+// marginal-relief crossover is the same ₹12,70,588.
 export const MARGINAL_RELIEF_BAND_FY_2026_27 = {
   fy: "2026-27",
   lower: 1_200_001,
-  upper: 1_275_000,
+  upper: 1_270_588,
 } as const;
 
 /**
@@ -191,10 +197,6 @@ function sumAnnual(investments: Investment[], type: Investment["type"]): number 
   return investments
     .filter((i) => i.type === type)
     .reduce((s, i) => s + (i.monthlyContribution ?? 0) * 12, 0);
-}
-
-function sumValue(investments: Investment[], type: Investment["type"]): number {
-  return investments.filter((i) => i.type === type).reduce((s, i) => s + i.value, 0);
 }
 
 function mutualFundsSIPAnnual(investments: Investment[]): number {

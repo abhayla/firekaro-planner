@@ -22,9 +22,11 @@ export interface TaxCliffPoint {
 /**
  * The FY 2025-26 new-regime 87A rebate phase-out band. Below ₹12L taxable the
  * rebate zeroes tax; just above it marginal relief caps the tax at the income
- * over ₹12L, producing a steep but bounded rise across this band.
+ * over ₹12L, producing a steep but bounded rise across this band. The upper edge
+ * is the ₹12,70,588 crossover where relief stops being needed (60,000 / 0.85 over
+ * ₹12L) — kept in sync with MARGINAL_RELIEF_BAND_FY_2025_26 (gh-issue #2 finding #4).
  */
-export const REBATE_CLIFF_BAND = { lo: 1_200_000, hi: 1_275_000 } as const;
+export const REBATE_CLIFF_BAND = { lo: 1_200_000, hi: 1_270_588 } as const;
 
 export interface TaxCliffArgs {
   fy: string;

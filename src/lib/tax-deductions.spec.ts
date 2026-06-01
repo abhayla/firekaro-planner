@@ -73,6 +73,25 @@ describe("deriveDeductions — 80CCD(1B) NPS", () => {
   });
 });
 
+describe("deriveDeductions — 80CCD(2) employer NPS", () => {
+  // gh-issue #2 finding #1: the prior `npsAnnual * 0.5` heuristic fabricated an
+  // employer-NPS deduction from the EMPLOYEE's own NPS. 80CCD(2) is the employer's
+  // actual contribution (up to 10% of basic), which this app does not yet track —
+  // so we claim 0 rather than invent a figure (5W-PRINCIPLES: no fabricated values).
+  it("returns 0 even when the member has personal NPS — employer NPS is not tracked yet", () => {
+    const hh = emptyHH();
+    hh.investments = [
+      { id: "i1", type: "NPS", value: 200_000, ownerId: "self", monthlyContribution: 8_000 },
+    ];
+    const result = deriveDeductions(hh);
+    expect(result.section80CCD2).toBe(0);
+  });
+
+  it("returns 0 when there is no NPS at all", () => {
+    expect(deriveDeductions(emptyHH()).section80CCD2).toBe(0);
+  });
+});
+
 describe("deriveDeductions — Sec 24 home loan interest", () => {
   it("caps at ₹2L for single borrower", () => {
     const hh = emptyHH();
@@ -175,6 +194,16 @@ describe("isInMarginalReliefBand", () => {
 
   it("FY 2025-26: 13.5L is NOT in band (above)", () => {
     expect(isInMarginalReliefBand(1_350_000, "2025-26")).toBe(false);
+  });
+
+  // gh-issue #2 finding #4: relief stops at taxable ≈ ₹12,70,588 (60,000 / 0.85 over
+  // ₹12L), not the previously-coded ₹12,75,000. Lock both edges of the true crossover.
+  it("FY 2025-26: 12.70L is still in band (just below the ₹12,70,588 crossover)", () => {
+    expect(isInMarginalReliefBand(1_270_000, "2025-26")).toBe(true);
+  });
+
+  it("FY 2025-26: 12.72L is NOT in band (above the ₹12,70,588 crossover)", () => {
+    expect(isInMarginalReliefBand(1_272_000, "2025-26")).toBe(false);
   });
 
   it("FY 2026-27 inherits same band", () => {

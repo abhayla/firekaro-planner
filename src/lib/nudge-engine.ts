@@ -349,8 +349,11 @@ export function evaluateNudges(ctx: NudgeContext): Nudge[] {
     if (headroom80C > 25_000) gaps.push(`₹${Math.round(headroom80C / 1000)}k of your ₹1.5L 80C limit`);
     if (headroom80CCD1B > 10_000)
       gaps.push(`₹${Math.round(headroom80CCD1B / 1000)}k of the ₹50k NPS 80CCD(1B) top-up`);
-    if (ded.section80CCD2 === 0 && sumValueByType(ctx.household.investments, "NPS") > 0)
-      gaps.push("employer NPS under 80CCD(2)");
+    // NOTE: 80CCD(2) (employer NPS) is intentionally NOT surfaced here. It is the
+    // employer's contribution — not a user-controllable Chapter-VI-A top-up — and we
+    // do not yet track it, so keying a nudge off mere personal-NPS holdings would fire
+    // an un-actionable suggestion for every NPS holder. Reinstate a precise employer-NPS
+    // nudge when the Member.salary employer-NPS field lands (gh-issue #2 findings #1/#2).
     if (gaps.length > 0) {
       out.push({
         id: "deduction-under-utilization",
