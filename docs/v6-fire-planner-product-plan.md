@@ -318,3 +318,35 @@ standard 24/25/26 + TDD gates) when its predecessor is verified.
 - `docs/audit/v5-implementation-gap-2026-05-30.md` — proof the planner is research-complete
 - `mvp/CLAUDE.md` · `mvp/src/lib/storage-adapter.ts` · `mvp/src/lib/auth-provider.ts` — the v6 seam
 - `5W-CONTEXT.md` §4 / `5W-PRINCIPLES.md` — FireKaro's portfolio role + the four principles
+
+---
+
+## 9. Target persona & focus (chosen 2026-06-01)
+
+**Primary wedge — the urban salaried accumulator.** Optimize FireKaro hardest for this user first
+and let the product stay opinionated around them:
+
+- Age **28–45**, **salaried** in IT / tech / finance / consulting / MNCs
+- **Metro / Tier-1**, household income **₹15L–₹1Cr+**, equity-comfortable, English-literate
+- Often **DINK or young-family / sandwich-gen** — exactly the seeded **Sharmas / Iyers / Mehtas**
+
+**Basis:** (1) FIRE adoption in India is, observably, an affluent urban-salaried movement, not a
+mass-market one — "cover all of India" would dilute a FIRE planner into a commodity budgeting app;
+(2) the product is already deepest here; (3) Abhay's own household is the archetype (dogfood + the
+5W Financial data-layer role); (4) YAGNI — build for the next real user, not a speculative one.
+
+**Build tiering that follows from the wedge:**
+- **Tier 0 — persona-independent, do now:** tax-config staleness guard (no silently-stale/guessed
+  FY numbers) + Monte Carlo confidence bands (stop over-stating single-point certainty). Help every
+  user regardless of targeting.
+- **Tier 1 — deepen the wedge:** Form 16 / CAS import (kill manual-entry friction, honour
+  Principle 3), persona-templated onboarding (reuse seeds), salaried/family/DINK polish.
+- **Tier 2 — adjacent, after the wedge is excellent:** freelancer (44ADA, partly done), **NRI**,
+  **HUF**.
+- **Tier 3 — deprioritised (maybe never):** rural / agricultural, vernacular mass-market, pure
+  already-retired seniors. Different products.
+
+**Boundary (L-042):** the *market-positioning lock* is a 5 Wealths decision — to be recorded under
+`D:\Abhay\VibeCoding\5Wealths\Financial Wealth\FW-FireKaro\DECISIONS.md`. This section is the
+repo-side reflection that gates Tier-1/Tier-2 engineering, not the formal portfolio commitment.
+`TODO(5W):` ratify "primary persona = urban salaried accumulator; defer NRI/HUF/vernacular/rural."
