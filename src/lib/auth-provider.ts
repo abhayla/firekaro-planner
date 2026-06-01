@@ -50,6 +50,28 @@ export class ServerAuthProvider implements AuthProvider {
 }
 
 /**
+ * v6 SaaS — server mode but NO valid session. Installed by main.ts when
+ * GET /api/planner/me returns 401, so the router's auth guard bounces to /login.
+ * getCurrentUserId() fails fast (it must never be reached — the guard redirects
+ * before any store hydrates). In demo/localStorage mode this is never installed,
+ * so LocalAuthProvider keeps isAuthenticated()===true and the demo flow is unchanged.
+ */
+export class UnauthenticatedAuthProvider implements AuthProvider {
+  // Returns an empty sentinel rather than throwing: the Pinia stores instantiate
+  // eagerly at mount and call getCurrentUserId() BEFORE the router's auth guard can
+  // redirect to /login. Throwing crashes App setup and aborts the navigation. The
+  // empty id is never used for real reads/writes — the guard sends every non-login
+  // route to /login, and Login.vue touches no store.
+  getCurrentUserId(): string {
+    return "";
+  }
+
+  isAuthenticated(): boolean {
+    return false;
+  }
+}
+
+/**
  * Singleton — every consumer imports this. Replaced with a real provider
  * in v6 SaaS by swapping this one export.
  *

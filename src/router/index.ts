@@ -3,6 +3,7 @@ import { useHouseholdStore } from "@/stores/household";
 import { useFeaturesStore } from "@/stores/features";
 import { useAssumptionsStore } from "@/stores/assumptions";
 import { featuresGuardingRoute } from "@/lib/features";
+import { getAuthProvider } from "@/lib/auth-provider";
 
 function realRoute(
   path: string,
@@ -118,6 +119,18 @@ const router = createRouter({
 // lock: sidebar always shows 12 items). Only NEW routes added in v5 stages
 // (N: /investments/buckets, O: /fire-goals/stress-test, P: /estate-planning)
 // participate in the gate.
+// Auth gate (v6) — runs FIRST, before feature-gate + onboarding. In server mode an
+// unauthenticated session installs UnauthenticatedAuthProvider (main.ts) →
+// isAuthenticated() is false → bounce to /login before any store hydrates. In
+// demo/localStorage mode the provider is LocalAuthProvider (always authed), so this
+// guard is a no-op and the demo flow is UNCHANGED (the non-negotiable spine).
+router.beforeEach((to) => {
+  const authed = getAuthProvider().isAuthenticated();
+  if (!authed && to.name !== "login") return { name: "login" };
+  if (authed && to.name === "login") return { name: "splash" };
+  return true;
+});
+
 router.beforeEach((to) => {
   const guardingFeatures = featuresGuardingRoute(String(to.name ?? ""));
   if (guardingFeatures.length === 0) return true;

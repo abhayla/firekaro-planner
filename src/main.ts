@@ -15,7 +15,7 @@ import vuetify from "./plugins/vuetify";
 import "./styles/tokens.css";
 import "./styles/motion.css";
 import { setAdapter } from "./lib/storage-adapter";
-import { setAuthProvider, ServerAuthProvider } from "./lib/auth-provider";
+import { setAuthProvider, ServerAuthProvider, UnauthenticatedAuthProvider } from "./lib/auth-provider";
 import { ServerAdapter } from "./lib/server-adapter";
 
 /**
@@ -42,13 +42,16 @@ async function installServerAdapter(): Promise<void> {
       headers,
     });
     if (!meRes.ok) {
-      console.warn("[boot] not authenticated — staying on the localStorage path");
+      // Reachable but no valid session → force the login gate (router redirects to /login).
+      console.warn("[boot] not authenticated — routing to /login");
+      setAuthProvider(new UnauthenticatedAuthProvider());
       return;
     }
     const { data } = (await meRes.json()) as { data?: { id?: string } };
     const userId = data?.id;
     if (!userId) {
-      console.warn("[boot] /me returned no userId — staying on localStorage");
+      console.warn("[boot] /me returned no userId — routing to /login");
+      setAuthProvider(new UnauthenticatedAuthProvider());
       return;
     }
     const adapter = new ServerAdapter(userId, { baseUrl, devBypass });
