@@ -1,6 +1,6 @@
 ---
 description: Dev-only auth bypass pattern. Gated by DEV_BYPASS_AUTH=true and production refusal. Security-sensitive — treat as private.
-globs: ["server/middleware/**/*.ts", "server/lib/auth.ts", "server/routes/auth/**/*.ts"]
+globs: ["server/src/middleware/**/*.ts", "server/src/lib/auth.ts", "server/src/lib/validate-env.ts", "server/src/routes/**/*.ts"]
 version: "1.0.0"
 synthesized: true
 private: true
@@ -12,26 +12,32 @@ FIREKaro supports a local-development auth bypass so the frontend can be driven 
 
 ## How It Works
 
-The auth middleware in `server/middleware/auth.ts` checks three conditions before yielding a cached dev user:
+The auth middleware in `server/src/middleware/auth.ts` checks three conditions before yielding a cached dev user:
 
-1. `process.env.NODE_ENV !== 'production'` — the process MUST NOT be running as production.
+1. `process.env.NODE_ENV === 'development' || === 'test'` — the process MUST be running under an
+   EXPLICIT dev/test env. Riding on `!== 'production'` alone was a footgun: an UNSET `NODE_ENV` on
+   the VPS would have left the bypass live on real data (closed 2026-06-01).
 2. `process.env.DEV_BYPASS_AUTH === 'true'` — the bypass MUST be opted into at env-file level.
-3. The incoming request carries an `x-dev-bypass` header — the bypass MUST be opted into per-request.
+3. The incoming request carries an `x-dev-bypass: true` header — the bypass MUST be opted into per-request.
 
-Only when all three are true does the middleware attach the cached dev user (email `dev@firekaro.local`) to the request context. Any other path runs the full Better Auth session handler.
+Only when all three are true does the middleware attach the cached dev user (email `dev@firekaro-v6.local`) to the request context. Any other path runs the full Better Auth session handler.
 
 ## MUST / MUST NOT — Security Invariants
 
-- MUST NOT remove or loosen the `NODE_ENV !== 'production'` guard. That single check is the last line of defence; every other condition can be set accidentally.
+- MUST NOT loosen the NODE_ENV guard. It MUST require an EXPLICIT `development`/`test` value — never relax it back to a mere `!== 'production'` check, which treats an unset `NODE_ENV` as safe and is the exact footgun that was closed.
 - MUST NOT allow the bypass to trigger from config alone. The `x-dev-bypass` header requirement forces an explicit opt-in per request so a stale env var cannot silently expose a running instance.
 - MUST NOT log the dev user's session token or cached Better Auth record. Even in dev, the logger's redaction paths (`token`, `session`, `authorization`) must apply.
 - MUST NOT extend the bypass to cover new sensitive endpoints without also extending the three-factor gate check to cover them.
 - MUST NOT expose a UI toggle that flips `DEV_BYPASS_AUTH` — it is an env-only knob. A UI toggle would be tamperable at runtime.
 - MUST NOT store production credentials in `.env.development` or similar shadow files. Placeholder detection in `validate-env.ts` (see `environment-validation.md`) catches the common mistake of reusing prod secrets in dev.
 
-## Prod Refusal
+## Boot Refusal
 
-The middleware MUST log and reject any attempt to set `DEV_BYPASS_AUTH=true` in a production process. The intended behaviour is: detect the misconfiguration at boot, emit a `logger.error(...)`, and either exit non-zero or force the bypass off. Do not "tolerate" the misconfiguration by ignoring it — a silent ignore masks the deployment error.
+`server/src/lib/validate-env.ts` refuses to boot (throws) whenever `DEV_BYPASS_AUTH === 'true'` and
+`NODE_ENV` is not an explicit `development`/`test` — this covers BOTH a production process AND the
+unset-`NODE_ENV` VPS misconfiguration. Fail-fast at boot, never "tolerate" the misconfiguration by
+ignoring it — a silent ignore masks the deployment error. This boot check is the suspenders; the
+middleware gate (above) is the belt.
 
 ## Rotation & Cleanup
 
