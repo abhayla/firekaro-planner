@@ -38,3 +38,4 @@ Thumbs.db
 
 # Playwright MCP scratch (snapshots/console/network dumps)
 .playwright-mcp/
+.claude/.overask-violations.log

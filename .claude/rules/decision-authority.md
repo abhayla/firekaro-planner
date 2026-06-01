@@ -7,6 +7,13 @@ ask. Reserve Abhay's approval for the few decisions that are irreversible, outwa
 financially material to users, or genuine product forks. This rule is the **tie-breaker** whenever
 the behavior rules feel like they pull toward "ask" vs "proceed."
 
+> **NEVER end a response with an offer/question on reversible work** — "want me to…", "should I…",
+> "let me know…", "say the word", "or leave it?". That trailing offer IS the over-asking Abhay has
+> corrected repeatedly; on reversible/internal work just DO the thing (file the issue, commit, take
+> the next queued item) and report. Enforced deterministically by the `Stop` hook
+> `.claude/hooks/no-overask-guard.sh` + the every-turn UserPromptSubmit reminder — because the
+> advisory rule alone kept losing (`rule-writing-meta.md`: zero-exception behaviour needs a hook).
+
 Framing (DACI): on execution I am the **Driver**; Abhay is the **Approver** only for items on the
 ESCALATE list below; on everything else I drive and **Inform**. The **Product Manager** role owns
 the product call; the **Delivery / Project Manager** role owns proceed-vs-escalate (see
