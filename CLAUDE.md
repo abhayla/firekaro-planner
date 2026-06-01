@@ -33,6 +33,12 @@ became "v6" — the real product). The old tax/transaction tracker (`FIREKaro-Vu
 the `firekaro.com` Next.js app are being **retired**; this is the **canonical product repo**.
 Multi-tenant by design — every persisted entity is owned by a `userId`.
 
+**Live in production since 2026-06-01: https://firekaro.com** (Hostinger VPS `72.61.240.224`,
+PM2 `firekaro-api` + nginx → Supabase, Cloudflare edge TLS). The deploy/redeploy runbook is
+`docs/DEPLOY.md` (SSOT for VPS bring-up); CI is `.github/workflows/ci.yml`. Production
+config: `NODE_ENV=production`, `DEV_BYPASS_AUTH=false` (boot guard refuses otherwise — see
+`.claude/rules/dev-bypass-auth.md`).
+
 The v6 product plan is the design SSOT: `docs/v6-fire-planner-product-plan.md`. The original v5
 build contract (still the source of truth for the planner's screens/math) is
 `docs/goals/build-firekaro-mvp-v5.md`. Status files: `FINAL-BRIEF-v5.md`,
@@ -111,8 +117,13 @@ Prisma scripts hitting Supabase while the dev server holds connections MUST appe
   `$transaction`. Auto-flow recurring rows upsert by `(userId, sourceRefId)`; `"Joint"` ownerId is
   plain TEXT (no FK). TDD red-first; 15 unit tests are the no-DB correctness proof. The Prisma
   read/write layer the diff engine drives is `server/src/lib/household-repo.ts`.
-- **Auth:** Better Auth (Google + sessions) + the **3-factor dev-bypass** (`NODE_ENV!=='production'`
-  + `DEV_BYPASS_AUTH==='true'` + `x-dev-bypass` header), dev user `dev@firekaro-v6.local`.
+- **Auth:** Better Auth (Google OAuth + sessions) + the **3-factor dev-bypass** (`NODE_ENV` is an
+  explicit `development`/`test` + `DEV_BYPASS_AUTH==='true'` + `x-dev-bypass` header), dev user
+  `dev@firekaro-v6.local`. The frontend login UI is `src/pages/Login.vue` (route `/login`) driving
+  `src/lib/auth-client.ts`; the router's first `beforeEach` guard bounces users there when
+  `getAuthProvider().isAuthenticated()` is false (`LocalAuthProvider` returns true in demo mode, so
+  the bounce only bites under the ServerAdapter). Auth routes (`/api/auth/*`) are rate-limited
+  (`.claude/rules/rate-limiting-middleware.md`).
 - The `.claude/rules/` for **Hono / Prisma / api-envelope / api-response-unwrapping / dev-bypass-auth
   / structured-logging** apply to `server/` (it IS Hono + Prisma + Better Auth).
 
