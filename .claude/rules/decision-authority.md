@@ -12,6 +12,22 @@ ESCALATE list below; on everything else I drive and **Inform**. The **Product Ma
 the product call; the **Delivery / Project Manager** role owns proceed-vs-escalate (see
 `engineering-roles.md`).
 
+## Confidence gate — converge on INTENT before building
+
+Default-to-deciding (below) governs **execution** calls once intent is clear. It does NOT license
+guessing at **what to build**. For non-trivial work, gate the *start* on confidence in intent/design:
+
+- **≥ ~95% confident** — can state "done" in one unambiguous sentence, no consequential fork → proceed, decide-and-report.
+- **< ~95% with 1–2 missing details** → the Clarification Gate (one targeted question at a time, answered from the codebase first).
+- **< ~95% on a consequential fork** (expensive to reverse, materially changes the product, no clear best-practice winner) → **converge first, don't guess**: run **`/grill-me`** (plan stress-test) or **`/grill-with-docs`** (same, and records decisions into CONTEXT/ADRs — preferred in this docs-disciplined repo) until shared understanding is reached.
+- **Greenfield "what should we even build"** → **`/brainstorm`** first.
+
+Not a return to over-asking: grilling is a **single structured convergence pass on consequential
+intent**, not scattered questions on reversible details. Once intent is locked, the DECIDE/INFORM/
+ESCALATE logic takes over. The 95% is a heuristic ("would I be guessing on something costly to undo?"),
+not a literal score. **Override:** if Abhay says "you take a call" / pre-authorizes, the gate is
+waived — proceed on best judgment, stating one-line assumptions.
+
 ## DECIDE autonomously — just do it, then report
 Reversible + internal + best-practice-clear:
 - Which engineering/PM role to adopt; which skills/agents to dispatch
