@@ -35,3 +35,6 @@ Thumbs.db
 # editor
 .idea/
 *.swp
+
+# Playwright MCP scratch (snapshots/console/network dumps)
+.playwright-mcp/
