@@ -59,9 +59,35 @@ export function normalizeWhatsAppNumber(raw: string): string {
   return (raw ?? "").replace(/\D/g, "");
 }
 
+/**
+ * SAFETY RAIL (feedback_whatsapp_test_recipient): the comma-separated allowlist
+ * of numbers permitted to receive messages while broadcast is OFF. Set in
+ * server/.env as WATI_TEST_RECIPIENTS (Abhay's number 917972672473 during dev).
+ * Empty list + broadcast off ⇒ fail-closed: NO message goes out.
+ */
+export function parseTestRecipients(env: NodeJS.ProcessEnv = process.env): string[] {
+  return (env.WATI_TEST_RECIPIENTS ?? "")
+    .split(",")
+    .map((n) => normalizeWhatsAppNumber(n))
+    .filter((n) => n.length > 0);
+}
+
+/**
+ * The explicit broadcast switch. Until WATI_ALLOW_ALL_RECIPIENTS === 'true',
+ * sends are restricted to the allowlist. Flipping this on = messaging real users
+ * = an escalation (spend + outbound) — Abhay's call only, never a silent default.
+ */
+export function isBroadcastEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  return env.WATI_ALLOW_ALL_RECIPIENTS === "true";
+}
+
 interface SendDeps {
   config?: WatiConfig | null;
   fetchImpl?: typeof fetch;
+  /** Normalized numbers allowed as recipients (defaults to WATI_TEST_RECIPIENTS env). */
+  allowlist?: string[];
+  /** Bypass the allowlist — explicit broadcast (defaults to WATI_ALLOW_ALL_RECIPIENTS env). */
+  allowAll?: boolean;
 }
 
 /**
@@ -91,6 +117,26 @@ export async function sendTemplateMessage(
   }
   if (!input.templateName?.trim()) {
     return { ok: false, status: 0, error: "Missing templateName" };
+  }
+
+  // SAFETY RAIL — fail-closed recipient allowlist. Until broadcast is explicitly
+  // enabled, refuse to message anyone outside WATI_TEST_RECIPIENTS. Prevents
+  // accidentally messaging real users during testing (feedback_whatsapp_test_recipient).
+  const allowAll = deps.allowAll ?? isBroadcastEnabled();
+  const allowlist = deps.allowlist ?? parseTestRecipients();
+  if (!allowAll && !allowlist.includes(number)) {
+    logger.warn(
+      { template: input.templateName },
+      "WhatsApp send BLOCKED: recipient not in test allowlist and broadcast not enabled",
+    );
+    return {
+      ok: false,
+      status: 0,
+      error:
+        "Recipient blocked by safety allowlist: not in WATI_TEST_RECIPIENTS and " +
+        "WATI_ALLOW_ALL_RECIPIENTS is not 'true'. Add the number to the test allowlist " +
+        "or get explicit broadcast approval before sending to real users.",
+    };
   }
 
   const base = config.endpoint.replace(/\/+$/, "");

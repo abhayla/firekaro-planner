@@ -4,6 +4,8 @@ import {
   getWatiConfig,
   isWhatsAppEnabled,
   normalizeWhatsAppNumber,
+  parseTestRecipients,
+  isBroadcastEnabled,
   type WatiConfig,
 } from "./wati-client";
 
@@ -70,14 +72,14 @@ describe("sendTemplateMessage", () => {
     const fetchImpl = vi.fn();
     const noNumber = await sendTemplateMessage(
       { whatsappNumber: "+++", templateName: "t" },
-      { config: CONFIG, fetchImpl: fetchImpl as unknown as typeof fetch },
+      { config: CONFIG, fetchImpl: fetchImpl as unknown as typeof fetch, allowAll: true },
     );
     expect(noNumber.ok).toBe(false);
     expect(noNumber.error).toMatch(/number/i);
 
     const noTemplate = await sendTemplateMessage(
       { whatsappNumber: "919876543210", templateName: "" },
-      { config: CONFIG, fetchImpl: fetchImpl as unknown as typeof fetch },
+      { config: CONFIG, fetchImpl: fetchImpl as unknown as typeof fetch, allowAll: true },
     );
     expect(noTemplate.ok).toBe(false);
     expect(noTemplate.error).toMatch(/template/i);
@@ -95,7 +97,7 @@ describe("sendTemplateMessage", () => {
           { name: "2", value: "₹1 Cr" },
         ],
       },
-      { config: CONFIG, fetchImpl: fetchImpl as unknown as typeof fetch },
+      { config: CONFIG, fetchImpl: fetchImpl as unknown as typeof fetch, allowAll: true },
     );
 
     expect(res.ok).toBe(true);
@@ -119,7 +121,7 @@ describe("sendTemplateMessage", () => {
     );
     const res = await sendTemplateMessage(
       { whatsappNumber: "919876543210", templateName: "firekaro_welcome" },
-      { config: CONFIG, fetchImpl: fetchImpl as unknown as typeof fetch },
+      { config: CONFIG, fetchImpl: fetchImpl as unknown as typeof fetch, allowAll: true },
     );
     expect(res.ok).toBe(false);
     expect(res.status).toBe(200);
@@ -130,7 +132,7 @@ describe("sendTemplateMessage", () => {
     const fetchImpl = vi.fn(async () => jsonResponse({ message: "unauthorized" }, 401));
     const res = await sendTemplateMessage(
       { whatsappNumber: "919876543210", templateName: "firekaro_welcome" },
-      { config: CONFIG, fetchImpl: fetchImpl as unknown as typeof fetch },
+      { config: CONFIG, fetchImpl: fetchImpl as unknown as typeof fetch, allowAll: true },
     );
     expect(res.ok).toBe(false);
     expect(res.status).toBe(401);
@@ -143,10 +145,73 @@ describe("sendTemplateMessage", () => {
     });
     const res = await sendTemplateMessage(
       { whatsappNumber: "919876543210", templateName: "firekaro_welcome" },
-      { config: CONFIG, fetchImpl: fetchImpl as unknown as typeof fetch },
+      { config: CONFIG, fetchImpl: fetchImpl as unknown as typeof fetch, allowAll: true },
     );
     expect(res.ok).toBe(false);
     expect(res.status).toBe(0);
     expect(res.error).toMatch(/ECONNREFUSED/);
+  });
+});
+
+describe("recipient safety allowlist (feedback_whatsapp_test_recipient)", () => {
+  const ABHAY = "917972672473"; // the ONLY approved test recipient
+
+  it("parseTestRecipients parses + normalizes a comma list", () => {
+    const env = { WATI_TEST_RECIPIENTS: "+91 79726-72473, 919999988888" } as NodeJS.ProcessEnv;
+    expect(parseTestRecipients(env)).toEqual(["917972672473", "919999988888"]);
+  });
+
+  it("parseTestRecipients is empty (fail-closed) when unset", () => {
+    expect(parseTestRecipients({} as NodeJS.ProcessEnv)).toEqual([]);
+  });
+
+  it("isBroadcastEnabled is true ONLY for the exact string 'true'", () => {
+    expect(isBroadcastEnabled({ WATI_ALLOW_ALL_RECIPIENTS: "true" } as NodeJS.ProcessEnv)).toBe(true);
+    expect(isBroadcastEnabled({ WATI_ALLOW_ALL_RECIPIENTS: "1" } as NodeJS.ProcessEnv)).toBe(false);
+    expect(isBroadcastEnabled({ WATI_ALLOW_ALL_RECIPIENTS: "TRUE" } as NodeJS.ProcessEnv)).toBe(false);
+    expect(isBroadcastEnabled({} as NodeJS.ProcessEnv)).toBe(false);
+  });
+
+  it("BLOCKS a non-allowlisted number and never calls fetch (fail-closed default)", async () => {
+    const fetchImpl = vi.fn();
+    const res = await sendTemplateMessage(
+      { whatsappNumber: "919999988888", templateName: "firekaro_welcome" },
+      { config: CONFIG, fetchImpl: fetchImpl as unknown as typeof fetch, allowlist: [ABHAY] },
+    );
+    expect(res.ok).toBe(false);
+    expect(res.error).toMatch(/allowlist/i);
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("blocks EVERYTHING when allowlist empty and broadcast off (true fail-closed)", async () => {
+    const fetchImpl = vi.fn();
+    const res = await sendTemplateMessage(
+      { whatsappNumber: ABHAY, templateName: "firekaro_welcome" },
+      { config: CONFIG, fetchImpl: fetchImpl as unknown as typeof fetch, allowlist: [], allowAll: false },
+    );
+    expect(res.ok).toBe(false);
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("ALLOWS the approved number (Abhay's) — fetch is called", async () => {
+    const fetchImpl = vi.fn(async () => jsonResponse({ result: true }));
+    const res = await sendTemplateMessage(
+      { whatsappNumber: "+91 79726 72473", templateName: "firekaro_welcome" },
+      { config: CONFIG, fetchImpl: fetchImpl as unknown as typeof fetch, allowlist: [ABHAY] },
+    );
+    expect(res.ok).toBe(true);
+    expect(fetchImpl).toHaveBeenCalledOnce();
+    const [url] = fetchImpl.mock.calls[0] as unknown as [string];
+    expect(url).toContain(`whatsappNumber=${ABHAY}`);
+  });
+
+  it("allowAll=true bypasses the allowlist (explicit broadcast)", async () => {
+    const fetchImpl = vi.fn(async () => jsonResponse({ result: true }));
+    const res = await sendTemplateMessage(
+      { whatsappNumber: "919999988888", templateName: "firekaro_monthly_digest" },
+      { config: CONFIG, fetchImpl: fetchImpl as unknown as typeof fetch, allowAll: true },
+    );
+    expect(res.ok).toBe(true);
+    expect(fetchImpl).toHaveBeenCalledOnce();
   });
 });

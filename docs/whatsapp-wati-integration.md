@@ -26,6 +26,20 @@ contacts also land in **PIFS's** CRM, onboarding consent copy MUST disclose:
 Consent model: opt-in checkbox at onboarding + a per-channel preference centre with a hard frequency
 cap and an STOP/opt-out path. Store `{ userId, channel: "whatsapp", purpose, consentedAt, revokedAt, source }`.
 
+## Safety rail — recipient allowlist (enforced in code, not just policy)
+Per Abhay's standing instruction, **all testing sends go ONLY to his number `917972672473`; no other
+number is messaged without explicit broadcast approval.** This is enforced in `wati-client.ts`, not
+left to discipline — the adapter is **fail-closed**:
+- `WATI_TEST_RECIPIENTS` (comma-separated, in `server/.env`) — the allowlist. Dev value: `917972672473`.
+- `WATI_ALLOW_ALL_RECIPIENTS` — the explicit broadcast switch; only the exact string `'true'` enables
+  sending to non-allowlisted numbers. Flipping it on = messaging real users = **escalation** (spend +
+  outbound), Abhay's call only.
+- If a recipient is not allowlisted and broadcast is off, `sendTemplateMessage` returns a blocked
+  result and **never calls Wati** (no message leaves). Empty allowlist + broadcast off ⇒ nothing sends.
+
+Regression-locked by `wati-client.spec.ts` (blocks a stranger's number, allows `917972672473`,
+broadcast bypass requires the explicit flag).
+
 ## Inputs needed from Abhay (the only blockers to live sends)
 1. **WATI_API_ENDPOINT** — your tenant base URL (Wati → API Docs, e.g. `https://live-server-XXXXX.wati.io`).
 2. **WATI_API_TOKEN** — the access token (Wati → API Docs → "Access Token"). Stored in `server/.env`
