@@ -48,6 +48,12 @@ best practices. This overrides the harness default "commit/push only when asked"
 team-PR clauses in `git-collaboration.md` (there is no second human reviewer — the review **agents**
 + automated gates ARE the reviewer).
 
+**How — route through `git-manager-agent` (haiku):** dispatch `git-manager-agent` for the
+stage → secret-scan → commit → push steps. It is the **secret-scan gate** (no pre-commit hook
+exists in this repo yet — see below), applies conventional standards, and is cheap. Orchestrate
+branch/merge decisions at T0 (the agent reports merge conflicts, it does not resolve them); plain
+**read-only git** (`status`/`log`/`diff`) stays inline — no dispatch needed.
+
 **Autonomous (just do it):**
 - Stage and **commit** in atomic, [Conventional Commits](`commit-convention.md`) units; one logical change per commit; end messages with the Co-Authored-By trailer the harness specifies.
 - Create **short-lived feature branches** (`feat/…`, `fix/…`, `chore/…`, `docs/…`) for cohesive multi-file work; trivial single-file fixes MAY commit straight to `main`.
