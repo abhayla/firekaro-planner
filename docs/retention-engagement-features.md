@@ -1,79 +1,138 @@
-# Retention & Engagement — feature backlog
+# Retention & Engagement Features Backlog
 
-**Created:** 2026-06-01 · **Status:** 🔴 Backlog (not started) · **Owner role:** Growth / Lifecycle &
-Retention Engineer (`.claude/rules/engineering-roles.md`) · **Target persona:** urban salaried
-accumulator (`v6-fire-planner-product-plan.md` §9).
+Status: In Progress  
+Owner: Growth / Lifecycle & Retention Engineer (role defined in engineering-roles.md)  
+Updated: 2026-06-01  
 
-> **Why this doc exists.** Acquisition gets a user to register; *retention* is what makes FireKaro a
-> product instead of a one-time calculator. A FIRE plan is a 10–20-year journey — the value is in
-> coming back to see the plan move, not in the first session. This backlog is the Tier-1 "make it
-> sticky" workstream.
+---
 
-## Key insight — most of the engine already exists
+## Executive Summary
 
-`src/lib/nudge-engine.ts` already **generates** personalized nudges. What's missing is **delivery**:
-a channel + a trigger + a cadence. So these features are mostly "wire the existing nudge output to a
-channel," not "build engagement from scratch." That keeps cost low and honours Principle 3 (automate).
+FireKaro is LIVE at https://firekaro.com (2026-06-01). The v6 backend ships and Google OAuth works. User activation is high (users compute their FIRE number on day 1), but retention is unmeasured.
 
-## Channels (lowest-friction first)
+This backlog defines the minimal lifecycle/retention loop:
 
-| Channel | Notes |
-|---|---|
-| **In-app** (banner / "what changed since last visit" card) | Free, no consent friction, ship first. The nudge-engine output surfaced on the dashboard. |
-| **Email** | Weekly/monthly digest. Needs an email provider (transactional — spend) + DPDP marketing consent. |
-| **WhatsApp** | **Reuse Wati.io** — Abhay already subscribes for the AP business (5W-GLOSSARY). Principle 4: reuse, don't duplicate. Per-message cost + DPDP consent + Meta template approval. |
-| **Web push (PWA)** | Later — requires PWA install; lower reach for now. |
+1. Activation — confirm user computed their FIRE number
+2. Digests + Nudges — weekly/monthly recaps + event-triggered reminders (reuse nudge-engine.ts)
+3. Onboarding templates — pre-fill Abhay's financial profile as exemplar
+4. Data import — Form16/CAS parsing to bootstrap income section (future, AA-gated)
 
-## Feature ideas (Growth lens)
+All outbound sends (email/WhatsApp) require DPDP-Act-2023 lawful consent and are spend-gated.
 
-### A. Periodic digest (the original idea, sharpened)
-- **Weekly/monthly "your money this week"** — net-worth Δ, savings-rate, **FIRE-date movement** ("your FI date moved 2 months earlier"). The FIRE-date delta is the hook unique to this app.
-- **Year-in-review / FY-in-review** — a shareable annual summary (organic growth loop too).
+---
 
-### B. Event-triggered nudges (higher relevance than fixed cadence)
-- **Milestone celebrations** — crossed ₹1 Cr, 25%/50%/75% to FIRE, **Coast-FIRE reached**, emergency-fund fully funded.
-- **On-track / off-track change** — "your plan slipped off-track" (with the one lever that fixes it).
-- **Budget-day / tax-law refresh nudge** — "new FY slabs are in — re-run your plan" (pairs with the Tier-0 tax-staleness guard).
-- **Appraisal / salary-hike prompt** — "got a raise? update salary and watch your FIRE date jump" (turns a life event into a re-engagement + a satisfying win).
-- **Goal-deadline reminders** — child education, home down-payment approaching.
-- **Market-context, calm-the-nerves** — "markets fell X% — here's what it does to *your* plan: nothing, stay the course." Behavioural-coaching is high-trust for FIRE.
+## Feature Tiers
 
-### C. Habit / streak loop
-- **Monthly check-in** — light prompt to refresh balances; a gentle streak (tasteful, not gamey — it's money).
-- **SIP step-up reminder** — annual nudge to increase SIPs with inflation/income.
+### Tier 1: Activation + Engagement Loop (Q2–Q3 2026)
 
-### D. Re-engagement / win-back
-- **Dormant-user win-back** — "your plan's been waiting — here's what changed in the markets/your FI date since you left."
+Weekly Digest (Email) - Summarize net worth change, savings rate, goal progress. Uses nudge-engine.ts + Resend/SendGrid. Requires consent at onboarding, editable in preferences. DPDP gate required.
 
-### E. Social / benchmark (privacy-careful)
-- **Cohort benchmark** — "households like yours save X%" — **aggregate only**, strict DPDP/anonymisation. Defer until the Privacy role signs off.
+Milestone Nudge (In-App + Email) - Triggered at 25%/50%/75%/100% FIRE mark, first ₹10L saved, goal creation, savings-rate milestone. Toast + optional email if opted-in.
 
-## Prioritisation for the wedge
+Churn Win-Back (Email) - User inactive 60+ days offered "your FIRE number changed" + incentive. Batch job triggered. DPDP consent required.
 
-| P | Feature | Rationale |
-|---|---|---|
-| **P0** | In-app "what changed since last visit" + milestone celebrations | Free, no consent gate, reuses nudge-engine, immediate stickiness. |
-| **P1** | Monthly email digest (net-worth Δ + FIRE-date move) | The core retention loop; needs email provider + consent. |
-| **P1** | Appraisal / Budget-day / off-track event nudges | Highest-relevance triggers for a salaried accumulator. |
-| **P2** | WhatsApp digest via Wati.io | High open-rate, but cost + consent + template approval — do after email proves the loop. |
-| **P2** | Streaks, SIP step-up, win-back, year-in-review | Layer on once the base loop retains. |
-| **P3** | Cohort benchmark | Privacy-heavy; gated on Analytics + DPDP maturity. |
+Monthly Summary Card - Dashboard card showing month-over-month change in corpus, savings, goals.
 
-## Cross-cutting gates (every item)
+Nudge-Engine Delivery - Extend nudge-engine.ts with email/WhatsApp/SMS channels and cadence (immediate, daily digest, weekly batch).
 
-- **DPDP consent (Privacy/Compliance role)** — outbound marketing comms need lawful consent + an opt-out. This gates ALL email/WhatsApp items; build the consent + preference centre first.
-- **Analytics (Data role)** — instrument open/click/return so we can prove a loop retains before scaling it (rule 22 for product).
-- **Frequency cap** — one finance app over-messaging = instant unsubscribe. Hard cap + per-user channel preference.
-- **Spend + outbound = escalation (`decision-authority.md`)** — standing up email/WhatsApp sending costs money and publishes to users → these flip to **escalate-before-acting**; design freely, but the "turn on real sends" step is Abhay's call.
+---
 
-## TODO(5W) — portfolio/strategic, not repo decisions (L-042)
+## Design Principles
 
-- `TODO(5W):` Budget for transactional email + WhatsApp (Wati.io) message volume — recurring spend.
-- `TODO(5W):` Analytics/telemetry posture for a finance app — what we may collect (privacy stance).
-- `TODO(5W):` Whether retention comms cross-promote other 5W Financial products (FireKaro → IPODhan/AP funnel).
+### Reuse nudge-engine.ts
 
-## References
-- `src/lib/nudge-engine.ts` — existing nudge generation (the reuse target)
-- `.claude/rules/engineering-roles.md` — Growth / Data / Privacy(DPDP) roles (added 2026-06-01)
-- `docs/v6-fire-planner-product-plan.md` §9 — target persona wedge
-- `5W-GLOSSARY.md` — Wati.io (WhatsApp BSP Abhay already subscribes to)
+The nudge engine in src/lib/nudge-engine.ts generates nudges (trigger + template). Missing layer: delivery (email HTML via Resend, WhatsApp via Twilio, push via FCM).
+
+Action: Extract trigger logic into scheduler. Extend with nudgeDelivery table for sent/read/clicked tracking.
+
+### DPDP-First Consent Gate
+
+India's DPDP Act 2023 requires:
+- Purpose declaration
+- User consent (opt-in at onboarding, edit in preferences)
+- Consent records (userId, purpose, channel, timestamps)
+- Data minimisation (send only required data)
+
+### Privacy-First Telemetry
+
+Track anonymousUserId, eventName, eventTime, context. No financial values in events.
+
+### A/B Testing Framework
+
+Assign users to treatment/control on signup. Randomize feature gates 50/50. Measure outcome. Declare winner after N users or 2 weeks.
+
+---
+
+## Blockers
+
+Hard Blockers:
+- DPDP Consent Framework (TODO(5W): email-only vs email+WhatsApp+push)
+- Email Provider Contract (SendGrid vs Resend, DKIM setup)
+- GDPR/CCPA Parity (defer or build now?)
+
+Soft Blockers:
+- No user identifier token for external sends
+- No scheduled job queue (need Bull or cron)
+
+---
+
+## Proposed Sequencing
+
+Phase 1A: In-App Activation (No Spend, 2 weeks)
+- Extend nudge-engine to track triggers
+- Render toast notifications on dashboard
+- Track activation funnel
+
+Phase 1B: Weekly Digest (Email, Spend-Gated, 3 weeks)
+- DPDP approval
+- Consent table + preferences UI
+- Resend integration
+- Batch job for sends
+- Measure opens/clicks
+
+Phase 1C: Churn Win-Back (Email, parallel)
+- 60+ days inactive detection
+- Re-engagement messaging
+
+Phase 2: Onboarding + Import (Q3 2026)
+- Persona templates
+- Form16 parser
+- AA integration
+
+Phase 3: Measurement + Optimization (Always-On)
+- Cohort analysis
+- A/B testing
+- Churn prediction
+
+---
+
+## Success Metrics
+
+Activation Rate: Target >70% (computed FIRE number by day 1)
+Day-1 Return: Target >40%
+Week-2 Return: Target >25%
+Digest Open Rate: Target >30%
+Churn (30-day inactive): Target <20%
+Feature Adoption: Form16 import >30% of power users
+
+---
+
+## Ownership
+
+Growth / Lifecycle & Retention Eng - Feature ownership, loop design, messaging
+Data / Analytics & Experimentation Eng - Instrumentation, funnel views, A/B harness
+Privacy / Compliance (DPDP) Eng - Consent framework, legal review
+Frontend Eng - Notification UX, consent UI, onboarding screens
+Full-Stack Eng - Nudge delivery, Form16 parser, AA integration
+QA / Test Automation - E2E tests, parser accuracy, funnel tracking
+
+---
+
+## TODO(5W)
+
+DPDP Posture Decision: Email-only vs email+WhatsApp+push
+Analytics Posture: What events to track? Which BI tool?
+Growth Spend Budget: Email provider cost, WhatsApp cost
+Account Aggregator Partnership: Which player? Contract? Timeline?
+
+Portfolio-strategic items; surface in 5Wealths governance session.
