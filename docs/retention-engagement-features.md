@@ -19,6 +19,10 @@ This backlog defines the minimal lifecycle/retention loop:
 
 All outbound sends (email/WhatsApp) require DPDP-Act-2023 lawful consent and are spend-gated.
 
+**Locked 2026-06-01:** Phase 1 = **WhatsApp only via Wati.io** (email deferred). User contacts sync
+to the **PIFS Zoho CRM, same DB, filtered by source = `FireKaro`** (Abhay's call; `TODO(5W)` to
+ratify the cross-entity funnel). Full design + Meta templates: `docs/whatsapp-wati-integration.md`.
+
 ---
 
 ## Feature Tiers
