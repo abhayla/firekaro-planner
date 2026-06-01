@@ -6,10 +6,25 @@ import { useHouseholdStore } from "@/stores/household";
 import { AVAILABLE_FYS } from "@/lib/tax";
 import AssumptionsPanel from "@/components/shared/AssumptionsPanel.vue";
 import { SEED_META, loadSeed, getActiveSeed, type SeedName } from "@/seeds";
+import { authClient } from "@/lib/auth-client";
 
 const ui = useUiStore();
 const household = useHouseholdStore();
 const router = useRouter();
+
+// Sign-out only applies in real server-adapter (authenticated) mode — the demo /
+// localStorage deployment has no account to sign out of.
+const isServerMode = computed(
+  () =>
+    import.meta.env.VITE_USE_SERVER_ADAPTER === "on" ||
+    import.meta.env.VITE_USE_SERVER_ADAPTER === "true",
+);
+
+async function signOut() {
+  await authClient.signOut();
+  // Full reload so the main.ts boot seam re-resolves /me (now 401) → router → /login.
+  window.location.href = "/login";
+}
 
 const showAssumptions = ref(false);
 
@@ -153,6 +168,18 @@ const savedLabel = computed(() => {
         title="Adjust assumptions"
       >
         <v-icon icon="mdi-cog" />
+      </v-btn>
+
+      <v-btn
+        v-if="isServerMode"
+        icon
+        size="small"
+        variant="text"
+        @click="signOut"
+        title="Sign out"
+        aria-label="Sign out"
+      >
+        <v-icon icon="mdi-logout" />
       </v-btn>
     </div>
 

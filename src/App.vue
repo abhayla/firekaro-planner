@@ -32,7 +32,13 @@ onBeforeUnmount(() => {
   window.removeEventListener("keydown", onGlobalKeydown);
 });
 
-const isDemo = computed(() => true);
+// Demo chip shows only in the localStorage/sample deployment (e.g. GitHub Pages).
+// In real server-adapter mode (login + authenticated SaaS) it must NOT show.
+const isDemo = computed(
+  () =>
+    import.meta.env.VITE_USE_SERVER_ADAPTER !== "on" &&
+    import.meta.env.VITE_USE_SERVER_ADAPTER !== "true",
+);
 </script>
 
 <template>
