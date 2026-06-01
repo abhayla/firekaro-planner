@@ -50,6 +50,10 @@ build contract (still the source of truth for the planner's screens/math) is
 Frontend and backend each have their **own `package.json` / `node_modules`** — run `npm install` in
 both `.` (root) and `server/`.
 
+> **Do NOT trust `README.md`** — it is the pre-extraction `mvp/` doc and is stale: it calls this repo a
+> "folder", references non-existent sibling trees (`demo/`, a separate production `src/` on :5173), and
+> links to `../docs/…` one level above the repo. THIS file is the SSOT for layout, ports, and commands.
+
 ## Commands
 
 **Frontend (repo root):**
@@ -58,8 +62,11 @@ npm run dev               # Vite dev server on http://localhost:5175
 npm run test:unit         # vitest run (one-shot)
 npm run test:unit -- src/lib/tax.spec.ts   # single spec file
 npm run test:unit -- -t "marginal relief"  # filter by test name (vitest -t)
+npm run test:unit:watch   # vitest watch mode
+npm run test:coverage     # vitest run --coverage
 npm run type-check        # vue-tsc --build --force  (banner: firekaro-mvp)
 npm run build             # vue-tsc -b && vite build
+npm run preview           # serve the production build locally
 npm run test:e2e          # playwright
 ```
 
@@ -103,7 +110,8 @@ Prisma scripts hitting Supabase while the dev server holds connections MUST appe
 - **Household diff engine** (`server/src/lib/household-diff.ts`): a pure function that maps an
   incoming `Household` to per-table insert/update/delete; `PUT /household` applies it in ONE Prisma
   `$transaction`. Auto-flow recurring rows upsert by `(userId, sourceRefId)`; `"Joint"` ownerId is
-  plain TEXT (no FK). TDD red-first; 15 unit tests are the no-DB correctness proof.
+  plain TEXT (no FK). TDD red-first; 15 unit tests are the no-DB correctness proof. The Prisma
+  read/write layer the diff engine drives is `server/src/lib/household-repo.ts`.
 - **Auth:** Better Auth (Google + sessions) + the **3-factor dev-bypass** (`NODE_ENV!=='production'`
   + `DEV_BYPASS_AUTH==='true'` + `x-dev-bypass` header), dev user `dev@firekaro-v6.local`.
 - The `.claude/rules/` for **Hono / Prisma / api-envelope / api-response-unwrapping / dev-bypass-auth
