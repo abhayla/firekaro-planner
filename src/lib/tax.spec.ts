@@ -65,6 +65,33 @@ describe("computeTax — FY 2025-26 marginal relief", () => {
   });
 });
 
+describe("computeTax — surcharge marginal relief (gh #1)", () => {
+  it("caps surcharge via marginal relief just above ₹50L (old regime)", () => {
+    // gross 50,60,000 − sd 50,000 = taxable 50,10,000 (₹10k over the ₹50L threshold)
+    const r = computeTax({ grossIncome: 5060000, regime: "OLD", fy: "2024-25", deductions: 0 });
+    expect(r.taxableIncome).toBe(5010000);
+    // Raw 10% surcharge would be ₹1,31,550; marginal relief caps it to ₹7,000.
+    expect(r.surcharge).toBe(7000);
+    expect(r.surcharge).toBeLessThan(20000); // guard: NOT the un-relieved ₹1.31L
+    expect(r.totalTax).toBe(1375400); // exact rupee — substance, not a range
+  });
+
+  it("does NOT apply relief well inside a band — ₹75L old → full 10%", () => {
+    const r = computeTax({ grossIncome: 7550000, regime: "OLD", fy: "2024-25", deductions: 0 });
+    expect(r.surcharge / r.taxAfterRebate).toBeCloseTo(0.1, 2);
+  });
+
+  it("applies the 25% band rate at ₹3Cr (old regime)", () => {
+    const r = computeTax({ grossIncome: 30050000, regime: "OLD", fy: "2024-25", deductions: 0 });
+    expect(r.surcharge / r.taxAfterRebate).toBeCloseTo(0.25, 2);
+  });
+
+  it("pins exact total tax at ₹15L gross (new regime FY2024-25)", () => {
+    const r = computeTax({ grossIncome: 1500000, regime: "NEW", fy: "2024-25" });
+    expect(r.totalTax).toBe(130000); // exact rupee substance assertion
+  });
+});
+
 describe("recommendRegime", () => {
   it("returns the regime with lower total tax", () => {
     const r = recommendRegime({

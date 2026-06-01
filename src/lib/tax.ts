@@ -167,21 +167,51 @@ export function calculateSurcharge(
   taxableIncome: number,
   slabs: SurchargeSlab[],
   cap: number | null,
+  // Income-tax slabs for the same regime. When provided, surcharge marginal
+  // relief is applied (gh #1). Optional for backward-compatibility with any
+  // caller that only needs the raw band surcharge.
+  incomeSlabs?: TaxSlabEntry[],
 ): number {
   if (taxableIncome <= 5000000) return 0;
   let rate = 0;
-  for (const slab of slabs) {
+  let bandMin = 0;
+  let prevRate = 0; // surcharge rate applicable AT the band's lower threshold
+  for (let i = 0; i < slabs.length; i++) {
+    const slab = slabs[i];
     if (taxableIncome > slab.min && taxableIncome <= slab.max) {
       rate = slab.rate;
+      bandMin = slab.min;
+      prevRate = i > 0 ? slabs[i - 1].rate : 0;
       break;
     }
   }
   if (rate === 0) {
-    const last = slabs[slabs.length - 1];
-    if (taxableIncome > last.min) rate = last.rate;
+    const lastIdx = slabs.length - 1;
+    const last = slabs[lastIdx];
+    if (taxableIncome > last.min) {
+      rate = last.rate;
+      bandMin = last.min;
+      prevRate = lastIdx > 0 ? slabs[lastIdx - 1].rate : 0;
+    }
   }
   if (cap !== null && rate > cap) rate = cap;
-  return Math.round(tax * rate);
+  if (cap !== null && prevRate > cap) prevRate = cap;
+  let surcharge = Math.round(tax * rate);
+
+  // Marginal relief on surcharge (Indian law): for income just above a
+  // threshold, total (tax + surcharge) must not exceed the total at the
+  // threshold (taxed at the previous band's surcharge rate) plus the income
+  // above the threshold. Without this, crossing ₹50L/₹1Cr/₹2Cr/₹5Cr by ₹1
+  // over-taxes by the full surcharge.
+  if (incomeSlabs && rate > 0 && bandMin > 0) {
+    const taxAtThreshold = calculateSlabTax(bandMin, incomeSlabs);
+    const totalAtThreshold = taxAtThreshold * (1 + prevRate);
+    const allowedMaxTotal = totalAtThreshold + (taxableIncome - bandMin);
+    if (tax + surcharge > allowedMaxTotal) {
+      surcharge = Math.max(0, Math.round(allowedMaxTotal - tax));
+    }
+  }
+  return surcharge;
 }
 
 export interface FullTaxResult {
@@ -238,6 +268,7 @@ export function computeTax(args: ComputeTaxArgs): FullTaxResult {
     taxableIncome,
     config.surchargeSlabs,
     regime === "NEW" ? config.surchargeCapNewRegime : null,
+    regimeConfig.slabs,
   );
   const cess = Math.round((taxAfterRebate + surcharge) * config.cessRate);
   const totalTax = taxAfterRebate + surcharge + cess;
