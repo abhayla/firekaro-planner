@@ -153,6 +153,11 @@ export function derive(household: Household, assumptions: Assumptions, lens: Der
   // over the LENSED subset so the recommendation + fyTax match /tax-planning.
   const lensedDeductions = deriveDeductions({
     ...household,
+    // members MUST be lensed too: section80CCD2 sums members' employerNpsAnnual, and
+    // grossIncome below is built from lensedEarners only. Passing full household.members
+    // here would deduct the whole household's employer NPS from a single lensed earner's
+    // income (understating tax / overstating FIRE). Scope it to the lensed earners.
+    members: lensedEarners,
     investments: lensedInvestments,
     liabilities: lensedLiabilities,
     insurance: lensedInsurance,

@@ -349,11 +349,12 @@ export function evaluateNudges(ctx: NudgeContext): Nudge[] {
     if (headroom80C > 25_000) gaps.push(`₹${Math.round(headroom80C / 1000)}k of your ₹1.5L 80C limit`);
     if (headroom80CCD1B > 10_000)
       gaps.push(`₹${Math.round(headroom80CCD1B / 1000)}k of the ₹50k NPS 80CCD(1B) top-up`);
-    // NOTE: 80CCD(2) (employer NPS) is intentionally NOT surfaced here. It is the
-    // employer's contribution — not a user-controllable Chapter-VI-A top-up — and we
-    // do not yet track it, so keying a nudge off mere personal-NPS holdings would fire
-    // an un-actionable suggestion for every NPS holder. Reinstate a precise employer-NPS
-    // nudge when the Member.salary employer-NPS field lands (gh-issue #2 findings #1/#2).
+    // NOTE: 80CCD(2) (employer NPS) is intentionally NOT surfaced as a deduction-
+    // under-utilization gap. The Member.salary.employerNpsAnnual field now exists
+    // (gh-issue #2), but 80CCD(2) is the EMPLOYER's contribution — not a user-controllable
+    // Chapter-VI-A top-up — so "you're leaving deductions unused" doesn't fit (the user
+    // can't act on it). A distinct "ask your employer about NPS" prompt could live
+    // elsewhere; it does not belong in this self-directed top-up nudge.
     if (gaps.length > 0) {
       out.push({
         id: "deduction-under-utilization",

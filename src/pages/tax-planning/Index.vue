@@ -94,16 +94,15 @@ const totalTaxable = computed(() =>
 );
 
 // Phase 4 Stage J — marginal-relief band detection (audit Entry #13 A13.2-4).
-const marginalReliefActive = computed(() => {
-  const taxableIncome =
-    totalTaxable.value - derivedDeductions.value.totalDeductions - derivedDeductions.value.section80CCD2;
-  return isInMarginalReliefBand(taxableIncome, ui.currentFY);
-});
-const marginalReliefSuggestions = computed(() => {
-  const taxableIncome =
-    totalTaxable.value - derivedDeductions.value.totalDeductions - derivedDeductions.value.section80CCD2;
-  return marginalReliefMitigations(taxableIncome, ui.currentFY);
-});
+// The MR band is a NEW-regime 87A rebate-cliff construct, so test it against the actual
+// new-regime taxable income (gross − standard deduction − 80CCD(2) employer NPS), which
+// newResult already computes — not an old-regime totalDeductions proxy (gh-issue #2 review).
+const marginalReliefActive = computed(() =>
+  isInMarginalReliefBand(newResult.value.taxableIncome, ui.currentFY),
+);
+const marginalReliefSuggestions = computed(() =>
+  marginalReliefMitigations(newResult.value.taxableIncome, ui.currentFY),
+);
 
 // Decision rule-of-thumb (audit Entry #12 A12.5), corrected to the research rule:
 //   deductions ≥ ₹5L  → OLD regime usually wins (deduction value beats the

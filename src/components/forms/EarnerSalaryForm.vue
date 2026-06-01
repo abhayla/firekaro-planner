@@ -190,7 +190,7 @@ function saveEdit() {
                 density="comfortable"
                 min="0"
                 placeholder="0"
-                hint="Employer's annual NPS contribution from your salary slip — deductible in both tax regimes"
+                hint="Employer's annual NPS (80CCD(2)) — deductible in both regimes, capped at 14% of Basic+DA (new) / 10% (old). Enter only the deductible portion."
                 persistent-hint
                 :rules="employerNpsRules"
               />

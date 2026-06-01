@@ -64,6 +64,26 @@ describe("derive() — pure kernel", () => {
     expect(first).toBe(second);
   });
 
+  it("gh-issue #2 review: a member lens does not leak the other earner's employer NPS into this earner's tax", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    loadSeedPersona(h, a); // Sharmas: rohit + priya earners (not solo → member lens active)
+    const lens = { isFamilyView: false, viewingMemberId: "rohit", currentFY: "2025-26" };
+
+    const priya = h.data.members.find((m) => m.id === "priya")!;
+
+    priya.salary!.employerNpsAnnual = 0;
+    const rohitTaxBaseline = derive(h.data, a.values, lens).annualTax;
+
+    // Give ONLY Priya a large employer-NPS deduction.
+    priya.salary!.employerNpsAnnual = 500_000;
+    const rohitTaxAfter = derive(h.data, a.values, lens).annualTax;
+
+    // Rohit's lensed tax must be unchanged — Priya's employer NPS is her deduction, not his.
+    // (Before the fix, deriveDeductions summed unlensed members and leaked it into his tax.)
+    expect(rohitTaxAfter).toBe(rohitTaxBaseline);
+  });
+
   it("an empty household yields a zero corpus and zero progress (defensive)", () => {
     const a = useAssumptionsStore();
     const h = useHouseholdStore();
