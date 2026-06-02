@@ -36,10 +36,16 @@ export type Liquidity = "liquid" | "moderate" | "illiquid";
  *           interest, Crypto, debt MF post-2023, rental income).
  *
  * Equity instruments (Stocks / Equity MF / ESOP / International equity / REIT)
- * receive a SEPARATE LTCG/STCG treatment (10%/15% rule pre FY 2024-25, 12.5%/
- * 20% post FY 2024-25). To keep the bucket enum stable across surfaces, those
- * route as `slab` here and the tax-engine layer (lib/tax.ts) applies the
- * special LTCG/STCG rates from the instrument's `type` discriminator.
+ * route as `slab` here only to keep the bucket enum stable across surfaces.
+ *
+ * IMPORTANT (2026-06-02 FinTech sweep): there is currently **no** held-instrument
+ * capital-gains-on-sale engine. `lib/tax.ts` does NOT apply LTCG/STCG rates (it has
+ * only slab/surcharge/rebate/cess), and the correct ESOP CG functions in `esop-tax.ts`
+ * are not wired into any user-facing number. So a held equity/MF/debt/gold sale incurs
+ * NO computed capital-gains tax today, and the schema can't even distinguish equity-MF
+ * from debt-MF or capture an acquisition date. Whether realized-CG tax should be modelled
+ * (vs absorbed into net-return / SWR assumptions, as many FIRE tools do) is a scope
+ * decision tracked in gh-issue #8 — do not assume this `slab` routing taxes the gain.
  */
 export type TaxBucket = "EEE" | "EET" | "ETT" | "slab";
 
