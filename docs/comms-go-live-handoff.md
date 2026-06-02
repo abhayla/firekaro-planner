@@ -26,17 +26,20 @@ Zoho accepted `Lead_Source="FireKaro"` on first upsert and stored it (the value 
 manual picklist edit needed. *(If you ever want it as a formal picklist option for filtering UIs,
 add it under Leads → Lead Source — optional, not blocking.)*
 
-### A3. The 7 WhatsApp templates  ✅ CREATED + SUBMITTED via API (2026-06-02) → ⏳ awaiting Meta approval
-**Self-resolved** — turns out Wati exposes a create endpoint (`POST /api/v1/whatsApp/templates`), so
-I no longer needed you to hand-create them in the UI. All 7 (#2–8) were submitted from the manifest
-`docs/wati-templates.json` via the new global skill `/wati-template-create-and-track`, under **clean
-base names** (`firekaro_milestone/offtrack/goal_reminder/annual_review/monthly_digest/winback/salary_update`)
-— the API keeps the name verbatim (no date suffix). Categories correct (4 UTILITY, 3 MARKETING). All
-`PENDING` Meta review at submission (Meta takes 30 min–24 h).
-**No longer blocked on you.** Next: re-run `/wati-template-create-and-track` to poll → as each flips
-`APPROVED`, set `COMMS_TEMPLATE_<KEY>=firekaro_<name>` in local `server/.env` + the VPS (folds into A4),
-then `/wati-send-and-verify-delivery` to your number. (`COMMS_TEMPLATE_WELCOME` already = the approved
-`firekaro_welcome_2026_06_03`.)
+### A3. The 7 WhatsApp templates  ✅ DONE — created, submitted, APPROVED + delivery-verified (2026-06-02)
+**Fully self-resolved.** Wati exposes a create endpoint (`POST /api/v1/whatsApp/templates`), so I
+submitted all 7 (#2–8) from the manifest `docs/wati-templates.json` via the global skill
+`/wati-template-create-and-track`, under **clean base names** (no date suffix). **Meta APPROVED all 7**
+(verified via `getMessageTemplates` — 4 UTILITY, 3 MARKETING).
+- **No env wiring needed:** the approved names exactly match the code defaults in
+  `server/src/lib/comms-templates.ts` (`DEFAULTS`), so the sender resolves the right name with NO
+  `COMMS_TEMPLATE_*` override — locally AND on the VPS (which already runs that code from A4). The
+  override env vars remain available if a future template ever approves under a different name.
+- **End-to-end proven:** sent `firekaro_milestone` (UTILITY, 3 vars) to the test number `917972672473`
+  → Wati terminal status `DELIVERED` confirmed. The approved-template → send → deliver path works.
+- Remaining for full lifecycle: the MARKETING three (`monthly_digest`/`winback`/`salary_update`) only
+  *send* once `marketingOptIn` consent + broadcast (A6) are on; UTILITY four are usable now (gated by
+  the test allowlist until A6).
 
 ### A4. VPS env + redeploy  ✅ DONE (2026-06-02 — Claude has SSH after all)
 The "no SSH" was stale — key `~/.ssh/firekaro_v6_vps` works (root@srv1707492). Done in **safe mode**:

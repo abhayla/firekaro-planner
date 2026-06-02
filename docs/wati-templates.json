@@ -23,7 +23,7 @@
       "key": "MILESTONE",
       "elementName": "firekaro_milestone",
       "category": "UTILITY",
-      "status": "pending",
+      "status": "approved",
       "body": "Hi {{1}}, an update on your FireKaro plan: your corpus has crossed ₹{{2}}, putting you at {{3}} of your FIRE target. Open the app at firekaro.com to see your plan.",
       "variables": [
         { "position": 1, "name": "name", "sample": "Abhay" },
@@ -35,7 +35,7 @@
       "key": "OFFTRACK",
       "elementName": "firekaro_offtrack",
       "category": "UTILITY",
-      "status": "pending",
+      "status": "approved",
       "body": "Hi {{1}}, a heads-up on your FireKaro plan: your projected FIRE year has moved to {{2}}, mainly due to {{3}}. Review the details at firekaro.com.",
       "variables": [
         { "position": 1, "name": "name", "sample": "Abhay" },
@@ -47,7 +47,7 @@
       "key": "GOAL_REMINDER",
       "elementName": "firekaro_goal_reminder",
       "category": "UTILITY",
-      "status": "pending",
+      "status": "approved",
       "body": "Hi {{1}}, a reminder about your FireKaro goal \"{{2}}\": its target date is {{3}} and you're at {{4}} of the target. Review it at firekaro.com.",
       "variables": [
         { "position": 1, "name": "name", "sample": "Abhay" },
@@ -60,7 +60,7 @@
       "key": "ANNUAL_REVIEW",
       "elementName": "firekaro_annual_review",
       "category": "UTILITY",
-      "status": "pending",
+      "status": "approved",
       "note": "Mild reclassification risk — kept instructional/non-promotional to stay UTILITY.",
       "body": "Hi {{1}}, a new financial year has started. Your FireKaro plan still uses last year's income and investment figures. Update them at firekaro.com so your FIRE projection stays accurate.",
       "variables": [
@@ -71,7 +71,7 @@
       "key": "MONTHLY_DIGEST",
       "elementName": "firekaro_monthly_digest",
       "category": "MARKETING",
-      "status": "pending",
+      "status": "approved",
       "note": "MARKETING — only sendable with marketingOptIn + broadcast ON; subject to Meta per-user cap.",
       "body": "Hi {{1}}, your FireKaro month in numbers — net worth {{2}}, savings rate {{3}}, projected FIRE date {{4}}. See your full snapshot at firekaro.com.",
       "variables": [
@@ -85,7 +85,7 @@
       "key": "WINBACK",
       "elementName": "firekaro_winback",
       "category": "MARKETING",
-      "status": "pending",
+      "status": "approved",
       "note": "MARKETING — dormant re-engagement (~60d no login).",
       "body": "Hi {{1}}, it's been a while since you checked your FireKaro plan. Your projected FIRE date is now {{2}}. See what's changed at firekaro.com.",
       "variables": [
@@ -97,7 +97,7 @@
       "key": "SALARY_UPDATE",
       "elementName": "firekaro_salary_update",
       "category": "MARKETING",
-      "status": "pending",
+      "status": "approved",
       "note": "MARKETING — income-change/appraisal prompt.",
       "body": "Hi {{1}}, did your income change recently? Update your salary at firekaro.com to see how it moves your FIRE date.",
       "variables": [
