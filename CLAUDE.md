@@ -115,7 +115,7 @@ Prisma scripts hitting Supabase while the dev server holds connections MUST appe
 - **DB: Supabase project `firekaro-planner`** (ap-south-1, Postgres 17). Connect via the **session
   pooler** `aws-1-ap-south-1.pooler.supabase.com:5432` (the direct `db.*.supabase.co` host is
   IPv6-only → P1001 over IPv4). `DATABASE_URL` + `BETTER_AUTH_SECRET` live in **`server/.env`**
-  (gitignored — never commit). 22-table schema in `server/prisma/schema.prisma`, derived 1:1 from
+  (gitignored — never commit). 24-table schema in `server/prisma/schema.prisma`, derived 1:1 from
   the frontend's Zod model (`src/types/household.ts` + `assumptions.ts`).
 - **Document endpoints** `GET`+`PUT /api/planner/{household,assumptions,scenarios,features,ui,
   expense-history}` + `DELETE /api/planner/all` + `GET /api/planner/me` — mirror the
@@ -135,7 +135,11 @@ Prisma scripts hitting Supabase while the dev server holds connections MUST appe
   `comms-signup.ts` (DPDP consent, approved templates, signup hook), `zoho-crm-client.ts` +
   `zoho-lead-mapping.ts` (Zoho lead upsert). Each has a colocated `.spec.ts`. Outbound sends are
   **spend + outward-facing → escalate per `decision-authority.md`**; Wati `200 ≠ delivered` (verify
-  via `getMessages` status — see the `project_wati_delivery_gotcha` memory).
+  via `getMessages` status — see the `project_wati_delivery_gotcha` memory). WhatsApp **templates**
+  are defined in the manifest `docs/wati-templates.json` (SSOT; `whatsapp-templates.md` is its
+  readable companion) and created/submitted to Meta via the **global** skill
+  `/wati-template-create-and-track`; sending an approved template is `/wati-send-and-verify-delivery`
+  (both global in `~/.claude/skills/`, sharing `WATI_*` creds).
 - **Auth:** Better Auth (Google OAuth + sessions) + the **3-factor dev-bypass** (`NODE_ENV` is an
   explicit `development`/`test` + `DEV_BYPASS_AUTH==='true'` + `x-dev-bypass` header), dev user
   `dev@firekaro-v6.local`. The frontend login UI is `src/pages/Login.vue` (route `/login`) driving

@@ -1,8 +1,20 @@
-# FireKaro WhatsApp template catalog (create + get approved in Wati)
+# FireKaro WhatsApp template catalog (human-readable companion)
+
+> **⚠️ SSOT is `docs/wati-templates.json`, NOT this file.** The machine source of truth for the
+> templates is the JSON manifest, consumed by the global skill `/wati-template-create-and-track`
+> (it submits each to Wati → Meta and polls to approval). **Edit the JSON, not this markdown.** This
+> file is the readable narrative + Meta-rule notes that pairs with it.
+>
+> **Submission status (2026-06-02):** all 7 pending templates (#2–8) were **created + submitted to
+> Meta via the Wati API** under their clean base names (`firekaro_milestone`, `firekaro_offtrack`,
+> `firekaro_goal_reminder`, `firekaro_annual_review`, `firekaro_monthly_digest`, `firekaro_winback`,
+> `firekaro_salary_update`) — the API preserves the name verbatim (no date suffix, unlike UI-created
+> ones). All `PENDING` Meta review at submission time. Re-run `/wati-template-create-and-track` to
+> poll status; wire `COMMS_TEMPLATE_<KEY>` once each is `APPROVED`.
 
 **Created:** 2026-06-02 · **Owner:** Growth/Lifecycle · **Pairs with:** the preference centre
 (`/api/comms/consent`) + `server/src/lib/comms-templates.ts` (name mapping) + the proven Meta rules
-in `meta-whatsapp-delivery-policies.md`.
+in `meta-whatsapp-delivery-policies.md` + the manifest `docs/wati-templates.json`.
 
 ## How to use this
 Create each template in Wati exactly as below. **Keep the UTILITY ones non-promotional and
@@ -75,15 +87,18 @@ Samples: `Abhay`
 ---
 
 ## After approval
-Send me the exact approved name for each. They get wired via env (no code change):
+The 7 were API-submitted under clean base names (no date suffix), so once Meta marks each `APPROVED`
+these get wired via env (no code change). All but WELCOME are `PENDING` until Meta approves:
 ```
-COMMS_TEMPLATE_WELCOME=firekaro_welcome_2026_06_03
-COMMS_TEMPLATE_MILESTONE=...
-COMMS_TEMPLATE_OFFTRACK=...
-COMMS_TEMPLATE_GOAL_REMINDER=...
-COMMS_TEMPLATE_ANNUAL_REVIEW=...
-COMMS_TEMPLATE_MONTHLY_DIGEST=...
-COMMS_TEMPLATE_WINBACK=...
-COMMS_TEMPLATE_SALARY_UPDATE=...
+COMMS_TEMPLATE_WELCOME=firekaro_welcome_2026_06_03   # already APPROVED
+COMMS_TEMPLATE_MILESTONE=firekaro_milestone          # submitted, PENDING
+COMMS_TEMPLATE_OFFTRACK=firekaro_offtrack            # submitted, PENDING
+COMMS_TEMPLATE_GOAL_REMINDER=firekaro_goal_reminder  # submitted, PENDING
+COMMS_TEMPLATE_ANNUAL_REVIEW=firekaro_annual_review  # submitted, PENDING
+COMMS_TEMPLATE_MONTHLY_DIGEST=firekaro_monthly_digest # submitted, PENDING (MARKETING)
+COMMS_TEMPLATE_WINBACK=firekaro_winback              # submitted, PENDING (MARKETING)
+COMMS_TEMPLATE_SALARY_UPDATE=firekaro_salary_update  # submitted, PENDING (MARKETING)
 ```
-The default for WELCOME is already the approved `firekaro_welcome_2026_06_03`.
+Re-run `/wati-template-create-and-track` to poll; it reports each template's live status. Once a name
+shows `APPROVED`, set its `COMMS_TEMPLATE_*` (local `server/.env` + the VPS — A4) and verify a real
+delivery with `/wati-send-and-verify-delivery firekaro_<name>`.

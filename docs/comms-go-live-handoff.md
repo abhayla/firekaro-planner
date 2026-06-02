@@ -26,10 +26,17 @@ Zoho accepted `Lead_Source="FireKaro"` on first upsert and stored it (the value 
 manual picklist edit needed. *(If you ever want it as a formal picklist option for filtering UIs,
 add it under Leads → Lead Source — optional, not blocking.)*
 
-### A3. Approve the 7 WhatsApp templates → send me the exact names  ⛔ (in progress on your side)
-Catalog: `docs/whatsapp-templates.md` (welcome already approved). Wati will likely date-suffix them.
-**You:** create + approve #2–8 in Wati; paste me each **exact approved name**.
-**Then I:** set `COMMS_TEMPLATE_<KEY>=<exact name>` (no code change — env-driven mapping is built).
+### A3. The 7 WhatsApp templates  ✅ CREATED + SUBMITTED via API (2026-06-02) → ⏳ awaiting Meta approval
+**Self-resolved** — turns out Wati exposes a create endpoint (`POST /api/v1/whatsApp/templates`), so
+I no longer needed you to hand-create them in the UI. All 7 (#2–8) were submitted from the manifest
+`docs/wati-templates.json` via the new global skill `/wati-template-create-and-track`, under **clean
+base names** (`firekaro_milestone/offtrack/goal_reminder/annual_review/monthly_digest/winback/salary_update`)
+— the API keeps the name verbatim (no date suffix). Categories correct (4 UTILITY, 3 MARKETING). All
+`PENDING` Meta review at submission (Meta takes 30 min–24 h).
+**No longer blocked on you.** Next: re-run `/wati-template-create-and-track` to poll → as each flips
+`APPROVED`, set `COMMS_TEMPLATE_<KEY>=firekaro_<name>` in local `server/.env` + the VPS (folds into A4),
+then `/wati-send-and-verify-delivery` to your number. (`COMMS_TEMPLATE_WELCOME` already = the approved
+`firekaro_welcome_2026_06_03`.)
 
 ### A4. VPS env + redeploy  ✅ DONE (2026-06-02 — Claude has SSH after all)
 The "no SSH" was stale — key `~/.ssh/firekaro_v6_vps` works (root@srv1707492). Done in **safe mode**:
@@ -69,7 +76,11 @@ carries ONLY the `whatsappMessageId`; fixed to correlate by that id (commit `996
 
 ## C. Optional / nice-to-have
 
-- **C1. Finalize the Wati skill as global** — `mv .claude/skills/wati-send-and-verify-delivery ~/.claude/skills/` so it's usable across all Claude Code + Cowork projects (it's already portable). Your call (affects all projects).
+- **C1. Wati skills are now GLOBAL  ✅ DONE (2026-06-02)** — both `wati-send-and-verify-delivery`
+  (moved out of the repo) and the new `wati-template-create-and-track` live in `~/.claude/skills/`,
+  usable across all Claude Code + Cowork projects. They share the same `WATI_*` creds
+  (`~/.config/wati/.env` global → `server/.env` → shell). Note: being global, they're no longer in
+  this repo's git — they live only in `~/.claude/skills/` on the machine.
 
 ---
 

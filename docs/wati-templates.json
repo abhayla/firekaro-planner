@@ -1,0 +1,108 @@
+{
+  "_doc": "Machine SSOT for FireKaro's WhatsApp templates, consumed by the global skill /wati-template-create-and-track (it submits each non-approved template to Wati -> Meta and polls to approval). Human-readable companion: docs/whatsapp-templates.md (generated/reference only — edit THIS file, not the markdown). Meta rules enforced: (1) body MUST NOT end with a variable — static text after the last {{n}}; (2) UTILITY = transactional/account-specific (delivers reliably); MARKETING = engagement (per-user capped, needs marketingOptIn). Variables are positional {{1}}..{{n}}; `variables[]` order MUST match the {{n}} positions and supplies Meta approval samples (-> Wati customParams).",
+  "project": "FireKaro",
+  "wabaId": "108848848852725",
+  "defaults": {
+    "language": "en",
+    "footer": "FireKaro · firekaro.com",
+    "header": null,
+    "buttons": []
+  },
+  "templates": [
+    {
+      "key": "WELCOME",
+      "elementName": "firekaro_welcome",
+      "category": "UTILITY",
+      "status": "approved",
+      "approvedName": "firekaro_welcome_2026_06_03",
+      "note": "Already approved (UTILITY, variable-free) — skill SKIPS create. Live body differs from earlier draft; recorded as-approved.",
+      "body": "Hi, welcome to FireKaro! 🎯\n\nYour personalised FIRE (Financial Independence, Retire Early) plan is ready. Open the app anytime to track your net worth, savings rate, and see your FIRE date move closer as your finances grow.",
+      "variables": []
+    },
+    {
+      "key": "MILESTONE",
+      "elementName": "firekaro_milestone",
+      "category": "UTILITY",
+      "status": "pending",
+      "body": "Hi {{1}}, an update on your FireKaro plan: your corpus has crossed ₹{{2}}, putting you at {{3}} of your FIRE target. Open the app at firekaro.com to see your plan.",
+      "variables": [
+        { "position": 1, "name": "name", "sample": "Abhay" },
+        { "position": 2, "name": "corpus_amount", "sample": "1 Cr" },
+        { "position": 3, "name": "fire_target_pct", "sample": "25%" }
+      ]
+    },
+    {
+      "key": "OFFTRACK",
+      "elementName": "firekaro_offtrack",
+      "category": "UTILITY",
+      "status": "pending",
+      "body": "Hi {{1}}, a heads-up on your FireKaro plan: your projected FIRE year has moved to {{2}}, mainly due to {{3}}. Review the details at firekaro.com.",
+      "variables": [
+        { "position": 1, "name": "name", "sample": "Abhay" },
+        { "position": 2, "name": "fire_year", "sample": "2043" },
+        { "position": 3, "name": "driver", "sample": "higher monthly expenses" }
+      ]
+    },
+    {
+      "key": "GOAL_REMINDER",
+      "elementName": "firekaro_goal_reminder",
+      "category": "UTILITY",
+      "status": "pending",
+      "body": "Hi {{1}}, a reminder about your FireKaro goal \"{{2}}\": its target date is {{3}} and you're at {{4}} of the target. Review it at firekaro.com.",
+      "variables": [
+        { "position": 1, "name": "name", "sample": "Abhay" },
+        { "position": 2, "name": "goal_name", "sample": "Myra's Education" },
+        { "position": 3, "name": "target_date", "sample": "Mar 2032" },
+        { "position": 4, "name": "goal_pct", "sample": "60%" }
+      ]
+    },
+    {
+      "key": "ANNUAL_REVIEW",
+      "elementName": "firekaro_annual_review",
+      "category": "UTILITY",
+      "status": "pending",
+      "note": "Mild reclassification risk — kept instructional/non-promotional to stay UTILITY.",
+      "body": "Hi {{1}}, a new financial year has started. Your FireKaro plan still uses last year's income and investment figures. Update them at firekaro.com so your FIRE projection stays accurate.",
+      "variables": [
+        { "position": 1, "name": "name", "sample": "Abhay" }
+      ]
+    },
+    {
+      "key": "MONTHLY_DIGEST",
+      "elementName": "firekaro_monthly_digest",
+      "category": "MARKETING",
+      "status": "pending",
+      "note": "MARKETING — only sendable with marketingOptIn + broadcast ON; subject to Meta per-user cap.",
+      "body": "Hi {{1}}, your FireKaro month in numbers — net worth {{2}}, savings rate {{3}}, projected FIRE date {{4}}. See your full snapshot at firekaro.com.",
+      "variables": [
+        { "position": 1, "name": "name", "sample": "Abhay" },
+        { "position": 2, "name": "net_worth", "sample": "1.8 Cr" },
+        { "position": 3, "name": "savings_rate", "sample": "42%" },
+        { "position": 4, "name": "fire_date", "sample": "Aug 2041" }
+      ]
+    },
+    {
+      "key": "WINBACK",
+      "elementName": "firekaro_winback",
+      "category": "MARKETING",
+      "status": "pending",
+      "note": "MARKETING — dormant re-engagement (~60d no login).",
+      "body": "Hi {{1}}, it's been a while since you checked your FireKaro plan. Your projected FIRE date is now {{2}}. See what's changed at firekaro.com.",
+      "variables": [
+        { "position": 1, "name": "name", "sample": "Abhay" },
+        { "position": 2, "name": "fire_date", "sample": "Aug 2041" }
+      ]
+    },
+    {
+      "key": "SALARY_UPDATE",
+      "elementName": "firekaro_salary_update",
+      "category": "MARKETING",
+      "status": "pending",
+      "note": "MARKETING — income-change/appraisal prompt.",
+      "body": "Hi {{1}}, did your income change recently? Update your salary at firekaro.com to see how it moves your FIRE date.",
+      "variables": [
+        { "position": 1, "name": "name", "sample": "Abhay" }
+      ]
+    }
+  ]
+}
