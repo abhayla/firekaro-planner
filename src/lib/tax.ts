@@ -261,6 +261,11 @@ export interface ComputeTaxArgs {
   // (10% basic OLD / 14% basic NEW). When omitted, `employerNps` is used uncapped
   // (we do not fabricate basic from CTC). gh-issue #3.
   employerNpsBasic?: number;
+  // Per-member {nps, basic} pairs for the 80CCD(2) cap. When provided, each member's employer
+  // NPS is capped at the regime ceiling of THEIR OWN basic and summed — an over-contributor
+  // cannot borrow an under-contributor's headroom (more correct than the aggregate `employerNps`
+  // + `employerNpsBasic` scalars for a multi-earner household). gh-issue #4.
+  employerNpsByMember?: { nps: number; basic: number }[];
   isSalaried?: boolean;
 }
 
@@ -282,12 +287,22 @@ export function computeTax(args: ComputeTaxArgs): FullTaxResult {
   // TODO(gh-issue #4): central/state GOVERNMENT employees get 14% under the OLD regime too;
   // we under-cap them here (conservative — never over-deducts). Needs an employer-sector
   // field on Member to branch on.
-  const rawEmployerNps = Math.max(0, args.employerNps ?? 0);
-  const basicForCap = Math.max(0, args.employerNpsBasic ?? 0);
-  const employerNps =
-    basicForCap > 0
-      ? Math.min(rawEmployerNps, (regime === "NEW" ? 0.14 : 0.1) * basicForCap)
-      : rawEmployerNps;
+  const npsCeiling = regime === "NEW" ? 0.14 : 0.1;
+  let employerNps: number;
+  if (args.employerNpsByMember && args.employerNpsByMember.length > 0) {
+    // Per-member cap (gh-issue #4): cap each member's employer NPS at the ceiling of their OWN
+    // basic, then sum — no cross-member headroom borrowing.
+    employerNps = args.employerNpsByMember.reduce((sum, m) => {
+      const nps = Math.max(0, m.nps);
+      const basic = Math.max(0, m.basic);
+      return sum + (basic > 0 ? Math.min(nps, npsCeiling * basic) : nps);
+    }, 0);
+  } else {
+    // Aggregate fallback (single earner, or callers that pass scalars).
+    const rawEmployerNps = Math.max(0, args.employerNps ?? 0);
+    const basicForCap = Math.max(0, args.employerNpsBasic ?? 0);
+    employerNps = basicForCap > 0 ? Math.min(rawEmployerNps, npsCeiling * basicForCap) : rawEmployerNps;
+  }
 
   const taxableIncome = Math.max(0, grossIncome - sd - ded - employerNps);
 

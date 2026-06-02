@@ -135,8 +135,7 @@ const oldResult = computed(() =>
     regime: "OLD",
     fy: ui.currentFY,
     deductions: derivedDeductions.value.totalDeductions,
-    employerNps: derivedDeductions.value.section80CCD2,
-    employerNpsBasic: derivedDeductions.value.employerNpsBasicTotal,
+    employerNpsByMember: derivedDeductions.value.employerNpsByMember,
   }),
 );
 const newResult = computed(() =>
@@ -144,8 +143,7 @@ const newResult = computed(() =>
     grossIncome: totalTaxable.value,
     regime: "NEW",
     fy: ui.currentFY,
-    employerNps: derivedDeductions.value.section80CCD2,
-    employerNpsBasic: derivedDeductions.value.employerNpsBasicTotal,
+    employerNpsByMember: derivedDeductions.value.employerNpsByMember,
   }),
 );
 const activeResult = computed(() => (effectiveRegime.value === "OLD" ? oldResult.value : newResult.value));

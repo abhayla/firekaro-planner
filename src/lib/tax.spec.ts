@@ -109,6 +109,24 @@ describe("computeTax — 80CCD(2) employer NPS (gh-issue #2 finding #2)", () => 
     expect(withBasic.taxableIncome).toBe(noBasic.taxableIncome + 88_000);
   });
 
+  it("caps 80CCD(2) PER MEMBER — an over-contributor can't borrow another's headroom (gh-issue #4)", () => {
+    const base = computeTax({ grossIncome: 4_000_000, regime: "NEW", fy: "2025-26" });
+    // Earner A: ₹1.5L NPS on ₹5L basic (own 14% cap = ₹70k). Earner B: ₹0 NPS on ₹15L basic (₹2.1L unused).
+    const perMember = computeTax({
+      grossIncome: 4_000_000, regime: "NEW", fy: "2025-26",
+      employerNpsByMember: [{ nps: 150_000, basic: 500_000 }, { nps: 0, basic: 1_500_000 }],
+    });
+    // Per-member: min(150k,70k) + min(0,210k) = ₹70k deducted.
+    expect(perMember.taxableIncome).toBe(base.taxableIncome - 70_000);
+    // The old AGGREGATE path would wrongly allow min(150k, 0.14×20L=280k) = ₹150k.
+    const aggregate = computeTax({
+      grossIncome: 4_000_000, regime: "NEW", fy: "2025-26",
+      employerNps: 150_000, employerNpsBasic: 2_000_000,
+    });
+    expect(aggregate.taxableIncome).toBe(base.taxableIncome - 150_000);
+    expect(perMember.taxableIncome).toBeGreaterThan(aggregate.taxableIncome);
+  });
+
   it("employerNpsBasic of 0 (the common blank-basic path) trusts the entered figure uncapped", () => {
     const base = computeTax({ grossIncome: 2_000_000, regime: "NEW", fy: "2025-26" });
     const r = computeTax({ grossIncome: 2_000_000, regime: "NEW", fy: "2025-26", employerNps: 200_000, employerNpsBasic: 0 });

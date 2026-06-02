@@ -164,16 +164,15 @@ export function derive(household: Household, assumptions: Assumptions, lens: Der
   });
   const estimatedDeductionsForOld = lensedDeductions.totalDeductions;
   // 80CCD(2) employer NPS — applies in both regimes, passed separately (gh-issue #2);
-  // employerNpsBasic lets computeTax cap it at the regime ceiling (gh-issue #3).
-  const employerNps = lensedDeductions.section80CCD2;
-  const employerNpsBasic = lensedDeductions.employerNpsBasicTotal;
+  // employerNpsByMember lets computeTax cap each member at their own basic's ceiling
+  // (gh-issue #4), more correct than the aggregate scalars for a multi-earner household.
+  const employerNpsByMember = lensedDeductions.employerNpsByMember;
 
   const householdTaxRecommendation = recommendRegime({
     grossIncome: annualIncome.salaryIncome + annualIncome.businessShare + annualIncome.otherTaxable,
     fy: lens.currentFY,
     deductions: estimatedDeductionsForOld,
-    employerNps,
-    employerNpsBasic,
+    employerNpsByMember,
   });
 
   const fyTax = computeTax({
@@ -181,8 +180,7 @@ export function derive(household: Household, assumptions: Assumptions, lens: Der
     regime: householdTaxRecommendation.recommended,
     fy: lens.currentFY,
     deductions: estimatedDeductionsForOld,
-    employerNps,
-    employerNpsBasic,
+    employerNpsByMember,
   });
   const annualTax = fyTax.totalTax;
 
