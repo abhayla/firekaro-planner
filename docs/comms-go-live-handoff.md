@@ -31,23 +31,25 @@ Catalog: `docs/whatsapp-templates.md` (welcome already approved). Wati will like
 **You:** create + approve #2–8 in Wati; paste me each **exact approved name**.
 **Then I:** set `COMMS_TEMPLATE_<KEY>=<exact name>` (no code change — env-driven mapping is built).
 
-### A4. Provision VPS env + redeploy latest code  ⛔ prod deploy
-Why me-can't: no SSH/file access to the Hostinger box (Hostinger MCP is API-only) + this is a production deploy.
-**You (or give me SSH):** on the VPS, in `server/.env` add:
-```
-WATI_API_ENDPOINT=...           WATI_API_TOKEN=...
-WATI_TEST_RECIPIENTS=917972672473   WATI_ALLOW_ALL_RECIPIENTS=false   # keep false until A6
-WATI_WEBHOOK_SECRET=<random>
-ZOHO_CLIENT_ID=...  ZOHO_CLIENT_SECRET=...  ZOHO_REFRESH_TOKEN=...   # from A1
-COMMS_TEMPLATE_MILESTONE=...  COMMS_TEMPLATE_OFFTRACK=... (etc, from A3)
-```
-then: `git pull` → `cd server && npm install && npx prisma generate` → `pm2 restart firekaro-api`.
-*(The Supabase migration is ALREADY applied to prod — no DB step needed.)*
+### A4. VPS env + redeploy  ✅ DONE (2026-06-02 — Claude has SSH after all)
+The "no SSH" was stale — key `~/.ssh/firekaro_v6_vps` works (root@srv1707492). Done in **safe mode**:
+- Backed up the VPS code (`/root/firekaro-backup-precomms-*.tgz`), provisioned `WATI_*` + `ZOHO_*` +
+  `WATI_WEBHOOK_SECRET` into the VPS `server/.env` (`WATI_ALLOW_ALL_RECIPIENTS=false` — A6 still gates spend).
+- Shipped HEAD via `git archive | ssh tar` (the box isn't a git checkout), `npm ci` + `npm run build`
+  (frontend), `npm ci` + `prisma:generate` (server — client now knows the new tables),
+  `prisma:migrate:deploy` = **no pending migrations** (already applied), `pm2 reload firekaro-api`.
+- **Verified live:** `/api/health` ok+db connected · `/api/comms/consent` → 401 (route live, prod auth) ·
+  `/api/webhooks/wati` → 200 · `/preferences` → 200 (Notifications UI shipped).
+- **Still pending here:** `COMMS_TEMPLATE_*` go in once templates are approved (A3).
+- Rollback if ever needed: extract the backup tgz over `/var/www/firekaro`, `npm ci && npm run build`,
+  `pm2 reload`.
 
-### A5. Register the Wati delivery webhook
-Why: captures real DELIVERED/FAILED into the send-log. Depends on A4 (endpoint must be live).
-**You:** in Wati → set webhook URL to `https://firekaro.com/api/webhooks/wati?token=<WATI_WEBHOOK_SECRET>`.
-**Then I:** can verify webhook events land in `whatsapp_send_log`. *(I can also register it via the Wati API once deployed — tell me.)*
+### A5. Register the Wati delivery webhook  🟡 READY (endpoint live + secret set)
+The endpoint is live and `WATI_WEBHOOK_SECRET` is set on the VPS. The webhook URL is
+`https://firekaro.com/api/webhooks/wati?token=<WATI_WEBHOOK_SECRET>` (the secret value is in the VPS +
+local `server/.env`). **I'll register it via the Wati API next session after confirming it won't disturb
+the existing broker-business webhooks** — OR Abhay sets it in Wati → Settings → Webhooks. Not blocking
+sends; only needed for auto delivery-status capture.
 
 ### A6. Flip outbound ON (go-live) 🚦 spend + real users — your decision
 **You:** set `WATI_ALLOW_ALL_RECIPIENTS=true` on the VPS + `pm2 restart`. After this, real users (with consent) get messages and per-message spend begins. This is intentionally yours — I will not flip it.
