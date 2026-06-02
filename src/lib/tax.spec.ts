@@ -27,6 +27,29 @@ describe("computeTax — New Regime FY 2024-25", () => {
   });
 });
 
+describe("computeTax — FY 2025-26 new regime exact-rupee locks (headline current-year regime)", () => {
+  // Substance locks so a future slab-boundary/rate typo in the current-year new regime is
+  // caught (previously only relational assertions existed — FinTech audit 2026-06-02).
+  it("₹20L gross → ₹1,92,400 total tax (taxable 19.25L: 20k+40k+60k+65k slab, 4% cess)", () => {
+    const r = computeTax({ grossIncome: 2_000_000, regime: "NEW", fy: "2025-26" });
+    expect(r.taxableIncome).toBe(1_925_000); // 20L − 75k standard deduction
+    expect(r.totalTax).toBe(192_400);
+  });
+
+  it("just above the ₹12L rebate cliff → marginal relief caps tax at the income over ₹12L", () => {
+    // gross 12.85L − 75k SD = taxable 12.10L → tax capped at ₹10,000 (excess over ₹12L) + 4% cess.
+    const r = computeTax({ grossIncome: 1_285_000, regime: "NEW", fy: "2025-26" });
+    expect(r.taxableIncome).toBe(1_210_000);
+    expect(r.totalTax).toBe(10_400);
+  });
+
+  it("at/below the ₹12L rebate limit → zero tax", () => {
+    const r = computeTax({ grossIncome: 1_275_000, regime: "NEW", fy: "2025-26" }); // taxable 12.00L
+    expect(r.taxableIncome).toBe(1_200_000);
+    expect(r.totalTax).toBe(0);
+  });
+});
+
 describe("computeTax — 80CCD(2) employer NPS (gh-issue #2 finding #2)", () => {
   // 80CCD(2) is the one Chapter VI-A deduction allowed in the NEW regime too. The
   // engine must subtract `employerNps` from taxable income in BOTH regimes.

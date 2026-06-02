@@ -25,7 +25,7 @@
 > `server/lib/tax-config.ts` backend + `src/types/tax.ts` mirror. In this extracted
 > `firekaro-planner` repo there is no tax backend — tax math is client-side.
 
-- `src/lib/tax.ts` — single SSOT for tax slabs, old/new regime, surcharge, cess, rebate, CII (FY 2022-23 → 2025-26)
+- `src/lib/tax.ts` — single SSOT for tax slabs, old/new regime, surcharge (+ marginal relief), cess, rebate. **Configured FYs: 2024-25 → 2026-27** (an unconfigured FY silently falls back to the newest — gh-issue #6). CII-indexed LTCG is **not** implemented here (gh-issue #6).
 - `src/lib/tax-deductions.ts` — 80C / 80D / 80CCD deduction caps
 - FY 2025-26 new regime includes marginal relief (tax cannot exceed income above the ₹12L rebate limit)
 

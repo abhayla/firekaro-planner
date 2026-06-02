@@ -83,15 +83,22 @@ User-facing assumptions (with per-household overrides such as `swrOverride`) res
 `src/types/assumptions.ts` (`DEFAULT_ASSUMPTIONS`) + `src/lib/assumption-math.ts` in the order
 scenario → household → global (see `docs/adr/0002-retire-layered-assumption-resolver.md`).
 
-### Cost Inflation Index (CII)
+### Cost Inflation Index (CII) — NOT currently implemented
 
-The `CII_INDEX` map (for LTCG indexation) lives in `src/lib/tax.ts`:
+> **Doc-drift correction (2026-06-02 FinTech sweep):** the `CII_INDEX` map described below was
+> inherited from the retired `FIREKaro-Vue` monorepo and **does NOT exist in this repo** — a
+> repo-wide grep finds no `CII_INDEX` constant and no indexation arithmetic in `src/lib/`. Indexed
+> debt/property LTCG is not modelled here (equity/foreign LTCG is correctly post-Budget-2024 12.5%
+> *without* indexation — see `esop-tax.ts`). Whether to add CII-indexed LTCG is tracked as a scope
+> decision in gh-issue #6. Do not assume `tax.ts` owns a CII map until that issue is resolved.
+
+If CII indexation is added, the canonical home would be `src/lib/tax.ts`, shaped as:
 
 ```ts
+// NOT YET IMPLEMENTED — see gh-issue #6.
 export const CII_INDEX: Record<string, number> = {
   '2001-02': 100,
-  '2002-03': 105,
-  // ... full index through current year
+  // ... notified index (FY2023-24 = 348, FY2024-25 = 363) through current year
 }
 ```
 
