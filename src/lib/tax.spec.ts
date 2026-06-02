@@ -27,6 +27,20 @@ describe("computeTax — New Regime FY 2024-25", () => {
   });
 });
 
+describe("getTaxConfigForFY — nearest-FY fallback for unconfigured years (gh-issue #6 / ADR-0003)", () => {
+  // Historical-year tax accuracy is out of scope (FIRE planner, not a tax-return tracker),
+  // but an unconfigured FY must NOT silently get the NEWEST slabs — fall back to the nearest.
+  it("a PAST unconfigured FY falls back to the OLDEST configured FY, not the newest", () => {
+    expect(getTaxConfigForFY("2022-23")).toBe(getTaxConfigForFY("2024-25"));
+  });
+  it("a FUTURE unconfigured FY falls back to the NEWEST configured FY", () => {
+    expect(getTaxConfigForFY("2099-00")).toBe(getTaxConfigForFY("2026-27"));
+  });
+  it("configured FYs are distinct (sanity — slab structure changed 2024-25 → 2025-26)", () => {
+    expect(getTaxConfigForFY("2024-25")).not.toBe(getTaxConfigForFY("2025-26"));
+  });
+});
+
 describe("computeTax — FY 2025-26 new regime exact-rupee locks (headline current-year regime)", () => {
   // Substance locks so a future slab-boundary/rate typo in the current-year new regime is
   // caught (previously only relational assertions existed — FinTech audit 2026-06-02).

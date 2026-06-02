@@ -133,7 +133,25 @@ export const AVAILABLE_FYS = Object.keys(TAX_CONFIGS);
 export const DEFAULT_FY = "2026-27";
 
 export function getTaxConfigForFY(fy: string): FYTaxConfig {
-  return TAX_CONFIGS[fy] ?? TAX_CONFIGS[DEFAULT_FY];
+  const direct = TAX_CONFIGS[fy];
+  if (direct) return direct;
+  // gh-issue #6 / ADR-0003: accurate historical-year tax is OUT of scope (FireKaro is a FIRE
+  // planner, not a tax-return tracker). But an unconfigured FY must NOT silently receive the
+  // NEWEST slabs for an OLD year — fall back to the NEAREST configured FY (least-wrong): the
+  // oldest config for past years, the newest for future years.
+  const fys = Object.keys(TAX_CONFIGS).sort(); // "YYYY-YY" sorts chronologically
+  const oldest = fys[0];
+  const newest = fys[fys.length - 1];
+  const startYear = parseInt(fy.slice(0, 4), 10);
+  const nearest =
+    Number.isNaN(startYear) || startYear >= parseInt(oldest.slice(0, 4), 10) ? newest : oldest;
+  if (import.meta.env?.DEV && import.meta.env?.MODE !== "test") {
+    console.warn(
+      `[tax] No tax config for FY ${fy}; using nearest configured FY ${nearest}. ` +
+        `Historical/forward tax is approximate — see gh-issue #6.`,
+    );
+  }
+  return TAX_CONFIGS[nearest];
 }
 
 export function calculateSlabTax(taxableIncome: number, slabs: TaxSlabEntry[]): number {

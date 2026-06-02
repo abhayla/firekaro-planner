@@ -3,6 +3,10 @@
 
 import { floorCeilingWithdrawal, type FloorCeilingWithdrawalConfig } from "@/lib/withdrawal-strategy";
 
+// India SWR — deliberately conservative (3.5% vs the US 4% rule). Per ADR-0003, realized
+// capital-gains / withdrawal taxation is NOT modelled per-transaction (that is tax-tracker
+// scope, not FIRE-planner scope); the post-tax sustainability headroom is absorbed into this
+// SWR. Keep this in mind before treating the FIRE number as a strictly pre-tax target.
 export const INDIA_SWR = 0.035;
 export const INDIA_INFLATION = 0.06;
 export const INDIA_HEALTHCARE_INFLATION = 0.08;
