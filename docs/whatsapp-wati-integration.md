@@ -103,6 +103,26 @@ few days"` — and so did the PIFS broker MARKETING broadcasts to that number go
 - **Escalation (Abhay's go):** flipping on real outbound sends (spend + publishes to users);
   writing real contacts into the PIFS production CRM.
 
+## Runtime architecture — production sends vs the dev skill (decided 2026-06-02)
+**The deployed app sends WhatsApp from its own backend — NOT the skill.** Three separate layers:
+
+| Layer | Runs | Where | Real users? |
+|---|---|---|---|
+| **Production send path** | Hono backend: `wati-client.ts` adapter + sender service + scheduler + webhook receiver | Hostinger VPS under PM2, creds from the **VPS** `server/.env` | **Yes** |
+| **Dev/ops verification** | `/wati-send-and-verify-delivery` skill (Claude/Cowork-driven) | dev machine / Cowork | No — test number only |
+| **Monitoring** | Cowork daily delivery report (read-only) | Cowork | No |
+
+- A **skill is Claude-in-the-loop**; production must send **autonomously 24/7** (a 2am signup → welcome
+  fires from the server). So the runtime path is compiled backend code calling the Wati API via the
+  adapter — never the skill. The skill exercises the *same* Wati API only for testing/debugging (DRY
+  in concept, different role).
+- **Still to build into the Hono app** (until then the deployed app sends nothing): sender/trigger
+  service (`nudge-engine` → consent gate → adapter → send-log), a scheduler (node-cron in PM2 /
+  pg_cron), and a Wati webhook-receiver route to capture real DELIVERED/FAILED status.
+- **Escalations (outward/prod):** (1) put `WATI_*` in the **VPS** `server/.env` (local + `~/.config`
+  creds don't reach Hostinger); (2) set `WATI_ALLOW_ALL_RECIPIENTS=true` + replace the test allowlist
+  with per-user DPDP consent gating — the "live to real users" switch (spend + outbound) = Abhay's call.
+
 ## References
 - `docs/retention-engagement-features.md` — parent backlog
 - `src/lib/nudge-engine.ts` — nudge generation (reuse target)
