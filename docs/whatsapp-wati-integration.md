@@ -1,8 +1,14 @@
 # WhatsApp engagement via Wati.io — design + templates
 
-**Created:** 2026-06-01 · **Status:** 🟡 In design / build · **Owner roles:** Growth/Lifecycle &
+**Created:** 2026-06-01 · **Status:** 🟢 Channel PROVEN live 2026-06-02 (UTILITY template
+`firekaro_welcome_2026_06_03` sent → Meta `DELIVERED` → received on the test phone); build of the
+consent/send-log/nudge-wiring foundation in progress. · **Owner roles:** Growth/Lifecycle &
 Retention (loop), Full-Stack (channel), Privacy/Compliance DPDP (consent). · **Scope:** Phase 1 of
 `retention-engagement-features.md` — **WhatsApp only** (email deferred).
+
+> **Proven 2026-06-02:** same number + same body, **UTILITY DELIVERED while MARKETING FAILED** (per-user
+> marketing cap, err 131049) — see `meta-whatsapp-delivery-policies.md`. → FireKaro lifecycle messages
+> MUST be UTILITY; digests are capped MARKETING (use email as the uncapped channel).
 
 ## Decisions (locked 2026-06-01)
 - **Channel first:** WhatsApp via **Wati.io** (existing subscription — reuse, Principle 4). Email later.
