@@ -16,7 +16,7 @@
  * the band so surfaces can render the warning chip.
  */
 
-import type { Household, Investment, Liability, InsurancePolicy } from "@/types/household";
+import type { Household, Investment, Liability, InsurancePolicy, Member } from "@/types/household";
 
 // ---------- Statutory limits (audit-grounded, FY 2025-26 onward) ----------
 // These are STATUTORY FACTS per R1.4 — they appear read-only on /preferences
@@ -111,8 +111,8 @@ export function deriveDeductions(
   );
 
   // ---- 80D — health insurance ----
-  const healthSelfPremium = sumHealthPremium(insurance, "self");
-  const healthParentsPremium = sumHealthPremium(insurance, "parents");
+  const healthSelfPremium = sumHealthPremium(insurance, "self", household.members);
+  const healthParentsPremium = sumHealthPremium(insurance, "parents", household.members);
   const cap80Dself = options.isSelfSenior ? LIMIT_80D_SENIOR_SELF : LIMIT_80D_SELF;
   const cap80Dparents = options.hasSeniorParents
     ? LIMIT_80D_SENIOR_PARENTS
@@ -237,16 +237,24 @@ function sumLifePremium(insurance: InsurancePolicy[]): number {
     .reduce((s, p) => s + p.annualPremium, 0);
 }
 
+/** A household member whose free-text `relation` marks them a parent (seeds use "Father"/"Mother"). */
+function isParentMember(m: Member): boolean {
+  return /\b(parent|father|mother|dad|mom)\b/i.test(m.relation ?? "");
+}
+
 function sumHealthPremium(
   insurance: InsurancePolicy[],
   scope: "self" | "parents",
+  members: Member[],
 ): number {
-  // MVP-1: aggregate all Health policies as self. The parents-specific
-  // bucket lands in Stage K when InsurancePolicy.insuredPersonId can
-  // discriminate parents from other dependents.
-  if (scope === "parents") return 0;
+  // 80D has two independent buckets: self+family and parents. A Health policy is a
+  // "parents" policy when its insuredPersonId maps to a member whose relation is a parent
+  // (gh-issue #6 — this bucket previously returned 0, dropping a legitimate deduction).
+  const parentIds = new Set(members.filter(isParentMember).map((m) => m.id));
+  const isParentPolicy = (p: InsurancePolicy) => parentIds.has(p.insuredPersonId);
   return insurance
     .filter((p) => p.type === "Health")
+    .filter((p) => (scope === "parents" ? isParentPolicy(p) : !isParentPolicy(p)))
     .reduce((s, p) => s + p.annualPremium, 0);
 }
 

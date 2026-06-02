@@ -213,6 +213,30 @@ describe("deriveDeductions — 80D health insurance", () => {
     expect(result.section80D).toBe(25_000);
   });
 
+  it("routes a parent's health policy to the 80D parents bucket (gh-issue #6 — was hard-0)", () => {
+    const hh = emptyHH();
+    hh.members = [
+      { id: "self", relation: "" },
+      { id: "dad", relation: "Father" },
+    ] as Household["members"];
+    hh.insurance = [
+      { id: "p1", type: "Health", provider: "Star", sumAssured: 500_000, annualPremium: 20_000, insuredPersonId: "self" },
+      { id: "p2", type: "Health", provider: "Niva", sumAssured: 500_000, annualPremium: 30_000, insuredPersonId: "dad" },
+    ];
+    // self ₹20k (≤₹25k cap) + parents min(₹25k, ₹30k) = ₹25k → ₹45k
+    expect(deriveDeductions(hh).section80D).toBe(45_000);
+  });
+
+  it("parents bucket honours the senior cap when hasSeniorParents is set", () => {
+    const hh = emptyHH();
+    hh.members = [{ id: "mom", relation: "Mother" }] as Household["members"];
+    hh.insurance = [
+      { id: "p1", type: "Health", provider: "Niva", sumAssured: 500_000, annualPremium: 45_000, insuredPersonId: "mom" },
+    ];
+    // parents senior cap ₹50k → full ₹45k; self bucket empty
+    expect(deriveDeductions(hh, { hasSeniorParents: true }).section80D).toBe(45_000);
+  });
+
   it("caps at ₹50k self when senior flag set", () => {
     const hh = emptyHH();
     hh.insurance = [
