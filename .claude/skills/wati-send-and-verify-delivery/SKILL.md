@@ -34,19 +34,26 @@ means *accepted*, not *delivered*.** A send is only successful when Wati's `getM
 | `WATI_ALLOW_ALL_RECIPIENTS` | Must equal `true` to send to anyone outside the allowlist (an explicit broadcast — escalation) |
 
 ## STEP 0: Resolve the config (don't assume it's already in the shell)
-These values may live in the **shell env**, a **dotenv file** (`.env`, `server/.env`, …), or a
-**secret store / Cowork secret**. Locate them however this project stores them, then export for the
-session. If they're in a dotenv file, source it:
+These values may live in a **machine-global file** (`~/.config/wati/.env` — recommended, works in
+EVERY Claude Code project on the machine), a **project dotenv** (`.env`, `server/.env`, …), the
+**shell env**, or a **Cowork secret**. Load the global file first as the base, then let any
+project-local file override it:
 ```bash
-for f in .env server/.env server/.env.local .env.local; do
-  [ -f "$f" ] && set -a && . "$f" && set +a && break
+# Global base (all local projects) → then project overrides. No early break.
+for f in "$HOME/.config/wati/.env" "$HOME/.wati.env" "$WATI_ENV_FILE" \
+         .env server/.env server/.env.local .env.local; do
+  [ -n "$f" ] && [ -f "$f" ] && set -a && . "$f" && set +a
 done
 TOKEN="${WATI_API_TOKEN#Bearer }"          # strip a leading "Bearer " if present
 BASE="${WATI_API_ENDPOINT%/}"              # trim trailing slash
 TPL="$1"                                      # arg 1: template name
 NUM="${2:-$(printf '%s' "$WATI_TEST_RECIPIENTS" | cut -d, -f1 | tr -cd '0-9')}"  # arg 2 or first allowlisted
 ```
-If `$BASE` or `$TOKEN` is empty after this, STOP and ask where this project keeps its Wati credentials.
+If `$BASE` or `$TOKEN` is empty after this, STOP: this environment has no Wati credentials. Set them
+up once — locally: `mkdir -p ~/.config/wati && $EDITOR ~/.config/wati/.env` (the 4 `WATI_*` lines,
+`chmod 600`). In **Claude Cowork** (a separate/remote environment that does NOT share this machine's
+home dir): add the 4 `WATI_*` values as **Cowork environment secrets** — the shell-env branch above
+picks them up.
 
 ## STEP 1: Confirm the template is APPROVED + check its category
 ```bash
