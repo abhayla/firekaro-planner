@@ -44,6 +44,7 @@ Copy `server/.env.example` → `server/.env` and set **real** values:
 | `ALLOWED_ORIGINS` | `https://firekaro.com,https://www.firekaro.com` |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | the production OAuth client (see §6) |
 | `PORT` | `3100` |
+| `LIFECYCLE_RUN_TOKEN` | a real secret (`openssl rand -base64 32`) — guards `POST /api/internal/lifecycle/run`; the daily cron (§5a) sends it in `x-internal-token`. Unset ⇒ the endpoint returns 500 (fail-closed, never runs unguarded). |
 
 `validate-env.ts` fails the boot fast if a required var is missing or a placeholder
 secret is used in production — that is intended.
@@ -85,6 +86,35 @@ pm2 start ecosystem.config.cjs
 pm2 save && pm2 startup     # resurrect on VPS reboot (run the printed command)
 pm2 logs firekaro-api       # confirm "firekaro_v6 backend listening"
 ```
+
+## 5a. Lifecycle nudge cron (WhatsApp lifecycle loop)
+
+The lifecycle evaluator (welcome / milestone / off-track / annual-review WhatsApp
+nudges) is driven by a daily POST to a token-guarded internal endpoint — NOT an
+in-process timer (restart-safe, observable, manually triggerable). It only fires
+nudges to **consenting** users, each **once per period/threshold** (send-log
+dedupe). Outbound is still restricted to `WATI_TEST_RECIPIENTS` until the A6
+broadcast flag is flipped, so enabling the cron does **not** message real users.
+
+Add a root crontab entry on the VPS (09:00 IST = 03:30 UTC chosen here):
+
+```bash
+sudo crontab -e
+# Daily FireKaro lifecycle nudges (reads the token from server/.env)
+30 3 * * * cd /var/www/firekaro/server && curl -s -X POST \
+  -H "x-internal-token: $(grep -E '^LIFECYCLE_RUN_TOKEN=' .env | cut -d= -f2- | tr -d '\"')" \
+  http://127.0.0.1:3100/api/internal/lifecycle/run >> /var/log/firekaro-lifecycle.log 2>&1
+```
+
+Manual trigger / smoke test (returns `{users, candidates, sent, deduped, notSent}`):
+
+```bash
+curl -s -X POST -H "x-internal-token: $LIFECYCLE_RUN_TOKEN" \
+  http://127.0.0.1:3100/api/internal/lifecycle/run
+```
+
+A second run within the same period returns `sent:0` (everything deduped) — that
+is the expected idempotent behaviour, not a failure.
 
 ## 6. Google OAuth (production client)
 
