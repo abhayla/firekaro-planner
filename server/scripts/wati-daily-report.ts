@@ -15,6 +15,7 @@
  */
 import "dotenv/config";
 import { getWatiConfig } from "../src/lib/wati-client";
+import { prisma } from "../src/lib/prisma";
 
 interface WatiMsg {
   statusString?: string;
@@ -52,7 +53,46 @@ function recipientNumbers(): string[] {
     .filter(Boolean);
 }
 
+/**
+ * True all-users report straight from WhatsAppSendLog (status populated by the
+ * Wati webhook). The production source once the DB is migrated + sends flow — no
+ * per-number Wati polling. Run with `--from-db`.
+ */
+async function reportFromDb(sinceHours: number) {
+  const cutoff = new Date(Date.now() - sinceHours * 3_600_000);
+  const rows = await prisma.whatsAppSendLog.findMany({
+    where: { sentAt: { gte: cutoff } },
+    select: { status: true, failedDetail: true, templateName: true },
+  });
+  const counts: Record<string, number> = {};
+  const failBuckets = new Map<string, number>();
+  for (const r of rows) {
+    const s = (r.status ?? "OTHER").toUpperCase();
+    counts[s] = (counts[s] ?? 0) + 1;
+    if (s === "FAILED") {
+      const reason = classifyFailure(r.failedDetail ?? "");
+      failBuckets.set(reason, (failBuckets.get(reason) ?? 0) + 1);
+    }
+  }
+  const total = rows.length;
+  const pct = (n: number) => (total ? ((n / total) * 100).toFixed(1) : "0.0");
+  console.log(`WhatsApp delivery report (send-log) — last ${sinceHours}h`);
+  console.log(`Messages: ${total}`);
+  console.log(`  Delivered: ${counts.DELIVERED ?? 0} (${pct(counts.DELIVERED ?? 0)}%)   Read: ${counts.READ ?? 0}`);
+  console.log(`  Sent-only: ${counts.SENT ?? 0}   Blocked (consent/cap): ${counts.BLOCKED ?? 0}`);
+  console.log(`  FAILED: ${counts.FAILED ?? 0} (${pct(counts.FAILED ?? 0)}%)`);
+  for (const [reason, n] of [...failBuckets.entries()].sort((a, b) => b[1] - a[1])) {
+    console.log(`    - ${reason} …… ${n}`);
+  }
+  await prisma.$disconnect();
+}
+
 async function main() {
+  if (process.argv.includes("--from-db")) {
+    await reportFromDb(Number(arg("--since-hours") ?? 24));
+    return;
+  }
+
   const c = getWatiConfig();
   if (!c) {
     console.error("✗ Wati not configured");
