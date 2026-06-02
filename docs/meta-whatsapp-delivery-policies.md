@@ -220,12 +220,12 @@ A daily report MUST count by terminal status, not by API-accept (HTTP 200).
 `finalText`, template name (in `eventDescription`), `created`. This is the ground-truth per-message
 record and is how we diagnosed error 131049. Use it for the **failure-reason-per-message** column.
 
-### Data source B — aggregate campaign analytics (V3, confirm availability on the plan)
-- `GET {base}/api/ext/v3/broadcasts` — list campaigns/broadcasts.
-- `GET {base}/api/ext/v3/broadcasts/overview` — aggregate counts.
-- `GET {base}/api/ext/v3/broadcasts/{broadcast-id}` and `…/{broadcast-id}/recipients` —
-  per-campaign sent / delivered / read / failed counts + per-recipient status.
-Use these for the **sent / delivered totals** without paging every number.
+### Data source B — aggregate campaign analytics (V3) — **NOT available on our tenant**
+`GET {base}/api/ext/v3/broadcasts*` returned **HTTP 404** against our tenant base
+(`live-mt-server.wati.io/105355`) — the V3 `ext` analytics API isn't enabled for this token/plan
+(probed 2026-06-02). **Don't build on it.** If the plan later exposes V3, it would give per-campaign
+sent/delivered/failed without per-number paging. Until then, drive the report from **our send-log +
+Data source A**.
 
 ### Data source C — webhooks (real-time, the most robust for a daily tally)
 Subscribe Wati webhooks and persist each event to our own `WhatsAppSendLog` table; then the daily
@@ -250,6 +250,31 @@ Failed: F — by reason:
   other ……………………………………………… w
 Top failing templates: <name> (f failures), …
 ```
+
+### Ready-made script + Cowork runbook
+A turnkey report exists: **`server/scripts/wati-daily-report.ts`** (built on Data source A — the only
+confirmed endpoint). It pulls each recipient's messages, filters to the window, classifies
+SENT/DELIVERED/READ/FAILED, and buckets failures by error class + template.
+
+```bash
+# from the repo's server/ dir (reads WATI_API_* + WATI_TEST_RECIPIENTS from server/.env)
+cd server
+npx tsx scripts/wati-daily-report.ts                  # last 24h, numbers from WATI_TEST_RECIPIENTS
+npx tsx scripts/wati-daily-report.ts --since-hours 48
+npx tsx scripts/wati-daily-report.ts --numbers 9199...,9198...
+```
+Example output (verified 2026-06-02): `3 messages, 100% FAILED, 131049 per-user marketing cap x3`.
+
+**For the scheduled Cowork agent in this repo:**
+1. Run the command above on the daily schedule; capture stdout as the report body.
+2. **Number source today = `WATI_TEST_RECIPIENTS`.** A true *all-users* report needs the distinct
+   numbers FireKaro actually messaged — that arrives when the backend **send-log
+   (`WhatsAppSendLog`)** lands; then point `recipientNumbers()` at it (or, better, query the
+   send-log directly once webhooks populate delivery status). The script has a comment marking the
+   exact swap point.
+3. **The Wati token is a secret** — it's already in the gitignored `server/.env`; the agent reads it
+   from there, never from a prompt.
+4. Do **not** add a retry-failed step — 131049 failures must not be auto-resent < 24h (§2).
 
 ### Reporting cautions (so the numbers aren't misleading)
 - **Never report "sent" as success.** Count `DELIVERED`/`READ` separately from `SENT`.
