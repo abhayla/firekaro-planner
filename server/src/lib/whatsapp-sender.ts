@@ -24,6 +24,8 @@ export interface SendNudgeInput {
   templateName: string;
   category: TemplateCategory;
   parameters?: WatiTemplateParam[];
+  /** Per-period/threshold idempotency key, stamped on the send-log row (D6). */
+  dedupeKey?: string;
 }
 
 export interface SendNudgeResult {
@@ -64,6 +66,22 @@ export async function sendNudge(
 ): Promise<SendNudgeResult> {
   const deps = { ...defaultDeps(), ...depsOverride };
 
+  // D1 — fail-closed when no number is on record. Don't reach the consent gate or
+  // the adapter; record a BLOCKED "no-number" row (visible in the daily report) and
+  // stop. A missing number is an absent-opt-in, not an error.
+  if (!input.toNumber || !input.toNumber.trim()) {
+    const log = await deps.recordSend({
+      userId: input.userId,
+      toNumber: input.toNumber ?? "",
+      templateName: input.templateName,
+      category: input.category,
+      status: "BLOCKED",
+      failedDetail: "no-number",
+      dedupeKey: input.dedupeKey ?? null,
+    });
+    return { sent: false, reason: "no-number", logId: log.id };
+  }
+
   const consent = await deps.getConsent(input.userId, "whatsapp");
   const recent = await deps.recentTimestamps(input.userId, deps.policy.windowHours);
   const decision = decideSend({
@@ -84,6 +102,7 @@ export async function sendNudge(
       category: input.category,
       status: "BLOCKED",
       failedDetail: decision.reason,
+      dedupeKey: input.dedupeKey ?? null,
     });
     return { sent: false, reason: decision.reason, logId: log.id };
   }
@@ -101,6 +120,7 @@ export async function sendNudge(
     status: result.ok ? "SENT" : "FAILED",
     failedDetail: result.ok ? null : (result.error ?? null),
     providerMessageId: result.providerMessageId ?? null,
+    dedupeKey: input.dedupeKey ?? null,
   });
 
   return {

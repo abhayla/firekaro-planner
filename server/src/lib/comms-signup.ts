@@ -1,6 +1,8 @@
 import { prisma } from "./prisma";
 import { upsertLead } from "./zoho-crm-client";
 import { firekaroUserToZohoLead } from "./zoho-lead-mapping";
+import { alreadySent } from "./comms-repo";
+import { triggerWelcome } from "./whatsapp-triggers";
 import { logger } from "./logger";
 
 /**
@@ -33,6 +35,47 @@ function defaultDeps(): SignupDeps {
     syncLead: async (user) =>
       upsertLead(firekaroUserToZohoLead({ name: user.name, email: user.email })),
   };
+}
+
+/**
+ * Welcome-on-consent (D3): the welcome WhatsApp fires when a number is FIRST saved
+ * with an un-revoked consent — NOT at OAuth signup (no number exists then). Pure
+ * decision + send, deps-injectable for unit testing. Idempotent via the "welcome"
+ * dedupe key (alreadySent). Best-effort — the caller must not let it break the
+ * consent PUT response.
+ */
+export interface WelcomeTarget {
+  userId: string;
+  whatsappNumber: string | null;
+  revoked: boolean;
+  firstName: string;
+}
+
+export interface WelcomeDeps {
+  alreadyWelcomed: (userId: string) => Promise<boolean>;
+  fireWelcome: (t: { userId: string; toNumber: string; firstName: string }) => Promise<{ sent: boolean; reason: string }>;
+}
+
+function defaultWelcomeDeps(): WelcomeDeps {
+  return {
+    alreadyWelcomed: (userId) => alreadySent(userId, "welcome"),
+    fireWelcome: (t) => triggerWelcome(t).then((r) => ({ sent: r.sent, reason: r.reason })),
+  };
+}
+
+export async function maybeSendWelcome(
+  target: WelcomeTarget,
+  depsOverride: Partial<WelcomeDeps> = {},
+): Promise<{ fired: boolean; reason: string }> {
+  const deps = { ...defaultWelcomeDeps(), ...depsOverride };
+  if (!target.whatsappNumber || target.revoked) return { fired: false, reason: "no-number-or-revoked" };
+  if (await deps.alreadyWelcomed(target.userId)) return { fired: false, reason: "already-welcomed" };
+  const r = await deps.fireWelcome({
+    userId: target.userId,
+    toNumber: target.whatsappNumber,
+    firstName: target.firstName,
+  });
+  return { fired: r.sent, reason: r.reason };
 }
 
 export async function onUserCreated(

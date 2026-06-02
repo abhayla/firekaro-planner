@@ -534,6 +534,10 @@ model CommsConsent {
   userId         String
   channel        String // "whatsapp" | "email"
   marketingOptIn Boolean   @default(false)
+  // Recipient address for this channel (digits-only for whatsapp). Null until the
+  // user supplies it in Preferences → Notifications. The sender resolves its target
+  // from this column; null ⇒ fail-closed (no send, logged — D1).
+  whatsappNumber String?
   revokedAt      DateTime?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
@@ -555,11 +559,16 @@ model WhatsAppSendLog {
   failedDetail      String?
   errorCode         String?
   providerMessageId String?
+  // Per-period/threshold idempotency key (e.g. "milestone:50", "annual_review:2026-27",
+  // "welcome"). The lifecycle evaluator skips a nudge whose (userId, dedupeKey) already
+  // has a non-blocked row, so each nudge fires once per period/threshold (D6).
+  dedupeKey         String?
   sentAt            DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
   @@index([userId])
   @@index([toNumber])
   @@index([status])
+  @@index([userId, dedupeKey])
   @@map("whatsapp_send_log")
 }

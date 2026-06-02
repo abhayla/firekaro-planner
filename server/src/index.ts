@@ -17,6 +17,7 @@ import { rateLimit } from "./middleware/rate-limit";
 import plannerRoutes from "./routes/planner";
 import whatsappWebhookRoutes from "./routes/whatsapp-webhook";
 import commsConsentRoutes from "./routes/comms-consent-route";
+import lifecycleInternalRoutes from "./routes/lifecycle-internal";
 
 /**
  * v6 backend entry — Hono app for the mvp/ FIRE Planner. Structure copy-adapted
@@ -85,6 +86,10 @@ app.route("/api/webhooks", whatsappWebhookRoutes);
 
 // DPDP consent surface (session-authed).
 app.route("/api/comms", commsConsentRoutes);
+
+// Internal scheduler endpoint for the lifecycle evaluator (token-guarded, no
+// session — a daily VPS cron POSTs here). Mounted outside authMiddleware.
+app.route("/api/internal", lifecycleInternalRoutes);
 
 export { app };
 

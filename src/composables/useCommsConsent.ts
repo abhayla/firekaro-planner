@@ -23,11 +23,13 @@ interface ConsentRow {
   channel: string;
   marketingOptIn: boolean;
   revokedAt: string | null;
+  whatsappNumber?: string | null;
 }
 
 export function useCommsConsent() {
   const whatsappEnabled = ref(false); // base consent: a whatsapp row exists + not revoked
   const marketingOptIn = ref(false);
+  const whatsappNumber = ref(""); // recipient number; required for any send to reach the user
   const loading = ref(false);
   const saving = ref(false);
   const error = ref<string | null>(null);
@@ -35,6 +37,7 @@ export function useCommsConsent() {
   function apply(wa: ConsentRow | undefined) {
     whatsappEnabled.value = !!wa && !wa.revokedAt;
     marketingOptIn.value = !!wa?.marketingOptIn;
+    whatsappNumber.value = wa?.whatsappNumber ?? "";
   }
 
   async function load() {
@@ -67,6 +70,7 @@ export function useCommsConsent() {
           channel: "whatsapp",
           marketingOptIn: marketingOptIn.value,
           revoked: !whatsappEnabled.value,
+          whatsappNumber: whatsappNumber.value,
         }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -88,6 +92,7 @@ export function useCommsConsent() {
   return {
     whatsappEnabled,
     marketingOptIn,
+    whatsappNumber,
     loading,
     saving,
     error,

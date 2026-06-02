@@ -2,12 +2,13 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import { householdSchema } from "@planner/types/household";
-import { assumptionsSchema, type Assumptions } from "@planner/types/assumptions";
+import { assumptionsSchema } from "@planner/types/assumptions";
 import { authMiddleware } from "../middleware/auth";
 import { apiSuccess, apiError, ErrorCode } from "../lib/api-utils";
 import { logger } from "../lib/logger";
 import { prisma } from "../lib/prisma";
 import { readHousehold, applyHouseholdPlan } from "../lib/household-repo";
+import { mapAssumptionsRow } from "../lib/planner-read";
 import { diffHousehold } from "../lib/household-diff";
 
 /**
@@ -121,28 +122,7 @@ app.get("/assumptions", async (c) => {
   try {
     const row = await prisma.userAssumptions.findUnique({ where: { userId } });
     if (!row) return apiSuccess(c, null);
-    const assumptions: Assumptions = {
-      inflation: row.inflation,
-      equityReturn: row.equityReturn,
-      debtReturn: row.debtReturn,
-      realEstateReturn: row.realEstateReturn,
-      goldReturn: row.goldReturn,
-      npsReturn: row.npsReturn,
-      ppfReturn: row.ppfReturn,
-      epfReturn: row.epfReturn,
-      internationalReturn: row.internationalReturn,
-      reitReturn: row.reitReturn,
-      cryptoReturn: row.cryptoReturn,
-      healthcareInflation: row.healthcareInflation,
-      educationInflation: row.educationInflation,
-      housingInflation: row.housingInflation,
-      inflationWeights: row.inflationWeights as Assumptions["inflationWeights"],
-      swrOverride: row.swrOverride ?? undefined,
-      leanMultiplier: row.leanMultiplier,
-      fatMultiplier: row.fatMultiplier,
-      withdrawalRule: row.withdrawalRule as Assumptions["withdrawalRule"],
-    };
-    return apiSuccess(c, assumptions);
+    return apiSuccess(c, mapAssumptionsRow(row));
   } catch (err) {
     logger.error({ err, userId }, "GET /planner/assumptions failed");
     return apiError(c, "Failed to read assumptions", 500, ErrorCode.INTERNAL_ERROR);

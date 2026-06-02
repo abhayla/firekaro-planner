@@ -84,13 +84,22 @@ carries ONLY the `whatsappMessageId`; fixed to correlate by that id (commit `996
   usable across all Claude Code + Cowork projects. They share the same `WATI_*` creds
   (`~/.config/wati/.env` global → `server/.env` → shell). Note: being global, they're no longer in
   this repo's git — they live only in `~/.claude/skills/` on the machine.
-- **C2. Comms lifecycle loop — CONTRACTED, awaiting `/goal` run (2026-06-02).** Templates approved but
-  nothing auto-sends yet. **Discovery:** the app stores NO WhatsApp number anywhere (CommsConsent has no
-  phone; OAuth gives email/name only) → every send currently reaches only the test allowlist. Full design
-  in **`docs/goals/2026-06-02-comms-lifecycle-loop.md`** (Phase 0 number-capture → Phase 1 welcome +
-  scheduled server-side evaluator → Phase 2 marketing/winback). **Needs Abhay:** (1) run
-  `/goal docs/goals/2026-06-02-comms-lifecycle-loop.md`; (2) wire the daily cron on the VPS (Phase 1 DoD);
-  (3) A6 (`WATI_ALLOW_ALL_RECIPIENTS`) stays the go-live spend flip — the goal explicitly does NOT touch it.
+- **C2. Comms lifecycle loop — Phase 0 + 1 BUILT + live-verified (2026-06-02).** The `/goal` run is
+  done. Number capture (`CommsConsent.whatsappNumber`, Preferences UI), welcome-on-consent (D3), the
+  server-side `lifecycle-evaluator` + token-guarded `POST /api/internal/lifecycle/run`, and per-period
+  send-log dedupe (`whatsapp_send_log.dedupeKey`) all ship. **Live-verified end-to-end:** `welcome` +
+  `annual_review` both reached **DELIVERED** to the test number `917972672473`; a second endpoint run
+  sent nothing (dedup). Two additive Supabase migrations applied (`whatsappNumber`, `dedupeKey`). Phase 2
+  (marketing digest / winback / salary-update + `lastSeenAt`) stays deferred behind `marketingOptIn` + A6.
+  Full unit coverage; both trees green. **Needs Abhay (to take it live on prod):**
+  - **C2a. VPS redeploy** — ship the new code (A4-style `git archive | ssh … tar` → `npm ci && build` →
+    `prisma:migrate:deploy` (no pending — already applied) → `pm2 reload firekaro-api`). New backend route
+    `/api/internal` + Preferences number field.
+  - **C2b. `LIFECYCLE_RUN_TOKEN`** — add a real secret to the VPS `server/.env` (`openssl rand -base64 32`).
+    Unset ⇒ the endpoint returns 500 (fail-closed). Documented in `docs/DEPLOY.md` §1.
+  - **C2c. Daily cron** — add the crontab line from `docs/DEPLOY.md` §5a (POSTs the token-guarded endpoint
+    daily). Enabling it does **not** message real users — sends stay restricted to the test allowlist until A6.
+  - **C2d.** A6 (`WATI_ALLOW_ALL_RECIPIENTS`) stays the go-live spend flip — the loop explicitly does NOT touch it.
 
 ---
 

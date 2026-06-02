@@ -16,7 +16,8 @@
     "noEmit": true,
     "baseUrl": ".",
     "paths": {
-      "@planner/*": ["../src/*"]
+      "@planner/*": ["../src/*"],
+      "@/*": ["../src/*"]
     }
   },
   "include": ["src/**/*.ts", "scripts/**/*.ts", "../src/types/household.ts", "../src/types/assumptions.ts"],

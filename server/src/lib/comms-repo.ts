@@ -22,6 +22,48 @@ export async function getConsent(
   };
 }
 
+/** The user's stored WhatsApp number (digits-only), or null if none on record (D1). */
+export async function getWhatsAppNumber(userId: string): Promise<string | null> {
+  const row = await prisma.commsConsent.findUnique({
+    where: { userId_channel: { userId, channel: "whatsapp" } },
+    select: { whatsappNumber: true },
+  });
+  return row?.whatsappNumber ?? null;
+}
+
+/**
+ * True when this user already received a non-blocked send under `dedupeKey` — the
+ * idempotency check the lifecycle evaluator uses to fire each nudge once per
+ * period/threshold (D6). BLOCKED rows don't count (the send never went out).
+ */
+export async function alreadySent(userId: string, dedupeKey: string): Promise<boolean> {
+  const row = await prisma.whatsAppSendLog.findFirst({
+    where: { userId, dedupeKey, status: { not: "BLOCKED" } },
+    select: { id: true },
+  });
+  return row !== null;
+}
+
+export interface ConsentingWhatsAppUser {
+  userId: string;
+  whatsappNumber: string;
+}
+
+/**
+ * Every user the scheduled lifecycle evaluator may message: an un-revoked WhatsApp
+ * consent row WITH a stored number. The consent gate + fail-closed allowlist still
+ * apply per-send downstream — this is just the candidate set.
+ */
+export async function listConsentingWhatsAppUsers(): Promise<ConsentingWhatsAppUser[]> {
+  const rows = await prisma.commsConsent.findMany({
+    where: { channel: "whatsapp", revokedAt: null, whatsappNumber: { not: null } },
+    select: { userId: true, whatsappNumber: true },
+  });
+  return rows
+    .filter((r): r is { userId: string; whatsappNumber: string } => !!r.whatsappNumber)
+    .map((r) => ({ userId: r.userId, whatsappNumber: r.whatsappNumber }));
+}
+
 /** ISO timestamps of non-blocked WhatsApp sends to this user within the window. */
 export async function recentWhatsAppTimestamps(
   userId: string,
@@ -44,6 +86,8 @@ export interface RecordSendInput {
   failedDetail?: string | null;
   errorCode?: string | null;
   providerMessageId?: string | null;
+  /** Per-period/threshold idempotency key (D6); null for ad-hoc sends. */
+  dedupeKey?: string | null;
 }
 
 export async function recordSend(input: RecordSendInput): Promise<{ id: string }> {

@@ -127,12 +127,20 @@ Prisma scripts hitting Supabase while the dev server holds connections MUST appe
   plain TEXT (no FK). TDD red-first; the colocated `household-diff.spec.ts` units are the no-DB correctness proof. The Prisma
   read/write layer the diff engine drives is `server/src/lib/household-repo.ts`.
 - **Comms subsystem** (WhatsApp + Zoho CRM lifecycle messaging — see `docs/comms-go-live-handoff.md`
-  for the go-live blockers): two more mounted routes besides `/api/planner` —
-  **`/api/comms`** (consent CRUD, `comms-consent-route.ts`) and **`/api/webhooks`** (Wati delivery
-  webhook, `whatsapp-webhook.ts`). The `server/src/lib/` layer is `wati-client.ts` (WhatsApp send,
+  for the go-live blockers): three more mounted routes besides `/api/planner` —
+  **`/api/comms`** (consent CRUD + `whatsappNumber` capture, `comms-consent-route.ts`),
+  **`/api/webhooks`** (Wati delivery webhook, `whatsapp-webhook.ts`), and **`/api/internal`** (the
+  token-guarded daily lifecycle scheduler `POST /lifecycle/run`, `lifecycle-internal.ts` — guarded by
+  `LIFECYCLE_RUN_TOKEN`, mounted OUTSIDE authMiddleware; cron line in `docs/DEPLOY.md` §5a). The
+  `server/src/lib/` layer is `wati-client.ts` (WhatsApp send,
   **fail-closed allowlist → only Abhay's `917972672473`** in test), `whatsapp-sender.ts` +
-  `whatsapp-triggers.ts` (lifecycle/event sends), `comms-consent.ts` + `comms-templates.ts` +
-  `comms-signup.ts` (DPDP consent, approved templates, signup hook), `zoho-crm-client.ts` +
+  `whatsapp-triggers.ts` (consent-gated send + per-event triggers; send-log carries a `dedupeKey`),
+  `comms-consent.ts` + `comms-templates.ts` + `comms-signup.ts` (DPDP consent, approved templates,
+  signup hook + `maybeSendWelcome` D3), the **lifecycle loop** `lifecycle-evaluator.ts` (PURE: derived
+  FIRE signals → milestone/off-track/annual-review nudges + per-period dedupe keys) + `lifecycle-runner.ts`
+  (loads each consenting user's household, runs the shared **`@planner`/`@`-aliased `src/lib` `derive()`**
+  — no logic duplication — and fires deduped nudges), `planner-read.ts` (the `UserAssumptions`→`Assumptions`
+  mapper, shared with the planner route), and `zoho-crm-client.ts` +
   `zoho-lead-mapping.ts` (Zoho lead upsert). Each has a colocated `.spec.ts`. Outbound sends are
   **spend + outward-facing → escalate per `decision-authority.md`**; Wati `200 ≠ delivered` (verify
   via `getMessages` status — see the `project_wati_delivery_gotcha` memory). WhatsApp **templates**
