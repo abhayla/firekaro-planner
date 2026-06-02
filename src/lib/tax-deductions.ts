@@ -17,6 +17,7 @@
  */
 
 import type { Household, Investment, Liability, InsurancePolicy, Member } from "@/types/household";
+import { ageFromDOB } from "@/lib/age";
 
 // ---------- Statutory limits (audit-grounded, FY 2025-26 onward) ----------
 // These are STATUTORY FACTS per R1.4 — they appear read-only on /preferences
@@ -122,10 +123,14 @@ export function deriveDeductions(
   // ---- 80D — health insurance ----
   const healthSelfPremium = sumHealthPremium(insurance, "self", household.members);
   const healthParentsPremium = sumHealthPremium(insurance, "parents", household.members);
+  // Senior status: honour an explicit option, else auto-detect from member age — a parent ≥ 60
+  // qualifies for the ₹50k senior 80D cap (gh-issue #6; callers don't pass the flag today, so
+  // seniors were silently under-claiming the ₹25k cap). `?? ` keeps an explicit `false` honoured.
+  const hasSeniorParents =
+    options.hasSeniorParents ??
+    household.members.filter(isParentMember).some((m) => memberIsSenior(m));
   const cap80Dself = options.isSelfSenior ? LIMIT_80D_SENIOR_SELF : LIMIT_80D_SELF;
-  const cap80Dparents = options.hasSeniorParents
-    ? LIMIT_80D_SENIOR_PARENTS
-    : LIMIT_80D_PARENTS;
+  const cap80Dparents = hasSeniorParents ? LIMIT_80D_SENIOR_PARENTS : LIMIT_80D_PARENTS;
   const section80D =
     Math.min(cap80Dself, healthSelfPremium) +
     Math.min(cap80Dparents, healthParentsPremium);
@@ -250,6 +255,11 @@ function sumLifePremium(insurance: InsurancePolicy[]): number {
 /** A household member whose free-text `relation` marks them a parent (seeds use "Father"/"Mother"). */
 function isParentMember(m: Member): boolean {
   return /\b(parent|father|mother|dad|mom)\b/i.test(m.relation ?? "");
+}
+
+/** ≥ 60 by DOB → senior-citizen 80D limits. Missing DOB → not senior (safe default). */
+function memberIsSenior(m: Member): boolean {
+  return m.dateOfBirth ? ageFromDOB(m.dateOfBirth) >= 60 : false;
 }
 
 function sumHealthPremium(

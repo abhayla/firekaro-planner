@@ -227,6 +227,16 @@ describe("deriveDeductions — 80D health insurance", () => {
     expect(deriveDeductions(hh).section80D).toBe(45_000);
   });
 
+  it("auto-detects senior parents from age — 65+ parent gets the ₹50k cap with no explicit flag (gh-issue #6)", () => {
+    const hh = emptyHH();
+    hh.members = [{ id: "mom", relation: "Mother", dateOfBirth: "1958-06-01" }] as Household["members"];
+    hh.insurance = [
+      { id: "p1", type: "Health", provider: "Niva", sumAssured: 500_000, annualPremium: 45_000, insuredPersonId: "mom" },
+    ];
+    // ~68yo parent → senior 80D cap ₹50k → full ₹45k (without auto-detect it would cap at ₹25k).
+    expect(deriveDeductions(hh).section80D).toBe(45_000);
+  });
+
   it("parents bucket honours the senior cap when hasSeniorParents is set", () => {
     const hh = emptyHH();
     hh.members = [{ id: "mom", relation: "Mother" }] as Household["members"];
