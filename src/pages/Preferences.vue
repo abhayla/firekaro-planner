@@ -537,7 +537,9 @@ const featuresBySection = computed(() => {
         <section id="pref-section-glide" class="pref-section">
           <SectionHeader title="Glide path" :on-reset="() => resetSection('glide')" />
           <p class="text-body-2 text-medium-emphasis mb-3">
-            Pfau-Kitces rising-equity glide path per audit Entry #7.
+            Pfau-Kitces rising-equity glide path per audit Entry #7. Today this drives an
+            allocation-drift nudge; folding the de-risked return into the FIRE projection itself
+            is a planned enhancement (gh-issue #9).
           </p>
           <v-switch
             :model-value="glide.enabled"
