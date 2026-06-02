@@ -44,12 +44,13 @@ The "no SSH" was stale — key `~/.ssh/firekaro_v6_vps` works (root@srv1707492).
 - Rollback if ever needed: extract the backup tgz over `/var/www/firekaro`, `npm ci && npm run build`,
   `pm2 reload`.
 
-### A5. Register the Wati delivery webhook  🟡 READY (endpoint live + secret set)
-The endpoint is live and `WATI_WEBHOOK_SECRET` is set on the VPS. The webhook URL is
-`https://firekaro.com/api/webhooks/wati?token=<WATI_WEBHOOK_SECRET>` (the secret value is in the VPS +
-local `server/.env`). **I'll register it via the Wati API next session after confirming it won't disturb
-the existing broker-business webhooks** — OR Abhay sets it in Wati → Settings → Webhooks. Not blocking
-sends; only needed for auto delivery-status capture.
+### A5. Register the Wati delivery webhook  ✅ DONE + verified live
+✅ **DONE 2026-06-02** — Abhay registered the webhook in the Wati UI (events: Template Message
+Sent / DELIVERED / Read / FAILED / Status Update) → `https://firekaro.com/api/webhooks/wati?token=…`.
+**Verified live end-to-end:** a real send's `templateMessageSent_v2` linked the `whatsappMessageId`
+to the send-log row, then `sentMessageDELIVERED_v2` flipped it to **DELIVERED** (prod DB confirmed).
+Verifying caught a real bug — the handler matched on number+template, but Wati's DELIVERED payload
+carries ONLY the `whatsappMessageId`; fixed to correlate by that id (commit `9960649`).
 
 ### A6. Flip outbound ON (go-live) 🚦 spend + real users — your decision
 **You:** set `WATI_ALLOW_ALL_RECIPIENTS=true` on the VPS + `pm2 restart`. After this, real users (with consent) get messages and per-message spend begins. This is intentionally yours — I will not flip it.
