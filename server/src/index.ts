@@ -15,6 +15,7 @@ import { prisma } from "./lib/prisma";
 import { requestId } from "./middleware/request-id";
 import { rateLimit } from "./middleware/rate-limit";
 import plannerRoutes from "./routes/planner";
+import whatsappWebhookRoutes from "./routes/whatsapp-webhook";
 
 /**
  * v6 backend entry — Hono app for the mvp/ FIRE Planner. Structure copy-adapted
@@ -77,6 +78,9 @@ app.all("/api/auth/*", (c) => auth.handler(c.req.raw));
 
 // The planner document endpoints.
 app.route("/api/planner", plannerRoutes);
+
+// Wati delivery webhooks (no auth — external caller; optional shared-secret).
+app.route("/api/webhooks", whatsappWebhookRoutes);
 
 export { app };
 
