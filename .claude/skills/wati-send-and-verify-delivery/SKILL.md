@@ -11,7 +11,7 @@ description: >
 type: workflow
 allowed-tools: "Bash Read"
 argument-hint: "<template_name> [recipient_number]"
-version: "2.0.0"
+version: "2.1.0"
 ---
 
 # Wati — send a WhatsApp template and verify actual delivery
@@ -20,7 +20,12 @@ version: "2.0.0"
 means *accepted*, not *delivered*.** A send is only successful when Wati's `getMessages` shows
 `statusString: DELIVERED` (or `READ`). Always verify the terminal status.
 
-## Prerequisites (env vars — never hardcode these)
+## Prerequisites
+- **Only hard dependency: `curl`** (or any HTTP client). **Do NOT depend on `python3`/`jq`** — read
+  the JSON responses yourself; they're small.
+- **Config values** (never hardcode): `WATI_API_ENDPOINT`, `WATI_API_TOKEN`, `WATI_TEST_RECIPIENTS`,
+  `WATI_ALLOW_ALL_RECIPIENTS`.
+
 | Var | Purpose |
 |---|---|
 | `WATI_API_ENDPOINT` | Tenant base URL, e.g. `https://live-mt-server.wati.io/<tenantId>` (no trailing slash) |
@@ -28,18 +33,27 @@ means *accepted*, not *delivered*.** A send is only successful when Wati's `getM
 | `WATI_TEST_RECIPIENTS` | Comma-separated allowlist of numbers (digits, no `+`) that may receive test sends |
 | `WATI_ALLOW_ALL_RECIPIENTS` | Must equal `true` to send to anyone outside the allowlist (an explicit broadcast — escalation) |
 
+## STEP 0: Resolve the config (don't assume it's already in the shell)
+These values may live in the **shell env**, a **dotenv file** (`.env`, `server/.env`, …), or a
+**secret store / Cowork secret**. Locate them however this project stores them, then export for the
+session. If they're in a dotenv file, source it:
 ```bash
+for f in .env server/.env server/.env.local .env.local; do
+  [ -f "$f" ] && set -a && . "$f" && set +a && break
+done
 TOKEN="${WATI_API_TOKEN#Bearer }"          # strip a leading "Bearer " if present
 BASE="${WATI_API_ENDPOINT%/}"              # trim trailing slash
-TPL="<template_name>"                        # arg 1
-NUM="${2:-$(echo "$WATI_TEST_RECIPIENTS" | cut -d, -f1 | tr -cd '0-9')}"   # arg 2 or first allowlisted
+TPL="$1"                                      # arg 1: template name
+NUM="${2:-$(printf '%s' "$WATI_TEST_RECIPIENTS" | cut -d, -f1 | tr -cd '0-9')}"  # arg 2 or first allowlisted
 ```
+If `$BASE` or `$TOKEN` is empty after this, STOP and ask where this project keeps its Wati credentials.
 
 ## STEP 1: Confirm the template is APPROVED + check its category
 ```bash
-curl -s -H "Authorization: Bearer $TOKEN" "$BASE/api/v1/getMessageTemplates" \
-  | python3 -c "import sys,json;[print(t['elementName'],t.get('status'),t.get('category'),[p['paramName'] for p in t.get('customParams',[])]) for t in json.load(sys.stdin).get('messageTemplates',[]) if t['elementName']=='$TPL']"
+curl -s -H "Authorization: Bearer $TOKEN" "$BASE/api/v1/getMessageTemplates"
 ```
+Read the returned JSON yourself: find the object in `messageTemplates[]` whose `elementName == $TPL`,
+then check its `status`, `category`, and `customParams` (variable names).
 - `status` MUST be `APPROVED` (else it can't deliver — stop).
 - **`category`: UTILITY delivers reliably. MARKETING is subject to Meta's per-user cap** and will
   likely FAIL to a number that has recently received marketing (error 131049). Prefer UTILITY for
@@ -64,9 +78,10 @@ approval is known — retry once (Wati's send endpoint lags Meta approval).
 ## STEP 4: Verify the TERMINAL delivery status (the real check)
 Wait a few seconds, then read the most recent message for the number:
 ```bash
-curl -s -H "Authorization: Bearer $TOKEN" "$BASE/api/v1/getMessages/$NUM?pageSize=5" \
-  | python3 -c "import sys,json;i=json.load(sys.stdin)['messages']['items'];print([{'status':m.get('statusString'),'fail':m.get('failedDetail')} for m in i if m.get('eventType')=='broadcastMessage'][:2])"
+curl -s -H "Authorization: Bearer $TOKEN" "$BASE/api/v1/getMessages/$NUM?pageSize=5"
 ```
+In the returned JSON, find the most recent `messages.items[]` entry with `eventType == "broadcastMessage"`
+and read its `statusString` (and `failedDetail` if failed):
 - `DELIVERED` / `READ` → ✅ genuine success.
 - `SENT` → still in flight; re-check in a few seconds.
 - `FAILED` → read `failedDetail` and classify (STEP 5).
