@@ -1,5 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { computeTax, recommendRegime, marginalSlabRate, getTaxConfigForFY } from "./tax";
+import {
+  computeTax,
+  recommendRegime,
+  marginalSlabRate,
+  getTaxConfigForFY,
+  oldRegimeSlabsForAge,
+  type TaxSlabEntry,
+} from "./tax";
 
 describe("computeTax — New Regime FY 2024-25", () => {
   it("zero tax on income within rebate limit (₹7L)", () => {
@@ -256,5 +263,79 @@ describe("effectiveRate", () => {
     const r = computeTax({ grossIncome: 0, regime: "NEW", fy: "2024-25" });
     expect(r.effectiveRate).toBe(0);
     expect(r.totalTax).toBe(0);
+  });
+});
+
+describe("old-regime senior basic-exemption variant (gh-issue #6 LOW)", () => {
+  // Indian law (OLD regime only): basic exemption is ₹2.5L (<60), ₹3L (60–79 senior),
+  // ₹5L (80+ super-senior). The NEW regime is age-agnostic.
+  const BASE_OLD: TaxSlabEntry[] = [
+    { min: 0, max: 250000, rate: 0 },
+    { min: 250000, max: 500000, rate: 0.05 },
+    { min: 500000, max: 1000000, rate: 0.2 },
+    { min: 1000000, max: Infinity, rate: 0.3 },
+  ];
+
+  describe("oldRegimeSlabsForAge", () => {
+    it("leaves slabs unchanged below 60 (and when age is omitted)", () => {
+      expect(oldRegimeSlabsForAge(BASE_OLD, 45)).toEqual(BASE_OLD);
+      expect(oldRegimeSlabsForAge(BASE_OLD, undefined)).toEqual(BASE_OLD);
+    });
+
+    it("raises the 0% bracket to ₹3L for a senior (60–79)", () => {
+      expect(oldRegimeSlabsForAge(BASE_OLD, 65)).toEqual([
+        { min: 0, max: 300000, rate: 0 },
+        { min: 300000, max: 500000, rate: 0.05 },
+        { min: 500000, max: 1000000, rate: 0.2 },
+        { min: 1000000, max: Infinity, rate: 0.3 },
+      ]);
+    });
+
+    it("raises the 0% bracket to ₹5L and absorbs the 5% band for a super-senior (80+)", () => {
+      expect(oldRegimeSlabsForAge(BASE_OLD, 82)).toEqual([
+        { min: 0, max: 500000, rate: 0 },
+        { min: 500000, max: 1000000, rate: 0.2 },
+        { min: 1000000, max: Infinity, rate: 0.3 },
+      ]);
+    });
+
+    it("treats the 60 and 80 boundaries inclusively", () => {
+      expect(oldRegimeSlabsForAge(BASE_OLD, 60)[0]).toEqual({ min: 0, max: 300000, rate: 0 });
+      expect(oldRegimeSlabsForAge(BASE_OLD, 80)[0]).toEqual({ min: 0, max: 500000, rate: 0 });
+      expect(oldRegimeSlabsForAge(BASE_OLD, 59)[0]).toEqual({ min: 0, max: 250000, rate: 0 });
+    });
+  });
+
+  describe("computeTax applies the age exemption in the OLD regime", () => {
+    // gross ₹7L, non-salaried (no SD), no deductions → above the ₹5L rebate limit so
+    // the rebate does not mask the slab-tax difference. Exact-rupee locks:
+    const common = { grossIncome: 700000, regime: "OLD" as const, fy: "2025-26", isSalaried: false };
+
+    it("under-60: 5% on 2.5–5L + 20% on 5–7L = ₹52,500 slab tax", () => {
+      const r = computeTax({ ...common, taxpayerAge: 40 });
+      expect(r.slabTax).toBe(52500);
+    });
+
+    it("senior (65): ₹3L exemption → ₹50,000 slab tax (saves ₹2,500)", () => {
+      const r = computeTax({ ...common, taxpayerAge: 65 });
+      expect(r.slabTax).toBe(50000);
+    });
+
+    it("super-senior (82): ₹5L exemption, no 5% band → ₹40,000 slab tax (saves ₹12,500)", () => {
+      const r = computeTax({ ...common, taxpayerAge: 82 });
+      expect(r.slabTax).toBe(40000);
+    });
+
+    it("omitting taxpayerAge is identical to under-60 (no regression)", () => {
+      const withAge = computeTax({ ...common, taxpayerAge: 40 });
+      const noAge = computeTax(common);
+      expect(noAge.totalTax).toBe(withAge.totalTax);
+    });
+  });
+
+  it("NEW regime is age-agnostic — super-senior pays the same as a 30-year-old", () => {
+    const young = computeTax({ grossIncome: 700000, regime: "NEW", fy: "2025-26", taxpayerAge: 30 });
+    const superSenior = computeTax({ grossIncome: 700000, regime: "NEW", fy: "2025-26", taxpayerAge: 82 });
+    expect(superSenior.totalTax).toBe(young.totalTax);
   });
 });

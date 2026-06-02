@@ -165,6 +165,26 @@ export function calculateSlabTax(taxableIncome: number, slabs: TaxSlabEntry[]): 
 }
 
 /**
+ * OLD-regime basic exemption rises with the taxpayer's age (Indian law, gh-issue #6):
+ * ₹2.5L below 60, ₹3L for a senior (60–79), ₹5L for a super-senior (80+). The 0% bracket
+ * top is raised to the exemption and any lower taxable band is absorbed into it (so a
+ * super-senior loses the 5% ₹2.5–5L band entirely). The NEW regime is age-agnostic — do
+ * NOT call this for it. `age` undefined / below 60 returns the slabs unchanged.
+ * Assumes `slabs` begins with a single 0% bracket whose `max` ≤ the senior exemption
+ * (true for every OLD-regime config here).
+ */
+export function oldRegimeSlabsForAge(slabs: TaxSlabEntry[], age?: number): TaxSlabEntry[] {
+  const exemption = age != null && age >= 80 ? 500000 : age != null && age >= 60 ? 300000 : 250000;
+  if (exemption === 250000) return slabs;
+  const adjusted: TaxSlabEntry[] = [{ min: 0, max: exemption, rate: 0 }];
+  for (const slab of slabs) {
+    if (slab.max <= exemption) continue; // fully absorbed by the higher exemption
+    adjusted.push({ min: Math.max(slab.min, exemption), max: slab.max, rate: slab.rate });
+  }
+  return adjusted;
+}
+
+/**
  * Top marginal slab rate (decimal) the taxable income reaches, read off the
  * regime's slab table. Used by the EPF/VPF after-tax-yield drag (A15.3) to tax
  * excess-interest at the household's top applicable rate — NOT an invented rate.
@@ -267,6 +287,11 @@ export interface ComputeTaxArgs {
   // + `employerNpsBasic` scalars for a multi-earner household). gh-issue #4.
   employerNpsByMember?: { nps: number; basic: number }[];
   isSalaried?: boolean;
+  // Taxpayer's age in years (caller-resolved — FireKaro anchors it to the earner's current
+  // age, consistent with the forward projection's age basis; historical-FY accuracy is out of
+  // scope per ADR-0003). OLD regime only: raises the basic exemption to ₹3L at 60+ (senior) /
+  // ₹5L at 80+ (super-senior). Omitted/<60 ⇒ standard ₹2.5L. NEW regime ignores it. gh-issue #6.
+  taxpayerAge?: number;
 }
 
 export function computeTax(args: ComputeTaxArgs): FullTaxResult {
@@ -306,7 +331,11 @@ export function computeTax(args: ComputeTaxArgs): FullTaxResult {
 
   const taxableIncome = Math.max(0, grossIncome - sd - ded - employerNps);
 
-  const slabTax = calculateSlabTax(taxableIncome, regimeConfig.slabs);
+  // OLD regime: apply the age-based basic-exemption variant (senior ₹3L / super-senior ₹5L).
+  // NEW regime is age-agnostic, so its slabs pass through unchanged. gh-issue #6.
+  const effectiveSlabs =
+    regime === "OLD" ? oldRegimeSlabsForAge(regimeConfig.slabs, args.taxpayerAge) : regimeConfig.slabs;
+  const slabTax = calculateSlabTax(taxableIncome, effectiveSlabs);
 
   let rebate = 0;
   if (taxableIncome <= regimeConfig.rebateLimit) {
@@ -323,7 +352,7 @@ export function computeTax(args: ComputeTaxArgs): FullTaxResult {
     taxableIncome,
     config.surchargeSlabs,
     regime === "NEW" ? config.surchargeCapNewRegime : null,
-    regimeConfig.slabs,
+    effectiveSlabs,
   );
   const cess = Math.round((taxAfterRebate + surcharge) * config.cessRate);
   const totalTax = taxAfterRebate + surcharge + cess;

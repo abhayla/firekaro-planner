@@ -168,11 +168,15 @@ export function derive(household: Household, assumptions: Assumptions, lens: Der
   // (gh-issue #4), more correct than the aggregate scalars for a multi-earner household.
   const employerNpsByMember = lensedDeductions.employerNpsByMember;
 
+  // taxpayerAge drives the OLD-regime senior (60+/80+) basic-exemption variant (gh-issue #6).
+  // anchorAge is the lensed member's age, else the primary earner's — the same anchor the
+  // rest of the projection uses, consistent with this engine's single-aggregate-earner model.
   const householdTaxRecommendation = recommendRegime({
     grossIncome: annualIncome.salaryIncome + annualIncome.businessShare + annualIncome.otherTaxable,
     fy: lens.currentFY,
     deductions: estimatedDeductionsForOld,
     employerNpsByMember,
+    taxpayerAge: anchorAge,
   });
 
   const fyTax = computeTax({
@@ -181,6 +185,7 @@ export function derive(household: Household, assumptions: Assumptions, lens: Der
     fy: lens.currentFY,
     deductions: estimatedDeductionsForOld,
     employerNpsByMember,
+    taxpayerAge: anchorAge,
   });
   const annualTax = fyTax.totalTax;
 
