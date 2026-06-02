@@ -27,6 +27,7 @@ import {
   DEFAULT_HEALTHCARE_CORPUS_RESERVATION_PERCENT,
 } from "@/stores/household";
 import { useDismissedNudges } from "@/composables/useDismissedNudges";
+import { useCommsConsent } from "@/composables/useCommsConsent";
 import { useFireDerive } from "@/lib/useFireDerive";
 import { DEFAULT_ASSUMPTIONS } from "@/types/assumptions";
 
@@ -48,6 +49,7 @@ const SECTIONS: PrefSection[] = [
   { id: "statutory", label: "Statutory reference", badge: "Read-only" },
   { id: "estate", label: "Estate planning" },
   { id: "features", label: "Feature toggles" },
+  { id: "notifications", label: "Notifications", badge: "New" },
 ];
 
 const assumptions = useAssumptionsStore();
@@ -57,6 +59,23 @@ const dismissed = useDismissedNudges();
 assumptions.hydrate();
 household.hydrate();
 features.hydrate();
+
+// Comms/notification consent (DPDP) — backed by /api/comms/consent.
+const {
+  whatsappEnabled: waEnabled,
+  marketingOptIn: waMarketing,
+  saving: waSaving,
+  load: loadComms,
+  save: saveComms,
+  onWhatsappToggle: onWaToggle,
+} = useCommsConsent();
+loadComms();
+
+function resetComms() {
+  waEnabled.value = false;
+  waMarketing.value = false;
+  void saveComms();
+}
 
 // Edits read/write the flat household-scope `Assumptions` store directly —
 // this is the canonical persistence target (the layered resolver was retired,
@@ -736,6 +755,40 @@ const featuresBySection = computed(() => {
               </v-list>
             </v-card>
           </div>
+        </section>
+
+        <section id="pref-section-notifications" class="pref-section">
+          <SectionHeader title="Notifications & WhatsApp" :on-reset="resetComms" />
+          <p class="text-body-2 text-medium-emphasis mb-3">
+            Choose what FireKaro sends you on WhatsApp. Account &amp; plan alerts keep you informed
+            about <em>your</em> plan; marketing insights are optional and off by default (DPDP — opt
+            out anytime).
+          </p>
+          <v-row>
+            <v-col cols="12" md="8">
+              <v-switch
+                v-model="waEnabled"
+                color="primary"
+                density="comfortable"
+                :loading="waSaving"
+                hide-details
+                data-testid="pref-comms-whatsapp"
+                label="Receive WhatsApp updates about my plan (welcome, milestones, alerts)"
+                @update:model-value="onWaToggle"
+              />
+              <v-switch
+                v-model="waMarketing"
+                color="primary"
+                density="comfortable"
+                :disabled="!waEnabled"
+                :loading="waSaving"
+                hide-details
+                data-testid="pref-comms-marketing"
+                label="Also send monthly insights & tips (marketing — optional)"
+                @update:model-value="saveComms"
+              />
+            </v-col>
+          </v-row>
         </section>
       </v-col>
     </v-row>
