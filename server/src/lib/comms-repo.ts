@@ -52,28 +52,46 @@ export async function recordSend(input: RecordSendInput): Promise<{ id: string }
 }
 
 /**
- * Update the latest send-log row for a number+template with its async delivery
- * status (called by the Wati webhook). Returns the number of rows updated (0/1).
+ * Wati's "templateMessageSent_v2" webhook is the ONLY delivery event that carries
+ * the recipient (waId) + templateName; it also carries the whatsappMessageId.
+ * Stash that id on the latest matching not-yet-linked row so the later
+ * DELIVERED/READ/FAILED events (which carry ONLY the id) can find the row.
+ * Returns rows linked (0/1).
  */
-export async function markDeliveryStatus(params: {
+export async function linkProviderMessageId(params: {
   toNumber: string;
   templateName: string;
+  providerMessageId: string;
+}): Promise<number> {
+  const row = await prisma.whatsAppSendLog.findFirst({
+    where: { toNumber: params.toNumber, templateName: params.templateName, providerMessageId: null },
+    orderBy: { sentAt: "desc" },
+  });
+  if (!row) return 0;
+  await prisma.whatsAppSendLog.update({
+    where: { id: row.id },
+    data: { providerMessageId: params.providerMessageId },
+  });
+  return 1;
+}
+
+/**
+ * Update a send-log row's status by the Wati whatsappMessageId (the only key the
+ * DELIVERED/READ/FAILED webhooks carry). Returns rows updated (0/1).
+ */
+export async function updateStatusByProviderId(params: {
+  providerMessageId: string;
   status: string;
   failedDetail?: string | null;
   errorCode?: string | null;
 }): Promise<number> {
-  const latest = await prisma.whatsAppSendLog.findFirst({
-    where: { toNumber: params.toNumber, templateName: params.templateName },
-    orderBy: { sentAt: "desc" },
-  });
-  if (!latest) return 0;
-  await prisma.whatsAppSendLog.update({
-    where: { id: latest.id },
+  const res = await prisma.whatsAppSendLog.updateMany({
+    where: { providerMessageId: params.providerMessageId },
     data: {
       status: params.status,
       failedDetail: params.failedDetail ?? null,
       errorCode: params.errorCode ?? null,
     },
   });
-  return 1;
+  return res.count;
 }

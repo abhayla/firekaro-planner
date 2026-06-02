@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { apiSuccess, apiError, ErrorCode } from "../lib/api-utils";
 import { logger } from "../lib/logger";
-import { markDeliveryStatus } from "../lib/comms-repo";
+import { linkProviderMessageId, updateStatusByProviderId } from "../lib/comms-repo";
 
 /**
  * Wati delivery webhooks — captures the ASYNC status the HTTP 200 hides
@@ -35,17 +35,26 @@ app.post("/wati", async (c) => {
     return apiError(c, "Invalid JSON", 400, ErrorCode.VALIDATION_ERROR);
   }
 
-  const number = String(body.waId ?? body.whatsappNumber ?? body.number ?? "").replace(/\D/g, "");
-  const template = String(body.templateName ?? body.elementName ?? "");
+  // Wati event correlation: the templateMessageSent_v2 event carries waId +
+  // templateName + whatsappMessageId; DELIVERED/READ/FAILED carry ONLY the
+  // whatsappMessageId. So: on "sent" link the id to our row; on the rest, match by id.
   const status = mapStatus(String(body.eventType ?? body.type ?? body.statusString ?? ""));
+  const wamid = String(body.whatsappMessageId ?? "");
+  const waId = String(body.waId ?? body.whatsappNumber ?? body.number ?? "").replace(/\D/g, "");
+  const template = String(body.templateName ?? body.elementName ?? "");
 
-  if (number && template && status) {
-    await markDeliveryStatus({
-      toNumber: number,
-      templateName: template,
-      status,
-      failedDetail: body.failedDetail ? String(body.failedDetail) : null,
-    }).catch((e) => logger.warn({ err: e instanceof Error ? e.message : String(e) }, "webhook status update failed"));
+  try {
+    if (status === "SENT" && wamid && waId && template) {
+      await linkProviderMessageId({ toNumber: waId, templateName: template, providerMessageId: wamid });
+    } else if (wamid && status) {
+      await updateStatusByProviderId({
+        providerMessageId: wamid,
+        status,
+        failedDetail: body.failedDetail ? String(body.failedDetail) : null,
+      });
+    }
+  } catch (e) {
+    logger.warn({ err: e instanceof Error ? e.message : String(e) }, "webhook status update failed");
   }
 
   // Always 200 so Wati does not retry-storm on a payload we don't recognize.
