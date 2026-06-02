@@ -89,6 +89,16 @@ const incomeRows = computed<IncomeRow[]>(() => {
 // audit-grounded auto-deductions derivation (audit Entry #12 A12.2).
 const derivedDeductions = computed(() => deriveDeductions(household.data));
 
+// 80CCD(2) employer-NPS is the one deduction allowed in BOTH regimes — show the CAPPED value
+// at the displayed regime's ceiling (per-member), so the tax-reducing figure is visible (gh-issue #4).
+const employerNps80CCD2 = computed(() => {
+  const ceiling = effectiveRegime.value === "NEW" ? 0.14 : 0.1;
+  const list = derivedDeductions.value.employerNpsByMember;
+  const used = list.reduce((s, m) => s + (m.basic > 0 ? Math.min(m.nps, ceiling * m.basic) : m.nps), 0);
+  const limit = list.reduce((s, m) => s + (m.basic > 0 ? ceiling * m.basic : m.nps), 0);
+  return { used: Math.round(used), limit: Math.round(limit) };
+});
+
 const totalTaxable = computed(() =>
   incomeRows.value.filter((r) => r.isTaxable).reduce((s, r) => s + r.amount, 0),
 );
@@ -382,6 +392,7 @@ const takeHomeSegments = computed<ProportionSegment[]>(() => {
             <LimitMeter label="80CCD(1B) · NPS" :used="derivedDeductions.section80CCD1B" :limit="LIMIT_80CCD_1B" color="info" :format-value="formatINRCompact" />
             <LimitMeter label="80D · Health" :used="derivedDeductions.section80D" :limit="LIMIT_80D_SELF + LIMIT_80D_PARENTS" color="success" :format-value="formatINRCompact" />
             <LimitMeter label="Sec 24 · Home-loan interest" :used="derivedDeductions.section24" :limit="LIMIT_SECTION_24" color="warning" :format-value="formatINRCompact" />
+            <LimitMeter v-if="employerNps80CCD2.used > 0" label="80CCD(2) · Employer NPS (both regimes)" :used="employerNps80CCD2.used" :limit="employerNps80CCD2.limit" color="info" :format-value="formatINRCompact" />
           </div>
           <v-divider class="my-3" />
           <div class="row-line">
