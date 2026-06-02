@@ -12,7 +12,7 @@
  * whole household; specific member + family-view OFF → that member's slice +
  * the always-visible joint pool.
  */
-import type { Household, Member } from "@/types/household";
+import type { Household } from "@/types/household";
 import type { Assumptions } from "@/types/assumptions";
 import {
   calculateFIRENumber,

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { onUserCreated, type SignupDeps } from "./comms-signup";
+import { onUserCreated, maybeSendWelcome, type SignupDeps, type WelcomeDeps } from "./comms-signup";
 
 /**
  * Signup side-effects — seeds consent + syncs a Zoho lead, and is fail-safe:
@@ -43,5 +43,44 @@ describe("onUserCreated", () => {
       }),
     });
     await expect(onUserCreated(user, d)).resolves.toBeUndefined();
+  });
+});
+
+describe("maybeSendWelcome (D3)", () => {
+  function wdeps(over: Partial<WelcomeDeps> = {}): WelcomeDeps {
+    return {
+      alreadyWelcomed: vi.fn(async () => false),
+      fireWelcome: vi.fn(async () => ({ sent: true, reason: "sent" })),
+      ...over,
+    };
+  }
+  const target = { userId: "u1", whatsappNumber: "917972672473", revoked: false, firstName: "Abhay" };
+
+  it("fires the welcome the first time a number is saved with un-revoked consent", async () => {
+    const d = wdeps();
+    const r = await maybeSendWelcome(target, d);
+    expect(r).toEqual({ fired: true, reason: "sent" });
+    expect(d.fireWelcome).toHaveBeenCalledWith({ userId: "u1", toNumber: "917972672473", firstName: "Abhay" });
+  });
+
+  it("does NOT fire when there is no number", async () => {
+    const d = wdeps();
+    const r = await maybeSendWelcome({ ...target, whatsappNumber: null }, d);
+    expect(r.fired).toBe(false);
+    expect(d.fireWelcome).not.toHaveBeenCalled();
+  });
+
+  it("does NOT fire when consent is revoked", async () => {
+    const d = wdeps();
+    const r = await maybeSendWelcome({ ...target, revoked: true }, d);
+    expect(r.fired).toBe(false);
+    expect(d.fireWelcome).not.toHaveBeenCalled();
+  });
+
+  it("does NOT fire again when already welcomed (idempotent)", async () => {
+    const d = wdeps({ alreadyWelcomed: vi.fn(async () => true) });
+    const r = await maybeSendWelcome(target, d);
+    expect(r).toEqual({ fired: false, reason: "already-welcomed" });
+    expect(d.fireWelcome).not.toHaveBeenCalled();
   });
 });

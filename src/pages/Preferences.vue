@@ -64,6 +64,7 @@ features.hydrate();
 const {
   whatsappEnabled: waEnabled,
   marketingOptIn: waMarketing,
+  whatsappNumber: waNumber,
   saving: waSaving,
   load: loadComms,
   save: saveComms,
@@ -71,9 +72,19 @@ const {
 } = useCommsConsent();
 loadComms();
 
+// Basic shape check: 10–15 digits once stripped (country code + number). Empty is
+// allowed (the field is optional until the user opts in).
+const waNumberRules = [
+  (v: string) => {
+    const digits = (v ?? "").replace(/\D/g, "");
+    return digits.length === 0 || (digits.length >= 10 && digits.length <= 15) || "Enter a valid number with country code (e.g. 91XXXXXXXXXX)";
+  },
+];
+
 function resetComms() {
   waEnabled.value = false;
   waMarketing.value = false;
+  waNumber.value = "";
   void saveComms();
 }
 
@@ -787,6 +798,25 @@ const featuresBySection = computed(() => {
                 label="Also send monthly insights & tips (marketing — optional)"
                 @update:model-value="saveComms"
               />
+              <v-expand-transition>
+                <v-text-field
+                  v-if="waEnabled"
+                  v-model="waNumber"
+                  class="mt-3"
+                  variant="outlined"
+                  density="comfortable"
+                  prefix="+"
+                  type="tel"
+                  inputmode="numeric"
+                  :rules="waNumberRules"
+                  :loading="waSaving"
+                  data-testid="pref-comms-whatsapp-number"
+                  label="WhatsApp number (with country code)"
+                  hint="We send to this number only. Include the country code, e.g. 91XXXXXXXXXX."
+                  persistent-hint
+                  @blur="saveComms"
+                />
+              </v-expand-transition>
             </v-col>
           </v-row>
         </section>

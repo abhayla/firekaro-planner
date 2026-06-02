@@ -27,6 +27,7 @@ export async function fireNudge(
   target: NudgeTarget,
   values: string[],
   deps?: Partial<SenderDeps>,
+  dedupeKey?: string,
 ): Promise<SendNudgeResult> {
   const tpl = templateFor(key);
   if (values.length !== tpl.paramCount) {
@@ -42,6 +43,7 @@ export async function fireNudge(
       templateName: tpl.templateName,
       category: tpl.category,
       parameters: toParams(values),
+      dedupeKey,
     },
     deps,
   );
@@ -49,9 +51,10 @@ export async function fireNudge(
 
 // ---- Typed per-event triggers (param order matches docs/whatsapp-templates.md) ----
 
-/** Welcome: the approved template currently has no body variables. */
+/** Welcome: the approved template currently has no body variables. Deduped per
+ * user ("welcome") so it fires exactly once (D3). */
 export const triggerWelcome = (t: NudgeTarget, deps?: Partial<SenderDeps>) =>
-  fireNudge("welcome", t, [], deps);
+  fireNudge("welcome", t, [], deps, "welcome");
 
 // The app link is static text (firekaro.com) inside each template body, so it is
 // NOT a param here.

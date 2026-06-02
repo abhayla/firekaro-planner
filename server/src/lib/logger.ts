@@ -20,6 +20,11 @@ export const logger = pino({
       "*.password",
       "*.secret",
       "*.token",
+      // PII: WhatsApp recipient numbers must never reach logs (comms subsystem).
+      "whatsappNumber",
+      "toNumber",
+      "*.whatsappNumber",
+      "*.toNumber",
     ],
     censor: "[REDACTED]",
   },

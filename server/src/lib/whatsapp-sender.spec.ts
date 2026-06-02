@@ -87,4 +87,33 @@ describe("sendNudge", () => {
       expect.objectContaining({ status: "FAILED", failedDetail: "131049 cap" }),
     );
   });
+
+  // D1 — fail-closed when no WhatsApp number is on record: don't even reach the
+  // consent gate or the adapter; log a BLOCKED "no-number" row and stop.
+  it("blocks + logs BLOCKED 'no-number' when toNumber is empty (never touches consent/adapter)", async () => {
+    const d = deps();
+    const r = await sendNudge({ ...input, toNumber: "   " }, d);
+    expect(r).toMatchObject({ sent: false, reason: "no-number", logId: "log1" });
+    expect(d.getConsent).not.toHaveBeenCalled();
+    expect(d.send).not.toHaveBeenCalled();
+    expect(d.recordSend).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "BLOCKED", failedDetail: "no-number" }),
+    );
+  });
+
+  // Phase 1 — the dedupeKey threads through to the send-log row so a later run can
+  // detect an already-sent nudge (per-period/threshold dedup).
+  it("threads dedupeKey onto both the SENT and BLOCKED log rows", async () => {
+    const ok = deps();
+    await sendNudge({ ...input, dedupeKey: "milestone:50" }, ok);
+    expect(ok.recordSend).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "SENT", dedupeKey: "milestone:50" }),
+    );
+
+    const blocked = deps({ getConsent: vi.fn(async () => null) });
+    await sendNudge({ ...input, dedupeKey: "milestone:50" }, blocked);
+    expect(blocked.recordSend).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "BLOCKED", dedupeKey: "milestone:50" }),
+    );
+  });
 });
