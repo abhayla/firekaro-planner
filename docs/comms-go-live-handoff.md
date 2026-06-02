@@ -15,18 +15,16 @@ keep one source of truth).
 
 ## A. Critical path to send real WhatsApp messages (in order)
 
-### A1. Zoho OAuth — create a Self Client → give me 3 values  ⛔ blocks lead-sync creds
-Why me-can't: needs your Zoho login + OneAuth MFA; I won't enter your password.
-**You (2 min):** `https://api-console.zoho.in` → **Add Client → Self Client** → create →
-- copy **Client ID** + **Client Secret**
-- tab **Generate Code** → scope `ZohoCRM.modules.ALL`, time 10 min, any "scope description" → **Create** → copy the **grant code**
-- paste me **Client ID + Client Secret + grant code**.
-**Then I:** exchange the code for a refresh token, store `ZOHO_CLIENT_ID/SECRET/REFRESH_TOKEN`, and the Zoho lead-sync is credential-complete.
-*(Alt: log into Zoho once in the controlled "Claude Chrome" and I drive the whole flow.)*
+### A1. Zoho OAuth → refresh token  ✅ DONE (2026-06-02)
+Self Client created (Abhay), grant code exchanged → `ZOHO_CLIENT_ID/SECRET/REFRESH_TOKEN` in LOCAL
+`server/.env` (scope `ZohoCRM.modules.ALL`, India DC). **Verified live:** `upsertLead` created Lead
+`475281000040523001` in PIFS CRM with `Lead_Source=FireKaro`, confirmed via getRecord, then deleted.
+*Carry-over:* the same `ZOHO_*` values must also go into the **VPS** `server/.env` (part of A4).
 
-### A2. Zoho — add `FireKaro` to the `Lead_Source` picklist
-Why me-can't: edits your production CRM config. (I *could* try via API — say the word and I will; otherwise:)
-**You (1 min):** CRM → Setup → Customization → Modules → **Leads** → field **Lead Source** → add value **`FireKaro`** → save.
+### A2. Zoho `FireKaro` Lead_Source value  ✅ SELF-RESOLVED (2026-06-02)
+Zoho accepted `Lead_Source="FireKaro"` on first upsert and stored it (the value now exists). No
+manual picklist edit needed. *(If you ever want it as a formal picklist option for filtering UIs,
+add it under Leads → Lead Source — optional, not blocking.)*
 
 ### A3. Approve the 7 WhatsApp templates → send me the exact names  ⛔ (in progress on your side)
 Catalog: `docs/whatsapp-templates.md` (welcome already approved). Wati will likely date-suffix them.
