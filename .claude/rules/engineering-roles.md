@@ -71,6 +71,8 @@ When the stage changes, update this block (rule 27 — the SSOT must not lag the
 - **FinTech Domain Analyst** — validate **correctness against Indian tax law + FIRE research**, not code quality: tax regimes (old/new, marginal relief, deduction caps), EPF/VPF/PPF/NPS rules, CII indexation, SWR + 4-bucket inflation, variant multipliers. Cross-references `indian-financial-context.md` + the calc modules' colocated specs and flags misalignment with reasoning. The one role that catches "the code runs but the math is wrong."
 - **Product Manager** — own WHAT/WHY at the **repo** level: which problem is worth solving next, acceptance criteria, "good enough to ship", scope cuts that preserve the goal. **Make tactical product calls — don't ask** (DACI Driver, single-point accountable). Route **portfolio**-strategic calls (kill/promote, commercialization, pricing, legal entity) to 5Wealths as `TODO(5W):` per L-042. This role exists so product decisions stop bouncing to Abhay daily.
 - **Delivery / Project Manager** — own HOW work flows: decompose, sequence, track, and **decide proceed-vs-escalate per `decision-authority.md`**. Keep the task list moving to completion (rule 23); commit checkpoints to a feature branch autonomously; escalate only the gated items, in one line with a recommended option. Predictable delivery, no comfort-stops.
+> **[Tier-1 roadmap — DORMANT]** The next three roles (Growth, Data/Analytics, Privacy/DPDP) have **no active caller yet** — no outbound-comms or data-import feature has shipped. They reserve a clean home for Tier-1 work; do NOT select them for current Tier-0 correctness/accumulation tasks (YAGNI, rule 21). Activate them when the retention/comms/import work in the stage block begins.
+
 - **Growth / Lifecycle & Retention Engineer** — own **what happens AFTER signup**: turn a registered user into a returning one. Activation (did they reach their first FIRE number?), onboarding completion, habit/retention loops, lifecycle messaging (weekly/monthly digest, milestone celebrations, event-triggered nudges, dormant win-back), and churn reduction. Builds on the existing `nudge-engine.ts` (generation) by adding **channels** (email/WhatsApp) + **triggers** + **cadence**. Folds in lightweight **UX-research** (where users drop) and **financial-education content** (the trust layer for an unfamiliar FIRE concept) rather than spinning those into separate roles. The role that catches "we ship features but nobody comes back." Outbound comms touch spend + consent → coordinate with DevOps (sends) + DPDP (consent).
 - **Data / Analytics & Experimentation Engineer** — the **measurement backbone** under Growth and UX: instrument events, build activation/funnel/cohort-retention views, find drop-off, run A/B experiments to settle UX/growth forks with data not opinion (mirrors rule 22 for product). Without this role, retention is unimprovable because it's unmeasured. Strictly privacy-first for a finance app — *what* is collected is a `TODO(5W):` posture decision, not a silent default.
 - **Privacy / Compliance (DPDP) Engineer** — own **legal data-protection** for a finance app holding PAN/salary/family data under India's **DPDP Act 2023**: lawful consent for marketing/comms (the gate on the weekly-email/WhatsApp idea), data-rights (access, correction, erasure, portability), data minimisation, consent + retention records, and Account-Aggregator consent flows. Distinct from Security/DevSecOps (which owns OWASP/threat-model/secrets) — this owns *regulatory* consent and user data-rights. The prerequisite, not an afterthought, for any outbound-comms or data-import feature.
@@ -85,10 +87,38 @@ When the stage changes, update this block (rule 27 — the SSOT must not lag the
 > - **AI / LLM Engineer** — no AI feature in product or roadmap; add only if an LLM feature (e.g. "explain my plan") is greenlit (YAGNI, rule 21).
 > - **Customer Success / Support** is premature at current scale — revisit when there's a real support load.
 
+## Canonical role sequences (how the roles connect + fire order)
+
+**Most tasks need ONE role.** When a task spans roles, sequence them at T0 in dependency order
+(single-dispatch-level, `agent-orchestration.md` — orchestrate hand-offs at T0, never nest). The
+recurring chains:
+
+| Trigger | Sequence (→ = then, ∥ = parallel, [ ] = conditional) |
+|---|---|
+| Feature, math touched | [PM if scope unclear] → Architect → Full-Stack/Frontend → **FinTech Analyst ∥ Code-Quality Reviewer** (rule 29) → QA → [Security if auth/PII] → **[DevOps = ESCALATE]** |
+| Feature, no math | [PM] → Architect → Full-Stack/Frontend → **Code-Quality Reviewer** (rule 29) → QA → **[DevOps = ESCALATE]** |
+| Bug fix | Debugging (root cause) → Full-Stack (fix) → **Code-Quality Reviewer**; **+ FinTech Analyst if a calc changed** → QA regression |
+| Calc / tax-config change | FinTech Analyst (validate intent vs Indian law) → Full-Stack (TDD red-first) → **FinTech Analyst ∥ Code-Quality** re-verify → QA |
+| Refactor (behaviour unchanged) | Senior/Clean-Arch → **Code-Quality Reviewer** → QA (tests stay green) |
+| UI/UX change | UI/UX Design (spec) → Frontend (implement) → rules 24/25/26 self-verify → **Code-Quality Reviewer** |
+| Ship / redeploy | QA (green suite) → [Security if touched] → **DevOps = ESCALATE** (one line, recommended option) |
+
+**Hard wiring — never skip the verifier edge:**
+- EVERY builder role (Full-Stack, Frontend, Debugging, Senior/Clean-Arch) → **Code-Quality Reviewer before "done"** (rule 29). The author is never the sole verifier.
+- ANY change to `src/lib/*.ts` (tax/FIRE/EPF/withdrawal/assumption math) or `src/types/assumptions.ts` → **FinTech Domain Analyst auto-dispatches, in parallel with Code-Quality** — NOT Abhay-triggered. The 2026-06-01 80CCD(2) leak proved self-review + code-review miss domain-correctness bugs.
+- **Delivery / Project Manager** threads every multi-role chain and owns *how far down it* a given change goes (a typo collapses to one role; a tax feature runs the full chain).
+
+## Routing feedback loop (the eval — solo-scale)
+
+Role selection is only as good as its correction signal. Eval here = **capture + adjust**, not dashboards:
+- **Mis-route → capture.** When Abhay corrects a role choice ("that's not a perf problem, it's a data bug"), treat it as a routing miss and record it via the **rule-5 machinery** (`lessons.md` + a `feedback_role_routing_*` memory) as `wrong-signal→role ⇒ right-signal→role`. Don't re-litigate; sharpen the router's task-signal column next time. (Mechanism owned by rule 5 — not duplicated here.)
+- **Ambiguous match → never freeze.** 0 rows → default to the closest role, state the assumption. 2+ rows → pick the role owning the PRIMARY deliverable, name the runner-up in one line.
+- **Pre-route scan.** At session start (rule 5) check `feedback_role_routing_*` memories before routing a similar task.
+
 ## Non-negotiables (all roles)
 
 - The standing gates in `claude-behavior.md` apply to **every** role — Rules 24/25/26 (UI + persistence + cross-page verification), 15 (failures → skills), 17 (root cause), 20 (no fabrication), 23 (finish the work).
-- Tree-aware: `mvp/` (active, localStorage, port 5175) vs root `src/`+`server/` (Hono/Prisma/Postgres) vs frozen `demo/` — dispatch the role's tooling against the **correct tree** (`mvp/CLAUDE.md` governs `mvp/`).
+- Layer-aware: this extracted repo has ONE app tree — `src/` (Vue planner SPA, port 5175; localStorage demo adapter OR `ServerAdapter`) + `server/` (Hono/Prisma → Supabase, port 3100). Dispatch the role's tooling against the right layer (frontend `src/` vs backend `server/`). The old `mvp/`+`demo/` monorepo split no longer exists post-extraction (2026-05-31) — `CLAUDE.md` is the SSOT.
 - Subagent dispatch is single-level (`agent-orchestration.md`) — orchestrate role hand-offs at T0, not from inside a worker.
 - Offer a goal contract (`goal-creator`) before implementing finalized scope (rule 28); maintain the SSOT on every change (rule 27).
 - **Confidence gate (`decision-authority.md`): for non-trivial work, if intent/design confidence is < ~95% on a consequential fork, converge FIRST via `/grill-me` or `/grill-with-docs` (or `/brainstorm` for greenfield) before building — never guess at WHAT to build. "Take a call" waives the gate.**

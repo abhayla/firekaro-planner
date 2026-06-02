@@ -52,6 +52,12 @@ Workers (agents dispatched from a T0 orchestrator) MUST conform to:
 
 **Failure attribution:** The T0 orchestrator is responsible for aggregating worker return contracts, retrying failed workers (within the global retry budget — see Rule 5), and escalating unresolvable failures to the user. Workers propagate structured failure details (specific step, error, retry count) but do NOT decide whether to retry.
 
+> **Scope note (this repo, verified 2026-06-02):** §§4, 7, 8, 9 below describe multi-stage
+> *pipeline-orchestrator* infrastructure (config DAGs, workflow contracts, per-scope state files).
+> No `config/*.yaml` and no pipeline orchestrator is deployed in `firekaro-planner` today — these
+> sections are **dead-letter here**, retained only for any future pipeline skill. The live,
+> load-bearing sections for this repo's role hand-offs are **§§1–3, 5–6, 10–11**.
+
 ## 4. Externalize DAGs to Config
 
 Pipeline stage definitions, dependency graphs, and execution order MUST be defined in a config file (YAML/JSON in `config/`), not inline in agent or skill bodies. Inline DAGs cannot be modified without editing the pattern, violating separation of concerns. The orchestrator reads the config at runtime.
