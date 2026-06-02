@@ -78,10 +78,14 @@ Co-Authored-By: Claude <noreply@anthropic.com>
 
 Before every commit, run these checks in order:
 
-1. **TypeScript validation**: `npm run type-check` — MUST pass with zero errors
-2. **Linting**: `npm run lint` — ESLint with auto-fix applied
-3. **Targeted unit tests**: `npm run test:unit -- --grep "relevant-pattern"` — run tests related to changed code
-4. **Review changes**: `git status` then `git diff` — verify only intended files are staged
+1. **TypeScript validation**: `npm run type-check` — MUST pass with zero errors (run in BOTH trees: repo root + `server/`)
+2. **Targeted unit tests**: `npm run test:unit -- -t "relevant-pattern"` — run tests related to changed code (`-t` filters by test name; vitest has no `--grep`)
+3. **Review changes**: `git status` then `git diff` — verify only intended files are staged
+
+> **No ESLint in this repo.** There is no `eslint.config.*` and no `lint` script in either
+> `package.json`; the gate is `type-check` + `test:unit` (matches `CLAUDE.md` → "Conventions"). The
+> deterministic pre-commit hook (`.githooks/pre-commit`, wired by the root `prepare` script) does a
+> secret scan, not linting. Do not add a `npm run lint` step until ESLint is actually configured.
 
 If any check fails, fix before committing. NEVER use `--no-verify` to skip pre-commit hooks.
 
