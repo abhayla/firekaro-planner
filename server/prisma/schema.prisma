@@ -526,3 +526,40 @@ model MigrationAudit {
   @@index([userId])
   @@map("migration_audit")
 }
+
+// comms_consent — DPDP consent per user + channel. The gate decideSend() reads
+// (server/src/lib/comms-consent.ts). Bare userId per the document-model convention.
+model CommsConsent {
+  id             String    @id @default(cuid())
+  userId         String
+  channel        String // "whatsapp" | "email"
+  marketingOptIn Boolean   @default(false)
+  revokedAt      DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@unique([userId, channel])
+  @@index([userId])
+  @@map("comms_consent")
+}
+
+// whatsapp_send_log — one row per send + its async delivery status (Wati webhook
+// updates it). The "200 != delivered" truth lives here, not in the HTTP response.
+model WhatsAppSendLog {
+  id                String   @id @default(cuid())
+  userId            String
+  toNumber          String
+  templateName      String
+  category          String // "utility" | "marketing"
+  status            String   @default("SENT") // SENT | DELIVERED | READ | FAILED | BLOCKED
+  failedDetail      String?
+  errorCode         String?
+  providerMessageId String?
+  sentAt            DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([userId])
+  @@index([toNumber])
+  @@index([status])
+  @@map("whatsapp_send_log")
+}
