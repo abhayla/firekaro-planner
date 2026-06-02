@@ -44,6 +44,15 @@ build contract (still the source of truth for the planner's screens/math) is
 `docs/goals/build-firekaro-mvp-v5.md`. Status files: `FINAL-BRIEF-v5.md`,
 `VERIFICATION-REPORT-v5.md`, `POST-RUN-NOTES-v5.md`; deferrals `DEFERRED-v5.md`.
 
+> **⛔ Needs-Abhay register (read + maintain EVERY session): `docs/comms-go-live-handoff.md`.**
+> This is the **single, canonical list of everything blocked on Abhay** (account logins/MFA,
+> secrets, prod deploy, spend/go-live, and recurring escalation gates). Every session MUST: (1)
+> **consult it** before assuming a task is fully doable; (2) **keep it current** — tick/remove items
+> as they're unblocked, append new ones as they arise, and commit the change. **Do NOT create a
+> parallel "needs-Abhay"/blockers file** — append here (it supersedes the deleted
+> `.claude/tasks/needs-abhay.md`). It is a disposable worklist that *consumes* the SSOTs, not a
+> design SSOT itself.
+
 ## Repository layout
 
 | Path | What | Port |

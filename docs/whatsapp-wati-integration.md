@@ -122,6 +122,8 @@ few days"` — and so did the PIFS broker MARKETING broadcasts to that number go
 - **Escalations (outward/prod):** (1) put `WATI_*` in the **VPS** `server/.env` (local + `~/.config`
   creds don't reach Hostinger); (2) set `WATI_ALLOW_ALL_RECIPIENTS=true` + replace the test allowlist
   with per-user DPDP consent gating — the "live to real users" switch (spend + outbound) = Abhay's call.
+  > **All open Abhay-blocked items (these + the rest) are tracked in the canonical needs-Abhay
+  > register `docs/comms-go-live-handoff.md` — consult + update it there, not here.**
 
 ## References
 - `docs/retention-engagement-features.md` — parent backlog
