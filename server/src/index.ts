@@ -16,6 +16,7 @@ import { requestId } from "./middleware/request-id";
 import { rateLimit } from "./middleware/rate-limit";
 import plannerRoutes from "./routes/planner";
 import whatsappWebhookRoutes from "./routes/whatsapp-webhook";
+import commsConsentRoutes from "./routes/comms-consent-route";
 
 /**
  * v6 backend entry — Hono app for the mvp/ FIRE Planner. Structure copy-adapted
@@ -81,6 +82,9 @@ app.route("/api/planner", plannerRoutes);
 
 // Wati delivery webhooks (no auth — external caller; optional shared-secret).
 app.route("/api/webhooks", whatsappWebhookRoutes);
+
+// DPDP consent surface (session-authed).
+app.route("/api/comms", commsConsentRoutes);
 
 export { app };
 
