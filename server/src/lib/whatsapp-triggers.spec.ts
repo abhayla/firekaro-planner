@@ -38,23 +38,22 @@ function captureDeps() {
 }
 
 describe("whatsapp-triggers", () => {
-  it("milestone fires the milestone template with [name, amount, percent, link]", async () => {
+  it("milestone fires the milestone template with [name, amount, percent] (link is static)", async () => {
     const { deps, send } = captureDeps();
-    await triggerMilestone(target, { amount: "1 Cr", percent: "25%", link: "https://firekaro.com" }, deps);
+    await triggerMilestone(target, { amount: "1 Cr", percent: "25%" }, deps);
     const arg = send.mock.calls[0][0];
     expect(arg.templateName).toContain("milestone");
-    expect((arg.parameters ?? []).map((p) => p.value)).toEqual(["Abhay", "1 Cr", "25%", "https://firekaro.com"]);
-    expect((arg.parameters ?? []).map((p) => p.name)).toEqual(["1", "2", "3", "4"]);
+    expect((arg.parameters ?? []).map((p) => p.value)).toEqual(["Abhay", "1 Cr", "25%"]);
+    expect((arg.parameters ?? []).map((p) => p.name)).toEqual(["1", "2", "3"]);
   });
 
-  it("off-track fires with [name, year, driver, link]", async () => {
+  it("off-track fires with [name, year, driver]", async () => {
     const { deps, send } = captureDeps();
-    await triggerOffTrack(target, { fireYear: "2043", driver: "higher expenses", link: "x" }, deps);
+    await triggerOffTrack(target, { fireYear: "2043", driver: "higher expenses" }, deps);
     expect((send.mock.calls[0][0].parameters ?? []).map((p) => p.value)).toEqual([
       "Abhay",
       "2043",
       "higher expenses",
-      "x",
     ]);
   });
 
@@ -66,7 +65,7 @@ describe("whatsapp-triggers", () => {
 
   it("fireNudge resolves the template name from the catalog", async () => {
     const { deps, send } = captureDeps();
-    await fireNudge("monthly_digest", target, ["Abhay", "1.8 Cr", "42%", "Aug 2041", "x"], deps);
+    await fireNudge("monthly_digest", target, ["Abhay", "1.8 Cr", "42%", "Aug 2041"], deps);
     expect(send.mock.calls[0][0].templateName).toContain("monthly_digest");
   });
 });

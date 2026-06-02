@@ -29,14 +29,17 @@ export interface TemplateMapping {
 
 /** Canonical defaults. `templateName` is the base name; override per deployment via env. */
 const DEFAULTS: Record<NudgeKey, TemplateMapping> = {
+  // Param counts exclude the app link — it's static text (firekaro.com) in each
+  // body, since a template can't END with a variable (Meta rule) and the link is
+  // the same for everyone.
   welcome: { templateName: "firekaro_welcome_2026_06_03", category: "utility", paramCount: 0 },
-  milestone: { templateName: "firekaro_milestone", category: "utility", paramCount: 4 },
-  offtrack: { templateName: "firekaro_offtrack", category: "utility", paramCount: 4 },
-  goal_reminder: { templateName: "firekaro_goal_reminder", category: "utility", paramCount: 5 },
-  annual_review: { templateName: "firekaro_annual_review", category: "utility", paramCount: 2 },
-  monthly_digest: { templateName: "firekaro_monthly_digest", category: "marketing", paramCount: 5 },
-  winback: { templateName: "firekaro_winback", category: "marketing", paramCount: 3 },
-  salary_update: { templateName: "firekaro_salary_update", category: "marketing", paramCount: 2 },
+  milestone: { templateName: "firekaro_milestone", category: "utility", paramCount: 3 },
+  offtrack: { templateName: "firekaro_offtrack", category: "utility", paramCount: 3 },
+  goal_reminder: { templateName: "firekaro_goal_reminder", category: "utility", paramCount: 4 },
+  annual_review: { templateName: "firekaro_annual_review", category: "utility", paramCount: 1 },
+  monthly_digest: { templateName: "firekaro_monthly_digest", category: "marketing", paramCount: 4 },
+  winback: { templateName: "firekaro_winback", category: "marketing", paramCount: 2 },
+  salary_update: { templateName: "firekaro_salary_update", category: "marketing", paramCount: 1 },
 };
 
 export const NUDGE_KEYS = Object.keys(DEFAULTS) as NudgeKey[];

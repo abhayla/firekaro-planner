@@ -53,50 +53,40 @@ export async function fireNudge(
 export const triggerWelcome = (t: NudgeTarget, deps?: Partial<SenderDeps>) =>
   fireNudge("welcome", t, [], deps);
 
+// The app link is static text (firekaro.com) inside each template body, so it is
+// NOT a param here.
 export const triggerMilestone = (
   t: NudgeTarget,
-  v: { amount: string; percent: string; link: string },
+  v: { amount: string; percent: string },
   deps?: Partial<SenderDeps>,
-) => fireNudge("milestone", t, [t.firstName, v.amount, v.percent, v.link], deps);
+) => fireNudge("milestone", t, [t.firstName, v.amount, v.percent], deps);
 
 export const triggerOffTrack = (
   t: NudgeTarget,
-  v: { fireYear: string; driver: string; link: string },
+  v: { fireYear: string; driver: string },
   deps?: Partial<SenderDeps>,
-) => fireNudge("offtrack", t, [t.firstName, v.fireYear, v.driver, v.link], deps);
+) => fireNudge("offtrack", t, [t.firstName, v.fireYear, v.driver], deps);
 
 export const triggerGoalReminder = (
   t: NudgeTarget,
-  v: { goalName: string; date: string; percent: string; link: string },
+  v: { goalName: string; date: string; percent: string },
   deps?: Partial<SenderDeps>,
-) => fireNudge("goal_reminder", t, [t.firstName, v.goalName, v.date, v.percent, v.link], deps);
+) => fireNudge("goal_reminder", t, [t.firstName, v.goalName, v.date, v.percent], deps);
 
-export const triggerAnnualReview = (
-  t: NudgeTarget,
-  v: { link: string },
-  deps?: Partial<SenderDeps>,
-) => fireNudge("annual_review", t, [t.firstName, v.link], deps);
+export const triggerAnnualReview = (t: NudgeTarget, deps?: Partial<SenderDeps>) =>
+  fireNudge("annual_review", t, [t.firstName], deps);
 
 export const triggerMonthlyDigest = (
   t: NudgeTarget,
-  v: { netWorth: string; savingsRate: string; fireDate: string; link: string },
+  v: { netWorth: string; savingsRate: string; fireDate: string },
   deps?: Partial<SenderDeps>,
-) =>
-  fireNudge(
-    "monthly_digest",
-    t,
-    [t.firstName, v.netWorth, v.savingsRate, v.fireDate, v.link],
-    deps,
-  );
+) => fireNudge("monthly_digest", t, [t.firstName, v.netWorth, v.savingsRate, v.fireDate], deps);
 
 export const triggerWinback = (
   t: NudgeTarget,
-  v: { fireDate: string; link: string },
+  v: { fireDate: string },
   deps?: Partial<SenderDeps>,
-) => fireNudge("winback", t, [t.firstName, v.fireDate, v.link], deps);
+) => fireNudge("winback", t, [t.firstName, v.fireDate], deps);
 
-export const triggerSalaryUpdate = (
-  t: NudgeTarget,
-  v: { link: string },
-  deps?: Partial<SenderDeps>,
-) => fireNudge("salary_update", t, [t.firstName, v.link], deps);
+export const triggerSalaryUpdate = (t: NudgeTarget, deps?: Partial<SenderDeps>) =>
+  fireNudge("salary_update", t, [t.firstName], deps);
