@@ -200,6 +200,66 @@ Source: [Meta — Pricing](https://developers.facebook.com/documentation/busines
 
 ---
 
+## 11. Building the daily delivery report (data sources & method)
+
+> Added for the scheduled daily report: **how many messages were sent, how many delivered, and the
+> failure reason per message.** This is the operational companion to the policy above.
+
+**Auth (all endpoints):** `Authorization: Bearer <WATI_API_TOKEN>` against the tenant base URL
+(ours: `https://live-mt-server.wati.io/105355`). The token is a **secret** — it must be read from an
+env var / secret store by whoever runs the report, **never pasted into this document or a prompt.**
+
+### The message status lifecycle (what "delivered" means)
+Each message moves through statuses Wati exposes as `statusString`:
+`SENT` → `DELIVERED` → `READ`, or terminal `FAILED`. "Sent" (Meta accepted) is **not** "delivered".
+A daily report MUST count by terminal status, not by API-accept (HTTP 200).
+
+### Data source A — per-recipient drill-down (confirmed working, V1)
+`GET {base}/api/v1/getMessages/{whatsappNumber}?pageSize=N`
+→ returns `messages.items[]` each with `statusString`, **`failedDetail`** (the human failure reason),
+`finalText`, template name (in `eventDescription`), `created`. This is the ground-truth per-message
+record and is how we diagnosed error 131049. Use it for the **failure-reason-per-message** column.
+
+### Data source B — aggregate campaign analytics (V3, confirm availability on the plan)
+- `GET {base}/api/ext/v3/broadcasts` — list campaigns/broadcasts.
+- `GET {base}/api/ext/v3/broadcasts/overview` — aggregate counts.
+- `GET {base}/api/ext/v3/broadcasts/{broadcast-id}` and `…/{broadcast-id}/recipients` —
+  per-campaign sent / delivered / read / failed counts + per-recipient status.
+Use these for the **sent / delivered totals** without paging every number.
+
+### Data source C — webhooks (real-time, the most robust for a daily tally)
+Subscribe Wati webhooks and persist each event to our own `WhatsAppSendLog` table; then the daily
+report is a local query (no rate-limited polling):
+`Template Message Sent` · `Sent Message is DELIVERED` · `Send Message is Read` ·
+`Template Message FAILED` (carries the failure reason / error code) · `Template Status Update`.
+**This is the recommended long-term source** — it captures the async delivery truth the HTTP 200 hides.
+
+### Map a failure to a reason (join with §9)
+`failedDetail` text ↔ error code: e.g. *"restricted it for higher quality messaging"* = **131049**
+(per-user marketing cap). Bucket failures by error code so the report shows *why* (marketing-cap vs
+invalid-number vs quality vs window-expired), not just a count.
+
+### Suggested daily report shape
+```
+Date: YYYY-MM-DD   Window: last 24h
+Total attempted: N      Delivered: D (D/N %)      Read: R
+Failed: F — by reason:
+  131049 per-user marketing cap …… x   (action: switch to UTILITY / wait 24h)
+  131026 undeliverable/not-on-WA …… y
+  131047 window-expired ………………… z
+  other ……………………………………………… w
+Top failing templates: <name> (f failures), …
+```
+
+### Reporting cautions (so the numbers aren't misleading)
+- **Never report "sent" as success.** Count `DELIVERED`/`READ` separately from `SENT`.
+- A 200 from `sendTemplateMessage` is *accept*, not delivery — the report must read terminal status.
+- Marketing-cap (131049) failures are **recipient-state, not a bug** — flag them as "throttled by
+  Meta", recommend UTILITY/email, and **do not auto-retry < 24h** (excessive retries get the WABA
+  blocked for that user). See §2.
+- Rates/limits drift (a Jan-2026 pricing update followed the Jul-2025 one) — re-verify before
+  attaching cost figures to the report.
+
 ## Sources
 - [Meta — Per-user marketing template message limits](https://developers.facebook.com/documentation/business-messaging/whatsapp/templates/marketing-templates/per-user-limits/)
 - [Meta — Template categorization](https://developers.facebook.com/documentation/business-messaging/whatsapp/templates/template-categorization/)
