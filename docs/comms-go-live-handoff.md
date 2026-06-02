@@ -84,6 +84,13 @@ carries ONLY the `whatsappMessageId`; fixed to correlate by that id (commit `996
   usable across all Claude Code + Cowork projects. They share the same `WATI_*` creds
   (`~/.config/wati/.env` global → `server/.env` → shell). Note: being global, they're no longer in
   this repo's git — they live only in `~/.claude/skills/` on the machine.
+- **C2. Comms lifecycle loop — CONTRACTED, awaiting `/goal` run (2026-06-02).** Templates approved but
+  nothing auto-sends yet. **Discovery:** the app stores NO WhatsApp number anywhere (CommsConsent has no
+  phone; OAuth gives email/name only) → every send currently reaches only the test allowlist. Full design
+  in **`docs/goals/2026-06-02-comms-lifecycle-loop.md`** (Phase 0 number-capture → Phase 1 welcome +
+  scheduled server-side evaluator → Phase 2 marketing/winback). **Needs Abhay:** (1) run
+  `/goal docs/goals/2026-06-02-comms-lifecycle-loop.md`; (2) wire the daily cron on the VPS (Phase 1 DoD);
+  (3) A6 (`WATI_ALLOW_ALL_RECIPIENTS`) stays the go-live spend flip — the goal explicitly does NOT touch it.
 
 ---
 
