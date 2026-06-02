@@ -84,6 +84,29 @@ describe("derive() — pure kernel", () => {
     expect(rohitTaxAfter).toBe(rohitTaxBaseline);
   });
 
+  it("gh-issue #9: projected expenses grow at a constant NOMINAL inflation (real/nominal coherence)", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    loadSeedPersona(h, a);
+    const k = derive(h.data, a.values, { isFamilyView: false, viewingMemberId: null, currentFY: "2025-26" });
+    const p = k.projection;
+    expect(p.length).toBeGreaterThan(15);
+
+    // Year 0 expense = today's expense (inflation^0). The classic FIRE bug is a real-vs-nominal
+    // mismatch; this pins that expenses compound at a CONSTANT nominal rate, not a real/zero one.
+    const base = p[0].inflatedAnnualExpenses;
+    const ratio = p[1].inflatedAnnualExpenses / base;
+    expect(ratio).toBeGreaterThan(1.05); // 4-bucket blended inflation ≈ 7.9% — NOT ~1.0 (real/zero)
+    expect(ratio).toBeLessThan(1.1);
+    for (const n of [5, 10, 15]) {
+      const expected = base * Math.pow(ratio, n);
+      expect(Math.abs(p[n].inflatedAnnualExpenses - expected) / expected).toBeLessThan(0.001);
+    }
+
+    // Corpus accumulates (nominal blended return + contributions) — not flat/shrinking.
+    expect(p[10].corpus).toBeGreaterThan(p[0].corpus);
+  });
+
   it("an empty household yields a zero corpus and zero progress (defensive)", () => {
     const a = useAssumptionsStore();
     const h = useHouseholdStore();
