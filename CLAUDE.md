@@ -126,6 +126,16 @@ Prisma scripts hitting Supabase while the dev server holds connections MUST appe
   `$transaction`. Auto-flow recurring rows upsert by `(userId, sourceRefId)`; `"Joint"` ownerId is
   plain TEXT (no FK). TDD red-first; the colocated `household-diff.spec.ts` units are the no-DB correctness proof. The Prisma
   read/write layer the diff engine drives is `server/src/lib/household-repo.ts`.
+- **Comms subsystem** (WhatsApp + Zoho CRM lifecycle messaging — see `docs/comms-go-live-handoff.md`
+  for the go-live blockers): two more mounted routes besides `/api/planner` —
+  **`/api/comms`** (consent CRUD, `comms-consent-route.ts`) and **`/api/webhooks`** (Wati delivery
+  webhook, `whatsapp-webhook.ts`). The `server/src/lib/` layer is `wati-client.ts` (WhatsApp send,
+  **fail-closed allowlist → only Abhay's `917972672473`** in test), `whatsapp-sender.ts` +
+  `whatsapp-triggers.ts` (lifecycle/event sends), `comms-consent.ts` + `comms-templates.ts` +
+  `comms-signup.ts` (DPDP consent, approved templates, signup hook), `zoho-crm-client.ts` +
+  `zoho-lead-mapping.ts` (Zoho lead upsert). Each has a colocated `.spec.ts`. Outbound sends are
+  **spend + outward-facing → escalate per `decision-authority.md`**; Wati `200 ≠ delivered` (verify
+  via `getMessages` status — see the `project_wati_delivery_gotcha` memory).
 - **Auth:** Better Auth (Google OAuth + sessions) + the **3-factor dev-bypass** (`NODE_ENV` is an
   explicit `development`/`test` + `DEV_BYPASS_AUTH==='true'` + `x-dev-bypass` header), dev user
   `dev@firekaro-v6.local`. The frontend login UI is `src/pages/Login.vue` (route `/login`) driving
