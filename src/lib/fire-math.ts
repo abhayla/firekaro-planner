@@ -9,7 +9,10 @@ import { floorCeilingWithdrawal, type FloorCeilingWithdrawalConfig } from "@/lib
 // SWR. Keep this in mind before treating the FIRE number as a strictly pre-tax target.
 export const INDIA_SWR = 0.035;
 export const INDIA_INFLATION = 0.06;
-export const INDIA_HEALTHCARE_INFLATION = 0.08;
+// NB: the LIVE healthcare-inflation default is 14% (`DEFAULT_ASSUMPTIONS.healthcareInflation`
+// in types/assumptions.ts) — research-grounded for Indian medical inflation. The old 8%
+// `INDIA_HEALTHCARE_INFLATION` constant was stale + dead (no importers) and is removed to
+// avoid a future editor "fixing" the wrong value (FinTech sweep 2026-06-02).
 export const DEFAULT_RETURNS = 0.12;
 
 export const SWR_AGE_TABLE: Array<{ maxAge: number; swr: number }> = [
@@ -171,8 +174,12 @@ export function roundPercent(value: number, decimals = 1): number {
   return Math.round(value * m) / m;
 }
 
-export function calculateFIRENumber(annualExpenses: number, swr?: number, age?: number): number {
-  const eff = swr ?? getAdjustedSWR(age);
+export function calculateFIRENumber(annualExpenses: number, swr?: number, _age?: number): number {
+  // No-SWR fallback uses the canonical India SWR, NOT the deprecated age table — the live
+  // kernel always passes the horizon-resolved effectiveSWR (derive.ts), so the age path was a
+  // latent trap (re-introducing the age-vs-horizon bug audit Entry #1 fixed). `_age` retained
+  // for caller signature compatibility (FinTech sweep 2026-06-02).
+  const eff = swr ?? INDIA_SWR;
   if (eff <= 0) return Infinity;
   return annualExpenses / eff;
 }

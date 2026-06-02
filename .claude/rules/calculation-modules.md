@@ -73,11 +73,13 @@ interface CapitalGainResult {
 Research-default constants are exported from `src/lib/fire-math.ts`:
 
 ```ts
-export const INDIA_SWR = 0.035          // Safe Withdrawal Rate for India
+export const INDIA_SWR = 0.035          // Safe Withdrawal Rate for India (post-tax headroom; ADR-0003)
 export const INDIA_INFLATION = 0.06     // General inflation assumption
-export const INDIA_HEALTHCARE_INFLATION = 0.08
 export const DEFAULT_RETURNS = 0.12     // Equity returns assumption
 ```
+
+> Healthcare inflation is **14%** in the LIVE default (`DEFAULT_ASSUMPTIONS.healthcareInflation`
+> in `src/types/assumptions.ts`) — research-grounded for Indian medical inflation. The old `INDIA_HEALTHCARE_INFLATION = 0.08` constant was stale/dead and was removed (FinTech sweep 2026-06-02).
 
 User-facing assumptions (with per-household overrides such as `swrOverride`) resolve through
 `src/types/assumptions.ts` (`DEFAULT_ASSUMPTIONS`) + `src/lib/assumption-math.ts` in the order

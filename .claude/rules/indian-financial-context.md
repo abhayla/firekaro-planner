@@ -36,8 +36,9 @@ Exported from `src/lib/fire-math.ts`:
 ```ts
 INDIA_SWR = 0.035           // 3.5% Safe Withdrawal Rate for India
 INDIA_INFLATION = 0.06      // General inflation assumption
-INDIA_HEALTHCARE_INFLATION = 0.08
 DEFAULT_RETURNS = 0.12      // Equity returns assumption
+// Healthcare inflation = 14% live (DEFAULT_ASSUMPTIONS.healthcareInflation, types/assumptions.ts).
+// The old INDIA_HEALTHCARE_INFLATION = 0.08 constant was stale/dead → removed (2026-06-02).
 ```
 
 ## Indian Financial Year
