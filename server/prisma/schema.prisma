@@ -570,5 +570,9 @@ model WhatsAppSendLog {
   @@index([toNumber])
   @@index([status])
   @@index([userId, dedupeKey])
+  // PARTIAL UNIQUE on (userId, dedupeKey) WHERE status <> 'BLOCKED' AND dedupeKey IS NOT NULL is
+  // enforced by a raw-SQL migration (20260603090000_send_log_partial_unique_dedupe) — Prisma can't
+  // model a partial unique index. It's the DB-level dedup backstop (gh-issue #10); recordSend catches
+  // its P2002 as "already deduped". Do NOT `prisma migrate dev` against it (would drop the index).
   @@map("whatsapp_send_log")
 }

@@ -1,4 +1,6 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "./prisma";
+import { logger } from "./logger";
 import type { CommsChannel, ConsentRecord } from "./comms-consent";
 
 /**
@@ -91,8 +93,27 @@ export interface RecordSendInput {
 }
 
 export async function recordSend(input: RecordSendInput): Promise<{ id: string }> {
-  const row = await prisma.whatsAppSendLog.create({ data: input });
-  return { id: row.id };
+  try {
+    const row = await prisma.whatsAppSendLog.create({ data: input });
+    return { id: row.id };
+  } catch (e) {
+    // gh-issue #10: the partial unique index (userId, dedupeKey WHERE status<>'BLOCKED')
+    // is the DB-level dedup backstop. A concurrent run that already recorded this
+    // (userId, dedupeKey) non-blocked send loses the race here — treat the P2002 as
+    // "already deduped" (not an error) and return the winning row's id.
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002" && input.dedupeKey) {
+      const existing = await prisma.whatsAppSendLog.findFirst({
+        where: { userId: input.userId, dedupeKey: input.dedupeKey, status: { not: "BLOCKED" } },
+        orderBy: { sentAt: "desc" },
+      });
+      logger.warn(
+        { userId: input.userId, dedupeKey: input.dedupeKey },
+        "send-log dedup race — duplicate non-blocked record suppressed by partial unique index",
+      );
+      if (existing) return { id: existing.id };
+    }
+    throw e;
+  }
 }
 
 /**
