@@ -79,11 +79,14 @@ carries ONLY the `whatsappMessageId`; fixed to correlate by that id (commit `996
 
 ## C. Optional / nice-to-have
 
-- **C1. Wati skills are now GLOBAL  ✅ DONE (2026-06-02)** — both `wati-send-and-verify-delivery`
-  (moved out of the repo) and the new `wati-template-create-and-track` live in `~/.claude/skills/`,
-  usable across all Claude Code + Cowork projects. They share the same `WATI_*` creds
-  (`~/.config/wati/.env` global → `server/.env` → shell). Note: being global, they're no longer in
-  this repo's git — they live only in `~/.claude/skills/` on the machine.
+- **C1. Wati skills live in the REPO  ✅ CORRECTED (2026-06-03)** — both `wati-send-and-verify-delivery`
+  and `wati-template-create-and-track` are committed under **`.claude/skills/`** so **Cowork + clones
+  discover them** (the repo is the only shared surface across environments). The earlier "move to
+  `~/.claude/skills/` to be global" call (2026-06-02) was WRONG — `~/.claude` is machine-local and
+  invisible to Cowork, which broke discovery there. Lesson: [[project_cowork_skill_discovery]].
+  **Creds are still environment-local:** the `WATI_*` values live in this machine's
+  `~/.config/wati/.env` + (gitignored) `server/.env` — Cowork can't see either, so Cowork must supply
+  the 4 `WATI_*` vars via its OWN environment secrets (per each skill's STEP 0).
 - **C2. Comms lifecycle loop — Phase 0 + 1 BUILT + live-verified (2026-06-02).** The `/goal` run is
   done. Number capture (`CommsConsent.whatsappNumber`, Preferences UI), welcome-on-consent (D3), the
   server-side `lifecycle-evaluator` + token-guarded `POST /api/internal/lifecycle/run`, and per-period
