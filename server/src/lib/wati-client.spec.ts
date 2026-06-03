@@ -136,6 +136,41 @@ describe("sendTemplateMessage", () => {
     expect(res.error).toMatch(/not on WhatsApp/);
   });
 
+  it("treats a 200 with `result` ABSENT as a failure (gh-issue #5 MED-1)", async () => {
+    const fetchImpl = vi.fn(async () => jsonResponse({})); // 200 but no `result` key
+    const res = await sendTemplateMessage(
+      { whatsappNumber: "919876543210", templateName: "firekaro_welcome" },
+      { config: CONFIG, fetchImpl: fetchImpl as unknown as typeof fetch, allowAll: true },
+    );
+    expect(res.ok).toBe(false);
+    expect(res.status).toBe(200);
+  });
+
+  it("rejects an oversized parameter list BEFORE egress (gh-issue #5 LOW)", async () => {
+    const fetchImpl = vi.fn(async () => jsonResponse({ result: true }));
+    const parameters = Array.from({ length: 21 }, (_, i) => ({ name: String(i + 1), value: "x" }));
+    const res = await sendTemplateMessage(
+      { whatsappNumber: "919876543210", templateName: "firekaro_welcome", parameters },
+      { config: CONFIG, fetchImpl: fetchImpl as unknown as typeof fetch, allowAll: true },
+    );
+    expect(res.ok).toBe(false);
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("rejects a parameter value with control characters BEFORE egress (gh-issue #5 LOW)", async () => {
+    const fetchImpl = vi.fn(async () => jsonResponse({ result: true }));
+    const res = await sendTemplateMessage(
+      {
+        whatsappNumber: "919876543210",
+        templateName: "firekaro_welcome",
+        parameters: [{ name: "1", value: "badvalue" }],
+      },
+      { config: CONFIG, fetchImpl: fetchImpl as unknown as typeof fetch, allowAll: true },
+    );
+    expect(res.ok).toBe(false);
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
   it("propagates HTTP errors", async () => {
     const fetchImpl = vi.fn(async () => jsonResponse({ message: "unauthorized" }, 401));
     const res = await sendTemplateMessage(

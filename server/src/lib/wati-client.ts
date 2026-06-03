@@ -141,12 +141,31 @@ export async function sendTemplateMessage(
     };
   }
 
+  // gh-issue #5 (LOW): bound the parameter fan-out before egress — a template send must
+  // never carry an unbounded count, oversized values, or control chars. Fail-closed.
+  const params = input.parameters ?? [];
+  if (params.length > 20) {
+    return { ok: false, status: 0, error: "Too many template parameters (max 20)" };
+  }
+  for (const p of params) {
+    if (typeof p.value === "string" && p.value.length > 1024) {
+      return { ok: false, status: 0, error: "Template parameter value too long (max 1024 chars)" };
+    }
+    if (
+      typeof p.value === "string" &&
+      [...p.value].some((ch) => ch.charCodeAt(0) < 0x20 || ch.charCodeAt(0) === 0x7f)
+    ) {
+      return { ok: false, status: 0, error: "Template parameter contains control characters" };
+    }
+  }
+
   const base = config.endpoint.replace(/\/+$/, "");
-  const url = `${base}/api/v1/sendTemplateMessage?whatsappNumber=${number}`;
+  // number is digits-only after normalize; encode defensively to make the invariant explicit.
+  const url = `${base}/api/v1/sendTemplateMessage?whatsappNumber=${encodeURIComponent(number)}`;
   const body = {
     template_name: input.templateName,
     broadcast_name: input.broadcastName ?? input.templateName,
-    parameters: input.parameters ?? [],
+    parameters: params,
   };
 
   try {
@@ -166,8 +185,10 @@ export async function sendTemplateMessage(
       // Non-JSON body — fall back to HTTP status for the verdict.
     }
 
-    // Wati signals failure via { result: false } even on HTTP 200, so check both.
-    const apiOk = res.ok && parsed.result !== false;
+    // Wati's documented success shape is { result: true }. Require it explicitly (gh-issue #5):
+    // a 200 with `result` ABSENT or non-true (e.g. an unexpected body, or a partial response)
+    // is treated as a FAILURE, not optimistically as success — validate at the trust boundary.
+    const apiOk = res.ok && parsed.result === true;
     const providerMessageId =
       typeof parsed.id === "string"
         ? parsed.id
