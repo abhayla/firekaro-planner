@@ -27,6 +27,7 @@ import { loadMehtasSeed } from "@/seeds/mehtas";
 import { loadIyersSeed } from "@/seeds/iyers";
 import { derive } from "@/lib/derive";
 import { runMonteCarloFire } from "@/lib/monte-carlo";
+import { captureSnapshot, milestoneBandFor } from "@/lib/lifecycle-digest";
 
 type Loader = (h: ReturnType<typeof useHouseholdStore>, a: ReturnType<typeof useAssumptionsStore>) => void;
 
@@ -113,6 +114,35 @@ describe("headline plausibility — DEFAULT product lens (#22 foolproof gate)", 
       expect(def.fireNumber).toBe(fam.fireNumber);
       expect(def.annualSavings).toBe(fam.annualSavings);
       expect(def.totalCorpus).toBe(fam.totalCorpus);
+    });
+
+    it(`${persona.name}: the lifecycle-digest snapshot is domain-SANE on the default lens`, () => {
+      const h = useHouseholdStore();
+      const a = useAssumptionsStore();
+      persona.load(h, a);
+      const k = derive(h.data, a.values, DEFAULT_PRODUCT_LENS);
+      const snap = captureSnapshot(k, [], new Date("2026-06-03T00:00:00.000Z"));
+      const ctx = `${persona.name} digest snapshot`;
+
+      // The ceil(fireAge)==anchorAge+ceil(years) parity below RESTS on anchorAge being
+      // an integer (whole-year age). Lock that invariant so a future age-in-months change
+      // can't silently break the FireHero/digest parity (FinTech review 2026-06-03).
+      expect(Number.isInteger(k.anchorAge), `${ctx} — anchorAge is a whole year`).toBe(true);
+
+      // The displayed "now age" (ceil) MUST equal the FireHero headline age (Rule 26
+      // parity) AND clear the #22 sanity ceiling — an absurd snapshot age is a CI fail.
+      const displayedAge = Math.ceil(snap.fireAge);
+      expect(displayedAge, `${ctx} — ceil(fireAge) equals headline age`).toBe(
+        k.anchorAge + Math.ceil(k.yearsToRegular),
+      );
+      expect(displayedAge, `${ctx} — displayed FIRE age ≤ 70 (#22 bound)`).toBeLessThanOrEqual(70);
+
+      // The milestone band is coherent with the corpus/target ratio (no off-by-band).
+      expect(snap.milestoneBand, `${ctx} — band matches corpus ratio`).toBe(
+        milestoneBandFor(snap.currentCorpus, snap.fireNumber),
+      );
+      // JSON-safe (no Infinity/NaN reaching the persisted ui blob).
+      expect(JSON.parse(JSON.stringify(snap))).toEqual(snap);
     });
   }
 });
