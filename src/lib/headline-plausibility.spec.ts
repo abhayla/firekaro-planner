@@ -26,6 +26,7 @@ import { loadSeedPersona } from "@/lib/seed-persona";
 import { loadMehtasSeed } from "@/seeds/mehtas";
 import { loadIyersSeed } from "@/seeds/iyers";
 import { derive } from "@/lib/derive";
+import { runMonteCarloFire } from "@/lib/monte-carlo";
 
 type Loader = (h: ReturnType<typeof useHouseholdStore>, a: ReturnType<typeof useAssumptionsStore>) => void;
 
@@ -75,6 +76,29 @@ describe("headline plausibility — DEFAULT product lens (#22 foolproof gate)", 
       expect(k.progressPercent, `${ctx} — progress 0-100`).toBeLessThanOrEqual(100);
       expect(k.fireNumber, `${ctx} — fireNumber positive + finite`).toBeGreaterThan(0);
       expect(Number.isFinite(k.fireNumber)).toBe(true);
+
+      // (5) #18 MC band tracks the deterministic headline — on EVERY persona, INCLUDING
+      // the glide-ON Iyers. Earlier this invariant was asserted only on the glide-OFF
+      // Sharmas (where MC's scalar return == the headline schedule, so the gap is
+      // structurally zero) — a shape-vs-substance gap: the lock ran on the one persona
+      // that COULDN'T violate it (FinTech consolidated review, 2026-06-03). For a
+      // glide-ON persona the MC uses the scalar pre-glide return while the headline uses
+      // the tapered schedule, so MC p50 runs a few years FASTER (Iyers ≈ −2.5y) — a
+      // documented #18-v2 limitation (MC doesn't taper). This bound passes today and
+      // trips RED if that gap ever widens materially.
+      const mc = runMonteCarloFire({
+        currentCorpus: k.fireWithdrawableCorpus,
+        targetCorpus: k.fireNumber,
+        monthlySavings: k.monthlyContribution,
+        meanReturn: k.realBlendedReturn,
+        volatility: k.portfolioVolatility,
+      });
+      expect(mc.p10Years, `${ctx} — MC ordered p10≤p50≤p90`).toBeLessThanOrEqual(mc.p50Years);
+      expect(mc.p50Years).toBeLessThanOrEqual(mc.p90Years);
+      expect(
+        Math.abs(mc.p50Years - k.corpusOnlyYearsToRegular),
+        `${ctx} — MC p50 ${mc.p50Years.toFixed(1)} must track headline ${k.corpusOnlyYearsToRegular.toFixed(1)} (glide asymmetry bounded)`,
+      ).toBeLessThan(6);
     });
 
     it(`${persona.name}: the default lens is BYTE-IDENTICAL to family view on FIRE adequacy`, () => {
