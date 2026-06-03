@@ -190,11 +190,9 @@ Pure modules in `src/lib/` with colocated `*.spec.ts`: `fire-math.ts`, `tax.ts` 
 `cashflow.ts`, `epf-vpf.ts`, `nps-withdrawal.ts`, `esop-tax.ts`, `freedom-score.ts`, `adequacy.ts`,
 `stress-test.ts`, `investment-traits.ts`, `derived-records.ts`, `nudge-engine.ts`,
 `expense-history.ts`, `member-horizon.ts`, `age.ts`, and the **#15 accessible-money bridge** layer
-(`accessibility.ts`, `liquidation-tax.ts`, `eps-pension.ts`, `gratuity.ts`, `bridge.ts`).
-Research-grounded math: 4-bucket inflation, per-instrument returns, horizon-driven SWR, variant
-multipliers, glide path, Floor/Ceiling withdrawal. The bridge layer makes corpus-adequate ≠ FIRE-ready
-honest: locked/pre-tax money is no longer counted as spendable at the FIRE age (`derive.ts` →
-`bridgeCoverage`; a liquidity shortfall moves the headline FIRE age later). Keep modules pure (no
+(`accessibility.ts`, `liquidation-tax.ts`, `eps-pension.ts`, `gratuity.ts`, `bridge.ts` — see the
+dedicated note below). Research-grounded math: 4-bucket inflation, per-instrument returns,
+horizon-driven SWR, variant multipliers, glide path, Floor/Ceiling withdrawal. Keep modules pure (no
 store/DOM access).
 
 **Accessible-money bridge (honesty layer, #13/#14/#15 — `derive()` consumes it):** corpus ≥ FIRE
