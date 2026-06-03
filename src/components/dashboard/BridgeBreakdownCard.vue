@@ -26,8 +26,10 @@ const show = computed(() => {
 const reachable = computed(() => bc.value?.reachableCorpus ?? 0);
 const locked = computed(() => bc.value?.lockedCorpus ?? 0);
 const total = computed(() => reachable.value + locked.value);
+// Zero-corpus → 0% spendable, NOT 100%: an empty pot is not "fully reachable".
+// Defaulting to 100 would paint an optimistic all-green bar for a no-money state.
 const reachablePct = computed(() =>
-  total.value > 0 ? Math.round((reachable.value / total.value) * 100) : 100,
+  total.value > 0 ? Math.round((reachable.value / total.value) * 100) : 0,
 );
 
 // The engine's own corpus-only age (the exact age the bridge was tested at),
