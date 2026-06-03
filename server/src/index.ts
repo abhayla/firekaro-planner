@@ -89,6 +89,11 @@ app.route("/api/comms", commsConsentRoutes);
 
 // Internal scheduler endpoint for the lifecycle evaluator (token-guarded, no
 // session — a daily VPS cron POSTs here). Mounted outside authMiddleware.
+// Rate-limited (gh-issue #10): a leaked LIFECYCLE_RUN_TOKEN must not allow an
+// unthrottled loop to exhaust the Supabase session pooler (DoS) — the token guard
+// is entry control, this is the abuse ceiling. max:5/min leaves room for a manual
+// re-trigger + retries alongside the daily cron.
+app.use("/api/internal/*", rateLimit({ windowMs: 60_000, max: 5, prefix: "lifecycle" }));
 app.route("/api/internal", lifecycleInternalRoutes);
 
 export { app };

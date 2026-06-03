@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { decideSend, type ConsentRecord, type FrequencyPolicy } from "./comms-consent";
+import {
+  decideSend,
+  resolveConsentPatch,
+  type ConsentRecord,
+  type FrequencyPolicy,
+} from "./comms-consent";
 
 /**
  * Consent + frequency gate — the DPDP/cap decision every production send passes
@@ -118,5 +123,48 @@ describe("decideSend — frequency cap", () => {
       consent: consent({ revokedAt: NOW }),
     });
     expect(d.reason).toBe("revoked");
+  });
+});
+
+describe("resolveConsentPatch (gh-issue #10 — DPDP re-opt-in + phone validation)", () => {
+  const NOW = new Date("2026-06-03T00:00:00Z");
+
+  it("OMITTING `revoked` leaves revokedAt untouched on update (no silent re-opt-in)", () => {
+    const res = resolveConsentPatch({ whatsappNumberRaw: undefined }, NOW);
+    expect(res.ok).toBe(true);
+    if (res.ok) expect("revokedAt" in res.update).toBe(false);
+  });
+
+  it("revoked:true stamps revokedAt; revoked:false explicitly clears it", () => {
+    const t = resolveConsentPatch({ revoked: true }, NOW);
+    const f = resolveConsentPatch({ revoked: false }, NOW);
+    if (t.ok) expect(t.update.revokedAt).toEqual(NOW);
+    if (f.ok) expect(f.update.revokedAt).toBeNull();
+  });
+
+  it("a NEW row defaults to un-revoked when `revoked` is omitted", () => {
+    const res = resolveConsentPatch({}, NOW);
+    if (res.ok) expect(res.create.revokedAt).toBeNull();
+  });
+
+  it("rejects a too-short or too-long number (E.164 7–15 digits)", () => {
+    expect(resolveConsentPatch({ whatsappNumberRaw: "12" }, NOW).ok).toBe(false);
+    expect(resolveConsentPatch({ whatsappNumberRaw: "1".repeat(16) }, NOW).ok).toBe(false);
+  });
+
+  it("accepts a valid number; empty string ⇒ explicit clear (null)", () => {
+    const ok = resolveConsentPatch({ whatsappNumberRaw: "+91 79726 72473" }, NOW);
+    expect(ok.ok).toBe(true);
+    if (ok.ok) {
+      expect(ok.update.whatsappNumber).toBe("917972672473");
+      expect(ok.create.whatsappNumber).toBe("917972672473");
+    }
+    const clear = resolveConsentPatch({ whatsappNumberRaw: "" }, NOW);
+    if (clear.ok) expect(clear.update.whatsappNumber).toBeNull();
+  });
+
+  it("omitting the number leaves it untouched (no whatsappNumber key in update)", () => {
+    const res = resolveConsentPatch({ revoked: false }, NOW);
+    if (res.ok) expect("whatsappNumber" in res.update).toBe(false);
   });
 });

@@ -7,8 +7,57 @@
  * opt-in; any send needs an un-revoked channel consent.
  */
 
+import { normalizeWhatsAppNumber } from "./wati-client";
+
 export type CommsChannel = "whatsapp" | "email";
 export type TemplateCategory = "utility" | "marketing";
+
+/**
+ * Resolve the create/update field patches for a consent PUT from its (partial) input.
+ * DPDP-critical (gh-issue #10): an OMITTED `revoked` MUST NOT clear `revokedAt` — re-opt-in
+ * after a revoke must be EXPLICIT (`revoked:false`), never a silent side effect of an unrelated
+ * toggle (e.g. marketing-only). The UPDATE patch therefore omits `revokedAt` entirely when
+ * `revoked` is absent; a NEW row defaults to un-revoked. Phone numbers are validated to E.164
+ * length (7–15 digits) and follow the same "absent ⇒ untouched, empty ⇒ explicit clear" rule.
+ * Pure (injectable `now`) so the destructive-default class is unit-locked.
+ */
+export interface ConsentPatchInput {
+  revoked?: boolean;
+  whatsappNumberRaw?: string;
+}
+export type ConsentPatchResult =
+  | { ok: false; error: string }
+  | {
+      ok: true;
+      create: { revokedAt: Date | null; whatsappNumber?: string | null };
+      update: { revokedAt?: Date | null; whatsappNumber?: string | null };
+    };
+
+export function resolveConsentPatch(input: ConsentPatchInput, now: Date): ConsentPatchResult {
+  // A NEW row: explicit revoke ⇒ timestamp, otherwise un-revoked.
+  const create: { revokedAt: Date | null; whatsappNumber?: string | null } = {
+    revokedAt: input.revoked ? now : null,
+  };
+  const update: { revokedAt?: Date | null; whatsappNumber?: string | null } = {};
+
+  // `revoked` present ⇒ set/clear; ABSENT ⇒ leave the stored revocation untouched (DPDP).
+  if (input.revoked !== undefined) {
+    update.revokedAt = input.revoked ? now : null;
+  }
+
+  // Number present ⇒ validate + set/clear; absent ⇒ untouched; empty after normalize ⇒ clear.
+  if (input.whatsappNumberRaw !== undefined) {
+    const n = normalizeWhatsAppNumber(input.whatsappNumberRaw);
+    if (n.length && (n.length < 7 || n.length > 15)) {
+      return { ok: false, error: "Invalid WhatsApp number — must be 7–15 digits" };
+    }
+    const value = n.length ? n : null;
+    create.whatsappNumber = value;
+    update.whatsappNumber = value;
+  }
+
+  return { ok: true, create, update };
+}
 
 export interface ConsentRecord {
   channel: CommsChannel;

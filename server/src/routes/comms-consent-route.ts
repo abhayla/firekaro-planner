@@ -3,7 +3,7 @@ import { z } from "zod";
 import { authMiddleware } from "../middleware/auth";
 import { apiSuccess, apiError, ErrorCode } from "../lib/api-utils";
 import { prisma } from "../lib/prisma";
-import { normalizeWhatsAppNumber } from "../lib/wati-client";
+import { resolveConsentPatch } from "../lib/comms-consent";
 import { maybeSendWelcome } from "../lib/comms-signup";
 import { logger } from "../lib/logger";
 
@@ -56,20 +56,17 @@ app.put("/consent", async (c) => {
     return apiError(c, "Invalid consent payload", 400, ErrorCode.VALIDATION_ERROR);
   }
   const { channel, marketingOptIn, revoked, whatsappNumber } = parsed.data;
-  const revokedAt = revoked ? new Date() : null;
 
-  // Number is set/cleared ONLY when the key is present (absent ⇒ leave untouched).
-  // Empty after normalize ⇒ explicit clear (null).
-  const numberPatch: { whatsappNumber?: string | null } = {};
-  if (whatsappNumber !== undefined) {
-    const n = normalizeWhatsAppNumber(whatsappNumber);
-    numberPatch.whatsappNumber = n.length ? n : null;
-  }
+  // gh-issue #10: an OMITTED `revoked` must NOT clear revokedAt (no silent re-opt-in), and the
+  // number is length-validated. resolveConsentPatch owns that DPDP-critical "absent ⇒ untouched"
+  // logic (unit-locked in comms-consent.spec.ts).
+  const patch = resolveConsentPatch({ revoked, whatsappNumberRaw: whatsappNumber }, new Date());
+  if (!patch.ok) return apiError(c, patch.error, 400, ErrorCode.VALIDATION_ERROR);
 
   const row = await prisma.commsConsent.upsert({
     where: { userId_channel: { userId, channel } },
-    create: { userId, channel, marketingOptIn, revokedAt, ...numberPatch },
-    update: { marketingOptIn, revokedAt, ...numberPatch },
+    create: { userId, channel, marketingOptIn, ...patch.create },
+    update: { marketingOptIn, ...patch.update },
   });
 
   // D3 — fire the welcome the FIRST time a number is saved with un-revoked consent
