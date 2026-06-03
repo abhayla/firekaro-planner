@@ -114,7 +114,16 @@ export async function runLifecycle(
     }
     if (!signals) continue;
 
-    const firstName = await deps.getFirstName(u.userId);
+    // gh-issue #10: a DB hiccup fetching the name must not abort the whole run — fall back.
+    let firstName = "there";
+    try {
+      firstName = await deps.getFirstName(u.userId);
+    } catch (e) {
+      logger.warn(
+        { err: e instanceof Error ? e.message : String(e), userId: u.userId },
+        "lifecycle: firstName fetch failed — using fallback",
+      );
+    }
     const nudges = evaluateLifecycle({ signals, now: deps.now() });
 
     for (const n of nudges) {

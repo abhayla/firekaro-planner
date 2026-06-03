@@ -51,4 +51,9 @@ export function validateEnv(): void {
   if (isProduction && !process.env.BETTER_AUTH_URL) {
     logger.warn("BETTER_AUTH_URL not set — Google OAuth callback URLs will be incorrect");
   }
+  if (isProduction && !process.env.LIFECYCLE_RUN_TOKEN) {
+    logger.warn(
+      "LIFECYCLE_RUN_TOKEN not set — POST /api/internal/lifecycle/run will return 500 (scheduler disabled)",
+    );
+  }
 }

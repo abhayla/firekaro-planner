@@ -97,4 +97,17 @@ describe("runLifecycle", () => {
     expect(r.sent).toBe(0);
     expect(r.notSent).toBe(2);
   });
+
+  it("a getFirstName failure does NOT abort the run — falls back to 'there' (gh-issue #10)", async () => {
+    const d = deps({ getFirstName: vi.fn(async () => Promise.reject(new Error("db hiccup"))) });
+    const r = await runLifecycle(d);
+    expect(r.users).toBe(1);
+    expect(r.sent).toBe(2); // run completed despite the name fetch throwing
+    expect(d.fire).toHaveBeenCalledWith(
+      "milestone",
+      expect.objectContaining({ firstName: "there" }),
+      ["there", "₹1.25Cr", "62%"],
+      "milestone:50",
+    );
+  });
 });
