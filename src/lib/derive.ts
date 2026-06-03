@@ -190,11 +190,12 @@ export function derive(household: Household, assumptions: Assumptions, lens: Der
   const annualTax = fyTax.totalTax;
 
   const annualSavings = Math.max(0, annualIncome.total - annualTax - annualExpensesToday);
-  const monthlyInvestmentContribution = lensedInvestments.reduce(
-    (s, i) => s + (i.monthlyContribution ?? 0),
-    0,
-  );
-  const monthlyContribution = Math.round(annualSavings / 12) + monthlyInvestmentContribution;
+  // gh-issue #11: the monthly amount flowing to the corpus is the savings residual ALONE. The
+  // expense input EXCLUDES SIPs (UI contract: /expenses "Exclude rent, EMIs, insurance, and SIPs"),
+  // so investments[].monthlyContribution is ALREADY inside annualSavings — adding it again
+  // double-counted every SIP (≈10× over-statement for the Sharmas) and pulled the FIRE date years
+  // early. SIPs are a subset of the surplus, never additive to it.
+  const monthlyContribution = Math.round(annualSavings / 12);
   const monthlyTakeHome = Math.round((annualIncome.total - annualTax) / 12);
   const savingsRate = calculateSavingsRate(monthlyTakeHome, Math.round(annualSavings / 12));
 

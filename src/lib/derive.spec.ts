@@ -42,6 +42,20 @@ describe("derive() — pure kernel", () => {
     expect(kernel.projection.length).toBe(wrapper.projection.value.length);
   });
 
+  it("does NOT double-count SIP contributions — monthlyContribution = annualSavings/12 (gh-issue #11)", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    loadSeedPersona(h, a); // Sharmas — carries investment SIPs (monthlyContribution > 0)
+    // Sanity: the seed genuinely has SIPs, else this test would prove nothing.
+    const totalSip = h.data.investments.reduce((s, i) => s + (i.monthlyContribution ?? 0), 0);
+    expect(totalSip).toBeGreaterThan(0);
+
+    const k = derive(h.data, a.values, { isFamilyView: false, viewingMemberId: null, currentFY: "2025-26" });
+    // Expenses EXCLUDE SIPs (UI contract), so SIP money is already inside annualSavings — it must
+    // NOT be added again. The corpus-growth contribution is the savings residual alone.
+    expect(k.monthlyContribution).toBe(Math.round(k.annualSavings / 12));
+  });
+
   it("the Sharmas headline includes family layer + healthcare reservation on top of base", () => {
     const h = useHouseholdStore();
     const a = useAssumptionsStore();
