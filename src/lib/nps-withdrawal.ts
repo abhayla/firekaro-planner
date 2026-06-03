@@ -1,14 +1,18 @@
 /**
- * NPS withdrawal modeling — PFRDA 2025 60/20/20 split.
+ * NPS withdrawal modeling — PFRDA exit splits (normal + premature).
  *
  * Phase 2 Stage D per docs/goals/build-firekaro-mvp-v5.md §5.
  * Audit Entry #14 A14.1 — replaces v4's missing NPS withdrawal model.
+ * #15 bridge: extended with the premature-exit (before 60) split.
  *
- * PFRDA exit rules (per Master Direction 2025):
+ * PFRDA exit rules (per Master Direction):
+ *   NORMAL exit (at/after 60 — the default):
  *   - Corpus ≤ ₹5L: 100% withdrawable lump sum (no annuity requirement).
- *   - Corpus > ₹5L:
- *     - 60% lump sum, tax-FREE
- *     - 40% MUST go to annuity. Annuity income is taxed at slab.
+ *   - Corpus > ₹5L: 60% lump sum tax-FREE + 40% MANDATORY annuity (slab-taxed).
+ *
+ *   PREMATURE exit (before 60 — `exitType: "early"`):
+ *   - Corpus ≤ ₹2.5L: 100% withdrawable lump sum.
+ *   - Corpus > ₹2.5L: 20% lump sum tax-FREE + 80% MANDATORY annuity (slab-taxed).
  *
  * For corpus in the special low-band (≤₹5L), the user can take it all
  * as lump-sum. Above the band, the 40% annuity is mandatory regardless
@@ -18,6 +22,17 @@
 export const NPS_FULL_WITHDRAWAL_THRESHOLD = 500_000;
 export const NPS_LUMPSUM_PERCENT = 0.6;
 export const NPS_ANNUITY_PERCENT = 0.4;
+
+/**
+ * Premature-exit rules (exit BEFORE 60 — the salaried accumulator who retires
+ * early). Stricter than the normal 60/40 split: the corpus floor for a full
+ * lump is half (₹2.5L), and above it only 20% comes out as cash while 80% is
+ * forced into an annuity. This is the conservative, honest treatment for the
+ * #15 accumulation bridge — touching NPS early strands far more of it.
+ */
+export const NPS_EARLY_EXIT_THRESHOLD = 250_000;
+export const NPS_EARLY_LUMPSUM_PERCENT = 0.2;
+export const NPS_EARLY_ANNUITY_PERCENT = 0.8;
 
 export interface NpsWithdrawalSplit {
   totalCorpus: number;
@@ -48,21 +63,39 @@ export interface NpsWithdrawalInput {
   totalCorpus: number;
   /** Annuity rate as decimal (e.g. 0.06 = 6% annual annuity payout). */
   annuityRate?: number;
+  /**
+   * "normal" = exit at/after 60 (60/40 split, ₹5L lump floor — the default).
+   * "early"  = premature exit before 60 (20/80 split, ₹2.5L lump floor).
+   * Absent ⇒ "normal" so every existing caller is byte-identical.
+   */
+  exitType?: "normal" | "early";
 }
 
 /**
  * Compute the lump-sum / annuity split per PFRDA 2025 rules.
  *
+ * Normal exit (≥60, default):
  * - Below ₹5L: full lump sum, no annuity.
- * - Above ₹5L: 60% lump sum, 40% annuity at the assumed annuity rate
- *   (default 0.06 — research Ch 03 §3.7 cites Indian annuity rates
- *   typically 5.5-6.5%).
+ * - Above ₹5L: 60% lump sum, 40% annuity.
+ *
+ * Early exit (<60, `exitType: "early"`):
+ * - Below ₹2.5L: full lump sum, no annuity.
+ * - Above ₹2.5L: 20% lump sum, 80% annuity.
+ *
+ * Annuity uses the assumed annuity rate (default 0.06 — research Ch 03 §3.7
+ * cites Indian annuity rates typically 5.5-6.5%).
  */
 export function calculateNpsWithdrawal(input: NpsWithdrawalInput): NpsWithdrawalSplit {
   const { totalCorpus } = input;
   const annuityRate = input.annuityRate ?? 0.06;
+  const isEarly = input.exitType === "early";
+  const fullWithdrawalThreshold = isEarly
+    ? NPS_EARLY_EXIT_THRESHOLD
+    : NPS_FULL_WITHDRAWAL_THRESHOLD;
+  const lumpSumPercent = isEarly ? NPS_EARLY_LUMPSUM_PERCENT : NPS_LUMPSUM_PERCENT;
+  const annuityPercent = isEarly ? NPS_EARLY_ANNUITY_PERCENT : NPS_ANNUITY_PERCENT;
 
-  if (totalCorpus <= NPS_FULL_WITHDRAWAL_THRESHOLD) {
+  if (totalCorpus <= fullWithdrawalThreshold) {
     return {
       totalCorpus,
       lumpSum: totalCorpus,
@@ -73,8 +106,8 @@ export function calculateNpsWithdrawal(input: NpsWithdrawalInput): NpsWithdrawal
     };
   }
 
-  const lumpSum = totalCorpus * NPS_LUMPSUM_PERCENT;
-  const annuityCorpus = totalCorpus * NPS_ANNUITY_PERCENT;
+  const lumpSum = totalCorpus * lumpSumPercent;
+  const annuityCorpus = totalCorpus * annuityPercent;
   const annuityIncomeAnnual = Math.round(annuityCorpus * annuityRate);
 
   return {

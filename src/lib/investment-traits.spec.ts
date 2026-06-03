@@ -5,6 +5,7 @@ import {
   taxBucket,
   inflationRoute,
   assetClass,
+  accessibilityClass,
   isEmergencyFundEligible,
   returnBucketKey,
   typeLabel,
@@ -33,6 +34,20 @@ const defaultAssumptions: ReturnAssumptions = {
   ppfReturn: 0.071,
   epfReturn: 0.0825,
 };
+
+describe("accessibilityClass (#15 bridge partition)", () => {
+  it("liquid for sellable instruments incl. FD/Gold/ESOP", () => {
+    for (const t of ["Stocks", "MutualFunds", "FD", "Gold", "Crypto", "International", "REIT", "ESOP"] as InvestmentType[]) {
+      expect(accessibilityClass(makeInv(t))).toBe("liquid");
+    }
+  });
+  it("routes the locked retirement vehicles to their own classes", () => {
+    expect(accessibilityClass(makeInv("EPF_VPF"))).toBe("epf");
+    expect(accessibilityClass(makeInv("PPF"))).toBe("ppf");
+    expect(accessibilityClass(makeInv("NPS"))).toBe("nps");
+    expect(accessibilityClass(makeInv("RealEstate"))).toBe("realEstate");
+  });
+});
 
 describe("liquidity", () => {
   it("liquid for Stocks/MF/REIT/International/Crypto", () => {

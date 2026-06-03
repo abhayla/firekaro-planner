@@ -4,6 +4,7 @@ import {
   suggestNpsCap,
   postTaxAnnuityIncome,
   NPS_FULL_WITHDRAWAL_THRESHOLD,
+  NPS_EARLY_EXIT_THRESHOLD,
 } from "./nps-withdrawal";
 
 // PFRDA 2025 exit rules: corpus ≤ ₹5L → 100% lump sum; corpus > ₹5L →
@@ -50,6 +51,52 @@ describe("calculateNpsWithdrawal — above the threshold", () => {
     expect(r.lumpSum).toBe(360_000);
     expect(r.annuityCorpus).toBe(240_000);
     expect(r.isBelowThreshold).toBe(false);
+  });
+});
+
+describe("calculateNpsWithdrawal — early exit (premature, before 60)", () => {
+  // PFRDA premature-exit rules (exit before 60): corpus ≤ ₹2.5L → 100% lump;
+  // corpus > ₹2.5L → 20% lump (tax-free) + 80% MANDATORY annuity (slab-taxed).
+  // The accumulation bridge (#15) needs this for the salaried accumulator who
+  // retires at, e.g., 47 and cannot take the normal 60/40 NPS exit.
+  it("returns the full corpus as lump below the ₹2.5L early-exit threshold", () => {
+    const r = calculateNpsWithdrawal({ totalCorpus: 200_000, exitType: "early" });
+    expect(r.lumpSum).toBe(200_000);
+    expect(r.annuityCorpus).toBe(0);
+    expect(r.annuityIncomeAnnual).toBe(0);
+    expect(r.isBelowThreshold).toBe(true);
+    expect(r.annuityIncomeTaxable).toBe(false);
+  });
+
+  it("treats exactly ₹2.5L as below the early-exit threshold (full lump)", () => {
+    const r = calculateNpsWithdrawal({ totalCorpus: NPS_EARLY_EXIT_THRESHOLD, exitType: "early" });
+    expect(r.isBelowThreshold).toBe(true);
+    expect(r.lumpSum).toBe(250_000);
+  });
+
+  it("splits 20% lump / 80% annuity above ₹2.5L on early exit", () => {
+    const r = calculateNpsWithdrawal({ totalCorpus: 10_000_000, exitType: "early" });
+    expect(r.lumpSum).toBe(2_000_000); // 20%
+    expect(r.annuityCorpus).toBe(8_000_000); // 80%
+    expect(r.annuityIncomeAnnual).toBe(480_000); // 8,000,000 * 0.06
+    expect(r.isBelowThreshold).toBe(false);
+    expect(r.annuityIncomeTaxable).toBe(true);
+  });
+
+  it("early exit annuitises FAR more than normal exit (conservative: less cash now)", () => {
+    const normal = calculateNpsWithdrawal({ totalCorpus: 10_000_000 });
+    const early = calculateNpsWithdrawal({ totalCorpus: 10_000_000, exitType: "early" });
+    // Touching NPS before 60 strands 80% in an annuity vs 40% at/after 60 — the
+    // honest, conservative direction for an early-retiring accumulator.
+    expect(early.lumpSum).toBeLessThan(normal.lumpSum);
+    expect(early.annuityCorpus).toBeGreaterThan(normal.annuityCorpus);
+  });
+
+  it("defaults to normal exit (exitType absent) — byte-identical to before", () => {
+    const a = calculateNpsWithdrawal({ totalCorpus: 10_000_000 });
+    const b = calculateNpsWithdrawal({ totalCorpus: 10_000_000, exitType: "normal" });
+    expect(a).toEqual(b);
+    expect(a.lumpSum).toBe(6_000_000);
   });
 });
 

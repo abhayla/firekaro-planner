@@ -369,6 +369,48 @@ export function returnBucketKey(inv: Investment): ReturnBucketKey {
 }
 
 /**
+ * Accessibility class — the partition the #15 accumulation-bridge layer routes
+ * on (lib/accessibility.ts). Distinct from `liquidity()` (a 3-way friction
+ * grade) and `assetClass()` (a risk rollup): this answers "by WHAT RULE does
+ * this instrument's value become spendable cash in retirement?".
+ *
+ *  - liquid      → sellable at the FIRE age (Stocks, MF, FD, Gold, REIT, Crypto,
+ *                  International, ESOP-vested). FD's breakage penalty and gold's
+ *                  sale friction are not multi-year locks, so they count liquid.
+ *  - epf         → EPF/VPF — accessible on job exit (≈ the FIRE age).
+ *  - ppf         → 15-year lock from the opening year (else assumed locked to 60).
+ *  - nps         → 60/40 normal exit (≥60) or 20/80 premature exit (<60).
+ *  - realEstate  → primary residence already excluded from corpus; investment /
+ *                  inherited property is illiquid (rental income still counts).
+ *
+ * This is the ONLY place the accessibility partition switches on inv.type
+ * (A2 single-dispatch rule). accessibility.ts switches on the returned union.
+ */
+export type AccessibilityClass = "liquid" | "epf" | "ppf" | "nps" | "realEstate";
+
+export function accessibilityClass(inv: Investment): AccessibilityClass {
+  switch (inv.type) {
+    case "Stocks":
+    case "MutualFunds":
+    case "FD":
+    case "Gold":
+    case "Crypto":
+    case "International":
+    case "REIT":
+    case "ESOP":
+      return "liquid";
+    case "EPF_VPF":
+      return "epf";
+    case "PPF":
+      return "ppf";
+    case "NPS":
+      return "nps";
+    case "RealEstate":
+      return "realEstate";
+  }
+}
+
+/**
  * UI helper — short single-word label for a type used in chips, cards, and
  * legends. Centralizes the rendered string so a microcopy change touches one
  * place. The `type` parameter is the discriminator alone (not the full inv)
