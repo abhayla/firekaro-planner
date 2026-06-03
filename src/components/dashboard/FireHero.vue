@@ -22,6 +22,17 @@ const headline = computed(() => {
   return `You'll hit FIRE at age ${fireAge.value} (in ${formatYearsMonths(fire.yearsToRegular.value)}, by ${fireYear.value})`;
 });
 
+// #15 bridge: when the liquid-runway bridge pushes the headline FIRE age later
+// than the corpus-only adequacy age, surface BOTH so the honest headline doesn't
+// hide that the corpus was technically "ready" earlier.
+const bridgeSubline = computed(() => {
+  const bc = fire.bridgeCoverage.value;
+  if (!bc || bc.covered) return null;
+  // Use the engine's own corpus-only age (the exact age the bridge was tested at)
+  // so the copy never disagrees with the math by a rounding year.
+  return `Corpus target is reached at age ${bc.corpusOnlyFireAge} — but locked savings (PPF / NPS / pre-tax) keep your money from being fully spendable then, so sustainable FIRE is age ${bc.effectiveFireAge}.`;
+});
+
 const leanLabel = computed(() => {
   const y = fire.crossovers.value.lean;
   if (!y.year) return "Lean FIRE: not within horizon";
@@ -40,6 +51,11 @@ const fatLabel = computed(() => {
       <v-icon icon="mdi-fire" color="fire-orange" size="32" class="mr-2" />
       <h2 class="fire-hero__headline flex-grow-1">{{ headline }}</h2>
     </div>
+
+    <p v-if="bridgeSubline" class="fire-hero__subline" data-testid="fire-hero-bridge-subline">
+      <v-icon icon="mdi-lock-clock" size="16" color="warning" class="mr-1" />
+      {{ bridgeSubline }}
+    </p>
 
     <div class="progress-wrap my-3">
       <v-progress-linear
@@ -117,6 +133,13 @@ const fatLabel = computed(() => {
   letter-spacing: var(--tracking-tight);
   line-height: var(--leading-tight);
   color: var(--text-primary);
+}
+
+.fire-hero__subline {
+  font-size: var(--type-sm);
+  line-height: var(--leading-snug);
+  color: var(--text-secondary);
+  margin: var(--space-1) 0 var(--space-2);
 }
 
 .stat-block {

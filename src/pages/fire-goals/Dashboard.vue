@@ -10,6 +10,7 @@ import { computeFreedomScore } from "@/lib/freedom-score";
 import { toMonthly } from "@/lib/cashflow";
 import { isEmergencyFundEligible } from "@/lib/investment-traits";
 import FireHero from "@/components/dashboard/FireHero.vue";
+import BridgeBreakdownCard from "@/components/dashboard/BridgeBreakdownCard.vue";
 import FireProjectionChart from "@/components/dashboard/FireProjectionChart.vue";
 import AssetAllocationDonut from "@/components/dashboard/AssetAllocationDonut.vue";
 import SectionCard from "@/components/dashboard/SectionCard.vue";
@@ -248,6 +249,11 @@ onMounted(() => {
       </div>
 
       <FireHero />
+
+      <!-- #15 — accessible-money bridge: reachable vs locked, unlock timeline,
+           liquidity shortfall + every assumption with a one-tap fix. Self-hides
+           for a fully-liquid household. -->
+      <BridgeBreakdownCard />
 
       <!-- Phase 4 Stage I — audit-mandated dashboard additions -->
       <NudgeStack />
