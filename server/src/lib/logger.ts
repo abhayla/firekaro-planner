@@ -21,10 +21,13 @@ export const logger = pino({
       "*.secret",
       "*.token",
       // PII: WhatsApp recipient numbers must never reach logs (comms subsystem).
+      // failedDetail is provider/webhook-fed and can echo the recipient number.
       "whatsappNumber",
       "toNumber",
+      "failedDetail",
       "*.whatsappNumber",
       "*.toNumber",
+      "*.failedDetail",
     ],
     censor: "[REDACTED]",
   },

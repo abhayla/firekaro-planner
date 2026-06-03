@@ -235,6 +235,9 @@ export function derive(household: Household, assumptions: Assumptions, lens: Der
   // class for the accumulator). The household's current marginal rate is a
   // conservative proxy for the retiree's slab (documented simplification:
   // retirement income is usually lower, so this errs on the safe side).
+  // Note: householdMarginalRate is the bare slab rate (no 4% cess/surcharge) by
+  // design — do NOT "fix" it to the effective rate; the slab-proxy above already
+  // over-taxes the annuity, and adding cess would double-stack the conservatism.
   const npsAnnuityIncome = postTaxAnnuityIncome(npsSplit.annuityIncomeAnnual, householdMarginalRate);
   const npsAnnuityCorpus = npsSplit.annuityCorpus;
   const netAnnualExpenses = Math.max(0, annualExpensesToday - npsAnnuityIncome);
