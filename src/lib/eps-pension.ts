@@ -67,6 +67,18 @@ export function calculateEpsPension(input: EpsPensionInput): EpsPensionResult {
   const pensionStartAge = input.pensionStartAge ?? EPS_NORMAL_START_AGE;
   const serviceYears = Number.isFinite(input.serviceYears) ? Math.max(0, input.serviceYears) : 0;
 
+  // The early-from-50 (−4%/yr) / deferred-to-60 (+4%/yr) adjustments are NOT
+  // modelled (MVP scopes the standard 58 start). Disclose if a caller overrides
+  // the start age so the unadjusted figure is never presented as exact.
+  if (pensionStartAge !== EPS_NORMAL_START_AGE) {
+    assumptions.push({
+      id: "eps-start-age-unadjusted",
+      assumed: `EPS pension shown at the standard amount for a start age of ${pensionStartAge}`,
+      why: `the ±4%/yr early (from 50) / deferred (to 60) adjustment off the normal ${EPS_NORMAL_START_AGE} start is not modelled`,
+      impact: "starting earlier reduces, and deferring increases, the actual monthly pension",
+    });
+  }
+
   // Pensionable salary: ceiling-capped unless higher pension was opted.
   const rawSalary = Number.isFinite(input.monthlyPensionableSalary ?? NaN)
     ? Math.max(0, input.monthlyPensionableSalary as number)
@@ -154,6 +166,19 @@ export function deriveEpsPensionForMember(
       "a later actual career start means fewer service years — and below 10 years there is no monthly pension at all",
     fixField: "targetRetirementAge",
   });
+
+  // The single most bridge-relevant EPS fact for an early retiree: the pension
+  // does not pay until 58, so it cannot cover the years between an early FIRE age
+  // and 58. (Phase C correctly credits EPS as bridge income only from 58.)
+  if (result.eligible && retirementAge < EPS_NORMAL_START_AGE) {
+    result.assumptions.push({
+      id: `eps-starts-at-58:${member.id}`,
+      assetId: member.id,
+      assumed: `EPS pension begins at age ${EPS_NORMAL_START_AGE}, not at your retirement age`,
+      why: `you retire before ${EPS_NORMAL_START_AGE}, so EPS income cannot fund the years between your FIRE age and ${EPS_NORMAL_START_AGE}`,
+      impact: "those early-retirement years rely on your liquid corpus, not the EPS pension",
+    });
+  }
 
   return result;
 }

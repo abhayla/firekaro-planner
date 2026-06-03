@@ -99,6 +99,9 @@ export function postTaxLiquidation(
   const assetId = asset.id;
   const label = asset.label ?? typeLabel(asset.type);
 
+  // A zero-gross liquidation (e.g. an illiquid asset reaching here with 0 lump)
+  // returns a clean zero with NO assumption note — there is nothing being sold,
+  // so the unknown-cost-basis disclosure would be noise. Intentional, not a gap.
   const passThrough = (t: LiquidationTaxTreatment): LiquidationResult => ({
     grossProceeds: gp,
     taxOwed: 0,

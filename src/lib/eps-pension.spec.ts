@@ -67,6 +67,11 @@ describe("calculateEpsPension — the formula", () => {
     expect(r.assumptions.some((a) => /10 year|eligib|withdrawal/i.test(a.assumed + a.why))).toBe(true);
   });
 
+  it("discloses when a non-58 start age is used (unadjusted early/deferred amount)", () => {
+    const r = calculateEpsPension({ monthlyPensionableSalary: 15_000, serviceYears: 25, pensionStartAge: 50 });
+    expect(r.assumptions.some((a) => a.id === "eps-start-age-unadjusted")).toBe(true);
+  });
+
   it("is defensive: NaN/negative inputs do not crash and floor at zero pension", () => {
     const r = calculateEpsPension({ monthlyPensionableSalary: NaN, serviceYears: -5 });
     expect(r.monthlyPension).toBe(0);
@@ -108,6 +113,16 @@ describe("deriveEpsPensionForMember — derives service from age, discloses assu
     );
     // basic ₹1.2L/yr = ₹10k/mo < ₹15k ceiling → uses ₹10k.
     expect(r!.pensionableSalaryUsed).toBe(10_000);
+  });
+
+  it("discloses to an early retiree that EPS only begins at 58 (can't fund FIRE→58)", () => {
+    const r = deriveEpsPensionForMember(earner({ targetRetirementAge: 47 }), asOf);
+    expect(r!.assumptions.some((a) => a.id.startsWith("eps-starts-at-58"))).toBe(true);
+  });
+
+  it("does NOT add the starts-at-58 note when retiring at/after 58", () => {
+    const r = deriveEpsPensionForMember(earner({ targetRetirementAge: 60 }), asOf);
+    expect(r!.assumptions.some((a) => a.id.startsWith("eps-starts-at-58"))).toBe(false);
   });
 
   it("returns null for a non-earner / member without salary (no EPS)", () => {
