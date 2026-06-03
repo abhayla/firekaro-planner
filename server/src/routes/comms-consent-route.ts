@@ -45,7 +45,15 @@ const toDto = (r: {
 
 app.get("/consent", async (c) => {
   const userId = c.get("userId");
-  const rows = await prisma.commsConsent.findMany({ where: { userId } });
+  // Fetch ONLY the fields the DTO returns (gh-issue #10) — guards against a future column
+  // (a token, an internal flag) silently leaking to the browser via the default-all select.
+  // The number itself is intentionally returned: it's the caller's OWN number, to their OWN
+  // authenticated session, so the Preferences field can show/confirm what's saved (standard
+  // settings UX). Masking it would degrade the edit-confirm flow for marginal gain over HTTPS.
+  const rows = await prisma.commsConsent.findMany({
+    where: { userId },
+    select: { channel: true, marketingOptIn: true, revokedAt: true, whatsappNumber: true },
+  });
   return apiSuccess(c, rows.map(toDto));
 });
 
