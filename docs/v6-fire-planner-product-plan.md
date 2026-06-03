@@ -335,6 +335,38 @@ mass-market one — "cover all of India" would dilute a FIRE planner into a comm
 (2) the product is already deepest here; (3) Abhay's own household is the archetype (dogfood + the
 5W Financial data-layer role); (4) YAGNI — build for the next real user, not a speculative one.
 
+**Objectives across the persona's lifecycle (chosen 2026-06-03).** FireKaro serves the *same*
+urban-salaried person across their whole FIRE journey — accumulate → transition → live free — not
+just the accumulation slice. The five objectives, in order:
+
+0. **Effortless, accurate setup** — automate inputs (Form 16 / CAS / Account-Aggregator import,
+   smart defaults, "you probably also have X — add it?") so the plan is complete and trustworthy.
+   Honesty dies first on bad data; this is also the activation gate (Principle 3).
+1. **Tell the truth** — an honest, confidence-banded FIRE date that respects locked money (the
+   accessible-money bridge) and survives a stress test. *(largely built)*
+2. **Help them get there faster** — rank the *India-specific* levers (regime arbitrage,
+   80CCD(1B)/employer-NPS, prepay-vs-invest, savings-rate, allocation) by their impact on
+   **years-to-FIRE** — shown with the SAME honesty/confidence bands as objective 1 — and *sustain
+   the behaviour* through a track → nudge → celebrate loop (reuse `nudge-engine.ts`), not a one-time
+   report.
+3. **Give them the courage to stop** — an honest readiness verdict ("can I actually pull the
+   trigger?", answered by the bridge runway) and a guided transition off the salary. The
+   highest-trust, most-differentiated moment in the whole journey.
+4. **Keep them free** — post-FIRE decumulation guardrails (safe-withdrawal bands,
+   sequence-of-returns warnings, annual "still on track?" review) that protect financial
+   independence through markets and decades. **In-scope for our own user who reaches FIRE — NOT a
+   pivot to acquiring already-retired seniors (that stays Tier-3, a different product).**
+
+**Stance — decision support, not advice.** We show the *consequences* of the user's own choices
+("+₹X SIP → FIRE Y years sooner, here's the range"); we never recommend specific products. This
+keeps the "not financial advice" positioning intact and makes the user the decider. *(The
+regulatory/SEBI-RIA positioning of "guidance" is a `TODO(5W):` — the repo holds the educational
+line; the formal posture is a 5 Wealths call.)*
+
+**The plan is alive (Principle 4)** — it updates from every signal (salary hike, new SIP, market
+move, expense creep) and re-surfaces "your FIRE date moved — here's why," turning a one-time
+calculator into a companion.
+
 **Build tiering that follows from the wedge:**
 - **Tier 0 — persona-independent, do now:** tax-config staleness guard (no silently-stale/guessed
   FY numbers) + Monte Carlo confidence bands (stop over-stating single-point certainty). Help every
@@ -344,7 +376,9 @@ mass-market one — "cover all of India" would dilute a FIRE planner into a comm
 - **Tier 2 — adjacent, after the wedge is excellent:** freelancer (44ADA, partly done), **NRI**,
   **HUF**.
 - **Tier 3 — deprioritised (maybe never):** rural / agricultural, vernacular mass-market, pure
-  already-retired seniors. Different products.
+  already-retired seniors. Different products. *(Distinct from objective 4 above: post-FIRE
+  management for **our own** accumulator who reaches FIRE is in-scope and sequenced; **acquiring**
+  already-retired strangers as new users is the out-of-scope item here.)*
 
 **Boundary (L-042):** the *market-positioning lock* is a 5 Wealths decision — to be recorded under
 `D:\Abhay\VibeCoding\5Wealths\Financial Wealth\FW-FireKaro\DECISIONS.md`. This section is the

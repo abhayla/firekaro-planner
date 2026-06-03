@@ -14,14 +14,19 @@ standalone personas: each role's real work is done by the named agents/skills (p
 > **Now (production-live, 2026-06-01):** FireKaro is LIVE at https://firekaro.com (Hostinger VPS,
 > PM2 + nginx → Supabase; Google OAuth working). The v6 backend (Hono/Prisma document API +
 > ServerAdapter) shipped. **Primary target persona is LOCKED: the urban salaried accumulator**
-> (`docs/v6-fire-planner-product-plan.md` §9). Focus has shifted from "ship it" to **make it
-> correct, sticky, and friction-free for that wedge**:
+> (`docs/v6-fire-planner-product-plan.md` §9). Focus has shifted from "ship it" to **serve that
+> wedge across their whole FIRE lifecycle** (the 5 objectives, §9: set-up · honesty ·
+> get-there-faster · readiness-to-stop · stay-free-post-FIRE):
 > - **Tier 0 — correctness/honesty (do now):** tax-config staleness guard + Monte Carlo confidence
 >   bands → **FinTech Domain Analyst** validates, **Full-Stack** builds.
-> - **Tier 1 — retention + onboarding:** lifecycle digests/nudges + Form16/CAS import + persona
->   onboarding templates → **Growth / Lifecycle & Retention** leads, **Frontend** + **Full-Stack**
->   build, **Data / Analytics** measures, **Privacy / Compliance (DPDP)** gates any user comms.
-> - **Tier 2 — adjacent personas (later):** freelancer → NRI → HUF.
+> - **Tier 1 — retention + onboarding (obj 0+2):** effortless/automated setup (Form16/CAS import) +
+>   lifecycle digests/nudges + persona onboarding templates → **Growth / Lifecycle & Retention**
+>   leads, **Frontend** + **Full-Stack** build, **Data / Analytics** measures, **Privacy /
+>   Compliance (DPDP)** gates any user comms.
+> - **Tier 2 — deepen the wedge's later lifecycle (obj 3+4):** transition-readiness ("can I
+>   stop?", off the bridge runway) + post-FIRE decumulation guardrails for our *own* accumulator →
+>   **FinTech Domain Analyst** validates, **Full-Stack** + **Frontend** build.
+> - **Tier 3 — adjacent personas (later):** freelancer → NRI → HUF.
 
 The **Security / DevSecOps**, **DevOps / Release**, and **QA / Test Automation** roles stay primary
 around any redeploy / `firekaro.com` change. The **FinTech Domain Analyst** is always-on background

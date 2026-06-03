@@ -25,8 +25,15 @@ Guidance for Claude Code when working in this repository.
 
 **FireKaro** — a research-grounded Indian **FIRE** (Financial Independence, Retire Early) planning
 SaaS. **Vue 3 + Vite + Vuetify 3** frontend (`src/`) + a **Hono + Prisma + Better Auth** backend
-(`server/`) on **Supabase** Postgres. Planning & tracking only — not financial advice, no bank
-connections, no transaction execution.
+(`server/`) on **Supabase** Postgres. Planning & tracking only — **decision support, not financial
+advice** (we show the consequences of the user's *own* choices; we never recommend products), no
+bank connections, no transaction execution.
+
+**Goal (objectives SSOT: `docs/v6-fire-planner-product-plan.md` §9; decision-anchoring:
+`.claude/rules/goal-anchored-decisions.md`):** serve the **urban-salaried accumulator** across their
+*whole FIRE lifecycle* — (0) set up effortlessly · (1) tell the truth (honest, confidence-banded
+FIRE date) · (2) get there faster · (3) know when it's safe to stop · (4) stay free post-FIRE. The
+plan is *alive* — it updates from every signal.
 
 Extracted **2026-05-31** as a standalone repo from the `FIREKaro-Vue` monorepo's `mvp/` tree (which
 became "v6" — the real product). The old tax/transaction tracker (`FIREKaro-Vue/src`+`server`) and

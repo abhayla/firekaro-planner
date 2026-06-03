@@ -17,11 +17,16 @@ serving the goal + the target user is. Requested by Abhay 2026-06-03.
   `docs/v6-fire-planner-product-plan.md`).
 - **Primary user (LOCKED):** the **urban salaried accumulator** — someone in the *accumulation*
   phase (still earning, building corpus), whose headline number is the **FIRE date / years-to-FIRE**
-  (`docs/v6-fire-planner-product-plan.md` §9). Tier-2 adjacent personas (freelancer → NRI → HUF) are
-  *later*, not now.
-- **Current "Now" priority order** (`.claude/rules/engineering-roles.md` stage block):
-  Tier 0 **correctness/honesty** → Tier 1 **retention/onboarding (stickiness)** → Tier 2 adjacent
-  personas.
+  (`docs/v6-fire-planner-product-plan.md` §9). FireKaro serves this *same person across their whole
+  lifecycle* — accumulate → transition off salary → live free post-FIRE (the **5 objectives** in
+  §9: effortless setup · honesty · get-there-faster · readiness-to-stop · stay-free). What is
+  *later*: adjacent **personas** (freelancer → NRI → HUF) and *acquiring* already-retired strangers
+  (a different product) — NOT the post-FIRE phase of our own user.
+- **Current "Now" priority order** (`.claude/rules/engineering-roles.md` stage block): Tier 0
+  **correctness/honesty** → Tier 1 **retention/onboarding (stickiness)** → Tier 2 **deepen the wedge
+  persona's later lifecycle** (transition-readiness + post-FIRE decumulation for our *own* user) →
+  Tier 3 **adjacent personas**. The ladder is the *same persona's* journey first, *other* personas
+  last.
 - **Portfolio role + principles:** FireKaro is the Financial-pillar data layer + commercial SaaS;
   the four immutable principles — permanent/productized, scale-from-day-1, automate,
   continuously-update (`5W-CONTEXT.md`, `5W-PRINCIPLES.md`).
@@ -34,9 +39,11 @@ serving the goal + the target user is. Requested by Abhay 2026-06-03.
 2. **Prefer combinations over false binaries** — the best answer is often "ship the correctness bit
    + build the persona-aligned feature + defer the wrong-user-phase one," not a single option.
 3. **Tie-break by persona + the "Now" order** — when options conflict, the *primary persona's* needs
-   and the order (correctness → stickiness → friction) decide. An option serving a **non-target user
-   phase** (e.g. drawdown/decumulation sophistication for a planner whose locked user is still
-   *accumulating*) loses to one serving the target persona.
+   and the order (correctness → stickiness → friction) decide. An option serving a **different
+   persona** (e.g. NRI/HUF tax sophistication while the salaried wedge is still being deepened)
+   loses to one serving the wedge persona. **Note:** post-FIRE / decumulation for our *own*
+   accumulator is NOT a non-target phase — it is objective 4 of the same lifecycle (sequenced after
+   the accumulation wedge is excellent, but firmly in-scope).
 4. **Honesty is a goal, not a nicety** — for a FIRE planner an *optimistic* error (over-stated
    corpus / earlier-than-real FIRE date) makes the user **under-save** — the worst failure mode.
    Options that remove optimistic bias for the target user rank high **regardless of fix size**.
@@ -61,6 +68,8 @@ reasoning stated.
   convenience, feature-completeness, or symmetry.
 - MUST state the goal/user reasoning IN the recommendation (a visible, auditable anchor).
 - MUST consider combinations of options, not just single options.
-- MUST let the target persona + the "Now" priority order break ties; a non-target user *phase* loses.
+- MUST let the wedge persona + the "Now" priority order break ties; a *different persona* loses to
+  the wedge. (The wedge persona's own later lifecycle — transition-readiness + post-FIRE — is
+  in-scope and sequenced; it is NOT a "non-target phase".)
 - MUST treat optimistic/honesty errors for the target user as high-priority (Tier-0), regardless of
   fix size.
