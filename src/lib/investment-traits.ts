@@ -411,6 +411,53 @@ export function accessibilityClass(inv: Investment): AccessibilityClass {
 }
 
 /**
+ * Liquidation-tax treatment — how a held instrument is taxed WHEN SOLD to fund
+ * retirement (#15 bridge, Phase B). Distinct from `taxBucket()` (the accrual/
+ * EEE-EET grade): this answers "what tax do I owe on cashing this out at the
+ * FIRE age?" under current post-Budget-2024 law.
+ *
+ *  - tax-free          → EPF/VPF (≥5yr service), PPF maturity, NPS lump (EEE/exit-exempt).
+ *  - equity-ltcg       → listed equity & equity MF & REIT & ESOP: 12.5% over the
+ *                        ₹1.25L/yr exemption (Sec 112A).
+ *  - ltcg-no-exemption → gold, international, property: 12.5% LTCG, no ₹1.25L
+ *                        exemption, indexation removed (Sec 112, Budget 2024).
+ *  - vda-flat          → crypto / VDAs: flat 30% on the gain, no exemption, no set-off.
+ *  - pass-through      → FD: interest is taxed annually as it accrues, so the
+ *                        principal carries no additional liquidation tax.
+ *
+ * The ONLY place this partition switches on inv.type (A2 single-dispatch rule);
+ * liquidation-tax.ts switches on the returned union.
+ */
+export type LiquidationTaxTreatment =
+  | "tax-free"
+  | "equity-ltcg"
+  | "ltcg-no-exemption"
+  | "vda-flat"
+  | "pass-through";
+
+export function liquidationTaxTreatment(inv: Investment): LiquidationTaxTreatment {
+  switch (inv.type) {
+    case "EPF_VPF":
+    case "PPF":
+    case "NPS":
+      return "tax-free";
+    case "Stocks":
+    case "MutualFunds":
+    case "ESOP":
+    case "REIT":
+      return "equity-ltcg";
+    case "Gold":
+    case "International":
+    case "RealEstate":
+      return "ltcg-no-exemption";
+    case "Crypto":
+      return "vda-flat";
+    case "FD":
+      return "pass-through";
+  }
+}
+
+/**
  * UI helper — short single-word label for a type used in chips, cards, and
  * legends. Centralizes the rendered string so a microcopy change touches one
  * place. The `type` parameter is the discriminator alone (not the full inv)

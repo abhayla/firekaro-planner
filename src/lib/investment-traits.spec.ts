@@ -6,6 +6,7 @@ import {
   inflationRoute,
   assetClass,
   accessibilityClass,
+  liquidationTaxTreatment,
   isEmergencyFundEligible,
   returnBucketKey,
   typeLabel,
@@ -46,6 +47,24 @@ describe("accessibilityClass (#15 bridge partition)", () => {
     expect(accessibilityClass(makeInv("PPF"))).toBe("ppf");
     expect(accessibilityClass(makeInv("NPS"))).toBe("nps");
     expect(accessibilityClass(makeInv("RealEstate"))).toBe("realEstate");
+  });
+});
+
+describe("liquidationTaxTreatment (#15 bridge, Phase B)", () => {
+  it("tax-free for EPF/PPF/NPS; pass-through for FD", () => {
+    for (const t of ["EPF_VPF", "PPF", "NPS"] as InvestmentType[]) {
+      expect(liquidationTaxTreatment(makeInv(t))).toBe("tax-free");
+    }
+    expect(liquidationTaxTreatment(makeInv("FD"))).toBe("pass-through");
+  });
+  it("equity-ltcg for listed equity/MF/REIT/ESOP; no-exemption for gold/intl/property; vda for crypto", () => {
+    for (const t of ["Stocks", "MutualFunds", "REIT", "ESOP"] as InvestmentType[]) {
+      expect(liquidationTaxTreatment(makeInv(t))).toBe("equity-ltcg");
+    }
+    for (const t of ["Gold", "International", "RealEstate"] as InvestmentType[]) {
+      expect(liquidationTaxTreatment(makeInv(t))).toBe("ltcg-no-exemption");
+    }
+    expect(liquidationTaxTreatment(makeInv("Crypto"))).toBe("vda-flat");
   });
 });
 
