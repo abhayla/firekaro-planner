@@ -327,14 +327,35 @@ export function derive(household: Household, assumptions: Assumptions, lens: Der
       }
     : blendedReturn;
 
-  // Headline FIRE dates (FireHero) use these — they MUST share the glide-aware
-  // schedule with the projection crossover, or the headline would stay optimistic.
-  // `corpusOnlyYearsToRegular` is the ADEQUACY leg (corpus grows to the FIRE
-  // number). The bridge layer below can push the HEADLINE later when the
-  // adequate corpus is not yet liquid (#15). Lean/Fat stay corpus-only.
-  const corpusOnlyYearsToRegular = calculateYearsToTarget(fireWithdrawableCorpus, fireNumber, monthlyContribution, expectedReturnSchedule);
-  const yearsToLean = calculateYearsToTarget(fireWithdrawableCorpus, variants.leanFIRE, monthlyContribution, expectedReturnSchedule);
-  const yearsToFat = calculateYearsToTarget(fireWithdrawableCorpus, variants.fatFIRE, monthlyContribution, expectedReturnSchedule);
+  // #20 (Tier-0 honesty): the headline grows TODAY's corpus to a TODAY's-rupee
+  // `fireNumber`, so it MUST compound at a REAL return. Growing a NOMINAL return
+  // against a non-inflating target reaches optimistically EARLY (#20). The deflator
+  // MUST be GENERAL CPI (`assumptions.inflation` ≈6%) — the rate at which a rupee
+  // loses economy-wide purchasing power — NOT the 4-bucket household EXPENSE blend
+  // (~7.9%, lifted by 14% healthcare). Deflating MARKET RETURNS by the
+  // healthcare-weighted expense basket is a modeling error: it crushed the real
+  // return to ~0.9% and made FIRE look unreachable (~age 115) for the seed personas
+  // (#20, FinTech-validated 2026-06-03). The same general CPI grows the FIRE target
+  // in projectCorpus below, so the headline and the chart crossover AGREE. Assumes
+  // savings keep pace with general inflation (constant REAL contribution).
+  // `householdInflation` (the 4-bucket blend) is retained ONLY for the retiree's
+  // decumulation withdrawal-floor growth — an INTENTIONAL asymmetry (a retiree's
+  // own spending DOES rise at their personal basket rate; a saver's corpus return
+  // deflates at CPI). Do NOT "consistency-fix" these to the same rate.
+  const householdInflation = resolveHouseholdInflation(assumptions);
+  const generalInflation = assumptions.inflation;
+  const toRealReturn = (nominal: number) => (1 + nominal) / (1 + generalInflation) - 1;
+  const realReturnSchedule: ReturnSchedule =
+    typeof expectedReturnSchedule === "function"
+      ? (yearIndex: number) => toRealReturn(expectedReturnSchedule(yearIndex))
+      : toRealReturn(expectedReturnSchedule);
+
+  // Headline FIRE dates (FireHero) — the ADEQUACY leg (corpus grows to the FIRE
+  // number) in the REAL frame. The bridge layer below can push the HEADLINE later
+  // when the adequate corpus is not yet liquid (#15). Lean/Fat stay corpus-only.
+  const corpusOnlyYearsToRegular = calculateYearsToTarget(fireWithdrawableCorpus, fireNumber, monthlyContribution, realReturnSchedule);
+  const yearsToLean = calculateYearsToTarget(fireWithdrawableCorpus, variants.leanFIRE, monthlyContribution, realReturnSchedule);
+  const yearsToFat = calculateYearsToTarget(fireWithdrawableCorpus, variants.fatFIRE, monthlyContribution, realReturnSchedule);
 
   // ----- #15 accumulation bridge: corpus-adequate ≠ FIRE-ready -----
   // At the age the corpus first meets the FIRE number, check that the LIQUID
@@ -415,8 +436,6 @@ export function derive(household: Household, assumptions: Assumptions, lens: Der
   const yfat = Number.isFinite(yearsToFat) ? yearsToFat : 30;
   const projectionHorizonYears = Math.min(60, Math.max(20, Math.ceil(yfat) + 5));
 
-  const householdInflation = resolveHouseholdInflation(assumptions);
-
   // A9.1 — Floor/Ceiling decumulation overlay (Constant → undefined → unchanged).
   const decumulation =
     assumptions.withdrawalRule === "FloorCeiling"
@@ -431,7 +450,9 @@ export function derive(household: Household, assumptions: Assumptions, lens: Der
     currentCorpus: fireWithdrawableCorpus,
     monthlyContribution,
     expectedReturns: expectedReturnSchedule,
-    inflation: householdInflation,
+    // #20: grow the FIRE target at GENERAL CPI (not the healthcare-weighted blend)
+    // so the chart crossover and the real-frame headline agree and FIRE is reachable.
+    inflation: generalInflation,
     annualExpensesToday,
     startAge: anchorAge,
     swr: effectiveSWR,
@@ -470,6 +491,7 @@ export function derive(household: Household, assumptions: Assumptions, lens: Der
     healthcareReservationPercent,
     variants,
     blendedReturn,
+    householdInflation,
     annualEpfVpfContribution,
     householdMarginalRate,
     epfAfterTaxReturn,

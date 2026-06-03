@@ -14,6 +14,7 @@ import { loadSeedPersona } from "@/lib/seed-persona";
 import { useFireDerive } from "@/lib/useFireDerive";
 import { derive } from "@/lib/derive";
 import { calculateNpsWithdrawal, postTaxAnnuityIncome } from "@/lib/nps-withdrawal";
+import { calculateYearsToTarget } from "@/lib/fire-math";
 
 describe("derive() — pure kernel", () => {
   beforeEach(() => setActivePinia(createPinia()));
@@ -183,8 +184,13 @@ describe("derive() — pure kernel", () => {
     const on = derive(h.data, a.values, lens);
 
     expect(off.blendedReturn).toBeCloseTo(0.12, 5); // all-equity flat baseline
-    const lastOff = off.projection[off.projection.length - 1].corpus;
-    const lastOn = on.projection[on.projection.length - 1].corpus;
+    // #20: real-framing enlarged yfat, so on/off projections now run to
+    // DIFFERENT horizons (glide-on FIREs later → longer projection). Comparing
+    // each path's OWN last point conflates horizon length with the de-risking
+    // effect this test isolates — compare at a COMMON year index instead.
+    const commonIdx = Math.min(off.projection.length, on.projection.length) - 1;
+    const lastOff = off.projection[commonIdx].corpus;
+    const lastOn = on.projection[commonIdx].corpus;
     expect(lastOn).toBeLessThan(lastOff);
     // The glide must NOT pull the FIRE crossover earlier (no optimistic bias).
     if (on.crossovers.regular.year != null && off.crossovers.regular.year != null) {
@@ -212,8 +218,10 @@ describe("derive() — pure kernel", () => {
     const on = derive(h.data, a.values, lens);
 
     expect(on.yearsToRegular).toBeGreaterThanOrEqual(off.yearsToRegular);
-    const lastOff = off.projection[off.projection.length - 1].corpus;
-    const lastOn = on.projection[on.projection.length - 1].corpus;
+    // Compare at a COMMON year index (see the all-equity test above for why).
+    const commonIdx = Math.min(off.projection.length, on.projection.length) - 1;
+    const lastOff = off.projection[commonIdx].corpus;
+    const lastOn = on.projection[commonIdx].corpus;
     expect(lastOn).toBeLessThanOrEqual(lastOff);
   });
 
@@ -228,6 +236,40 @@ describe("derive() — pure kernel", () => {
     const p = derive(h.data, a.values, lens).projection;
     expect(p[2].corpus).toBeGreaterThan(p[1].corpus);
     expect(p[1].corpus).toBeGreaterThan(p[0].corpus);
+  });
+
+  it("#20: headline FIRE is real-framed (CPI), REACHABLE, and agrees with the chart crossover", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    loadSeedPersona(h, a); // Sharmas
+    const lens = { isFamilyView: false, viewingMemberId: null, currentFY: "2025-26" };
+    const k = derive(h.data, a.values, lens);
+
+    // (a) #21 trip-wire — regular FIRE MUST be reachable within the plan horizon.
+    // The deflator bug (4-bucket healthcare blend ~7.9% instead of general CPI ~6%
+    // to deflate market RETURNS) crushed the real return to ~0.9% and made the
+    // crossover null (~age 115). A null/unreachable crossover for the flagship
+    // accumulator seed is the failure this asserts against.
+    expect(k.crossovers.regular.year, "Sharmas must reach regular FIRE within horizon").not.toBeNull();
+    expect(k.crossovers.regular.age!).toBeLessThanOrEqual(k.planToAge);
+
+    // (b) #20 agreement invariant — the headline years-to-FIRE and the chart
+    // crossover must AGREE (they disagreed pre-fix: the headline was optimistic via
+    // nominal-vs-frozen-target while the chart already inflated its target). The
+    // residual gap is the flat-REAL (headline) vs flat-NOMINAL (chart) contribution
+    // assumption + monthly-vs-annual granularity — bounded, not arbitrary.
+    expect(Math.abs(k.corpusOnlyYearsToRegular - k.crossovers.regular.yearsFromNow!)).toBeLessThan(6);
+
+    // (c) #20 real-frame direction — deflating returns by general CPI makes the
+    // headline strictly LATER than the buggy nominal-return-vs-frozen-target years
+    // (the optimistic-early guard; the old headline was ~22.8y, the honest one ~50y).
+    const nominalFrameYears = calculateYearsToTarget(
+      k.fireWithdrawableCorpus,
+      k.fireNumber,
+      k.monthlyContribution,
+      k.blendedReturn,
+    );
+    expect(k.corpusOnlyYearsToRegular).toBeGreaterThan(nominalFrameYears);
   });
 
   it("#15 bridge: a fully-liquid household's headline is byte-identical (bridge covered, no move)", () => {
