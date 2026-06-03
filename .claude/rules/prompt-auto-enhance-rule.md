@@ -20,6 +20,7 @@ detailed in its SSOT rule — pointer pattern, no duplication (`configuration-ss
 | **0–4.5** | Grade → diagnose → strengthen — with the **intent gate** woven in (1–2 gaps → one targeted question; consequential fork & confidence <~95% → `/grill-me` or `/grill-with-docs`) → step transcript | `/prompt-auto-enhance` + `decision-authority.md` → "Confidence gate" |
 | **4.6** | Show the final strengthened prompt (reflects the gate-resolved intent) | `/prompt-auto-enhance` |
 | **4.7 Role** | Infer the role, state `Role: <name> — <why>`, dispatch its backing agents/skills | `engineering-roles.md` |
+| **4.8 Plan** | For non-trivial coding work, produce a **visible plan** (plan mode / goal contract / inline plan block) BEFORE the first code edit — Skip trivial/mechanical edits | `plan-before-coding.md` |
 | **5 Execute** | Act under DACI: **decide** reversible/internal; **inform** on tactical product calls; **escalate** irreversible/outward in one line + keep working | `decision-authority.md` |
 | **6 Git** | Only if the turn produced committable changes: stage → secret-scan → commit → (branch/merge) → push via `git-manager-agent` + `.githooks/pre-commit` | `decision-authority.md` → "Git authority" |
 
@@ -108,6 +109,9 @@ These are the load-bearing contracts:
   `engineering-roles.md`), then execute under decision-authority — decide
   reversible/internal work, escalate only the gated items in one line
   (`decision-authority.md`)
+- For non-trivial coding work, a visible plan (plan mode / goal contract /
+  inline plan block) precedes the first code edit (`plan-before-coding.md`,
+  stage 4.8); trivial/mechanical edits skip it
 - If the turn produced committable changes, run stage 6 git via
   `git-manager-agent` + `.githooks/pre-commit`; skip git on Q&A / read-only turns
 - Resource CRUD requires the batch approval table — no creates / updates

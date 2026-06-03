@@ -45,6 +45,7 @@ if ! command -v jq >/dev/null; then
     echo "REMINDER: Start your response with *Enhanced: <what context was checked>* (under 15 words)."
     echo "Gather Tier 1 context (patterns, CLAUDE.md, git state) before responding."
     echo "For non-trivial prompts (ambiguous, multi-file, multi-step): run the Grade → Diagnose → Fix pipeline from /prompt-auto-enhance, then the governance tail — role (engineering-roles.md), gate (grill-me if a consequential fork is unclear), execute under decision-authority, git via git-manager-agent if changes. Skip for direct instructions, single-file changes, and questions."
+    echo "PLAN BEFORE CODING: for any non-trivial change (3+ files/steps, new feature, refactor, schema, or financial math) produce a visible plan — plan mode / goal contract / inline plan block — BEFORE the first code edit (.claude/rules/plan-before-coding.md). Skip only trivial/mechanical edits."
   }
   emit_reminder
   exit 0
@@ -86,5 +87,6 @@ echo "REMINDER: Start your response with *Enhanced: <what context was checked>* 
 echo "Gather Tier 1 context (patterns, CLAUDE.md, git state) before responding."
 echo "For non-trivial prompts (>15 chars, not a continuation): run the Grade → Diagnose → Fix pipeline from /prompt-auto-enhance. Show the step transcript and the final strengthened prompt before executing. Clarification Gate: ask one question at a time, no upper limit, until you have full confidence in user intent."
 echo "Then the governance tail: state Role: <name> — <why> (engineering-roles.md); gate intent (grill-me/grill-with-docs if a consequential fork is <~95% clear); execute under decision-authority (decide reversible, escalate irreversible in one line); and if the turn produced changes, do git via git-manager-agent + the secret-scan hook."
+echo "PLAN BEFORE CODING: for any non-trivial change (3+ files/steps, new feature, refactor, schema, or financial math) produce a visible plan — plan mode / goal contract / inline plan block — BEFORE the first code edit (.claude/rules/plan-before-coding.md). Skip only trivial/mechanical edits (typo, one-line fix, rename)."
 echo "DECIDE, DON'T ASK (hard rule): do NOT end your response with an offer/question (\"want me to…\", \"should I…\", \"let me know…\", \"say the word\", \"or leave it?\") on reversible/internal work — just DO it (file the issue, commit, take the next queued item) and report. ONLY a genuinely irreversible/outward/strategic action (push to prod, spend, deploy, DNS cutover, destructive git, a true product fork) earns a question. A Stop hook (no-overask-guard.sh) flags violations."
 exit 0
