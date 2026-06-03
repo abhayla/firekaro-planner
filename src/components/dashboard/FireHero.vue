@@ -5,7 +5,10 @@ import { formatINRCompact, formatYearsMonths } from "@/lib/formatters";
 import InfoTip from "@/components/shared/InfoTip.vue";
 import { describeFireConfidenceBand } from "@/lib/fire-confidence-band";
 
-const fire = useFireDerive();
+// #22: the FIRE headline is inherently HOUSEHOLD-level — pool every member so the
+// FIRE number (which funds the whole family) is never divided by one earner's
+// savings/corpus. Per-member drill-down lives on the income/tax pages, not here.
+const fire = useFireDerive({ forceHousehold: true });
 
 const fireYear = computed(() => new Date().getFullYear() + Math.ceil(fire.yearsToRegular.value || 0));
 const fireAge = computed(() => {

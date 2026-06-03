@@ -15,15 +15,22 @@ import { runMonteCarloFire } from "@/lib/monte-carlo";
  * `derive.spec.ts`, and `useFireDerive.seed.spec.ts` locks the end-to-end
  * behaviour through the real stores.
  */
-export function useFireDerive() {
+/**
+ * @param opts.forceHousehold — when true, derive over the WHOLE household
+ *   (pool every member), ignoring the per-member UI lens. FIRE adequacy is
+ *   inherently household-level — the FIRE number funds the whole family, so the
+ *   headline MUST NOT divide a household target by one earner's savings/corpus
+ *   (gh-issue #22). The FireHero passes this; per-member drill-down cards do not.
+ */
+export function useFireDerive(opts?: { forceHousehold?: boolean }) {
   const h = useHouseholdStore();
   const a = useAssumptionsStore();
   const ui = useUiStore();
 
   const d = computed(() =>
     derive(h.data, a.values, {
-      isFamilyView: ui.isFamilyView,
-      viewingMemberId: ui.viewingMemberId,
+      isFamilyView: opts?.forceHousehold ? true : ui.isFamilyView,
+      viewingMemberId: opts?.forceHousehold ? null : ui.viewingMemberId,
       currentFY: ui.currentFY,
     }),
   );

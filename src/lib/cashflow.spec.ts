@@ -138,3 +138,14 @@ describe("legacyFreqToPeriod (hydrate migration)", () => {
     expect(legacyFreqToPeriod(42)).toBe("A");
   });
 });
+
+describe("#22: toAnnual/toMonthly never return NaN on a legacy/unknown period", () => {
+  // A switch without a default arm returned `undefined` for any non-"M/Q/A" record
+  // → NaN-poisoned the FIRE number. The default arm treats unknown as already-annual.
+  it("an unknown period coerces to annual instead of NaN", () => {
+    expect(Number.isNaN(toAnnual({ amount: 100, period: "monthly" as never }))).toBe(false);
+    expect(toAnnual({ amount: 100, period: "monthly" as never })).toBe(100);
+    expect(Number.isNaN(toMonthly({ amount: 1200, period: undefined as never }))).toBe(false);
+    expect(toMonthly({ amount: 1200, period: undefined as never })).toBe(100);
+  });
+});

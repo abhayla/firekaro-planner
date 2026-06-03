@@ -55,6 +55,19 @@ describe("useFireDerive — Sharmas seed (research-spine proof)", () => {
     expect(d.progressPercent.value).toBeLessThanOrEqual(100);
   });
 
+  it("#22: the FIRE headline pools the whole household — never divides a household target by one earner", () => {
+    loadSeedPersona(useHouseholdStore(), useAssumptionsStore());
+    const hero = useFireDerive({ forceHousehold: true }); // what FireHero renders
+    const single = useFireDerive(); // default UI lens → single earner for the dual-income Sharmas
+    // The Sharmas are dual-income: the pooled hero counts BOTH earners' savings against
+    // the same household FIRE number, so its headline is strictly EARLIER than the
+    // single-earner default lens (which divides the household target by one earner — the
+    // gh-issue #22 incoherence). If forceHousehold ever stopped pooling, these would be
+    // equal and this lock would fail.
+    expect(hero.yearsToRegular.value).toBeLessThan(single.yearsToRegular.value);
+    expect(hero.savingsRate.value).toBeGreaterThan(single.savingsRate.value);
+  });
+
   it("#18: the Monte Carlo band is ordered and its median tracks the deterministic headline", () => {
     loadSeedPersona(useHouseholdStore(), useAssumptionsStore());
     const d = useFireDerive();

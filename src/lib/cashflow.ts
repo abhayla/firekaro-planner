@@ -43,6 +43,10 @@ export function toMonthly(cf: Cashflow): number {
       return cf.amount / MONTHS_PER_QUARTER;
     case "A":
       return cf.amount / MONTHS_PER_YEAR;
+    default:
+      // #22: an unknown/legacy period must NEVER return undefined → NaN-poison the
+      // FIRE number. Treat as annual (the conservative no-12×-blowup fallback).
+      return cf.amount / MONTHS_PER_YEAR;
   }
 }
 
@@ -60,6 +64,10 @@ export function toAnnual(cf: Cashflow): number {
     case "Q":
       return cf.amount * (MONTHS_PER_YEAR / MONTHS_PER_QUARTER);
     case "A":
+      return cf.amount;
+    default:
+      // #22: unknown/legacy period must NEVER return undefined → NaN. Treat as
+      // already-annual (conservative — avoids a spurious 12× inflation).
       return cf.amount;
   }
 }
