@@ -19,6 +19,12 @@ ESCALATE list below; on everything else I drive and **Inform**. The **Product Ma
 the product call; the **Delivery / Project Manager** role owns proceed-vs-escalate (see
 `engineering-roles.md`).
 
+> **Evaluating options is goal-anchored (`goal-anchored-decisions.md`).** This file governs WHO
+> decides + escalate-vs-decide; the substantive criterion for WHICH option is best is the goal +
+> LOCKED persona (urban salaried accumulator), not local convenience or feature-completeness. State
+> the goal/user reasoning in every recommendation; prefer combinations; honesty errors for the target
+> user are Tier-0 regardless of fix size.
+
 ## Confidence gate — converge on INTENT before building
 
 Default-to-deciding (below) governs **execution** calls once intent is clear. It does NOT license

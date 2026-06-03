@@ -112,3 +112,7 @@
     - **Act on every blocker/HIGH finding before commit**; track deferred-but-real findings as GitHub Issues (per `bug-filing-and-sibling-audit.md`), never silently drop them.
     - **Graceful degradation**: if a required reviewer agent is genuinely unavailable, MUST surface "independent verification skipped because <reason>" and MUST NOT claim the work is verified.
     - Skip only for trivial/mechanical work (typo, rename, dep bump, doc-only) where self-review plus the deterministic gates suffice.
+
+## Goal-Anchored Decisions
+
+30. **Anchor every non-trivial decision to the project goal + target user (MANDATORY)**: build-vs-defer-vs-cut, design forks, prioritization, scope, "which option?" — all MUST be resolved to the option (or **combination**) that best serves THIS project's documented goal and its LOCKED persona (the urban salaried accumulator), NOT local engineering convenience, feature-completeness, or symmetry. State the goal/user reasoning explicitly in the recommendation (visible, auditable); prefer combinations over false binaries; tie-break by persona + the "Now" priority order (correctness/honesty → stickiness → friction) — a non-target *user phase* loses to the target persona; and treat optimistic/honesty errors for the target user as Tier-0 regardless of fix size. Full rule + the SSOT anchors: `.claude/rules/goal-anchored-decisions.md`. Complements rule 21 (YAGNI) + `decision-authority.md` (who decides) — this is the substantive criterion for *which* option is best.
