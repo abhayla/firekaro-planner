@@ -111,6 +111,17 @@ describe("deriveDeductions — 80CCD(2) employer NPS", () => {
     expect(deriveDeductions(hh).employerNpsBasicTotal).toBe(1_400_000);
   });
 
+  it("propagates Member.salary.employerSector into employerNpsByMember[].sector (gh-issue #4)", () => {
+    const hh = emptyHH();
+    hh.members = [
+      { id: "a", salary: { annualCTC: 2_000_000, hikePercent: 8, employerNpsAnnual: 140_000, basicAnnual: 1_000_000, employerSector: "government" } },
+      { id: "b", salary: { annualCTC: 1_500_000, hikePercent: 8, employerNpsAnnual: 80_000, basicAnnual: 600_000 } },
+    ] as Household["members"];
+    const byMember = deriveDeductions(hh).employerNpsByMember;
+    expect(byMember.find((m) => m.nps === 140_000)?.sector).toBe("government");
+    expect(byMember.find((m) => m.nps === 80_000)?.sector).toBe("private"); // omitted ⇒ private default
+  });
+
   it("EXCLUDES section80CCD2 from totalDeductions (it is applied separately in both regimes)", () => {
     const hh = emptyHH();
     hh.members = [

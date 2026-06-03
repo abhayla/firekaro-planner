@@ -364,4 +364,11 @@ describe("computeTax — 80CCD(2) govt-sector 14% ceiling, OLD regime (gh-issue 
     const privNew = computeTax({ ...base, regime: "NEW", employerNpsByMember: [{ nps: 140000, basic: 1000000, sector: "private" }] });
     expect(govtNew.taxableIncome).toBe(privNew.taxableIncome);
   });
+
+  it("scalar fallback has NO sector channel → caps OLD at 10% (private); govt MUST use employerNpsByMember", () => {
+    // The scalar employerNps/employerNpsBasic path can't carry sector, so it conservatively
+    // under-caps a govt earner at 10% OLD. Documents the limitation (errs safe — never over-deducts).
+    const scalar = computeTax({ ...base, employerNps: 140000, employerNpsBasic: 1000000 });
+    expect(scalar.taxableIncome).toBe(1_900_000); // 20L − 10%×10L = 19L (private), not the 14% 18.6L
+  });
 });
