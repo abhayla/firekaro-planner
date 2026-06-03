@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "./prisma";
 import { logger } from "./logger";
 import type { CommsChannel, ConsentRecord } from "./comms-consent";
+import { retentionCutoff, SEND_LOG_RETENTION_DAYS } from "./send-log-retention";
 
 /**
  * Persistence for the comms gate + send-log (CommsConsent / WhatsAppSendLog).
@@ -157,6 +158,31 @@ export async function updateStatusByProviderId(params: {
       failedDetail: params.failedDetail ?? null,
       errorCode: params.errorCode ?? null,
     },
+  });
+  return res.count;
+}
+
+/**
+ * DPDP data-minimization (gh-issue #10): clear BOTH recipient-PII columns —
+ * `toNumber` (phone) and `failedDetail` (provider error text that can echo the
+ * number) — on send-log rows older than the retention window, KEEPING the row for
+ * template/status/timestamp analytics. One atomic updateMany whose WHERE mirrors
+ * `shouldPurgeSendLogPii` (sentAt < cutoff AND (toNumber <> '' OR failedDetail
+ * IS NOT NULL)). Idempotent — once both PII fields are cleared the row is excluded,
+ * so a re-run updates 0. Returns the number of rows purged. Run daily from the
+ * lifecycle cron.
+ */
+export async function purgeSendLogPii(
+  now: Date = new Date(),
+  retentionDays: number = SEND_LOG_RETENTION_DAYS,
+): Promise<number> {
+  const cutoff = retentionCutoff(now, retentionDays);
+  const res = await prisma.whatsAppSendLog.updateMany({
+    where: {
+      sentAt: { lt: cutoff },
+      OR: [{ toNumber: { not: "" } }, { failedDetail: { not: null } }],
+    },
+    data: { toNumber: "", failedDetail: null },
   });
   return res.count;
 }

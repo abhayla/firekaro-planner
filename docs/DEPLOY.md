@@ -106,7 +106,7 @@ sudo crontab -e
   http://127.0.0.1:3100/api/internal/lifecycle/run >> /var/log/firekaro-lifecycle.log 2>&1
 ```
 
-Manual trigger / smoke test (returns `{users, candidates, sent, deduped, notSent}`):
+Manual trigger / smoke test (returns `{users, candidates, sent, deduped, notSent, piiPurged}`):
 
 ```bash
 curl -s -X POST -H "x-internal-token: $LIFECYCLE_RUN_TOKEN" \
@@ -115,6 +115,13 @@ curl -s -X POST -H "x-internal-token: $LIFECYCLE_RUN_TOKEN" \
 
 A second run within the same period returns `sent:0` (everything deduped) — that
 is the expected idempotent behaviour, not a failure.
+
+**DPDP send-log retention (#10):** this same daily run also purges recipient PII
+from `whatsapp_send_log` — it NULLs `toNumber` on rows older than 90 days while
+KEEPING the row (template/status/timestamp stay for analytics). The count is
+reported as `piiPurged`. It is idempotent (already-purged rows are skipped) and
+needs **no separate cron** — it is folded into `/lifecycle/run`. A purge failure
+is logged but does not fail the lifecycle run.
 
 ## 6. Google OAuth (production client)
 

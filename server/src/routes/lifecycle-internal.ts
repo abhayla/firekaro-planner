@@ -3,6 +3,7 @@ import { timingSafeEqual } from "node:crypto";
 import { apiSuccess, apiError, ErrorCode } from "../lib/api-utils";
 import { logger } from "../lib/logger";
 import { runLifecycle } from "../lib/lifecycle-runner";
+import { purgeSendLogPii } from "../lib/comms-repo";
 
 /** Constant-time equality (guards length first — timingSafeEqual throws on a mismatch). */
 function safeEqual(a: string, b: string): boolean {
@@ -37,8 +38,19 @@ app.post("/lifecycle/run", async (c) => {
   }
   try {
     const result = await runLifecycle();
-    logger.info({ result }, "lifecycle endpoint run complete");
-    return apiSuccess(c, result);
+    // DPDP send-log PII purge (#10) runs daily alongside the lifecycle send. A purge
+    // failure must NOT fail the run that already succeeded — log it and report 0.
+    let piiPurged = 0;
+    try {
+      piiPurged = await purgeSendLogPii();
+    } catch (e) {
+      logger.error(
+        { err: e instanceof Error ? e.message : String(e) },
+        "send-log PII purge failed (lifecycle run otherwise succeeded)",
+      );
+    }
+    logger.info({ result, piiPurged }, "lifecycle endpoint run complete");
+    return apiSuccess(c, { ...result, piiPurged });
   } catch (e) {
     logger.error({ err: e instanceof Error ? e.message : String(e) }, "lifecycle run failed");
     return apiError(c, "Lifecycle run failed", 500, ErrorCode.INTERNAL_ERROR);
