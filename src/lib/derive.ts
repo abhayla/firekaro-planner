@@ -56,11 +56,16 @@ export function derive(household: Household, assumptions: Assumptions, lens: Der
   const earners = members.filter((m) => m.role === "EARNER");
   const isSolo = members.length <= 1;
 
-  // Decide member-lens vs whole-household aggregation (ISSUES-v2 #6 fix).
-  const applyMemberLens = !isSolo && !lens.isFamilyView;
-  const effectiveLensMemberId: string | null = applyMemberLens
-    ? lens.viewingMemberId ?? earners[0]?.id ?? members[0]?.id ?? null
-    : null;
+  // #22 ROOT FIX: the member lens applies ONLY when a member is EXPLICITLY selected
+  // (`viewingMemberId` set). With no explicit selection ("All" / the default view),
+  // aggregate the WHOLE household. The old `!isFamilyView` default silently scoped a
+  // dual-income household to the PRIMARY EARNER (`?? earners[0]`), so the headline
+  // divided a household FIRE target (funds both spouses + kids) by ONE earner's
+  // savings → an incoherent FIRE age (Sharmas age 81 vs the true household 62). When
+  // not lensed, the entire engine — income, tax, AND FIRE adequacy — runs on the
+  // household, so every consumer is coherent by construction.
+  const applyMemberLens = !isSolo && !lens.isFamilyView && lens.viewingMemberId != null;
+  const effectiveLensMemberId: string | null = applyMemberLens ? lens.viewingMemberId : null;
   const lensedMemberIds: Set<string> = applyMemberLens && effectiveLensMemberId
     ? new Set([effectiveLensMemberId])
     : new Set(members.map((m) => m.id));

@@ -19,6 +19,7 @@ import { useHouseholdStore } from "@/stores/household";
 import { useAssumptionsStore } from "@/stores/assumptions";
 import { loadSeedPersona } from "@/lib/seed-persona";
 import { useFireDerive } from "@/lib/useFireDerive";
+import { derive } from "@/lib/derive";
 
 describe("useFireDerive — Sharmas seed (research-spine proof)", () => {
   beforeEach(() => {
@@ -55,17 +56,21 @@ describe("useFireDerive — Sharmas seed (research-spine proof)", () => {
     expect(d.progressPercent.value).toBeLessThanOrEqual(100);
   });
 
-  it("#22: the FIRE headline pools the whole household — never divides a household target by one earner", () => {
-    loadSeedPersona(useHouseholdStore(), useAssumptionsStore());
-    const hero = useFireDerive({ forceHousehold: true }); // what FireHero renders
-    const single = useFireDerive(); // default UI lens → single earner for the dual-income Sharmas
-    // The Sharmas are dual-income: the pooled hero counts BOTH earners' savings against
-    // the same household FIRE number, so its headline is strictly EARLIER than the
-    // single-earner default lens (which divides the household target by one earner — the
-    // gh-issue #22 incoherence). If forceHousehold ever stopped pooling, these would be
-    // equal and this lock would fail.
-    expect(hero.yearsToRegular.value).toBeLessThan(single.yearsToRegular.value);
-    expect(hero.savingsRate.value).toBeGreaterThan(single.savingsRate.value);
+  it("#22: the DEFAULT lens pools the whole household — headline is NOT scoped to one earner", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    loadSeedPersona(h, a);
+    const lens = { viewingMemberId: null, currentFY: "2025-26" };
+    const def = derive(h.data, a.values, { ...lens, isFamilyView: false }); // default app view (FireHero)
+    const fam = derive(h.data, a.values, { ...lens, isFamilyView: true }); // explicit family view
+    // ROOT FIX (#22): with no member explicitly selected, the default lens aggregates
+    // the WHOLE household, so its FIRE-adequacy outputs are BYTE-IDENTICAL to family
+    // view — the headline can never divide a household target by one earner again.
+    expect(def.yearsToRegular).toBe(fam.yearsToRegular);
+    expect(def.fireNumber).toBe(fam.fireNumber);
+    expect(def.annualSavings).toBe(fam.annualSavings);
+    // And the dual-income Sharmas genuinely pool BOTH earners (the bug counted one).
+    expect(def.lensedEarners.length).toBe(2);
   });
 
   it("#18: the Monte Carlo band is ordered and its median tracks the deterministic headline", () => {
