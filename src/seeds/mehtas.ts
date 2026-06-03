@@ -117,7 +117,9 @@ export function loadMehtasSeed(household: HStore, assumptions: AStore) {
     vestedPercent: 85,
   });
 
-  household.setAvgMonthly(180000);
+  // Discretionary trimmed to keep the household internally consistent — a DINK
+  // near-FIRE couple lives well but still saves more than it invests (#12 lock).
+  household.setAvgMonthly(162000);
   household.addRecurring({
     label: "Society maintenance",
     amount: 35000,

@@ -23,6 +23,7 @@ import { isInMarginalReliefBand, deriveDeductions, LIMIT_80C, LIMIT_80CCD_1B } f
 import { suggestNpsCap } from "./nps-withdrawal";
 import { epfVpfOpportunityCostYears } from "./epf-vpf";
 import { isEmergencyFundEligible } from "./investment-traits";
+import { formatINRCompact } from "./formatters";
 
 export type NudgeSeverity = "info" | "warning" | "alert";
 
@@ -60,7 +61,8 @@ export type NudgeKind =
   | "glide-path-warning"
   | "nps-cap"
   | "epf-vpf-opportunity-cost"
-  | "emergency-fund-shortfall";
+  | "emergency-fund-shortfall"
+  | "over-committed-sips";
 
 export interface NudgeContext {
   household: Household;
@@ -89,6 +91,12 @@ export interface NudgeContext {
    * Same purity rationale as `lifestyleInflation`.
    */
   goalPostShift?: { shiftCount: number; totalYearsAdded: number };
+  /**
+   * Monthly savings surplus (annualSavings / 12) — used by the over-committed-SIPs
+   * guard (#12) to flag when configured SIPs exceed what the household actually
+   * saves. Optional: when absent, the guard does not fire (no false positive).
+   */
+  monthlySurplus?: number;
 }
 
 /**
@@ -304,6 +312,32 @@ export function evaluateNudges(ctx: NudgeContext): Nudge[] {
           routes: ["fire-dashboard", "investments-overview"],
         });
       }
+    }
+  }
+
+  // 12b. Over-committed SIPs (#12) — configured monthly SIPs exceed the monthly
+  // savings surplus, i.e. the household is set up to invest more than it actually
+  // saves each month. That plan is not fundable; flag it so the user trims expenses
+  // or right-sizes the SIPs. (Does not fire when monthlySurplus is not supplied.)
+  if (ctx.monthlySurplus != null) {
+    const monthlySip = ctx.household.investments.reduce(
+      (s, i) => s + (i.monthlyContribution ?? 0),
+      0,
+    );
+    // Strict `>`: an exactly-fundable plan (SIPs == surplus) is fine and does NOT
+    // fire — this mirrors the `≤` invariant in seed-consistency.spec.ts. Do not
+    // relax to `>=` or every exactly-fundable household starts nudging.
+    if (monthlySip > ctx.monthlySurplus) {
+      out.push({
+        id: "over-committed-sips",
+        kind: "over-committed-sips",
+        severity: "warning",
+        title: "Your investments exceed your savings",
+        body: `Your monthly SIPs (${formatINRCompact(monthlySip)}) are larger than your monthly surplus (${formatINRCompact(Math.max(0, ctx.monthlySurplus))}) — the plan invests more than the household saves each month. Review your expenses or right-size your SIPs so the plan is fundable.`,
+        routes: ["fire-dashboard", "investments-overview"],
+        ctaTarget: "/expenses",
+        ctaLabel: "Review expenses",
+      });
     }
   }
 

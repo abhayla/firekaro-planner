@@ -103,7 +103,7 @@ export function loadIyersSeed(household: HStore, assumptions: AStore) {
     type: "MutualFunds",
     label: "Index + Flexi-cap MF",
     value: 12_000_000,
-    monthlyContribution: 60_000,
+    monthlyContribution: 50_000,
     ownerId: "ashwin",
     isAutomated: true,
   });
@@ -146,12 +146,17 @@ export function loadIyersSeed(household: HStore, assumptions: AStore) {
     interestRate: 6.5,
   });
 
-  // Joint home loan — audit Entry #23 demonstration
+  // Joint home loan — audit Entry #23 demonstration.
+  // NOTE (#12 tuning): this is a DUAL co-borrower loan, so the Section-24(b)
+  // interest deduction cap is ₹4L (2 × ₹2L), not ₹2L. At ₹36L × 8.5% ≈ ₹3.06L
+  // interest the deduction is now interest-bound (below the ₹4L cap), so further
+  // changing the balance DOES move the deduction → tax → surplus. The reconciled
+  // figures below already reflect that; don't assume the loan is tax-neutral.
   household.addLiability({
     name: "Home Loan (SBI)",
     type: "HomeLoan",
-    outstandingBalance: 5_000_000,
-    monthlyEMI: 47_500,
+    outstandingBalance: 3_600_000,
+    monthlyEMI: 34_000,
     interestRate: 8.5,
     ownerId: "ashwin",
     isSharedWithSpouse: true,
@@ -181,8 +186,10 @@ export function loadIyersSeed(household: HStore, assumptions: AStore) {
     insuredPersonId: "ramesh",
   });
 
-  // Expenses — sandwich-gen reality: parents bucket + education target
-  household.setAvgMonthly(85_000);
+  // Expenses — sandwich-gen reality: parents bucket + education target.
+  // Discretionary trimmed (and the home loan part-prepaid above) so the family
+  // saves more than it invests and clears a ~40% savings rate (#12 reconciliation).
+  household.setAvgMonthly(45_000);
   household.addRecurring({
     label: "Home rent (until home loan ends)",
     amount: 32_000,
@@ -237,5 +244,6 @@ export function loadIyersSeed(household: HStore, assumptions: AStore) {
     household.data.healthcareCorpusReservationPercent = 0.20;
   }
 
+  household.markProfileComplete();
   household.markWizardComplete();
 }

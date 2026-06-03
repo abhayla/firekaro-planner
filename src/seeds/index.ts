@@ -26,7 +26,7 @@ export const SEED_META: Record<SeedName, SeedMeta> = {
   sharmas: {
     id: "sharmas",
     label: "The Sharmas",
-    description: "Family of 4 · mid-FIRE journey · ~12 yrs to go",
+    description: "Family of 4 · mid-FIRE journey · still building the corpus",
     icon: "mdi-home-heart",
   },
   empty: {
@@ -38,7 +38,7 @@ export const SEED_META: Record<SeedName, SeedMeta> = {
   mehtas: {
     id: "mehtas",
     label: "The Mehtas",
-    description: "DINK couple · near FIRE · ~18 months out",
+    description: "DINK couple · near FIRE · ~2 yrs out",
     icon: "mdi-rocket-launch",
   },
   iyers: {

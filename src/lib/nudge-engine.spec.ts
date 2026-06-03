@@ -166,6 +166,30 @@ describe("evaluateNudges — portfolio", () => {
   });
 });
 
+describe("evaluateNudges — over-committed SIPs (#12)", () => {
+  it("fires when monthly SIPs exceed the monthly surplus", () => {
+    const hh = emptyHousehold({
+      investments: [inv({ monthlyContribution: 60_000 }), inv({ id: "i2", monthlyContribution: 30_000 })],
+    });
+    const out = evaluateNudges(ctx({ household: hh, monthlySurplus: 50_000 }));
+    expect(kinds(out)).toContain("over-committed-sips");
+  });
+
+  it("does NOT fire when surplus covers the SIPs", () => {
+    const hh = emptyHousehold({
+      investments: [inv({ monthlyContribution: 40_000 })],
+    });
+    expect(kinds(evaluateNudges(ctx({ household: hh, monthlySurplus: 50_000 })))).not.toContain(
+      "over-committed-sips",
+    );
+  });
+
+  it("does NOT fire when monthlySurplus is absent (no false positive)", () => {
+    const hh = emptyHousehold({ investments: [inv({ monthlyContribution: 99_000 })] });
+    expect(kinds(evaluateNudges(ctx({ household: hh })))).not.toContain("over-committed-sips");
+  });
+});
+
 describe("evaluateNudges — estate", () => {
   it("fires estate-gaps when fewer than half the 7 items are complete", () => {
     const household = emptyHousehold({

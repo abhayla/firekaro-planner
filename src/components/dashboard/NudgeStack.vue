@@ -17,6 +17,7 @@ import { useHouseholdStore } from "@/stores/household";
 import { useAssumptionsStore } from "@/stores/assumptions";
 import { useUiStore } from "@/stores/ui";
 import { useFireDerive } from "@/lib/useFireDerive";
+import { derive } from "@/lib/derive";
 import { evaluateNudges, type NudgeSeverity } from "@/lib/nudge-engine";
 import { derivedFamilyLayer } from "@/lib/derived-records";
 import { analyzeLifestyleInflation, detectGoalPostShift } from "@/lib/expense-history";
@@ -50,6 +51,15 @@ const nudges = computed(() => {
   void household.snapshotVersion;
   const lifestyleInflation = analyzeLifestyleInflation(assumptions.householdInflation());
   const goalPostShift = detectGoalPostShift();
+  // Affordability (over-committed SIPs) is a WHOLE-household property — compute the
+  // surplus from the unlensed household so it matches the whole-household SIP total
+  // the engine sums. Using the lensed `fire.annualSavings` here would false-fire in
+  // a member-lens view (one earner's surplus vs the household's total SIPs).
+  const wholeHousehold = derive(household.data, assumptions.values, {
+    isFamilyView: true,
+    viewingMemberId: null,
+    currentFY: ui.currentFY,
+  });
   const all = evaluateNudges({
     household: household.data,
     family: derivedFamilyLayer(household.data),
@@ -60,6 +70,7 @@ const nudges = computed(() => {
     currentMonth: new Date().getMonth(),
     lifestyleInflation,
     goalPostShift,
+    monthlySurplus: Math.round((wholeHousehold.annualSavings || 0) / 12),
   });
   void assumptions.values;
   return all
