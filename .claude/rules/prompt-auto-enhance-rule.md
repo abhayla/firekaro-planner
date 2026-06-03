@@ -22,7 +22,8 @@ detailed in its SSOT rule — pointer pattern, no duplication (`configuration-ss
 | **4.7 Role** | Infer the role, state `Role: <name> — <why>`, dispatch its backing agents/skills | `engineering-roles.md` |
 | **4.8 Plan** | For non-trivial coding work, produce a **visible plan** (plan mode / goal contract / inline plan block) BEFORE the first code edit — Skip trivial/mechanical edits | `plan-before-coding.md` |
 | **5 Execute** | Act under DACI: **decide** reversible/internal; **inform** on tactical product calls; **escalate** irreversible/outward in one line + keep working | `decision-authority.md` |
-| **6 Git** | Only if the turn produced committable changes: stage → secret-scan → commit → (branch/merge) → push via `git-manager-agent` + `.githooks/pre-commit` | `decision-authority.md` → "Git authority" |
+| **5.5 Verify** | The hierarchical verification EDGE: T0 ("CEO") reproduces the doer's gate + routes output to an INDEPENDENT reviewer (BOTH API + UI), before commit. Fires on the OUTPUT's blast radius — **even on "yes"/continuation turns the hook skipped** (so this stage is NOT conditional on 4.7 having fired). "Trivial" = blast radius, not diff size. | `operating-model.md` |
+| **6 Git** | Only if the turn produced committable changes: stage → secret-scan → commit → (branch/merge) → push via `git-manager-agent` + `.githooks/pre-commit`. The git gate (type-check+tests) is the final mechanical SUBSET of 5.5. | `decision-authority.md` → "Git authority" |
 
 **Verbosity (chosen 2026-06-01): FULL.** Render the grade card + step transcript +
 final strengthened prompt on **every** non-trivial prompt — not a lean one-liner.
@@ -112,6 +113,11 @@ These are the load-bearing contracts:
 - For non-trivial coding work, a visible plan (plan mode / goal contract /
   inline plan block) precedes the first code edit (`plan-before-coding.md`,
   stage 4.8); trivial/mechanical edits skip it
+- Before stage 6, run stage 5.5 — the hierarchical verification edge
+  (`operating-model.md`): the role above reproduces the doer's gate + routes
+  output to an independent reviewer (API + UI) before any non-trivial output is
+  accepted/committed; it fires on the output's blast radius even on
+  "yes"/continuation turns the hook skipped
 - If the turn produced committable changes, run stage 6 git via
   `git-manager-agent` + `.githooks/pre-commit`; skip git on Q&A / read-only turns
 - Resource CRUD requires the batch approval table — no creates / updates

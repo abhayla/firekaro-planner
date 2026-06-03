@@ -241,7 +241,10 @@ choice persists under `firekaro-mvp:active-seed`.
 ## Engineering role router
 
 Adopt the right engineering role per task automatically — `.claude/rules/engineering-roles.md`
-(global, auto-loaded).
+(global, auto-loaded). The **operating model** above the roles — T0 is the orchestrator ("CEO"), the
+roles report through it, and verification is a MANDATORY EDGE (the role above reproduces + independently
+reviews the role below, API + UI, before any non-trivial output is accepted/committed) — is
+`.claude/rules/operating-model.md`.
 
 ## Conventions
 
