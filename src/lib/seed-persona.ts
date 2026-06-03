@@ -183,8 +183,11 @@ export function loadSeedPersona(household: HStore, assumptions: AStore) {
     isTaxExempt: false,
   });
 
-  // Expenses
-  household.setAvgMonthly(95000);
+  // Expenses — a disciplined urban-salaried accumulator: discretionary living burn (excl
+  // rent/EMIs/parents, which are recurring lines below) kept modest so the savings surplus
+  // realistically funds the SIPs and yields a sensible FIRE path (gh-issue #11 seed reconciliation;
+  // the old ₹95k left a ₹9.5k/mo surplus that couldn't fund the ₹1L/mo of contributions).
+  household.setAvgMonthly(45000);
   household.addRecurring({
     label: "Rent",
     amount: 35000,
