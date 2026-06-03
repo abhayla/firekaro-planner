@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { calculateCoastFire, calculateBaristaFire, coastTrajectory } from "./coast-fire";
+import {
+  calculateCoastFire,
+  calculateBaristaFire,
+  coastTrajectory,
+  realReturnForCoast,
+} from "./coast-fire";
 
 describe("calculateCoastFire", () => {
   it("returns smaller corpus when years and return are positive", () => {
@@ -81,6 +86,32 @@ describe("calculateCoastFire", () => {
       realReturn: 0.06,
     });
     expect(result.yearsAtCurrent(3_118_047)).toBeCloseTo(20, 0);
+  });
+});
+
+describe("realReturnForCoast (A1 — no positive clamp, gh-issue #9 L2)", () => {
+  it("returns the true (positive) real return", () => {
+    expect(realReturnForCoast(0.11, 0.079)).toBeCloseTo(0.031, 10);
+  });
+
+  it("returns a NEGATIVE real return when inflation exceeds nominal — NOT clamped", () => {
+    // Debt-heavy / high-inflation household: blended return 7%, healthcare-weighted
+    // inflation 12% → real return is genuinely negative.
+    expect(realReturnForCoast(0.07, 0.12)).toBeCloseTo(-0.05, 10);
+  });
+
+  it("a negative real return flows through to coast == fireNumber (no understatement)", () => {
+    const real = realReturnForCoast(0.07, 0.12); // -0.05
+    const r = calculateCoastFire({ fireNumber: 5_000_000, yearsToRetirement: 20, realReturn: real });
+    expect(r.coastCorpus).toBe(5_000_000);
+  });
+
+  it("the old 0.01 clamp WOULD have understated the coast corpus (regression guard)", () => {
+    // Documents the bug the clamp caused: forcing realReturn to 0.01 makes the
+    // library compound it down, reporting a coast corpus far below the true
+    // fireNumber — the optimistic "stop saving sooner" signal A1 removes.
+    const clamped = calculateCoastFire({ fireNumber: 5_000_000, yearsToRetirement: 20, realReturn: 0.01 });
+    expect(clamped.coastCorpus).toBeLessThan(5_000_000);
   });
 });
 

@@ -62,6 +62,13 @@ const aboveThreshold = computed(
         EPF contributions up to ₹2.5L/yr are tax-free; interest on the
         EXCESS is taxed at slab annually (audit Entry #15).
       </div>
+      <!-- A3 (#7): be explicit about the EPF boundary so users enter the right figure. -->
+      <div class="text-caption text-medium-emphasis mb-3">
+        Enter your <strong>EPF balance only</strong> (the amount in your EPF passbook).
+        The employer's <strong>EPS pension share is excluded</strong> — FireKaro does
+        not split the 12% employer contribution into EPF (3.67%) and EPS (8.33%); the
+        balance you enter is taken as your EPF corpus as-is.
+      </div>
       <div class="epf-grid">
         <div>
           <div class="epf-label">Annual contribution</div>

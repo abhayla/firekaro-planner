@@ -105,7 +105,7 @@ const showCard = computed(
         <div v-if="!split.isBelowThreshold">
           <div class="nps-label">Annuity income / yr</div>
           <div class="nps-value">{{ formatINRCompact(split.annuityIncomeAnnual) }}</div>
-          <div class="nps-detail">taxed at slab</div>
+          <div class="nps-detail">before tax — taxed at slab</div>
         </div>
       </div>
       <v-alert

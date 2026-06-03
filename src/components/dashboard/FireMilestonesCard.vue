@@ -16,7 +16,7 @@ import { useHouseholdStore } from "@/stores/household";
 import { useAssumptionsStore } from "@/stores/assumptions";
 import { useFireDerive } from "@/lib/useFireDerive";
 import { useFeaturesStore } from "@/stores/features";
-import { calculateCoastFire, calculateBaristaFire } from "@/lib/coast-fire";
+import { calculateCoastFire, calculateBaristaFire, realReturnForCoast } from "@/lib/coast-fire";
 import { formatINRCompact } from "@/lib/formatters";
 import CoastTrajectoryChart from "@/components/charts/CoastTrajectoryChart.vue";
 
@@ -54,7 +54,9 @@ const yearsToRetirement = computed(() => {
 
 const realReturn = computed(() => {
   // real = nominal - household blended inflation (4-bucket, audit Entry #3).
-  return Math.max(0.01, fire.blendedReturn.value - assumptions.householdInflation());
+  // A1 (gh-issue #9 L2): NO positive clamp — a negative real return must flow
+  // through so coast-fire returns coastCorpus = fireNumber (you cannot coast).
+  return realReturnForCoast(fire.blendedReturn.value, assumptions.householdInflation());
 });
 
 const coast = computed(() =>

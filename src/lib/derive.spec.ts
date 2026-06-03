@@ -13,6 +13,7 @@ import { useUiStore } from "@/stores/ui";
 import { loadSeedPersona } from "@/lib/seed-persona";
 import { useFireDerive } from "@/lib/useFireDerive";
 import { derive } from "@/lib/derive";
+import { calculateNpsWithdrawal, postTaxAnnuityIncome } from "@/lib/nps-withdrawal";
 
 describe("derive() — pure kernel", () => {
   beforeEach(() => setActivePinia(createPinia()));
@@ -157,5 +158,29 @@ describe("derive() — pure kernel", () => {
     expect(withNps.fireNumber).toBeLessThan(withoutNps);
     // The withdrawable corpus excludes the annuitised 40% (no double-count).
     expect(withNps.fireWithdrawableCorpus).toBeLessThan(withNps.totalCorpus);
+  });
+
+  it("A2 (#7): the NPS annuity offset is the POST-TAX pension, not the gross figure", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    loadSeedPersona(h, a);
+    // Whole-household lens → the NPS corpus the kernel sees is deterministic.
+    const lens = { isFamilyView: true, viewingMemberId: null, currentFY: "2025-26" };
+    // Large NPS so the mandatory 40% annuity fires (> ₹5L).
+    h.addInvestment({ type: "NPS", label: "NPS top-up", value: 8_000_000, monthlyContribution: 0, ownerId: "rohit" });
+
+    const k = derive(h.data, a.values, lens);
+    const npsCorpus = k.lensedInvestments
+      .filter((i) => i.type === "NPS")
+      .reduce((s, i) => s + i.value, 0);
+    const gross = calculateNpsWithdrawal({ totalCorpus: npsCorpus }).annuityIncomeAnnual;
+
+    expect(gross).toBeGreaterThan(0);
+    expect(k.householdMarginalRate).toBeGreaterThan(0); // Sharmas sit in a taxable slab
+    // The offset must equal the post-tax helper output — and be strictly below
+    // gross. This is the lock that would FAIL if derive regressed to the old
+    // optimistic gross-annuity offset.
+    expect(k.npsAnnuityIncome).toBe(postTaxAnnuityIncome(gross, k.householdMarginalRate));
+    expect(k.npsAnnuityIncome).toBeLessThan(gross);
   });
 });

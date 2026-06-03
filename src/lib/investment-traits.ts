@@ -238,10 +238,16 @@ export function inflationRoute(inv: Investment): InflationRoute {
  * Phase 0 seam is in place and Phase 2 only swaps the stub bodies.
  */
 export function accumulationRule(inv: Investment): AccumulationRule {
+  // A3 (#7) EPF boundary: the engine does NOT derive contributions or split the
+  // 12% employer share into EPF (3.67%) and EPS (8.33%). For EPF_VPF the holding's
+  // `value` is the USER-SUPPLIED EPF balance and is treated as the EPF corpus
+  // as-is — it EXCLUDES the EPS pension portion. Do not assume a derived
+  // accumulation here; corpus is entered, not computed (see EpfVpfThresholdCard).
   return {
     kind: "stub-phase-2",
     description: `accumulationRule for ${inv.type}: Phase 2 Stage C implements compounding rule (e.g., ` +
-      `EPF 8.25%/employer-match, PPF 7.1%/1.5L ceiling, SIP at expectedReturn).`,
+      `EPF 8.25%/employer-match, PPF 7.1%/1.5L ceiling, SIP at expectedReturn). NOTE (A3/#7): ` +
+      `EPF corpus is user-supplied and EXCLUDES the EPS pension share — no 3.67/8.33 split is derived.`,
   };
 }
 

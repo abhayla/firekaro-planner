@@ -32,7 +32,7 @@ import { toMonthly, toAnnual } from "@/lib/cashflow";
 import { returnBucketKey } from "@/lib/investment-traits";
 import { deriveDeductions } from "@/lib/tax-deductions";
 import { DEFAULT_FLOOR_CEILING } from "@/lib/withdrawal-strategy";
-import { calculateNpsWithdrawal } from "@/lib/nps-withdrawal";
+import { calculateNpsWithdrawal, postTaxAnnuityIncome } from "@/lib/nps-withdrawal";
 import {
   resolveHouseholdInflation,
   resolveEffectiveSWRByHorizon,
@@ -189,6 +189,13 @@ export function derive(household: Household, assumptions: Assumptions, lens: Der
   });
   const annualTax = fyTax.totalTax;
 
+  // Household marginal slab rate — computed early so BOTH the NPS-annuity
+  // post-tax offset (A2, #7) and the EPF after-tax yield drag (A15.3) use it.
+  const cfg = getTaxConfigForFY(lens.currentFY);
+  const slabs =
+    householdTaxRecommendation.recommended === "NEW" ? cfg.newRegime.slabs : cfg.oldRegime.slabs;
+  const householdMarginalRate = marginalSlabRate(fyTax.taxableIncome, slabs);
+
   const annualSavings = Math.max(0, annualIncome.total - annualTax - annualExpensesToday);
   // gh-issue #11: the monthly amount flowing to the corpus is the savings residual ALONE. The
   // expense input EXCLUDES SIPs (UI contract: /expenses "Exclude rent, EMIs, insurance, and SIPs"),
@@ -220,7 +227,13 @@ export function derive(household: Household, assumptions: Assumptions, lens: Der
     .filter((i) => i.type === "NPS")
     .reduce((s, i) => s + i.value, 0);
   const npsSplit = calculateNpsWithdrawal({ totalCorpus: npsCorpus });
-  const npsAnnuityIncome = npsSplit.annuityIncomeAnnual;
+  // A2 (#7): the NPS annuity is slab-taxable — offset expenses with the POST-TAX
+  // pension, never the gross figure. Offsetting by gross over-credits the annuity
+  // and under-states the required FIRE corpus (an optimistic error — the worst
+  // class for the accumulator). The household's current marginal rate is a
+  // conservative proxy for the retiree's slab (documented simplification:
+  // retirement income is usually lower, so this errs on the safe side).
+  const npsAnnuityIncome = postTaxAnnuityIncome(npsSplit.annuityIncomeAnnual, householdMarginalRate);
   const npsAnnuityCorpus = npsSplit.annuityCorpus;
   const netAnnualExpenses = Math.max(0, annualExpensesToday - npsAnnuityIncome);
   // Corpus available for withdrawal excludes the locked annuitised portion.
@@ -262,10 +275,7 @@ export function derive(household: Household, assumptions: Assumptions, lens: Der
   const annualEpfVpfContribution = fireCorpusInvestments
     .filter((i) => i.type === "EPF_VPF")
     .reduce((s, i) => s + (i.monthlyContribution ?? 0) * 12, 0);
-  const cfg = getTaxConfigForFY(lens.currentFY);
-  const slabs =
-    householdTaxRecommendation.recommended === "NEW" ? cfg.newRegime.slabs : cfg.oldRegime.slabs;
-  const householdMarginalRate = marginalSlabRate(fyTax.taxableIncome, slabs);
+  // cfg / slabs / householdMarginalRate are computed earlier (NPS A2 offset).
   const epfAfterTaxReturn = epfBucketAfterTaxReturn({
     annualContribution: annualEpfVpfContribution,
     marginalSlabRate: householdMarginalRate,

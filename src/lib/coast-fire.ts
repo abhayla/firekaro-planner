@@ -85,6 +85,22 @@ export function calculateCoastFire(input: CoastFireInput): CoastFireResult {
 }
 
 /**
+ * Real return for the Coast-FIRE calc = nominal blended return − inflation.
+ *
+ * A1 (gh-issue #9 L2): this MUST NOT be clamped to a positive floor. A negative
+ * real return is a meaningful state for debt-heavy / high-inflation households —
+ * `calculateCoastFire` then correctly returns `coastCorpus = fireNumber` (no
+ * amount of compounding helps, so you cannot "coast"; you need the full number
+ * today). The old `FireMilestonesCard` did `Math.max(0.01, nominal − inflation)`,
+ * which silently understated the coast corpus → an OPTIMISTIC "you can stop
+ * saving sooner than you actually can" signal. Pass the true real return through
+ * so the library's `realReturn <= 0 → fireNumber` guard can fire.
+ */
+export function realReturnForCoast(nominalReturn: number, inflation: number): number {
+  return nominalReturn - inflation;
+}
+
+/**
  * Barista FIRE — the corpus where part-time work earnings cover the gap
  * between portfolio withdrawals and full expenses. Different from Coast
  * (Coast = stop saving entirely; Barista = stop full-time work but keep

@@ -25,8 +25,21 @@ export interface NpsWithdrawalSplit {
   lumpSum: number;
   /** Corpus that MUST convert to annuity. */
   annuityCorpus: number;
-  /** Estimated annual annuity income (at the assumed annuity rate). */
+  /**
+   * Estimated annual annuity income (GROSS, at the assumed annuity rate).
+   * A2 (#7): this is slab-taxable each year — see `annuityIncomeTaxable`.
+   */
   annuityIncomeAnnual: number;
+  /**
+   * A2 (#7): the annuity income is taxed at the retiree's income-tax slab each
+   * year. Only the 60% lump sum is tax-free; the 40% annuitised pension is NOT.
+   * Consumers MUST NOT present `annuityIncomeAnnual` as net / tax-free income
+   * (e.g. offsetting expenses by the gross figure over-credits the pension and
+   * under-states the required FIRE corpus — an optimistic error). Apply
+   * {@link postTaxAnnuityIncome} with the retiree's marginal rate first. True
+   * whenever `annuityIncomeAnnual > 0`.
+   */
+  annuityIncomeTaxable: boolean;
   /** True when the corpus is below the ₹5L full-withdrawal threshold. */
   isBelowThreshold: boolean;
 }
@@ -55,21 +68,38 @@ export function calculateNpsWithdrawal(input: NpsWithdrawalInput): NpsWithdrawal
       lumpSum: totalCorpus,
       annuityCorpus: 0,
       annuityIncomeAnnual: 0,
+      annuityIncomeTaxable: false,
       isBelowThreshold: true,
     };
   }
 
   const lumpSum = totalCorpus * NPS_LUMPSUM_PERCENT;
   const annuityCorpus = totalCorpus * NPS_ANNUITY_PERCENT;
-  const annuityIncomeAnnual = annuityCorpus * annuityRate;
+  const annuityIncomeAnnual = Math.round(annuityCorpus * annuityRate);
 
   return {
     totalCorpus,
     lumpSum: Math.round(lumpSum),
     annuityCorpus: Math.round(annuityCorpus),
-    annuityIncomeAnnual: Math.round(annuityIncomeAnnual),
+    annuityIncomeAnnual,
+    // Derive the marker so the documented invariant literally holds even at a
+    // 0% annuity rate (above-threshold but annuityIncomeAnnual rounds to 0).
+    annuityIncomeTaxable: annuityIncomeAnnual > 0,
     isBelowThreshold: false,
   };
+}
+
+/**
+ * Post-tax annual annuity income — the NPS annuity is slab-taxable
+ * (see {@link NpsWithdrawalSplit.annuityIncomeTaxable}). Returns the gross
+ * annuity net of the retiree's marginal slab rate, so consumers that offset
+ * retirement expenses with the pension use the honest (smaller) figure rather
+ * than the gross amount. `marginalRate` is a decimal (e.g. 0.3) and is clamped
+ * into [0, 1] defensively.
+ */
+export function postTaxAnnuityIncome(grossAnnuityIncome: number, marginalRate: number): number {
+  const r = Math.min(Math.max(marginalRate, 0), 1);
+  return Math.round(grossAnnuityIncome * (1 - r));
 }
 
 /**

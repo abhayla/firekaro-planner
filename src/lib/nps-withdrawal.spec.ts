@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   calculateNpsWithdrawal,
   suggestNpsCap,
+  postTaxAnnuityIncome,
   NPS_FULL_WITHDRAWAL_THRESHOLD,
 } from "./nps-withdrawal";
 
@@ -16,6 +17,8 @@ describe("calculateNpsWithdrawal — below the ₹5L threshold", () => {
     expect(r.annuityCorpus).toBe(0);
     expect(r.annuityIncomeAnnual).toBe(0);
     expect(r.isBelowThreshold).toBe(true);
+    // A2 (#7): no annuity below the threshold → nothing slab-taxable.
+    expect(r.annuityIncomeTaxable).toBe(false);
   });
 
   it("treats exactly ₹5L as below-threshold (full withdrawal)", () => {
@@ -32,6 +35,9 @@ describe("calculateNpsWithdrawal — above the threshold", () => {
     expect(r.annuityCorpus).toBe(4_000_000);
     expect(r.annuityIncomeAnnual).toBe(240_000); // 4,000,000 * 0.06
     expect(r.isBelowThreshold).toBe(false);
+    // A2 (#7): the annuity income is slab-taxable each year (only the 60% lump
+    // sum is tax-free). The marker forbids any consumer treating it as net.
+    expect(r.annuityIncomeTaxable).toBe(true);
   });
 
   it("honors a custom annuity rate", () => {
@@ -44,6 +50,22 @@ describe("calculateNpsWithdrawal — above the threshold", () => {
     expect(r.lumpSum).toBe(360_000);
     expect(r.annuityCorpus).toBe(240_000);
     expect(r.isBelowThreshold).toBe(false);
+  });
+});
+
+describe("postTaxAnnuityIncome (A2 — annuity is slab-taxable, #7)", () => {
+  it("haircuts the gross annuity by the marginal slab rate", () => {
+    // ₹2.4L gross annuity at a 30% retirement slab → ₹1.68L net.
+    expect(postTaxAnnuityIncome(240_000, 0.3)).toBe(168_000);
+  });
+
+  it("returns the gross amount at a 0% rate (annuity below the exemption)", () => {
+    expect(postTaxAnnuityIncome(120_000, 0)).toBe(120_000);
+  });
+
+  it("clamps a nonsensical rate into [0,1] (defensive)", () => {
+    expect(postTaxAnnuityIncome(100_000, -0.5)).toBe(100_000);
+    expect(postTaxAnnuityIncome(100_000, 2)).toBe(0);
   });
 });
 
