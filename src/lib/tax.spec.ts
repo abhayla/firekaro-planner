@@ -339,3 +339,29 @@ describe("old-regime senior basic-exemption variant (gh-issue #6 LOW)", () => {
     expect(superSenior.totalTax).toBe(young.totalTax);
   });
 });
+
+describe("computeTax — 80CCD(2) govt-sector 14% ceiling, OLD regime (gh-issue #4)", () => {
+  // Govt employees get 14%-of-basic under the OLD regime too (private = 10% old / 14% new).
+  const base = { grossIncome: 2_000_000, regime: "OLD" as const, fy: "2025-26", isSalaried: false, deductions: 0 };
+
+  it("government member: OLD 80CCD(2) capped at 14% of basic, not 10%", () => {
+    const govt = computeTax({ ...base, employerNpsByMember: [{ nps: 140000, basic: 1000000, sector: "government" }] });
+    const priv = computeTax({ ...base, employerNpsByMember: [{ nps: 140000, basic: 1000000, sector: "private" }] });
+    // govt deducts the full ₹1.4L (14%); private is capped at ₹1L (10%) → govt taxable lower by ₹40k.
+    expect(priv.taxableIncome - govt.taxableIncome).toBe(40000);
+    expect(govt.taxableIncome).toBe(1_860_000);
+    expect(priv.taxableIncome).toBe(1_900_000);
+  });
+
+  it("defaults to private (10%) when sector is omitted (conservative — no over-deduction)", () => {
+    const omitted = computeTax({ ...base, employerNpsByMember: [{ nps: 140000, basic: 1000000 }] });
+    const priv = computeTax({ ...base, employerNpsByMember: [{ nps: 140000, basic: 1000000, sector: "private" }] });
+    expect(omitted.taxableIncome).toBe(priv.taxableIncome);
+  });
+
+  it("NEW regime is 14% for everyone — sector makes no difference", () => {
+    const govtNew = computeTax({ ...base, regime: "NEW", employerNpsByMember: [{ nps: 140000, basic: 1000000, sector: "government" }] });
+    const privNew = computeTax({ ...base, regime: "NEW", employerNpsByMember: [{ nps: 140000, basic: 1000000, sector: "private" }] });
+    expect(govtNew.taxableIncome).toBe(privNew.taxableIncome);
+  });
+});

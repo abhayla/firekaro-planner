@@ -285,7 +285,9 @@ export interface ComputeTaxArgs {
   // NPS is capped at the regime ceiling of THEIR OWN basic and summed — an over-contributor
   // cannot borrow an under-contributor's headroom (more correct than the aggregate `employerNps`
   // + `employerNpsBasic` scalars for a multi-earner household). gh-issue #4.
-  employerNpsByMember?: { nps: number; basic: number }[];
+  // Per-member `sector` ("government" gets the 14% OLD-regime 80CCD(2) ceiling, like the NEW
+  // regime; "private"/omitted gets 10% OLD). gh-issue #4.
+  employerNpsByMember?: { nps: number; basic: number; sector?: "private" | "government" }[];
   isSalaried?: boolean;
   // Taxpayer's age in years (caller-resolved — FireKaro anchors it to the earner's current
   // age, consistent with the forward projection's age basis; historical-FY accuracy is out of
@@ -306,24 +308,24 @@ export function computeTax(args: ComputeTaxArgs): FullTaxResult {
   // Old regime allows chapter VI-A; New regime ignores them — EXCEPT 80CCD(2) employer
   // NPS, which is deductible under both regimes and is passed separately (gh-issue #2).
   const ded = regime === "OLD" ? Math.max(0, args.deductions ?? 0) : 0;
-  // 80CCD(2): cap the employer-NPS deduction at the statutory ceiling — 14% of basic in
-  // the NEW regime, 10% in the OLD — when a basic salary is supplied. Absent a basic we
-  // trust the entered figure rather than fabricate basic from CTC (gh-issue #3).
-  // TODO(gh-issue #4): central/state GOVERNMENT employees get 14% under the OLD regime too;
-  // we under-cap them here (conservative — never over-deducts). Needs an employer-sector
-  // field on Member to branch on.
-  const npsCeiling = regime === "NEW" ? 0.14 : 0.1;
+  // 80CCD(2): cap the employer-NPS deduction at the statutory ceiling of basic salary.
+  // NEW regime = 14% for everyone. OLD regime = 14% for GOVERNMENT employees, 10% for
+  // private (gh-issue #4). Absent a basic we trust the entered figure rather than fabricate
+  // basic from CTC (gh-issue #3). Sector defaults to private (conservative — never over-deducts).
+  const ceilingFor = (sector?: "private" | "government") =>
+    regime === "NEW" ? 0.14 : sector === "government" ? 0.14 : 0.1;
+  const npsCeiling = ceilingFor("private"); // the scalar fallback assumes private
   let employerNps: number;
   if (args.employerNpsByMember && args.employerNpsByMember.length > 0) {
     // Per-member cap (gh-issue #4): cap each member's employer NPS at the ceiling of their OWN
-    // basic, then sum — no cross-member headroom borrowing.
+    // basic AND their OWN sector, then sum — no cross-member headroom borrowing.
     employerNps = args.employerNpsByMember.reduce((sum, m) => {
       const nps = Math.max(0, m.nps);
       const basic = Math.max(0, m.basic);
-      return sum + (basic > 0 ? Math.min(nps, npsCeiling * basic) : nps);
+      return sum + (basic > 0 ? Math.min(nps, ceilingFor(m.sector) * basic) : nps);
     }, 0);
   } else {
-    // Aggregate fallback (single earner, or callers that pass scalars).
+    // Aggregate fallback (single earner, or callers that pass scalars) — private ceiling.
     const rawEmployerNps = Math.max(0, args.employerNps ?? 0);
     const basicForCap = Math.max(0, args.employerNpsBasic ?? 0);
     employerNps = basicForCap > 0 ? Math.min(rawEmployerNps, npsCeiling * basicForCap) : rawEmployerNps;

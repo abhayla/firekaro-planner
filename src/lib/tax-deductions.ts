@@ -51,7 +51,7 @@ export interface DeductionBreakdown {
    * Per-member {nps, basic} pairs. Pass to computeTax as `employerNpsByMember` for a
    * per-member 80CCD(2) cap (no cross-member headroom borrowing). gh-issue #4.
    */
-  employerNpsByMember: { nps: number; basic: number }[];
+  employerNpsByMember: { nps: number; basic: number; sector?: "private" | "government" }[];
   /** Sec 80D — health insurance premium (self + parents). */
   section80D: number;
   /** Sec 24 — home loan interest. */
@@ -117,7 +117,11 @@ export function deriveDeductions(
   );
   // Per-member {nps, basic} for the per-member 80CCD(2) cap (gh-issue #4).
   const employerNpsByMember = household.members
-    .map((m) => ({ nps: m.salary?.employerNpsAnnual ?? 0, basic: m.salary?.basicAnnual ?? 0 }))
+    .map((m) => ({
+      nps: m.salary?.employerNpsAnnual ?? 0,
+      basic: m.salary?.basicAnnual ?? 0,
+      sector: m.salary?.employerSector ?? "private", // govt → 14% OLD ceiling (gh-issue #4)
+    }))
     .filter((e) => e.nps > 0 || e.basic > 0);
 
   // ---- 80D — health insurance ----

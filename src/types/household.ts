@@ -18,6 +18,10 @@ export const memberSalarySchema = z.object({
   // statutory ceiling (10% of basic old regime / 14% new). Optional — when absent the
   // employer-NPS figure is trusted uncapped (we don't derive basic from CTC). gh-issue #3.
   basicAnnual: z.number().min(0).optional(),
+  // Employer sector — GOVERNMENT employees get the 14%-of-basic 80CCD(2) ceiling under the
+  // OLD regime too (private = 10% old / 14% new). Optional; absent ⇒ "private" (conservative
+  // default — never over-deducts). gh-issue #4.
+  employerSector: z.enum(["private", "government"]).optional(),
 });
 export type MemberSalary = z.infer<typeof memberSalarySchema>;
 
