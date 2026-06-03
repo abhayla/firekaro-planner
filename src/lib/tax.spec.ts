@@ -6,9 +6,26 @@ import {
   getTaxConfigForFY,
   getTaxConfigCoverage,
   isProjectedTaxStale,
+  fireProjectionTaxNote,
   oldRegimeSlabsForAge,
   type TaxSlabEntry,
 } from "./tax";
+
+describe("fireProjectionTaxNote (#19 — Tier-0 honesty disclosure)", () => {
+  it("discloses when a projection runs PAST the newest configured FY", () => {
+    const note = fireProjectionTaxNote(2058);
+    expect(note).toContain("assumes today's slabs held constant");
+    expect(note).toContain("2026-27"); // the newest configured FY
+    expect(isProjectedTaxStale("2058-59")).toBe(true); // engine agrees
+  });
+  it("is SILENT when the projection stays within configured years", () => {
+    expect(fireProjectionTaxNote(2025)).toBeNull();
+    expect(fireProjectionTaxNote(2026)).toBeNull();
+  });
+  it("guards a non-finite year", () => {
+    expect(fireProjectionTaxNote(NaN)).toBeNull();
+  });
+});
 
 describe("computeTax — New Regime FY 2024-25", () => {
   it("zero tax on income within rebate limit (₹7L)", () => {

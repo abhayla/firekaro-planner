@@ -184,6 +184,20 @@ export function isProjectedTaxStale(fy: string): boolean {
   return getTaxConfigCoverage(fy).isFutureUnconfigured;
 }
 
+/**
+ * #19 UI disclosure (Tier-0 honesty): the one-line note shown when a FIRE projection's
+ * furthest CALENDAR year runs past the newest configured FY — those years silently apply
+ * today's slabs held flat, a material hidden assumption over a multi-decade horizon.
+ * Returns null when the projection stays within configured years. Pure → unit-tested.
+ */
+export function fireProjectionTaxNote(lastProjectionYear: number): string | null {
+  if (!Number.isFinite(lastProjectionYear)) return null;
+  const lastFy = `${lastProjectionYear}-${String((lastProjectionYear + 1) % 100).padStart(2, "0")}`;
+  const cov = getTaxConfigCoverage(lastFy);
+  if (!cov.isFutureUnconfigured) return null;
+  return `Tax beyond FY ${cov.newestConfiguredFy} assumes today's slabs held constant — long-horizon projections are estimates.`;
+}
+
 export function getTaxConfigForFY(fy: string): FYTaxConfig {
   // gh-issue #6 / ADR-0003: accurate historical-year tax is OUT of scope (FireKaro is a FIRE
   // planner, not a tax-return tracker). An unconfigured FY falls back to the NEAREST configured FY

@@ -4,6 +4,7 @@ import { Line } from "vue-chartjs";
 import { useFireDerive } from "@/lib/useFireDerive";
 import { registerChartJSOnce, CHART_COLORS } from "@/lib/chart-setup";
 import { formatINRCompact } from "@/lib/formatters";
+import { fireProjectionTaxNote } from "@/lib/tax";
 import type { Plugin } from "chart.js";
 
 registerChartJSOnce();
@@ -126,6 +127,13 @@ const chartOptions = computed(() => ({
   },
 }));
 
+// #19 (Tier-0 honesty): a multi-decade projection runs past the newest configured
+// tax FY — disclose that those years assume today's slabs, never hide it.
+const taxStalenessNote = computed(() => {
+  const proj = fire.projection.value;
+  return proj.length ? fireProjectionTaxNote(proj[proj.length - 1].year) : null;
+});
+
 const crossoverChips = computed(() => {
   const xs: { label: string; year: number; color: string }[] = [];
   const c = fire.crossovers.value;
@@ -154,6 +162,9 @@ const crossoverChips = computed(() => {
     <div class="chart-wrap" role="img" aria-label="FIRE corpus projection chart showing your path to financial independence">
       <Line :data="chartData" :options="chartOptions" :plugins="[crossoverMarkersPlugin]" :aria-label="'FIRE corpus projection over time'" />
     </div>
+    <p v-if="taxStalenessNote" class="tax-note" data-testid="fire-projection-tax-staleness">
+      <v-icon icon="mdi-information-outline" size="14" class="mr-1" />{{ taxStalenessNote }}
+    </p>
   </v-card>
 </template>
 
@@ -161,5 +172,14 @@ const crossoverChips = computed(() => {
 .chart-wrap {
   position: relative;
   height: 340px;
+}
+
+.tax-note {
+  margin-top: var(--space-2);
+  font-size: var(--type-xs, 0.75rem);
+  line-height: var(--leading-snug, 1.35);
+  color: var(--text-muted);
+  display: flex;
+  align-items: flex-start;
 }
 </style>
