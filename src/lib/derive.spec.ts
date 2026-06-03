@@ -160,6 +160,76 @@ describe("derive() — pure kernel", () => {
     expect(withNps.fireWithdrawableCorpus).toBeLessThan(withNps.totalCorpus);
   });
 
+  it("M1 (#9): an enabled glide path de-risks late years → LOWER terminal corpus than the flat path", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    loadSeedPersona(h, a);
+    const lens = { isFamilyView: false, viewingMemberId: null, currentFY: "2025-26" };
+
+    // Make the portfolio all-equity so the flat blended return == equityReturn (0.12),
+    // which sits ABOVE the entire glide schedule (75→40% equity ⇒ 10.75%→9%). This
+    // isolates the de-risking effect: every glide year compounds at or below the flat
+    // rate, so the terminal corpus MUST be lower under glide. (A mixed portfolio would
+    // conflate the 2-asset glide blend with the de-risking and muddy the direction.)
+    h.data.investments = [];
+    h.addInvestment({ type: "Stocks", label: "Equity", value: 5_000_000, monthlyContribution: 0, ownerId: "rohit" });
+
+    const glideOff = { enabled: false, startEquityPercent: 75, endEquityPercent: 40, taperWindowYears: 10 };
+    const glideOn = { enabled: true, startEquityPercent: 75, endEquityPercent: 40, taperWindowYears: 10 };
+
+    h.data.glidePath = { ...glideOff };
+    const off = derive(h.data, a.values, lens);
+    h.data.glidePath = { ...glideOn };
+    const on = derive(h.data, a.values, lens);
+
+    expect(off.blendedReturn).toBeCloseTo(0.12, 5); // all-equity flat baseline
+    const lastOff = off.projection[off.projection.length - 1].corpus;
+    const lastOn = on.projection[on.projection.length - 1].corpus;
+    expect(lastOn).toBeLessThan(lastOff);
+    // The glide must NOT pull the FIRE crossover earlier (no optimistic bias).
+    if (on.crossovers.regular.year != null && off.crossovers.regular.year != null) {
+      expect(on.crossovers.regular.year).toBeGreaterThanOrEqual(off.crossovers.regular.year);
+    }
+    // The HEADLINE "years to FIRE" (FireHero uses yearsToRegular) must ALSO be
+    // glide-aware — strictly later under de-risking, never earlier. This is the
+    // lock that would fail if the headline regressed to the flat-return path.
+    expect(on.yearsToRegular).toBeGreaterThan(off.yearsToRegular);
+  });
+
+  it("M1 (#9): enabling glide on a MIXED (sub-75%-equity) household never pulls FIRE earlier", () => {
+    // Regression lock for the optimistic-shift bug rules 24/25 caught on the Sharmas:
+    // a naive 2-asset rebase to 75% equity RAISED the return (their real equity weight
+    // is below 75%) and pulled FIRE *earlier*. The anchored model (start from the actual
+    // blended return, only ever shed equity downward) must guarantee glide ⇒ later-or-equal.
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    loadSeedPersona(h, a); // Sharmas — mixed portfolio, actual equity weight < 75%
+    const lens = { isFamilyView: false, viewingMemberId: null, currentFY: "2025-26" };
+
+    h.data.glidePath = { enabled: false, startEquityPercent: 75, endEquityPercent: 40, taperWindowYears: 10 };
+    const off = derive(h.data, a.values, lens);
+    h.data.glidePath = { enabled: true, startEquityPercent: 75, endEquityPercent: 40, taperWindowYears: 10 };
+    const on = derive(h.data, a.values, lens);
+
+    expect(on.yearsToRegular).toBeGreaterThanOrEqual(off.yearsToRegular);
+    const lastOff = off.projection[off.projection.length - 1].corpus;
+    const lastOn = on.projection[on.projection.length - 1].corpus;
+    expect(lastOn).toBeLessThanOrEqual(lastOff);
+  });
+
+  it("M1 (#9): a non-glide seed accumulates monotonically at the flat blended return", () => {
+    // NB: the BYTE-IDENTITY of the non-glide path is locked at the fire-math layer
+    // (fire-math.spec.ts constant-function `toEqual`) + the Sharmas seed lock; this
+    // test only guards that the default (glide-off) seed still accumulates sanely.
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    loadSeedPersona(h, a); // default glidePath.enabled === false
+    const lens = { isFamilyView: false, viewingMemberId: null, currentFY: "2025-26" };
+    const p = derive(h.data, a.values, lens).projection;
+    expect(p[2].corpus).toBeGreaterThan(p[1].corpus);
+    expect(p[1].corpus).toBeGreaterThan(p[0].corpus);
+  });
+
   it("A2 (#7): the NPS annuity offset is the POST-TAX pension, not the gross figure", () => {
     const h = useHouseholdStore();
     const a = useAssumptionsStore();

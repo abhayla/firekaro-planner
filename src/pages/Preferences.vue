@@ -567,9 +567,12 @@ const featuresBySection = computed(() => {
         <section id="pref-section-glide" class="pref-section">
           <SectionHeader title="Glide path" :on-reset="() => resetSection('glide')" />
           <p class="text-body-2 text-medium-emphasis mb-3">
-            Pfau-Kitces rising-equity glide path per audit Entry #7. Today this drives an
-            allocation-drift nudge; folding the de-risked return into the FIRE projection itself
-            is a planned enhancement (gh-issue #9).
+            Pfau-Kitces rising-equity glide path per audit Entry #7. When enabled, your equity
+            allocation tapers from the start % to the end % over the taper window. The FIRE
+            projection starts from your blended return today and de-risks it over the taper —
+            each percentage point of equity you shed lowers the projected return by the
+            equity-vs-debt gap — so a glide produces a more conservative corpus and a later (never
+            earlier) FIRE date (gh-issue #9).
           </p>
           <v-switch
             :model-value="glide.enabled"

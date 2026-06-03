@@ -33,6 +33,8 @@ import { returnBucketKey } from "@/lib/investment-traits";
 import { deriveDeductions } from "@/lib/tax-deductions";
 import { DEFAULT_FLOOR_CEILING } from "@/lib/withdrawal-strategy";
 import { calculateNpsWithdrawal, postTaxAnnuityIncome } from "@/lib/nps-withdrawal";
+import { equityPercentAtYear } from "@/lib/glide-path";
+import type { ReturnSchedule } from "@/lib/fire-math";
 import {
   resolveHouseholdInflation,
   resolveEffectiveSWRByHorizon,
@@ -291,9 +293,39 @@ export function derive(household: Household, assumptions: Assumptions, lens: Der
   }
   const blendedReturn = blendPortfolioReturn(assumptions, returnWeights, epfAfterTaxReturn);
 
-  const yearsToRegular = calculateYearsToTarget(fireWithdrawableCorpus, fireNumber, monthlyContribution, blendedReturn);
-  const yearsToLean = calculateYearsToTarget(fireWithdrawableCorpus, variants.leanFIRE, monthlyContribution, blendedReturn);
-  const yearsToFat = calculateYearsToTarget(fireWithdrawableCorpus, variants.fatFIRE, monthlyContribution, blendedReturn);
+  // M1 (#9): when the glide path is enabled, the corpus must compound each year
+  // at a DE-RISKED return reflecting that year's equity allocation, not one static
+  // blended return — else the projection AND the headline "years to FIRE" over-state
+  // growth and report an optimistically EARLY FIRE date (Tier-0 for the salaried
+  // accumulator).
+  //
+  // The schedule is ANCHORED to the household's actual `blendedReturn`: as the
+  // glide sheds equity (startEquityPercent → endEquityPercent over the taper),
+  // the return drops by the shed-equity fraction × the equity risk premium
+  // (equityReturn − debtReturn). It is therefore ALWAYS ≤ blendedReturn and equals
+  // blendedReturn before the taper begins — so enabling the glide can only push the
+  // FIRE date LATER or leave it unchanged, never earlier. (An earlier naive model
+  // rebased the whole portfolio to a 75%-equity 2-asset blend, which RAISED the
+  // return — and pulled FIRE optimistically earlier — for any household whose real
+  // equity weight was below 75%; rules 24/25 caught that on the Sharmas seed.)
+  // Non-glide households keep the flat blended return → byte-identical to before.
+  const glide = household.glidePath;
+  const glideYearsToRetirement = Math.max(0, targetRetirementAge - anchorAge);
+  const equityRiskPremium = Math.max(0, assumptions.equityReturn - assumptions.debtReturn);
+  const expectedReturnSchedule: ReturnSchedule = glide?.enabled
+    ? (yearIndex: number) => {
+        const startEquity = glide.startEquityPercent / 100;
+        const equityNow = equityPercentAtYear(glide, glideYearsToRetirement, yearIndex) / 100;
+        const equityShed = Math.max(0, startEquity - equityNow);
+        return blendedReturn - equityShed * equityRiskPremium;
+      }
+    : blendedReturn;
+
+  // Headline FIRE dates (FireHero) use these — they MUST share the glide-aware
+  // schedule with the projection crossover, or the headline would stay optimistic.
+  const yearsToRegular = calculateYearsToTarget(fireWithdrawableCorpus, fireNumber, monthlyContribution, expectedReturnSchedule);
+  const yearsToLean = calculateYearsToTarget(fireWithdrawableCorpus, variants.leanFIRE, monthlyContribution, expectedReturnSchedule);
+  const yearsToFat = calculateYearsToTarget(fireWithdrawableCorpus, variants.fatFIRE, monthlyContribution, expectedReturnSchedule);
 
   const yfat = Number.isFinite(yearsToFat) ? yearsToFat : 30;
   const projectionHorizonYears = Math.min(60, Math.max(20, Math.ceil(yfat) + 5));
@@ -313,7 +345,7 @@ export function derive(household: Household, assumptions: Assumptions, lens: Der
   const projection = projectCorpus({
     currentCorpus: fireWithdrawableCorpus,
     monthlyContribution,
-    expectedReturns: blendedReturn,
+    expectedReturns: expectedReturnSchedule,
     inflation: householdInflation,
     annualExpensesToday,
     startAge: anchorAge,

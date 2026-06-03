@@ -210,14 +210,17 @@ export function calculateYearsToTarget(
   currentCorpus: number,
   targetCorpus: number,
   monthlySavings: number,
-  expectedReturns: number = DEFAULT_RETURNS,
+  expectedReturns: ReturnSchedule = DEFAULT_RETURNS,
 ): number {
   if (currentCorpus >= targetCorpus) return 0;
   if (monthlySavings <= 0) return Infinity;
-  const r = expectedReturns / 12;
   let months = 0;
   let corpus = currentCorpus;
   while (corpus < targetCorpus && months < 1200) {
+    // M1 (#9): resolve the return for the current year so a glide-path schedule
+    // de-risks the headline "years to FIRE" the same way it de-risks the
+    // projection. A constant rate is byte-identical to the prior flat loop.
+    const r = resolveReturn(expectedReturns, Math.floor(months / 12)) / 12;
     corpus = corpus * (1 + r) + monthlySavings;
     months++;
   }
@@ -263,10 +266,28 @@ export interface DecumulationOverlay {
   retirementIncomeAnnual?: number;
 }
 
+/**
+ * A per-year expected-return schedule (M1, gh-issue #9): either one constant
+ * rate for the whole horizon, or a function of the year index (0 = first
+ * projected year) returning that year's expected return. The glide-path
+ * projection passes a function so de-risking late years compound at their lower
+ * implied return instead of a single static blend — otherwise a glide-enabled
+ * household over-states its terminal corpus → an optimistically early FIRE date.
+ */
+export type ReturnSchedule = number | ((yearIndex: number) => number);
+
+function resolveReturn(schedule: ReturnSchedule, yearIndex: number): number {
+  const r = typeof schedule === "function" ? schedule(yearIndex) : schedule;
+  // Defensive (defensive-coding.md): a schedule function could divide by zero or
+  // return NaN/undefined; a non-finite return would silently poison the whole
+  // corpus projection (Tier-0 math). Fall back to 0% for that year, not NaN.
+  return Number.isFinite(r) ? r : 0;
+}
+
 export function projectCorpus(args: {
   currentCorpus: number;
   monthlyContribution: number;
-  expectedReturns: number;
+  expectedReturns: ReturnSchedule;
   inflation: number;
   annualExpensesToday: number;
   startAge: number;
@@ -293,6 +314,9 @@ export function projectCorpus(args: {
   let prevWithdrawal = 0;
   for (let y = 0; y <= horizonYears; y++) {
     const age = startAge + y;
+    // M1 (#9): this year's expected return — a per-year value when a glide-path
+    // schedule is supplied, else the constant blended return (byte-identical).
+    const er = resolveReturn(expectedReturns, y);
     const inflated = annualExpensesToday * Math.pow(1 + inflation, y);
     const target = inflated / Math.max(swr, 0.001);
     const inDecumulation = !!decumulation && age >= decumulation.retirementAge;
@@ -314,7 +338,7 @@ export function projectCorpus(args: {
         corpusAtRetirement = corpus;
         retYear = 0;
       }
-      corpus = corpus * (1 + expectedReturns);
+      corpus = corpus * (1 + er);
       const wd = floorCeilingWithdrawal(
         decumulation.config,
         corpusAtRetirement,
@@ -330,7 +354,7 @@ export function projectCorpus(args: {
     } else {
       // Accumulation phase (unchanged): grow corpus over next 12 months + contribute.
       for (let m = 0; m < 12; m++) {
-        corpus = corpus * (1 + expectedReturns / 12) + monthlyContribution;
+        corpus = corpus * (1 + er / 12) + monthlyContribution;
       }
     }
   }

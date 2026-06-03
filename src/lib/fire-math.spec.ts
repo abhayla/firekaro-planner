@@ -172,6 +172,19 @@ describe("calculateYearsToTarget", () => {
     const years = calculateYearsToTarget(1000000, 5000000, 0, 0);
     expect(years === Infinity || years > 100).toBe(true);
   });
+
+  it("accepts a per-year return schedule; a constant function equals the numeric rate (M1, #9)", () => {
+    const numeric = calculateYearsToTarget(1_000_000, 20_000_000, 50_000, 0.11);
+    const fn = calculateYearsToTarget(1_000_000, 20_000_000, 50_000, () => 0.11);
+    expect(fn).toBe(numeric);
+  });
+
+  it("a down-tapering schedule takes LONGER to reach target than the flat start rate (de-risking → later FIRE)", () => {
+    const flatYears = calculateYearsToTarget(1_000_000, 20_000_000, 50_000, 0.11);
+    const taper = (y: number) => Math.max(0.09, 0.11 - y * 0.002);
+    const glidedYears = calculateYearsToTarget(1_000_000, 20_000_000, 50_000, taper);
+    expect(glidedYears).toBeGreaterThan(flatYears);
+  });
 });
 
 describe("projectCorpus", () => {
@@ -221,6 +234,41 @@ describe("projectCorpus", () => {
       expect(s.targetForLean).toBeLessThan(s.targetForRegular);
       expect(s.targetForRegular).toBeLessThan(s.targetForFat);
     }
+  });
+
+  // M1 (#9) — per-year return schedule (glide path drives the projection).
+  it("accepts a per-year return function; a constant function is byte-identical to the numeric rate", () => {
+    const common = {
+      currentCorpus: 5_000_000,
+      monthlyContribution: 50_000,
+      inflation: 0.06,
+      annualExpensesToday: 1_200_000,
+      startAge: 35,
+      swr: 0.035,
+      horizonYears: 20,
+    };
+    const numeric = projectCorpus({ ...common, expectedReturns: 0.11 });
+    const fn = projectCorpus({ ...common, expectedReturns: () => 0.11 });
+    expect(fn.map((p) => p.corpus)).toEqual(numeric.map((p) => p.corpus));
+  });
+
+  it("a down-tapering return schedule yields a LOWER terminal corpus than the flat start rate (de-risking)", () => {
+    const common = {
+      currentCorpus: 5_000_000,
+      monthlyContribution: 50_000,
+      inflation: 0.06,
+      annualExpensesToday: 1_200_000,
+      startAge: 35,
+      swr: 0.035,
+      horizonYears: 20,
+    };
+    // Flat at the high (start-equity) return.
+    const flat = projectCorpus({ ...common, expectedReturns: 0.11 });
+    // A schedule that STARTS at 0.11 and tapers DOWN to 0.09 — never above flat.
+    const taper = (y: number) => Math.max(0.09, 0.11 - y * 0.001);
+    const glided = projectCorpus({ ...common, expectedReturns: taper });
+    const lastIdx = flat.length - 1; // both runs share horizonYears → equal length
+    expect(glided[lastIdx].corpus).toBeLessThan(flat[lastIdx].corpus);
   });
 
   // A9.1 — Floor/Ceiling decumulation overlay.
