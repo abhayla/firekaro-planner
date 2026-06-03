@@ -89,6 +89,7 @@ function rowToMember(row: {
   salaryVpfTopUpPercent: number | null;
   salaryEmployerNpsAnnual: number | null;
   salaryBasicAnnual: number | null;
+  salaryEmployerSector: string | null;
   city: string;
   health: string;
   educationStage: string | null;
@@ -118,6 +119,10 @@ function rowToMember(row: {
       vpfTopUpPercent: row.salaryVpfTopUpPercent ?? undefined,
       employerNpsAnnual: row.salaryEmployerNpsAnnual ?? undefined,
       basicAnnual: row.salaryBasicAnnual ?? undefined,
+      employerSector: (row.salaryEmployerSector ?? undefined) as
+        | "private"
+        | "government"
+        | undefined,
     };
   }
   return m;
@@ -138,6 +143,7 @@ function memberToRow(m: Member, userId: string) {
     salaryVpfTopUpPercent: m.salary?.vpfTopUpPercent ?? null,
     salaryEmployerNpsAnnual: m.salary?.employerNpsAnnual ?? null,
     salaryBasicAnnual: m.salary?.basicAnnual ?? null,
+    salaryEmployerSector: m.salary?.employerSector ?? null,
     city: m.city,
     health: m.health,
     educationStage: m.educationStage ?? null,

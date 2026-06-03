@@ -155,6 +155,7 @@ model Member {
   salaryVpfTopUpPercent  Float?
   salaryEmployerNpsAnnual Float? // Sec 80CCD(2) employer NPS (gh-issue #2)
   salaryBasicAnnual       Float? // Basic+DA, caps 80CCD(2) at 10%/14% (gh-issue #3)
+  salaryEmployerSector    String? // "private" | "government" — govt gets 14% OLD ceiling (gh-issue #4)
 
   // Q2.1 onboarding fields.
   city            String  @default("Metro")
