@@ -10,6 +10,7 @@ import { computeFreedomScore } from "@/lib/freedom-score";
 import { toMonthly } from "@/lib/cashflow";
 import { isEmergencyFundEligible } from "@/lib/investment-traits";
 import FireHero from "@/components/dashboard/FireHero.vue";
+import LifecycleDigestCard from "@/components/dashboard/LifecycleDigestCard.vue";
 import BridgeBreakdownCard from "@/components/dashboard/BridgeBreakdownCard.vue";
 import FireProjectionChart from "@/components/dashboard/FireProjectionChart.vue";
 import AssetAllocationDonut from "@/components/dashboard/AssetAllocationDonut.vue";
@@ -247,6 +248,12 @@ onMounted(() => {
           </template>
         </v-chip>
       </div>
+
+      <!-- Tier-1 stickiness: "Since you were away" lifecycle digest — diffs the
+           live derive() headline against the persisted baseline and surfaces the
+           meaningful change FIRE-date-first. Self-hides when nothing meaningful
+           changed (or no baseline yet). Deep-link target for the WhatsApp nudge. -->
+      <LifecycleDigestCard />
 
       <FireHero />
 
