@@ -85,7 +85,7 @@ export function loadSeedPersona(household: HStore, assumptions: AStore) {
   household.addInvestment({
     type: "Stocks",
     label: "My equity portfolio",
-    value: 1200000,
+    value: 1800000,
     monthlyContribution: 20000,
     ownerId: "rohit",
     holdingsCount: 18,
@@ -93,9 +93,18 @@ export function loadSeedPersona(household: HStore, assumptions: AStore) {
   household.addInvestment({
     type: "MutualFunds",
     label: "SIP basket",
-    value: 800000,
-    monthlyContribution: 30000,
+    value: 2500000,
+    monthlyContribution: 50000,
     ownerId: "rohit",
+  });
+  // #21: Priya invests too — a savvy dual-income accumulator equity-tilts BOTH earners,
+  // not just the primary (keeps the persona a realistic archetype of the locked user).
+  household.addInvestment({
+    type: "MutualFunds",
+    label: "Priya's equity SIPs",
+    value: 1200000,
+    monthlyContribution: 22000,
+    ownerId: "priya",
   });
   household.addInvestment({
     type: "PPF",
@@ -120,7 +129,7 @@ export function loadSeedPersona(household: HStore, assumptions: AStore) {
   household.addInvestment({
     type: "FD",
     label: "Emergency fund FD",
-    value: 500000,
+    value: 200000,
     ownerId: "Joint",
   });
   // Q19C — NPS for Abhay

@@ -27,24 +27,21 @@ type Loader = (h: ReturnType<typeof useHouseholdStore>, a: ReturnType<typeof use
 // Per-persona FIRE-horizon bounds (#12). Tighter than a shared range so a silent
 // retune FAILS the lock instead of passing.
 //
-// #20 (2026-06-03): the real-return frame + general-CPI deflator fix moved
-// every horizon LATER (the old bounds were calibrated to the optimistic
-// nominal-vs-frozen-target bug). These bounds now reflect the HONEST corrected
-// horizons. The personas have drifted OUT of their intended "compelling" wedges
-// (Sharmas mid-journey ~20y → 32y; Iyers the contract's 10-15y wedge → 19y)
-// because their portfolios are real-estate-heavy / under-equity (~8.9% blend) for
-// the locked urban-accumulator persona (FinTech: should be ~10-11%). Recalibrating
-// the persona ALLOCATIONS (equity tilt) to restore the compelling wedges under
-// correct math is tracked in gh-issue #21 — when that lands, tighten these back.
+// #20/#22/#21 (2026-06-03): the FIRE date is now HONEST — real-return frame +
+// general-CPI deflator (#20) + household-coherent lens (#22), and the Sharmas were
+// equity-tilted to a realistic ~9.7% blend (#21) so their honest horizon is also
+// compelling (mid-50s FIRE, not 62). These bounds reflect the honest CORRECTED
+// horizons on the whole-household lens: Sharmas ~26y, Iyers ~19y (≈2y past their
+// own retire-goal of 55 — on-track), Mehtas near-FIRE. NOT bug-era optimistic values.
 const PERSONAS: Array<{
   name: string;
   load: Loader;
   savingsRate: [number, number];
   maxYearsToFire: number;
 }> = [
-  { name: "sharmas", load: (h, a) => loadSeedPersona(h, a), savingsRate: [40, 55], maxYearsToFire: 33 }, // #21: target ~20-25 after equity-tilt
+  { name: "sharmas", load: (h, a) => loadSeedPersona(h, a), savingsRate: [40, 55], maxYearsToFire: 27 }, // #21 equity-tilted → ~26y (age 56)
   { name: "mehtas", load: (h, a) => loadMehtasSeed(h, a), savingsRate: [40, 60], maxYearsToFire: 5 },
-  { name: "iyers", load: (h, a) => loadIyersSeed(h, a), savingsRate: [40, 50], maxYearsToFire: 20 }, // #21: restore to 10-15 wedge
+  { name: "iyers", load: (h, a) => loadIyersSeed(h, a), savingsRate: [40, 50], maxYearsToFire: 20 }, // ~19y, ≈2y past retire-goal 55
 ];
 
 const WHOLE_HOUSEHOLD = { isFamilyView: true, viewingMemberId: null, currentFY: "2025-26" };
