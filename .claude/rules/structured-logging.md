@@ -8,7 +8,7 @@ private: false
 
 # Structured Logging with Pino
 
-All server-side logging in FIREKaro MUST go through the pino logger exported from `server/lib/logger.ts`. The `eslint.config.js` `no-console` override blocks `console.log`, `console.info`, `console.warn`, and `console.error` in `server/**` with the message: "Use the pino logger from server/lib/logger.ts instead of console.*."
+All server-side logging in FIREKaro MUST go through the pino logger exported from `server/lib/logger.ts`. `server/eslint.config.mjs` (run via `cd server && npm run lint`) blocks `console.log`, `console.info`, `console.warn`, `console.error`, and `console.debug` in `server/src/**` — via both the built-in `no-console` rule and a `no-restricted-syntax` selector that carries the project message: "Use the pino logger from server/lib/logger.ts instead of console.*. See rules/structured-logging.md." Test specs (`server/src/**/*.spec.ts`) are exempt from the console block.
 
 ## Logger Behavior
 

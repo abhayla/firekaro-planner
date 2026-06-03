@@ -82,10 +82,14 @@ Before every commit, run these checks in order:
 2. **Targeted unit tests**: `npm run test:unit -- -t "relevant-pattern"` — run tests related to changed code (`-t` filters by test name; vitest has no `--grep`)
 3. **Review changes**: `git status` then `git diff` — verify only intended files are staged
 
-> **No ESLint in this repo.** There is no `eslint.config.*` and no `lint` script in either
-> `package.json`; the gate is `type-check` + `test:unit` (matches `CLAUDE.md` → "Conventions"). The
+> **ESLint: `server/` only.** The `server/` tree HAS a minimal ESLint gate
+> (`server/eslint.config.mjs`, run via `cd server && npm run lint`) enforcing exactly two
+> invariants over `server/src/**`: no raw `c.json()` (envelope discipline) and no `console.*`
+> (pino-logger discipline) — nothing else. Run it alongside `type-check` + `test:unit` when
+> committing `server/` changes. The **frontend root still has no ESLint** (no `eslint.config.*` /
+> `lint` script there); for root-only changes the gate stays `type-check` + `test:unit`. The
 > deterministic pre-commit hook (`.githooks/pre-commit`, wired by the root `prepare` script) does a
-> secret scan, not linting. Do not add a `npm run lint` step until ESLint is actually configured.
+> secret scan, not linting.
 
 If any check fails, fix before committing. NEVER use `--no-verify` to skip pre-commit hooks.
 

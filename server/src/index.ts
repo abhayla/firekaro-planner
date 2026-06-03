@@ -70,6 +70,7 @@ app.get("/api/health", async (c) => {
     health.database = "disconnected";
   }
   if (health.status !== "ok") {
+    // eslint-disable-next-line no-restricted-syntax -- 503 is outside apiError's status union and the health payload must ride in `data` (not the error envelope) so probes get the detail.
     return c.json({ success: false, data: health }, 503);
   }
   return apiSuccess(c, health);

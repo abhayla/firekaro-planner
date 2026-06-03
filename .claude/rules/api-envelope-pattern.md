@@ -8,7 +8,7 @@ private: false
 
 # API Response Envelope Pattern
 
-Every Hono route response in FIREKaro MUST be wrapped in a discriminated envelope emitted by the helpers in `server/lib/api-utils.ts`. Raw `c.json(...)` calls are rejected by the ESLint `no-restricted-syntax` rule in `eslint.config.js` with the message: "Use apiSuccess() or apiError() from server/lib/api-utils instead of raw c.json(). See rules/hono-route-conventions.md."
+Every Hono route response in FIREKaro MUST be wrapped in a discriminated envelope emitted by the helpers in `server/lib/api-utils.ts`. Raw `c.json(...)` calls are rejected by the ESLint `no-restricted-syntax` rule in `server/eslint.config.mjs` (run via `cd server && npm run lint`) with the message: "Use apiSuccess() or apiError() from server/lib/api-utils instead of raw c.json(). See rules/hono-route-conventions.md." The selector matches a `CallExpression` whose callee is `c.json`. The envelope helpers themselves (and the 503 health response, which is outside `apiError`'s status union) carry a scoped `eslint-disable-next-line no-restricted-syntax` with a reason.
 
 ## The Three Envelopes
 

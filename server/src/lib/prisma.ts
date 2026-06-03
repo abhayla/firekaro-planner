@@ -5,7 +5,7 @@ import { PrismaClient } from "@prisma/client";
  * globalThis caching prevents connection-pool exhaustion under tsx watch reload.
  */
 declare global {
-  // eslint-disable-next-line no-var
+  // `var` is required here so the augmentation lands on globalThis.
   var prismaV6: PrismaClient | undefined;
 }
 

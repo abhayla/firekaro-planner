@@ -19,6 +19,7 @@ export const ErrorCode = {
 export type ErrorCodeType = (typeof ErrorCode)[keyof typeof ErrorCode];
 
 export function apiSuccess<T>(c: Context, data: T, status: 200 | 201 = 200) {
+  // eslint-disable-next-line no-restricted-syntax -- this IS the envelope helper; raw c.json is its implementation.
   return c.json({ success: true, data }, status);
 }
 
@@ -28,6 +29,7 @@ export function apiError(
   status: 400 | 401 | 403 | 404 | 409 | 422 | 429 | 500 = 400,
   code?: ErrorCodeType,
 ) {
+  // eslint-disable-next-line no-restricted-syntax -- this IS the envelope helper; raw c.json is its implementation.
   return c.json(
     {
       success: false,
