@@ -57,6 +57,8 @@ export function useFireDerive() {
     householdMarginalRate: computed(() => d.value.householdMarginalRate),
     epfAfterTaxReturn: computed(() => d.value.epfAfterTaxReturn),
     yearsToRegular: computed(() => d.value.yearsToRegular),
+    corpusOnlyYearsToRegular: computed(() => d.value.corpusOnlyYearsToRegular),
+    bridgeCoverage: computed(() => d.value.bridgeCoverage),
     yearsToLean: computed(() => d.value.yearsToLean),
     yearsToFat: computed(() => d.value.yearsToFat),
     projection: computed(() => d.value.projection),

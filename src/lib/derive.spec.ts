@@ -230,6 +230,44 @@ describe("derive() — pure kernel", () => {
     expect(p[1].corpus).toBeGreaterThan(p[0].corpus);
   });
 
+  it("#15 bridge: a fully-liquid household's headline is byte-identical (bridge covered, no move)", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    loadSeedPersona(h, a);
+    const lens = { isFamilyView: true, viewingMemberId: null, currentFY: "2025-26" };
+    // Replace the portfolio with a single fully-liquid equity holding → no locked
+    // window → bridge trivially covered → headline == corpus-only adequacy age.
+    h.data.investments = [];
+    h.addInvestment({ type: "Stocks", label: "Equity", value: 5_000_000, monthlyContribution: 50_000, ownerId: "rohit" });
+    const k = derive(h.data, a.values, lens);
+    expect(k.bridgeCoverage).not.toBeNull();
+    expect(k.bridgeCoverage!.covered).toBe(true);
+    expect(k.yearsToRegular).toBe(k.corpusOnlyYearsToRegular);
+  });
+
+  it("#15 bridge: a corpus-adequate but LOCKED early-retiree's headline moves LATER than corpus-only", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    loadSeedPersona(h, a);
+    const lens = { isFamilyView: true, viewingMemberId: null, currentFY: "2025-26" };
+    // Construct a household that is corpus-adequate very soon (huge current corpus,
+    // so corpusOnlyYearsToRegular ≈ 0 at an early age) but with MOST of it locked
+    // in a no-opening-year PPF (assumed locked till 60) → the liquid runway can't
+    // bridge the early-retirement years → headline pushed later.
+    h.data.investments = [];
+    h.data.members.forEach((m) => { if (m.role === "EARNER") m.targetRetirementAge = 45; });
+    h.addInvestment({ type: "FD", label: "Liquid", value: 2_000_000, monthlyContribution: 0, ownerId: "rohit" });
+    h.addInvestment({ type: "PPF", label: "Big PPF", value: 200_000_000, monthlyContribution: 0, ownerId: "rohit" });
+    const k = derive(h.data, a.values, lens);
+    // Corpus is adequate almost immediately (₹20Cr ≫ FIRE number).
+    expect(k.corpusOnlyYearsToRegular).toBeLessThan(5);
+    expect(k.bridgeCoverage).not.toBeNull();
+    expect(k.bridgeCoverage!.covered).toBe(false);
+    expect(k.bridgeCoverage!.lockedCorpus).toBeGreaterThan(k.bridgeCoverage!.reachableCorpus);
+    // The honest headline is LATER than the corpus-only adequacy age.
+    expect(k.yearsToRegular).toBeGreaterThan(k.corpusOnlyYearsToRegular);
+  });
+
   it("A2 (#7): the NPS annuity offset is the POST-TAX pension, not the gross figure", () => {
     const h = useHouseholdStore();
     const a = useAssumptionsStore();

@@ -34,6 +34,9 @@ import { deriveDeductions } from "@/lib/tax-deductions";
 import { DEFAULT_FLOOR_CEILING } from "@/lib/withdrawal-strategy";
 import { calculateNpsWithdrawal, postTaxAnnuityIncome } from "@/lib/nps-withdrawal";
 import { equityPercentAtYear } from "@/lib/glide-path";
+import { computeBridgeCoverage, type BridgeHolding } from "@/lib/bridge";
+import { deriveEpsPensionForMember, EPS_NORMAL_START_AGE } from "@/lib/eps-pension";
+import { deriveGratuityForMember } from "@/lib/gratuity";
 import type { ReturnSchedule } from "@/lib/fire-math";
 import {
   resolveHouseholdInflation,
@@ -326,9 +329,88 @@ export function derive(household: Household, assumptions: Assumptions, lens: Der
 
   // Headline FIRE dates (FireHero) use these — they MUST share the glide-aware
   // schedule with the projection crossover, or the headline would stay optimistic.
-  const yearsToRegular = calculateYearsToTarget(fireWithdrawableCorpus, fireNumber, monthlyContribution, expectedReturnSchedule);
+  // `corpusOnlyYearsToRegular` is the ADEQUACY leg (corpus grows to the FIRE
+  // number). The bridge layer below can push the HEADLINE later when the
+  // adequate corpus is not yet liquid (#15). Lean/Fat stay corpus-only.
+  const corpusOnlyYearsToRegular = calculateYearsToTarget(fireWithdrawableCorpus, fireNumber, monthlyContribution, expectedReturnSchedule);
   const yearsToLean = calculateYearsToTarget(fireWithdrawableCorpus, variants.leanFIRE, monthlyContribution, expectedReturnSchedule);
   const yearsToFat = calculateYearsToTarget(fireWithdrawableCorpus, variants.fatFIRE, monthlyContribution, expectedReturnSchedule);
+
+  // ----- #15 accumulation bridge: corpus-adequate ≠ FIRE-ready -----
+  // At the age the corpus first meets the FIRE number, check that the LIQUID
+  // runway covers every retirement year until locked money (PPF / NPS annuity)
+  // unlocks. A short bridge moves the headline FIRE age LATER. A fully-liquid
+  // household has no locked window → covered → headline unchanged (byte-identical).
+  const bridge = computeBridge();
+  // Only a genuine liquidity SHORTFALL moves the headline later — when the bridge
+  // is covered (or not evaluated), the headline stays exactly on the adequacy leg
+  // (byte-identical; no rounding artifact from the bridge's integer age math).
+  const yearsToRegular =
+    bridge && !bridge.covered
+      ? Math.max(corpusOnlyYearsToRegular, bridge.effectiveFireAge - anchorAge)
+      : corpusOnlyYearsToRegular;
+
+  function computeBridge() {
+    // Only meaningful when the corpus actually reaches the FIRE number at a
+    // plannable age. An unreachable target (Infinity) or one past the plan
+    // horizon leaves the headline on the adequacy leg.
+    if (!Number.isFinite(corpusOnlyYearsToRegular)) return null;
+    const adequacyAge = Math.round(anchorAge + corpusOnlyYearsToRegular);
+    if (adequacyAge > planToAge) return null;
+
+    const dobForOwner = (ownerId: string): string | null => {
+      const direct = members.find((m) => m.id === ownerId);
+      if (direct) return direct.dateOfBirth;
+      // "Joint" (or an unmatched owner) anchors to the lens/primary earner.
+      const anchorMember =
+        members.find((m) => m.id === effectiveLensMemberId) ?? earners[0] ?? members[0];
+      return anchorMember?.dateOfBirth ?? null;
+    };
+
+    const holdings: BridgeHolding[] = fireCorpusInvestments.map((asset) => ({
+      asset,
+      ownerDob: dobForOwner(asset.ownerId),
+    }));
+
+    const rentalAnnual = lensedOtherIncome
+      .filter((o) => o.type === "Rental")
+      .reduce((s, o) => s + toAnnual({ amount: o.amount, period: o.frequency }), 0);
+    const postTax = (gross: number) => gross * (1 - householdMarginalRate);
+
+    // EPS pension + gratuity aggregated over the lensed earners (Phases D, E).
+    let epsAnnualGross = 0;
+    let gratuityNet = 0;
+    for (const m of lensedEarners) {
+      const eps = deriveEpsPensionForMember(m);
+      if (eps) epsAnnualGross += eps.annualPension;
+      const grat = deriveGratuityForMember(m, householdMarginalRate);
+      if (grat) gratuityNet += grat.net;
+    }
+
+    // Map today's holding values to the corpus at the retirement age: it grows
+    // toward the FIRE number via contributions + returns. The base MUST match
+    // the holdings being scaled — `holdings` is the FULL corpus, so scale on
+    // totalCorpus, not the annuity-excluded withdrawable corpus (using the
+    // smaller denominator would over-scale NPS and over-credit its annuity income
+    // — an optimistic error).
+    const corpusScale = totalCorpus > 0 ? fireNumber / totalCorpus : 1;
+
+    return computeBridgeCoverage({
+      holdings,
+      retirementAge: adequacyAge,
+      anchorAge,
+      planToAge,
+      annualExpenses: annualExpensesToday,
+      income: {
+        rentalAnnualPostTax: Math.round(postTax(rentalAnnual)),
+        epsAnnualPostTax: Math.round(postTax(epsAnnualGross)),
+        epsStartAge: EPS_NORMAL_START_AGE,
+      },
+      exitLumpNet: Math.round(gratuityNet),
+      marginalRate: householdMarginalRate,
+      corpusScale,
+    });
+  }
 
   const yfat = Number.isFinite(yearsToFat) ? yearsToFat : 30;
   const projectionHorizonYears = Math.min(60, Math.max(20, Math.ceil(yfat) + 5));
@@ -392,6 +474,8 @@ export function derive(household: Household, assumptions: Assumptions, lens: Der
     householdMarginalRate,
     epfAfterTaxReturn,
     yearsToRegular,
+    corpusOnlyYearsToRegular,
+    bridgeCoverage: bridge,
     yearsToLean,
     yearsToFat,
     projection,
