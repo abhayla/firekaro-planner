@@ -140,7 +140,7 @@ export function accessibleAtAge(
       return classifyNps(asset, retirementAge, value);
 
     case "realEstate":
-      return classifyRealEstate(asset, value);
+      return classifyRealEstate(asset);
   }
 }
 
@@ -243,7 +243,7 @@ function classifyNps(
   return result;
 }
 
-function classifyRealEstate(asset: Investment, value: number): AccessibilityResult {
+function classifyRealEstate(asset: Investment): AccessibilityResult {
   const assetId = asset.id;
   const role = asset.realEstateRole;
 
