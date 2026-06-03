@@ -34,8 +34,10 @@
  */
 import { calculateYearsToTarget } from "./fire-math";
 
-/** calculateYearsToTarget caps the horizon at 1200 months (100 yrs). */
-const MAX_PROJECTION_YEARS = 100;
+/** calculateYearsToTarget caps the horizon at 1200 months (100 yrs). Exported so
+ *  UI can treat any percentile >= this as "off the chart" and never render the
+ *  never-reached SENTINEL (MAX+1) as a literal year/age (gh-issue #18 honesty). */
+export const MAX_PROJECTION_YEARS = 100;
 
 /** Sentinel for paths that never reach FIRE — strictly worse than any real outcome,
  *  so they sort to the pessimistic end (fixes #18 M2: never-reached must not be
@@ -55,6 +57,36 @@ export const INDIA_RETURN_VOLATILITY = {
   gold: 0.15,
   realEstate: 0.12,
   cash: 0.01,
+} as const;
+
+/**
+ * Annual return volatility (stdev) per derive() return-bucket — the companion to
+ * `assumption-math.blendPortfolioReturn`'s per-bucket RETURNS. `blendPortfolioVolatility`
+ * value-weights these into one portfolio σ for the Monte Carlo headline band (#18).
+ *
+ * FinTech-validated 2026-06-03 (gh-issue #18). Every value is set on the
+ * NON-UNDERSTATEMENT side — an under-stated σ shrinks the band and manufactures
+ * false confidence, which for the accumulator is the optimistic failure mode:
+ *  - realEstate 0.15 (NOT the appraisal-smoothed 0.12 floor — true economic σ 0.15–0.20)
+ *  - nps 0.13 (NPS carries an equity sleeve; a debt-like 0.05 would understate — floor 0.12)
+ *  - international 0.22 (USD equity + FX vol for an INR investor)
+ *  - reit 0.20 (trades equity-like, not the smoothed-RE rate)
+ *  - crypto 0.60 (a FLOOR — real σ is 0.80–1.00+; tiny weight, lognormal caps at −1)
+ *  - ppf/epf 0.01 (sovereign fixed ≈ cash)
+ *  - other 0.05 (debt-like, mirrors blendPortfolioReturn's treatment)
+ */
+export const RETURN_BUCKET_VOLATILITY = {
+  equity: 0.2,
+  debt: 0.05,
+  realEstate: 0.15,
+  gold: 0.15,
+  nps: 0.13,
+  ppf: 0.01,
+  epf: 0.01,
+  international: 0.22,
+  reit: 0.2,
+  crypto: 0.6,
+  other: 0.05,
 } as const;
 
 export interface MonteCarloFireInput {

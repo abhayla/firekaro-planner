@@ -42,6 +42,7 @@ import {
   resolveHouseholdInflation,
   resolveEffectiveSWRByHorizon,
   blendPortfolioReturn,
+  blendPortfolioVolatility,
 } from "@/lib/assumption-math";
 
 export interface DeriveLens {
@@ -350,6 +351,14 @@ export function derive(household: Household, assumptions: Assumptions, lens: Der
       ? (yearIndex: number) => toRealReturn(expectedReturnSchedule(yearIndex))
       : toRealReturn(expectedReturnSchedule);
 
+  // #18 Monte Carlo inputs — the confidence band runs lazily in useFireDerive on
+  // the SAME real frame as the corrected headline: a scalar real blended return
+  // (the pre-glide anchor; glide-taper inside the band is a tracked v2 limitation)
+  // + a value-weighted portfolio volatility. Deterministic + cheap to expose here;
+  // the heavy simulation stays out of the kernel (the server nudge loop never pays).
+  const realBlendedReturn = toRealReturn(blendedReturn);
+  const portfolioVolatility = blendPortfolioVolatility(returnWeights);
+
   // Headline FIRE dates (FireHero) — the ADEQUACY leg (corpus grows to the FIRE
   // number) in the REAL frame. The bridge layer below can push the HEADLINE later
   // when the adequate corpus is not yet liquid (#15). Lean/Fat stay corpus-only.
@@ -491,6 +500,8 @@ export function derive(household: Household, assumptions: Assumptions, lens: Der
     healthcareReservationPercent,
     variants,
     blendedReturn,
+    realBlendedReturn,
+    portfolioVolatility,
     householdInflation,
     annualEpfVpfContribution,
     householdMarginalRate,

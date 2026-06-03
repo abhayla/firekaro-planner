@@ -8,8 +8,10 @@
  *     43yr horizon → 3.25%), NOT the v4 age-table value.
  *   - Entry #6 A6.10 + Entry #10 A10.5: family layer + healthcare reservation
  *     are added ON TOP of the base FIRE number.
- *   - Entry #3 A3.1: projection inflation uses the 4-bucket household blend
- *     (~7.9%), not the single 6%.
+ *   - #20 (supersedes the old Entry #3 A3.1): the corpus-target growth AND the
+ *     real-return deflator use GENERAL CPI (6%); the 4-bucket household blend
+ *     (~7.9%) is retained ONLY for the retiree's decumulation withdrawal floor.
+ *   - #18: the Monte Carlo headline band runs on that same real frame.
  */
 import { describe, it, expect, beforeEach } from "vitest";
 import { setActivePinia, createPinia } from "pinia";
@@ -51,5 +53,21 @@ describe("useFireDerive — Sharmas seed (research-spine proof)", () => {
     expect(d.fireNumber.value).toBeGreaterThan(0);
     expect(d.progressPercent.value).toBeGreaterThanOrEqual(0);
     expect(d.progressPercent.value).toBeLessThanOrEqual(100);
+  });
+
+  it("#18: the Monte Carlo band is ordered and its median tracks the deterministic headline", () => {
+    loadSeedPersona(useHouseholdStore(), useAssumptionsStore());
+    const d = useFireDerive();
+    const mc = d.monteCarlo.value;
+    // A genuine distribution, not a point: p10 ≤ p50 ≤ p90, with a real spread.
+    expect(mc.p10Years).toBeLessThanOrEqual(mc.p50Years);
+    expect(mc.p50Years).toBeLessThanOrEqual(mc.p90Years);
+    expect(mc.p90Years).toBeGreaterThan(mc.p10Years);
+    // The band runs on the SAME real frame as the corrected headline, so its
+    // median must land near the deterministic corpus-only years (consistency lock —
+    // a regression that reframed one but not the other would break this).
+    expect(Math.abs(mc.p50Years - d.corpusOnlyYearsToRegular.value)).toBeLessThan(8);
+    // Portfolio volatility is exposed and positive (the band has width).
+    expect(d.portfolioVolatility.value).toBeGreaterThan(0);
   });
 });

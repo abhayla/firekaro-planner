@@ -8,6 +8,7 @@
  */
 import type { Assumptions } from "@/types/assumptions";
 import { blendedInflation, getHorizonSWR } from "@/lib/fire-math";
+import { RETURN_BUCKET_VOLATILITY } from "@/lib/monte-carlo";
 
 /** Household 4-bucket blended inflation (audit Entry #3 A3.1 + A3.2 weights). */
 export function resolveHouseholdInflation(v: Assumptions): number {
@@ -85,5 +86,45 @@ export function blendPortfolioReturn(
     weights.reit * v.reitReturn +
     weights.crypto * v.cryptoReturn +
     weights.other * v.debtReturn; // treat "other" as debt-like
+  return weighted / total;
+}
+
+/**
+ * Blended portfolio annual return volatility (stdev), value-weighted over the SAME
+ * `PortfolioReturnWeights` buckets as `blendPortfolioReturn`, using
+ * `RETURN_BUCKET_VOLATILITY`. Feeds the Monte Carlo headline confidence band (#18).
+ * Empty/zero portfolio → equity σ (a sane default for a not-yet-invested accumulator).
+ *
+ * It is a value-weighted average of per-bucket stdevs and INTENTIONALLY omits the
+ * cross-asset covariance term. For a long-horizon FIRE band that errs HIGH (assumes
+ * perfect correlation = the widest, most honest band) rather than netting risk
+ * away — the non-understatement direction the honesty goal requires.
+ */
+export function blendPortfolioVolatility(weights: PortfolioReturnWeights): number {
+  const total =
+    weights.equity +
+    weights.debt +
+    weights.realEstate +
+    weights.gold +
+    weights.nps +
+    weights.ppf +
+    weights.epf +
+    weights.international +
+    weights.reit +
+    weights.crypto +
+    weights.other;
+  if (total <= 0) return RETURN_BUCKET_VOLATILITY.equity;
+  const weighted =
+    weights.equity * RETURN_BUCKET_VOLATILITY.equity +
+    weights.debt * RETURN_BUCKET_VOLATILITY.debt +
+    weights.realEstate * RETURN_BUCKET_VOLATILITY.realEstate +
+    weights.gold * RETURN_BUCKET_VOLATILITY.gold +
+    weights.nps * RETURN_BUCKET_VOLATILITY.nps +
+    weights.ppf * RETURN_BUCKET_VOLATILITY.ppf +
+    weights.epf * RETURN_BUCKET_VOLATILITY.epf +
+    weights.international * RETURN_BUCKET_VOLATILITY.international +
+    weights.reit * RETURN_BUCKET_VOLATILITY.reit +
+    weights.crypto * RETURN_BUCKET_VOLATILITY.crypto +
+    weights.other * RETURN_BUCKET_VOLATILITY.other;
   return weighted / total;
 }

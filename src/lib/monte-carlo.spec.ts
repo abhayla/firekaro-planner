@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { runMonteCarloFire, sampleAnnualReturns } from "./monte-carlo";
+import { runMonteCarloFire, sampleAnnualReturns, RETURN_BUCKET_VOLATILITY } from "./monte-carlo";
 import { calculateYearsToTarget } from "./fire-math";
 
 /**
@@ -109,5 +109,31 @@ describe("runMonteCarloFire", () => {
   it("a reaching plan reports a low P(never reach)", () => {
     const mc = runMonteCarloFire({ ...base, volatility: 0.18 });
     expect(mc.probabilityNeverReachFire).toBeLessThan(0.05);
+  });
+});
+
+describe("RETURN_BUCKET_VOLATILITY — non-understatement floors (#18)", () => {
+  // An UNDER-stated σ shrinks the confidence band and manufactures false
+  // confidence — for the accumulator that is the optimistic failure mode. These
+  // FinTech-validated floors (2026-06-03) must not be "tidied" downward.
+  it("real estate σ is the true-economic floor, NOT the appraisal-smoothed 0.12", () => {
+    expect(RETURN_BUCKET_VOLATILITY.realEstate).toBeGreaterThanOrEqual(0.15);
+  });
+  it("NPS σ reflects its equity sleeve (≥ 0.12, never debt-like)", () => {
+    expect(RETURN_BUCKET_VOLATILITY.nps).toBeGreaterThanOrEqual(0.12);
+  });
+  it("international σ carries FX vol on top of equity (≥ 0.22)", () => {
+    expect(RETURN_BUCKET_VOLATILITY.international).toBeGreaterThanOrEqual(0.22);
+  });
+  it("equity σ tracks the Nifty 20yr band (≥ 0.20)", () => {
+    expect(RETURN_BUCKET_VOLATILITY.equity).toBeGreaterThanOrEqual(0.2);
+  });
+  it("crypto σ is a high floor (≥ 0.60)", () => {
+    expect(RETURN_BUCKET_VOLATILITY.crypto).toBeGreaterThanOrEqual(0.6);
+  });
+  it("sovereign-fixed buckets (ppf/epf) are ~cash and debt stays low", () => {
+    expect(RETURN_BUCKET_VOLATILITY.ppf).toBeLessThanOrEqual(0.02);
+    expect(RETURN_BUCKET_VOLATILITY.epf).toBeLessThanOrEqual(0.02);
+    expect(RETURN_BUCKET_VOLATILITY.debt).toBeLessThanOrEqual(0.06);
   });
 });

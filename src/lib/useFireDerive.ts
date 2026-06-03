@@ -3,6 +3,7 @@ import { useHouseholdStore } from "@/stores/household";
 import { useAssumptionsStore } from "@/stores/assumptions";
 import { useUiStore } from "@/stores/ui";
 import { derive } from "@/lib/derive";
+import { runMonteCarloFire } from "@/lib/monte-carlo";
 
 /**
  * Single source of truth for all FIRE dashboard math — now a thin Pinia-aware
@@ -53,6 +54,20 @@ export function useFireDerive() {
     healthcareReservationPercent: computed(() => d.value.healthcareReservationPercent),
     variants: computed(() => d.value.variants),
     blendedReturn: computed(() => d.value.blendedReturn),
+    realBlendedReturn: computed(() => d.value.realBlendedReturn),
+    portfolioVolatility: computed(() => d.value.portfolioVolatility),
+    // #18 Monte Carlo headline confidence band — LAZY (Vue computed only runs the
+    // simulation when a consumer reads it, e.g. FireHero). Same real frame as the
+    // corrected headline so p50 ≈ the deterministic years-to-FIRE.
+    monteCarlo: computed(() =>
+      runMonteCarloFire({
+        currentCorpus: d.value.fireWithdrawableCorpus,
+        targetCorpus: d.value.fireNumber,
+        monthlySavings: d.value.monthlyContribution,
+        meanReturn: d.value.realBlendedReturn,
+        volatility: d.value.portfolioVolatility,
+      }),
+    ),
     annualEpfVpfContribution: computed(() => d.value.annualEpfVpfContribution),
     householdMarginalRate: computed(() => d.value.householdMarginalRate),
     epfAfterTaxReturn: computed(() => d.value.epfAfterTaxReturn),

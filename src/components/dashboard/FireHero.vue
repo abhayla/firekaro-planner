@@ -3,6 +3,7 @@ import { computed } from "vue";
 import { useFireDerive } from "@/lib/useFireDerive";
 import { formatINRCompact, formatYearsMonths } from "@/lib/formatters";
 import InfoTip from "@/components/shared/InfoTip.vue";
+import { describeFireConfidenceBand } from "@/lib/fire-confidence-band";
 
 const fire = useFireDerive();
 
@@ -33,6 +34,15 @@ const bridgeSubline = computed(() => {
   return `Corpus target is reached at age ${bc.corpusOnlyFireAge} — but locked savings (PPF / NPS / pre-tax) keep your money from being fully spendable then, so sustainable FIRE is age ${bc.effectiveFireAge}.`;
 });
 
+// #18 Monte Carlo confidence band: a deterministic point is false precision — two
+// plans with the same expected return but different volatility do NOT share a real
+// FIRE date. The pure helper builds the honest copy (spread + P(never reach) +
+// "illustrative" disclosure) and guards the never-reached sentinel — see
+// `lib/fire-confidence-band.ts` + its spec.
+const confidenceSubline = computed(() =>
+  describeFireConfidenceBand(fire.monteCarlo.value, fire.yearsToRegular.value, fire.anchorAge.value),
+);
+
 const leanLabel = computed(() => {
   const y = fire.crossovers.value.lean;
   if (!y.year) return "Lean FIRE: not within horizon";
@@ -55,6 +65,11 @@ const fatLabel = computed(() => {
     <p v-if="bridgeSubline" class="fire-hero__subline" data-testid="fire-hero-bridge-subline">
       <v-icon icon="mdi-lock-clock" size="16" color="warning" class="mr-1" />
       {{ bridgeSubline }}
+    </p>
+
+    <p v-if="confidenceSubline" class="fire-hero__subline" data-testid="fire-hero-confidence-subline">
+      <v-icon icon="mdi-chart-bell-curve" size="16" color="info" class="mr-1" />
+      {{ confidenceSubline }}
     </p>
 
     <div class="progress-wrap my-3">
