@@ -154,6 +154,15 @@ export function getTaxConfigForFY(fy: string): FYTaxConfig {
   return TAX_CONFIGS[nearest];
 }
 
+/**
+ * Sec 80CCD(2) employer-NPS deduction ceiling as a fraction of basic (Basic+DA). gh-issue #4:
+ * NEW regime = 14% for everyone; OLD regime = 14% for GOVERNMENT employees, 10% for private.
+ * Single source of the ceiling — the engine and any UI display computed import THIS (no copies).
+ */
+export function npsCeilingFor(regime: "OLD" | "NEW", sector?: "private" | "government"): number {
+  return regime === "NEW" ? 0.14 : sector === "government" ? 0.14 : 0.1;
+}
+
 export function calculateSlabTax(taxableIncome: number, slabs: TaxSlabEntry[]): number {
   let tax = 0;
   for (const slab of slabs) {
@@ -308,13 +317,9 @@ export function computeTax(args: ComputeTaxArgs): FullTaxResult {
   // Old regime allows chapter VI-A; New regime ignores them — EXCEPT 80CCD(2) employer
   // NPS, which is deductible under both regimes and is passed separately (gh-issue #2).
   const ded = regime === "OLD" ? Math.max(0, args.deductions ?? 0) : 0;
-  // 80CCD(2): cap the employer-NPS deduction at the statutory ceiling of basic salary.
-  // NEW regime = 14% for everyone. OLD regime = 14% for GOVERNMENT employees, 10% for
-  // private (gh-issue #4). Absent a basic we trust the entered figure rather than fabricate
-  // basic from CTC (gh-issue #3). Sector defaults to private (conservative — never over-deducts).
-  const ceilingFor = (sector?: "private" | "government") =>
-    regime === "NEW" ? 0.14 : sector === "government" ? 0.14 : 0.1;
-  const npsCeiling = ceilingFor("private"); // the scalar fallback assumes private
+  // 80CCD(2): cap the employer-NPS deduction at the statutory ceiling of basic salary
+  // (npsCeilingFor — the single source). Absent a basic we trust the entered figure rather
+  // than fabricate basic from CTC (gh-issue #3). Sector defaults to private (conservative).
   let employerNps: number;
   if (args.employerNpsByMember && args.employerNpsByMember.length > 0) {
     // Per-member cap (gh-issue #4): cap each member's employer NPS at the ceiling of their OWN
@@ -322,12 +327,13 @@ export function computeTax(args: ComputeTaxArgs): FullTaxResult {
     employerNps = args.employerNpsByMember.reduce((sum, m) => {
       const nps = Math.max(0, m.nps);
       const basic = Math.max(0, m.basic);
-      return sum + (basic > 0 ? Math.min(nps, ceilingFor(m.sector) * basic) : nps);
+      return sum + (basic > 0 ? Math.min(nps, npsCeilingFor(regime, m.sector) * basic) : nps);
     }, 0);
   } else {
     // Aggregate fallback (single earner, or callers that pass scalars) — private ceiling.
     const rawEmployerNps = Math.max(0, args.employerNps ?? 0);
     const basicForCap = Math.max(0, args.employerNpsBasic ?? 0);
+    const npsCeiling = npsCeilingFor(regime, "private");
     employerNps = basicForCap > 0 ? Math.min(rawEmployerNps, npsCeiling * basicForCap) : rawEmployerNps;
   }
 

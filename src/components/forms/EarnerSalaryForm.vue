@@ -47,7 +47,7 @@ const takeHome = computed(() => deriveTakeHomeFor(ctc.value, employerNps.value, 
 
 // Q4 (v3) + ISSUES-v2 #1: salary fields are no longer inline-editable. Pencil opens
 // a focused dialog. Read-only summary card outside.
-const editing = ref<{ annualCTC: number; hikePercent: number; vpfTopUpPercent: number | null; employerNpsAnnual: number | null; basicAnnual: number | null } | null>(null);
+const editing = ref<{ annualCTC: number; hikePercent: number; vpfTopUpPercent: number | null; employerNpsAnnual: number | null; basicAnnual: number | null; employerSector: "private" | "government" } | null>(null);
 const showEdit = computed({
   get: () => !!editing.value,
   set: (v) => { if (!v) editing.value = null; },
@@ -59,6 +59,7 @@ function startEdit() {
     vpfTopUpPercent: props.earner.salary?.vpfTopUpPercent ?? null,
     employerNpsAnnual: props.earner.salary?.employerNpsAnnual ?? null,
     basicAnnual: props.earner.salary?.basicAnnual ?? null,
+    employerSector: props.earner.salary?.employerSector ?? "private",
   };
 }
 
@@ -92,6 +93,7 @@ function saveEdit() {
         editing.value.employerNpsAnnual === null ? undefined : Number(editing.value.employerNpsAnnual),
       basicAnnual:
         editing.value.basicAnnual === null ? undefined : Number(editing.value.basicAnnual),
+      employerSector: editing.value.employerSector,
     },
   });
   editing.value = null;
@@ -218,6 +220,20 @@ function saveEdit() {
                 hint="Employer's annual NPS (80CCD(2)) — deductible in both regimes, capped at 14% of Basic+DA (new) / 10% (old). Enter only the deductible portion."
                 persistent-hint
                 :rules="employerNpsRules"
+              />
+            </v-col>
+            <v-col cols="12" md="6">
+              <v-select
+                v-model="editing.employerSector"
+                :items="[
+                  { title: 'Private / other', value: 'private' },
+                  { title: 'Government', value: 'government' },
+                ]"
+                label="Employer sector"
+                density="comfortable"
+                hint="Government employees get the 14% 80CCD(2) ceiling under the OLD regime too (private = 10% old / 14% new)."
+                persistent-hint
+                data-testid="employer-sector-select"
               />
             </v-col>
           </v-row>

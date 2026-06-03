@@ -2,7 +2,7 @@
 import { computed, ref } from "vue";
 import { useHouseholdStore } from "@/stores/household";
 import { useUiStore } from "@/stores/ui";
-import { computeTax } from "@/lib/tax";
+import { computeTax, npsCeilingFor } from "@/lib/tax";
 import { toAnnual } from "@/lib/cashflow";
 import { formatINRCompact, formatPercent, formatINR } from "@/lib/formatters";
 import {
@@ -92,10 +92,18 @@ const derivedDeductions = computed(() => deriveDeductions(household.data));
 // 80CCD(2) employer-NPS is the one deduction allowed in BOTH regimes — show the CAPPED value
 // at the displayed regime's ceiling (per-member), so the tax-reducing figure is visible (gh-issue #4).
 const employerNps80CCD2 = computed(() => {
-  const ceiling = effectiveRegime.value === "NEW" ? 0.14 : 0.1;
+  const regime = effectiveRegime.value;
   const list = derivedDeductions.value.employerNpsByMember;
-  const used = list.reduce((s, m) => s + (m.basic > 0 ? Math.min(m.nps, ceiling * m.basic) : m.nps), 0);
-  const limit = list.reduce((s, m) => s + (m.basic > 0 ? ceiling * m.basic : m.nps), 0);
+  // Per-member, sector-aware ceiling (npsCeilingFor — same source as the engine) so a govt
+  // member's 14% OLD figure displays correctly, matching what computeTax deducts (gh-issue #4).
+  const used = list.reduce(
+    (s, m) => s + (m.basic > 0 ? Math.min(m.nps, npsCeilingFor(regime, m.sector) * m.basic) : m.nps),
+    0,
+  );
+  const limit = list.reduce(
+    (s, m) => s + (m.basic > 0 ? npsCeilingFor(regime, m.sector) * m.basic : m.nps),
+    0,
+  );
   return { used: Math.round(used), limit: Math.round(limit) };
 });
 
