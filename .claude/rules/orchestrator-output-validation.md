@@ -31,6 +31,28 @@ Before accepting / committing / building on ANY output:
 5. **Only then accept.** On ANY divergence: return the work to the worker (`SendMessage`) or fix at
    T0 — never accept-and-hope.
 
+## UI outputs — the Playwright loop (MANDATORY, iterate until it matches intent)
+
+For ANY output that changes rendered UI (`.vue` templates, Vuetify props, styles, routes), the
+supervisor's "reproduce + inspect" steps MUST be a **Playwright MCP loop** — NEVER accepted on
+code-inspection alone (Abhay 2026-06-03: *"always perform UI validation using Playwright iteratively
+until it looks and works the way you implemented"*):
+
+1. **navigate** (`mcp__playwright__browser_navigate`) to the affected route (self-heal: start
+   `npm run dev` once if the dev server is down).
+2. **screenshot** (`browser_take_screenshot`) — does it **LOOK** the way it was implemented?
+3. **ARIA snapshot** (`browser_snapshot`) — is the intended element structurally present?
+4. **console** (`browser_console_messages`) — no NEW errors/warnings from the change?
+5. **interact** (click / fill / select) — does it **WORK** the way it was implemented?
+6. **Compare to the implemented intent — look AND behaviour**, not just "renders without error." On
+   ANY mismatch: fix the ROOT cause, re-run from step 1. **ITERATE until the rendered result matches
+   intent** (per rule 24: cap in-loop at 3 attempts, then `/fix-loop` — the success bar is
+   match-intent, never "good enough").
+
+"It builds / no console error" is a CLAIM about the UI; the screenshot + interaction are the proof.
+Pairs with rules 24/25/26 (dev-time + test-time mirrors) — this rule makes the Playwright loop the
+non-negotiable substance of the supervisor gate for UI.
+
 ## Relationship to the other gates (no duplication — `configuration-ssot.md`)
 
 - **`agent-orchestration.md` §2** says READ the return. This rule says reading is NOT ENOUGH —
