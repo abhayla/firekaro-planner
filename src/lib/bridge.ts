@@ -194,6 +194,10 @@ export function computeBridgeCoverage(input: BridgeInput): BridgeCoverage {
     let minSurplus = Number.POSITIVE_INFINITY;
     let underwaterYears = 0;
     for (let age = retAge; age <= lastUnlockAge; age++) {
+      // #17 convention: a tranche unlocking AT age N is credited BEFORE age-N's expense
+      // — i.e. same-year unlocks are spendable that year. This is ≤1yr optimistic, but is
+      // dominated by the bridge's no-returns-during-drawdown assumption, so the net check
+      // stays conservative. (Reviewer: no code change required for correctness.)
       for (const t of c.tranches) if (t.age === age) cumResources += t.netAmount;
       cumExpenses += Math.max(0, input.annualExpenses - incomeAtAge(age, c.npsStreams));
       const surplus = cumResources - cumExpenses;

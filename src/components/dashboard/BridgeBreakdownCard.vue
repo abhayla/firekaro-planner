@@ -13,6 +13,11 @@ import type { RouteLocationRaw } from "vue-router";
 
 const fire = useFireDerive();
 
+// #17 M1: end an engine-owned note with a period ONLY if it doesn't already end in
+// terminal punctuation — a hard-coded template "." renders "text.." / "text)." for any
+// note ending in "." or ")". Robust without auditing every AssumptionNote string.
+const withPeriod = (s: string) => (/[.!?)]\s*$/.test(s) ? s : `${s}.`);
+
 const bc = computed(() => fire.bridgeCoverage.value);
 
 // Render only when the bridge was evaluated AND there is something to show
@@ -165,8 +170,8 @@ function fixRoute(fixField?: string): RouteLocationRaw {
       >
         <div class="flex-grow-1">
           <div class="text-body-2 font-weight-medium">{{ a.assumed }}</div>
-          <div class="text-caption text-medium-emphasis">{{ a.why }}.</div>
-          <div v-if="a.impact" class="text-caption text-medium-emphasis">{{ a.impact }}.</div>
+          <div class="text-caption text-medium-emphasis">{{ withPeriod(a.why) }}</div>
+          <div v-if="a.impact" class="text-caption text-medium-emphasis">{{ withPeriod(a.impact) }}</div>
         </div>
         <v-btn
           v-if="a.fixField"
