@@ -2,6 +2,7 @@ import { createRouter, createWebHistory, type RouteRecordRaw } from "vue-router"
 import { useHouseholdStore } from "@/stores/household";
 import { useFeaturesStore } from "@/stores/features";
 import { useAssumptionsStore } from "@/stores/assumptions";
+import { useUiStore } from "@/stores/ui";
 import { featuresGuardingRoute } from "@/lib/features";
 import { getAuthProvider } from "@/lib/auth-provider";
 
@@ -170,6 +171,13 @@ router.beforeEach((to) => {
   // multipliers, SWR) survive a full reload onto any route — not just the
   // splash/preferences pages that previously owned the only hydrate calls.
   useAssumptionsStore().hydrate();
+  // Hydrate ui too BEFORE any route component mounts. The lifecycle-digest card is
+  // a deep dashboard descendant whose onMounted (silent baseline capture) fires
+  // before App.vue's onMounted ui.hydrate() — so without hydrating here, a returning
+  // user who already has ui prefs (FY / family-view) but no snapshot would have the
+  // card's just-captured baseline clobbered by the later stale hydrate, and the
+  // digest baseline would never accumulate. Guard-hydrate closes that ordering race.
+  useUiStore().hydrate();
 
   if (String(to.name ?? "").startsWith("wizard")) return true;
 

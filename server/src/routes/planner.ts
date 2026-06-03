@@ -40,10 +40,26 @@ const featuresBodySchema = z.object({
   userId: z.string().optional(), // ignored — server uses the session userId
 });
 
+// "Since you were away" lifecycle digest baseline — rides inside the `ui` prefs
+// Json blob (no migration). Additive + nullable so older ServerAdapter writes and
+// the frontend's null default both validate, and the snapshot isn't stripped on PUT.
+const lifecycleSnapshotSchema = z.object({
+  capturedAt: z.string(),
+  fireAge: z.number(),
+  fireYear: z.number(),
+  currentCorpus: z.number(),
+  fireNumber: z.number(),
+  savingsRatePct: z.number(),
+  milestoneBand: z.number(),
+  activeNudgeIds: z.array(z.string()),
+  monteCarloP50Age: z.number().nullable(),
+});
+
 const uiBodySchema = z.object({
   isFamilyView: z.boolean().optional(),
   viewingMemberId: z.string().nullable().optional(),
   currentFY: z.string().optional(),
+  lifecycleSnapshot: lifecycleSnapshotSchema.nullable().optional(),
 });
 
 const expenseSnapshotSchema = z.object({
