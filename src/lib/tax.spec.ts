@@ -4,6 +4,8 @@ import {
   recommendRegime,
   marginalSlabRate,
   getTaxConfigForFY,
+  getTaxConfigCoverage,
+  isProjectedTaxStale,
   oldRegimeSlabsForAge,
   type TaxSlabEntry,
 } from "./tax";
@@ -370,5 +372,35 @@ describe("computeTax — 80CCD(2) govt-sector 14% ceiling, OLD regime (gh-issue 
     // under-caps a govt earner at 10% OLD. Documents the limitation (errs safe — never over-deducts).
     const scalar = computeTax({ ...base, employerNps: 140000, employerNpsBasic: 1000000 });
     expect(scalar.taxableIncome).toBe(1_900_000); // 20L − 10%×10L = 19L (private), not the 14% 18.6L
+  });
+});
+
+describe("tax config coverage / staleness (gh-issue #19 — long-horizon honesty)", () => {
+  it("a configured FY is not stale and applies its own slabs", () => {
+    const cov = getTaxConfigCoverage("2026-27");
+    expect(cov.isConfigured).toBe(true);
+    expect(cov.isFutureUnconfigured).toBe(false);
+    expect(cov.appliedFy).toBe("2026-27");
+    expect(isProjectedTaxStale("2026-27")).toBe(false);
+  });
+
+  it("a FUTURE unconfigured FY is flagged stale and silently applies the newest (flat) slabs", () => {
+    const cov = getTaxConfigCoverage("2035-36");
+    expect(cov.isConfigured).toBe(false);
+    expect(cov.isFutureUnconfigured).toBe(true);
+    expect(cov.isPastUnconfigured).toBe(false);
+    expect(cov.appliedFy).toBe(cov.newestConfiguredFy);
+    expect(isProjectedTaxStale("2035-36")).toBe(true);
+  });
+
+  it("a PAST unconfigured FY is NOT projection-stale (historical tax is out of scope, ADR-0003)", () => {
+    const cov = getTaxConfigCoverage("2010-11");
+    expect(cov.isPastUnconfigured).toBe(true);
+    expect(cov.isFutureUnconfigured).toBe(false);
+    expect(isProjectedTaxStale("2010-11")).toBe(false);
+  });
+
+  it("regression: getTaxConfigForFY still falls back to the newest config for a future FY (behaviour preserved)", () => {
+    expect(getTaxConfigForFY("2035-36")).toBe(getTaxConfigForFY("2026-27"));
   });
 });

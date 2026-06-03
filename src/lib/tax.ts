@@ -132,26 +132,70 @@ const TAX_CONFIGS: Record<string, FYTaxConfig> = {
 export const AVAILABLE_FYS = Object.keys(TAX_CONFIGS);
 export const DEFAULT_FY = "2026-27";
 
-export function getTaxConfigForFY(fy: string): FYTaxConfig {
-  const direct = TAX_CONFIGS[fy];
-  if (direct) return direct;
-  // gh-issue #6 / ADR-0003: accurate historical-year tax is OUT of scope (FireKaro is a FIRE
-  // planner, not a tax-return tracker). But an unconfigured FY must NOT silently receive the
-  // NEWEST slabs for an OLD year — fall back to the NEAREST configured FY (least-wrong): the
-  // oldest config for past years, the newest for future years.
+/**
+ * Whether a requested FY actually has configured tax slabs, and what is applied if not.
+ * gh-issue #19 (Tier-0 honesty): a multi-decade FIRE projection runs far past the newest
+ * configured FY, and those years silently use the newest slabs held FLAT. `isFutureUnconfigured`
+ * is the user-facing disclosure condition ("tax beyond FY{newest} assumes current slabs").
+ */
+export interface TaxConfigCoverage {
+  fy: string;
+  /** Exact slabs exist for this FY. */
+  isConfigured: boolean;
+  /** A FUTURE year beyond the newest config ⇒ projection assumes today's slabs held flat. */
+  isFutureUnconfigured: boolean;
+  /** A PAST year before the oldest config (historical tax is out of scope — ADR-0003). */
+  isPastUnconfigured: boolean;
+  /** The FY whose slabs are actually applied (the nearest-configured fallback). */
+  appliedFy: string;
+  /** The newest FY with configured slabs. */
+  newestConfiguredFy: string;
+}
+
+export function getTaxConfigCoverage(fy: string): TaxConfigCoverage {
   const fys = Object.keys(TAX_CONFIGS).sort(); // "YYYY-YY" sorts chronologically
   const oldest = fys[0];
   const newest = fys[fys.length - 1];
+  const isConfigured = Object.prototype.hasOwnProperty.call(TAX_CONFIGS, fy);
   const startYear = parseInt(fy.slice(0, 4), 10);
-  const nearest =
-    Number.isNaN(startYear) || startYear >= parseInt(oldest.slice(0, 4), 10) ? newest : oldest;
-  if (import.meta.env?.DEV && import.meta.env?.MODE !== "test") {
+  const oldestYear = parseInt(oldest.slice(0, 4), 10);
+  const newestYear = parseInt(newest.slice(0, 4), 10);
+  // appliedFy mirrors the prior getTaxConfigForFY rule EXACTLY: NaN or >= oldest ⇒ newest, else oldest.
+  const appliedFy = isConfigured
+    ? fy
+    : Number.isNaN(startYear) || startYear >= oldestYear
+      ? newest
+      : oldest;
+  return {
+    fy,
+    isConfigured,
+    isFutureUnconfigured: !isConfigured && !Number.isNaN(startYear) && startYear > newestYear,
+    isPastUnconfigured: !isConfigured && !Number.isNaN(startYear) && startYear < oldestYear,
+    appliedFy,
+    newestConfiguredFy: newest,
+  };
+}
+
+/**
+ * True when projecting a FUTURE year with no configured slabs ⇒ the projection silently assumes
+ * the newest slabs held flat. The condition the #19 UI disclosure surfaces to the user.
+ */
+export function isProjectedTaxStale(fy: string): boolean {
+  return getTaxConfigCoverage(fy).isFutureUnconfigured;
+}
+
+export function getTaxConfigForFY(fy: string): FYTaxConfig {
+  // gh-issue #6 / ADR-0003: accurate historical-year tax is OUT of scope (FireKaro is a FIRE
+  // planner, not a tax-return tracker). An unconfigured FY falls back to the NEAREST configured FY
+  // (least-wrong) — single source of that rule is getTaxConfigCoverage (gh-issue #19, no drift).
+  const coverage = getTaxConfigCoverage(fy);
+  if (!coverage.isConfigured && import.meta.env?.DEV && import.meta.env?.MODE !== "test") {
     console.warn(
-      `[tax] No tax config for FY ${fy}; using nearest configured FY ${nearest}. ` +
+      `[tax] No tax config for FY ${fy}; using nearest configured FY ${coverage.appliedFy}. ` +
         `Historical/forward tax is approximate — see gh-issue #6.`,
     );
   }
-  return TAX_CONFIGS[nearest];
+  return TAX_CONFIGS[coverage.appliedFy];
 }
 
 /**
