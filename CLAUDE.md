@@ -178,12 +178,30 @@ or, in v6, the ServerAdapter → Supabase). Conventions (canonical: `src/stores/
 
 ## Calculations — `src/lib/*.ts` with colocated specs
 
-Pure modules in `src/lib/` with colocated `*.spec.ts`: `fire-math.ts`, `tax.ts` + `tax-deductions.ts`,
-`amortization.ts`, `withdrawal-strategy.ts`, `glide-path.ts`, `coast-fire.ts`, `cashflow.ts`,
-`epf-vpf.ts`, `nps-withdrawal.ts`, `esop-tax.ts`, `freedom-score.ts`, `adequacy.ts`,
-`investment-traits.ts`, `derived-records.ts`, `nudge-engine.ts`, `expense-history.ts`. Research-grounded
-math: 4-bucket inflation, per-instrument returns, horizon-driven SWR, variant multipliers, glide path,
-Floor/Ceiling withdrawal. Keep modules pure (no store/DOM access).
+**The kernel:** `derive.ts` is the ONE pure FIRE-math function — it takes a household snapshot +
+resolved assumptions + UI lens and returns every dashboard field. `useFireDerive.ts` is a thin
+Pinia-aware wrapper (reads the stores, calls `derive()` once, re-exposes each field as a `computed`);
+`derive.spec.ts` unit-tests the kernel and `useFireDerive.seed.spec.ts` locks end-to-end behaviour
+through the real stores. The lifecycle/nudge loop in `server/` shares this SAME `derive()` (no math
+duplication). Touching FIRE math almost always means touching `derive.ts`.
+
+Pure modules in `src/lib/` with colocated `*.spec.ts`: `fire-math.ts`, `tax.ts` + `tax-deductions.ts`
++ `tax-cliff.ts`, `amortization.ts`, `withdrawal-strategy.ts`, `glide-path.ts`, `coast-fire.ts`,
+`cashflow.ts`, `epf-vpf.ts`, `nps-withdrawal.ts`, `esop-tax.ts`, `freedom-score.ts`, `adequacy.ts`,
+`stress-test.ts`, `investment-traits.ts`, `derived-records.ts`, `nudge-engine.ts`,
+`expense-history.ts`, `member-horizon.ts`, `age.ts`. Research-grounded math: 4-bucket inflation,
+per-instrument returns, horizon-driven SWR, variant multipliers, glide path, Floor/Ceiling withdrawal.
+Keep modules pure (no store/DOM access).
+
+**Accessible-money bridge (honesty layer, #13/#14/#15 — `derive()` consumes it):** corpus ≥ FIRE
+number does NOT mean retire-ready — locked money (PPF maturing at 60, NPS forced into an annuity on
+early exit) can leave LIQUID money short in the early years. `bridge.ts` (`computeBridgeCoverage`)
+runs a conservative year-by-year liquidity check and **moves the effective headline FIRE age LATER**
+when the liquid runway can't cover the bridge years. It combines `accessibility.ts` (when/how-much
+each holding unlocks), `liquidation-tax.ts` (post-tax net of selling a holding), plus bridge income
+streams `eps-pension.ts` (EPS) + `gratuity.ts` + rental + NPS annuity. The headline FIRE verdict is
+gate-integrated, not a side card. Design SSOT: `docs/goals/2026-06-03-accessible-money-bridge.md` +
+GitHub issues #13/#14/#15.
 
 ## Routing (`src/router/index.ts`)
 
