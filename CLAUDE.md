@@ -188,12 +188,13 @@ duplication). Touching FIRE math almost always means touching `derive.ts`.
 Pure modules in `src/lib/` with colocated `*.spec.ts`: `fire-math.ts`, `tax.ts` + `tax-deductions.ts`
 + `tax-cliff.ts`, `amortization.ts`, `withdrawal-strategy.ts`, `glide-path.ts`, `coast-fire.ts`,
 `cashflow.ts`, `epf-vpf.ts`, `nps-withdrawal.ts`, `esop-tax.ts`, `freedom-score.ts`, `adequacy.ts`,
-`stress-test.ts`, `investment-traits.ts`, `derived-records.ts`, `nudge-engine.ts`,
+`stress-test.ts`, `monte-carlo.ts` (#18 — FIRE date as a confidence distribution, not a point),
+`investment-traits.ts`, `derived-records.ts`, `nudge-engine.ts`,
 `expense-history.ts`, `member-horizon.ts`, `age.ts`, and the **#15 accessible-money bridge** layer
 (`accessibility.ts`, `liquidation-tax.ts`, `eps-pension.ts`, `gratuity.ts`, `bridge.ts` — see the
 dedicated note below). Research-grounded math: 4-bucket inflation, per-instrument returns,
-horizon-driven SWR, variant multipliers, glide path, Floor/Ceiling withdrawal. Keep modules pure (no
-store/DOM access).
+horizon-driven SWR, variant multipliers, glide path, Floor/Ceiling withdrawal, Monte Carlo
+confidence bands. Keep modules pure (no store/DOM access).
 
 **Accessible-money bridge (honesty layer, #13/#14/#15 — `derive()` consumes it):** corpus ≥ FIRE
 number does NOT mean retire-ready — locked money (PPF maturing at 60, NPS forced into an annuity on
