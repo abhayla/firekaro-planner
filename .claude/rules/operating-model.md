@@ -65,9 +65,10 @@ For any **non-trivial** output (see blast-radius definition below), BEFORE it is
    changed; + `quality-gate-evaluator-agent` for larger/cross-file). The author/CEO is **never the sole
    verifier**, even when T0 built the work inline (rule 29).
 4. **Verify BOTH axes** when the change touches both — **API side** (independent `GET` / re-run; rules
-   25/26, `e2e-api-verification.md`) **AND UI side** (Playwright screenshot + ARIA + console, iterate
-   until it matches the implemented intent; rules 24/26, `orchestrator-output-validation.md` UI loop).
-   Name explicitly any axis that is genuinely N/A.
+   25/26, `e2e-api-verification.md`) **AND UI side** (Playwright screenshot + ARIA + console + **exercise
+   the screen's interactive functionality** — clicks/tabs/FY/dialog-open, non-destructive on prod; rule 32 —
+   iterate until it matches the implemented intent; rules 24/26/32, `orchestrator-output-validation.md` UI loop).
+   "Renders" is not "functions": a UI verification that never clicked anything is incomplete. Name explicitly any axis that is genuinely N/A.
 5. **Reviewer is adversarial** — prompted to refute / find the leak, not bless. Verification theater (a
    rubber-stamp pass, a glanced screenshot) does not satisfy this rule.
 

@@ -85,5 +85,10 @@ type runs; `testing.md` owns *how* tests are written (FIRST principles, flaky di
   user's account or Abhay's personal account.
 - MUST NOT load-test or active-pentest production; MUST NOT stand up a staging environment at current
   scale without an explicit need (YAGNI) — localhost+Supabase is the prod-like test env.
+- MUST verify **interactive functionality** (clicks, tabs, FY switches, forms, dialogs), not just render
+  /layout/console, at **every** testing layer (rule 32): pre-merge E2E exercises the full (incl. destructive)
+  flows; the **prod smoke MUST include non-destructive interactions** (tab/FY/expand/dialog-open-then-cancel) —
+  "it rendered" is never sufficient to claim a prod screen works.
 - MUST keep this the SSOT for test *placement* (where) and cross-reference `testing.md` (how),
-  `operating-model.md` (the pre-commit edge), and `DEPLOY.md` (the runbook) — never duplicate them.
+  `operating-model.md` (the pre-commit edge), `claude-behavior.md` rule 32 (interactive functionality), and
+  `DEPLOY.md` (the runbook) — never duplicate them.
