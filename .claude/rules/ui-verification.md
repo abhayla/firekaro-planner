@@ -40,8 +40,23 @@ pass = the proof a real user can enter it. The realization-method (UI-entry vs f
 **consequential fork** — confirm it when the user says "create data" without naming the form; never
 silently default to a fixture. The headed entry engine is `scripts/enter-persona-via-ui.mjs`.
 
+**Two non-negotiable data-entry-testing standards (added 2026-06-04, Abhay):**
+1. **Fill EVERY field — including OPTIONAL / non-mandatory ones.** Leaving optional fields blank
+   (VPF top-up, per-investment-type detail fields like qty/price/units/NAV/opening-year/bank/coin/
+   subtype/grams, end-year, premium-period, tax-exempt, horizon bucket, ESOP grant-country/exercise/
+   FMV, employer-sector, co-borrowers, etc.) is only PARTIAL testing — the optional paths go
+   unexercised. Full data-entry testing fills the *whole* form, every field, every type's detail
+   accordion.
+2. **After each section's save → navigate to that section's OVERVIEW / list screen and VERIFY the
+   entered data actually renders there** — not just that it persisted in storage. The product's value
+   is the data flowing through to the overview/dashboard; a per-section overview check (counts +
+   sample substance) confirms the real functionality the way a user experiences it. This is rule-26
+   cross-page verification applied *inline, per section, during entry* — not deferred to the end.
+
 ## CRITICAL RULES
 - MUST treat "create/enter/populate data" as headed UI form-entry + per-entity persistence verification — a `seeds/*.ts` fixture does NOT satisfy it.
+- MUST fill EVERY field on each form, including OPTIONAL ones (+ every type's detail accordion) — blank optionals = partial testing only.
+- MUST, after each section's save, open that section's OVERVIEW/list screen and verify the entered data renders there (counts + sample substance), per section, inline — not just confirm storage persistence.
 - MUST verify UI changes via `/verify-ui` (headed) before claiming a UI task done — screenshot is the verdict, not the exit code.
 - MUST NOT use the headless MCP browser for headed verification; use the script.
 - MUST preserve per-run screenshots (timestamped dir); never overwrite history.
