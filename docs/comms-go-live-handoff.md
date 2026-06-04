@@ -103,6 +103,19 @@ carries ONLY the `whatsappMessageId`; fixed to correlate by that id (commit `996
   - **C2c. Daily cron** — add the crontab line from `docs/DEPLOY.md` §5a (POSTs the token-guarded endpoint
     daily). Enabling it does **not** message real users — sends stay restricted to the test allowlist until A6.
   - **C2d.** A6 (`WATI_ALLOW_ALL_RECIPIENTS`) stays the go-live spend flip — the loop explicitly does NOT touch it.
+- **C3. Post-deploy production smoke (Tier-1) + authenticated UI (Tier-2)  ⏳ NEW (2026-06-04).** The
+  token-guarded `GET /api/internal/smoke` (read-only `prisma.user.count()` round-trip, richer than
+  `/api/health`'s `SELECT 1`) is **code-complete + independently reviewed** (commit `2d52f0f`), wired into
+  `docs/DEPLOY.md` §8 + `validate-env` (warns if unset). Governance: `.claude/rules/testing-strategy.md`
+  (prod = smoke + synthetic only). **Rides the SAME next redeploy as C2a** — one deploy ships both the comms
+  loop and the smoke endpoint. Activation:
+  - **C3a. `SMOKE_TOKEN`** — a secret in the VPS `server/.env` (`openssl rand -hex 32`); unset ⇒ 500 fail-closed.
+    I can add it on the box during the redeploy (same as C2b `LIFECYCLE_RUN_TOKEN`). Verify post-deploy:
+    `curl -H "x-smoke-token: …" https://firekaro.com/api/internal/smoke` → `{ok:true,database:"connected",…}`.
+  - **C3b. Dedicated test Google account** (Tier-2 authenticated prod UI) — **your-only item**: create a throwaway
+    Gmail, share the *address* (never the password — you type it yourself at the one-time session-seed; I keep
+    only the resulting cookie in `e2e/.auth/user.json`, gitignored, ~7-day). Tier-2 is on-demand (big releases /
+    incident verification), not every deploy.
 
 ---
 
