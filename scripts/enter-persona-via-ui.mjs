@@ -17,22 +17,24 @@ mkdirSync(OUT, { recursive: true });
 //  • PPF/NPS/EPF allowJoint:false → owner must be an EARNER (Madhu's PPF → Abhay).
 //  • Other-income + business owners are member-scoped with NO "Joint" (seed Joint → Abhay).
 //  • Recurring-expense form exposes `kind` not `inflationBucket`, no "education" kind.
+// Standard 1 (Abhay 2026-06-04): fill EVERY field incl optional + each type's detail accordion.
+// For tradables the value DERIVES from qty×price, so qty×price is set == the intended value.
 const INVESTMENTS = [
-  { type: "EPF · VPF (auto)", value: 4500000, owner: "Abhay Maurya", epf: true },
-  { type: "Stocks", label: "Direct equity portfolio", value: 2500000, monthly: 20000, owner: "Abhay Maurya", holdings: 25 },
-  { type: "Mutual Funds", label: "Mutual fund SIPs (multi-cap)", value: 6000000, monthly: 25000, owner: "Abhay Maurya" },
-  { type: "Mutual Funds", label: "Madhu's mutual funds", value: 3500000, monthly: 0, owner: "Madhu Kushwaha" },
-  { type: "PPF", label: "PPF (Abhay)", value: 2500000, monthly: 12500, owner: "Abhay Maurya" },
-  { type: "PPF", label: "PPF (Madhu → Abhay)", value: 1800000, monthly: 12500, owner: "Abhay Maurya" },
-  { type: "NPS", label: "NPS Tier-I", value: 1200000, monthly: 10000, owner: "Abhay Maurya" },
-  { type: "Real Estate", label: "3BHK Wakad, Pune", value: 13000000, owner: "Joint", reRole: "Primary residence (excluded from FIRE corpus)" },
-  { type: "Real Estate", label: "2BHK (let out)", value: 6000000, owner: "Joint", reRole: "Investment (counts toward corpus)" },
-  { type: "Gold", label: "Family gold + SGB", value: 1500000, owner: "Joint" },
-  { type: "FD / Bonds", label: "Emergency fund FD", value: 1000000, owner: "Joint" },
-  { type: "Crypto / Other", label: "Crypto (BTC/ETH)", value: 200000, owner: "Abhay Maurya" },
-  { type: "ESOP", esopGrant: 2000000, esopVested: 60, label: "Cognizant RSUs", owner: "Abhay Maurya" },
-  { type: "International Equity", label: "US index FoF (LRS)", value: 800000, owner: "Abhay Maurya" },
-  { type: "REIT", label: "Listed REIT", value: 300000, owner: "Abhay Maurya" },
+  { type: "EPF · VPF (auto)", value: 4500000, owner: "Abhay Maurya", epf: true, vpf: 5 },
+  { type: "Stocks", label: "Direct equity portfolio", value: 2500000, monthly: 20000, owner: "Abhay Maurya", holdings: 25, bucket: "Bucket 3", det: { Quantity: 250, "Avg price / share": 10000 } },
+  { type: "Mutual Funds", label: "Mutual fund SIPs (multi-cap)", value: 6000000, monthly: 25000, owner: "Abhay Maurya", bucket: "Bucket 3", det: { Units: 60000, "NAV / unit": 100 } },
+  { type: "Mutual Funds", label: "Madhu's mutual funds", value: 3500000, monthly: 0, owner: "Madhu Kushwaha", bucket: "Bucket 3", det: { Units: 35000, "NAV / unit": 100 } },
+  { type: "PPF", label: "PPF (Abhay)", value: 2500000, monthly: 12500, owner: "Abhay Maurya", bucket: "Bucket 4", det: { "Account opening year": 2010 } },
+  { type: "PPF", label: "PPF (Madhu → Abhay)", value: 1800000, monthly: 12500, owner: "Abhay Maurya", bucket: "Bucket 4", det: { "Account opening year": 2012 } },
+  { type: "NPS", label: "NPS Tier-I", value: 1200000, monthly: 10000, owner: "Abhay Maurya", bucket: "Bucket 4", det: { "Opening year": 2016 } },
+  { type: "Real Estate", label: "3BHK Wakad, Pune", value: 13000000, owner: "Joint", reRole: "Primary residence (excluded from FIRE corpus)", det: { "Purchase year": 2015 } },
+  { type: "Real Estate", label: "2BHK (let out)", value: 6000000, owner: "Joint", reRole: "Investment (counts toward corpus)", det: { "Purchase year": 2019 } },
+  { type: "Gold", label: "Family gold + SGB", value: 1500000, owner: "Joint", bucket: "Bucket 3", det: { Grams: 250, "Price/gram": 6000 } },
+  { type: "FD / Bonds", label: "Emergency fund FD", value: 1000000, owner: "Joint", bucket: "Bucket 1", det: { Principal: 1000000, "Interest %": 7, "Maturity year": 2028, Bank: "SBI" } },
+  { type: "Crypto / Other", label: "Crypto (BTC/ETH)", value: 200000, owner: "Abhay Maurya", bucket: "Bucket 4", det: { Coin: "BTC", Quantity: 0.05, "Price / coin": 4000000 } },
+  { type: "ESOP", esopGrant: 2000000, esopVested: 60, label: "Cognizant RSUs", owner: "Abhay Maurya", esopExercise: 100, esopFmv: 800 },
+  { type: "International Equity", label: "US index FoF (LRS)", value: 800000, owner: "Abhay Maurya", bucket: "Bucket 3" },
+  { type: "REIT", label: "Listed REIT", value: 300000, owner: "Abhay Maurya", bucket: "Bucket 3" },
 ];
 const RECURRING = [
   { label: "Society maintenance", amount: 7000, freq: "Monthly", kind: "General" },
@@ -103,7 +105,23 @@ async function count(key) {
   }, key);
 }
 const r = {};
+const overview = {};
 const go = async (path) => { await page.goto(`${BASE}${path}`, { waitUntil: "domcontentloaded" }); await page.waitForTimeout(700); await dismissTour(); };
+
+// Standard 2 (Abhay 2026-06-04): after each section's save, open that section's OVERVIEW
+// screen and verify the entered data actually RENDERS there (not just storage). Asserts the
+// expected substrings are present AND the empty-state phrase is absent.
+async function verifyOverview(name, path, mustContain = [], mustNotContain = []) {
+  await go(path);
+  await page.waitForTimeout(1000);
+  const txt = (await page.locator("body").innerText().catch(() => "")).replace(/\s+/g, " ");
+  const missing = mustContain.filter((s) => !txt.includes(s));
+  const leaked = mustNotContain.filter((s) => txt.includes(s));
+  const ok = missing.length === 0 && leaked.length === 0;
+  overview[name] = ok;
+  await page.screenshot({ path: `${OUT}/ov-${name}.png`, fullPage: true });
+  log(`   overview[${name}] ${ok ? "✅" : `❌ missing=${JSON.stringify(missing)} leaked=${JSON.stringify(leaked)}`}`);
+}
 
 try {
   await page.goto(BASE, { waitUntil: "domcontentloaded" });
@@ -157,8 +175,11 @@ try {
     const dlg = page.locator(".v-overlay--active .v-card", { hasText: "Edit salary" }).last();
     await dlg.locator('input[type="number"]').nth(0).fill("4200000"); // Annual CTC
     await dlg.locator('input[type="number"]').nth(1).fill("5");       // Annual hike
-    await dlg.locator('input[type="number"]').nth(3).fill("1680000"); // Basic (idx2 = VPF)
+    await dlg.locator('input[type="number"]').nth(2).fill("0");       // VPF top-up % (optional)
+    await dlg.locator('input[type="number"]').nth(3).fill("1680000"); // Basic + DA
     await dlg.locator('input[type="number"]').nth(4).fill("120000");  // Employer NPS
+    await page.getByTestId("employer-sector-select").click({ force: true });
+    await page.getByRole("option", { name: /private/i }).first().click().catch(() => {});
     await page.waitForTimeout(300);
     await shot("02b-salary-filled");
     await page.getByRole("button", { name: /save changes/i }).click();
@@ -179,20 +200,39 @@ try {
       if (inv.label) await page.getByLabel(/^label/i).first().fill(inv.label);
       await sel("Owner", inv.owner);
       if (inv.type === "ESOP") {
-        await page.getByLabel(/total grant/i).fill(String(inv.esopGrant));
-        await page.getByLabel(/vested %/i).fill(String(inv.esopVested));
+        await page.getByLabel(/total grant/i).first().fill(String(inv.esopGrant));
+        await page.getByLabel(/vested %/i).first().fill(String(inv.esopVested));
+        await page.getByTestId("esop-grantor-country").click({ force: true });
+        await page.getByRole("option", { name: "US", exact: true }).first().click().catch(() => {});
+        if (inv.esopExercise !== undefined) await page.getByTestId("esop-exercise-price").locator("input").fill(String(inv.esopExercise));
+        if (inv.esopFmv !== undefined) await page.getByTestId("esop-fmv-at-vest").locator("input").fill(String(inv.esopFmv));
       } else {
         await page.locator('input[type="number"]').first().fill(String(inv.value));
+        if (inv.epf && inv.vpf !== undefined) await page.getByLabel(/VPF top-up/i).first().fill(String(inv.vpf));
         if (inv.monthly !== undefined && !inv.epf) await page.getByLabel(/monthly contribution/i).fill(String(inv.monthly));
         if (inv.holdings) await page.getByLabel(/# holdings/i).fill(String(inv.holdings));
       }
-      if (inv.reRole) {
-        if (!(await page.getByTestId("re-role-select").isVisible({ timeout: 500 }).catch(() => false))) {
+      if (inv.bucket) {
+        await page.getByTestId("investment-bucket-select").click({ force: true });
+        await page.getByRole("option", { name: new RegExp(inv.bucket) }).first().click();
+      }
+      if (inv.reRole || inv.det) {
+        const reRoleVis = await page.getByTestId("re-role-select").isVisible({ timeout: 400 }).catch(() => false);
+        const firstDet = inv.det ? Object.keys(inv.det)[0] : null;
+        const detVis = firstDet ? await page.getByLabel(firstDet, { exact: false }).first().isVisible({ timeout: 400 }).catch(() => false) : false;
+        if (!reRoleVis && !detVis) {
           await page.getByRole("button", { name: /more details/i }).click().catch(() => {});
-          await page.waitForTimeout(300);
+          await page.waitForTimeout(400);
         }
-        await page.getByTestId("re-role-select").click({ force: true });
-        await page.getByRole("option", { name: inv.reRole }).click();
+        if (inv.reRole) {
+          await page.getByTestId("re-role-select").click({ force: true });
+          await page.getByRole("option", { name: inv.reRole }).first().click();
+        }
+        if (inv.det) {
+          for (const [lbl, val] of Object.entries(inv.det)) {
+            await page.getByLabel(lbl, { exact: false }).first().fill(String(val)).catch((e) => log(`     · ${inv.label} field "${lbl}": ${e.message?.split("\n")[0]}`));
+          }
+        }
       }
       await page.getByRole("button", { name: /^add investment$/i }).click();
       await page.waitForTimeout(400);
@@ -201,6 +241,7 @@ try {
   r.investments = await count("investments");
   await shot("03-investments");
   log(`3. investments: ${r.investments}/${INVESTMENTS.length}`);
+  await verifyOverview("investments", "/investments/overview", [], ["No investments yet"]);
 
   // ───────── 4. Avg monthly burn ─────────
   await go("/expenses/overview");
@@ -249,6 +290,7 @@ try {
   }
   r.planned = await count("planned");
   log(`6. goals: ${r.planned}/${GOALS.length}`);
+  await verifyOverview("expenses", "/expenses/overview", [], ["No recurring commitments"]);
 
   // ───────── 7. Liabilities ─────────
   await go("/liabilities/loans");
@@ -270,6 +312,7 @@ try {
   }
   r.liabilities = await count("liabilities");
   log(`7. liabilities: ${r.liabilities}/${LOANS.length}`);
+  await verifyOverview("liabilities", "/liabilities/overview", ["2 loans"], []);
 
   // ───────── 8. Insurance ─────────
   await go("/insurance/policies");
@@ -280,6 +323,8 @@ try {
       await page.getByLabel(/provider/i).first().fill(p.provider);
       await page.getByLabel(/sum assured/i).first().fill(String(p.sum));
       await page.getByLabel(/premium/i).first().fill(String(p.prem));
+      await page.getByLabel("Per", { exact: true }).first().click({ force: true }); // premium period (optional)
+      await page.getByRole("option", { name: "/yr", exact: true }).first().click().catch(() => {});
       await page.getByLabel(/insured person/i).first().click({ force: true });
       await page.getByRole("option", { name: p.insured, exact: true }).first().click();
       await page.getByRole("button", { name: /add policy/i }).first().click();
@@ -288,6 +333,7 @@ try {
   }
   r.insurance = await count("insurance");
   log(`8. insurance: ${r.insurance}/${POLICIES.length}`);
+  await verifyOverview("insurance", "/insurance/overview", ["2 policies"], []);
 
   // ───────── 9. Business (PIFS) ─────────
   await go("/income/business");
@@ -324,6 +370,7 @@ try {
   }
   r.otherIncome = await count("otherIncome");
   log(`10. otherIncome: ${r.otherIncome}/${OTHER_INCOME.length}`);
+  await verifyOverview("income", "/income/overview", ["42.00"], []);
 
   await go("/fire-goals/dashboard");
   await shot("00-dashboard-after-entry");
@@ -345,6 +392,10 @@ for (const [k, v] of Object.entries(exp)) {
   if (!ok) allOk = false;
   log(`${ok ? "✅" : "❌"} ${k}: ${got} (expected ${v})`);
 }
+log("--- per-section OVERVIEW render checks ---");
+for (const [k, v] of Object.entries(overview)) log(`${v ? "✅" : "❌"} overview[${k}] data renders on screen`);
+const ovOk = Object.values(overview).every(Boolean);
+if (!ovOk) allOk = false;
 log(`page errors: ${errors.length ? JSON.stringify(errors) : "none"}`);
 log(`screenshots: ${OUT}`);
 log(`VERDICT: ${allOk && errors.length === 0 ? "PASS ✅" : "PARTIAL — iterate"}`);
