@@ -90,5 +90,10 @@ export function useFireDerive() {
     totalLiabilitiesValue: computed(() => d.value.totalLiabilitiesValue),
     npsAnnuityIncome: computed(() => d.value.npsAnnuityIncome),
     fireWithdrawableCorpus: computed(() => d.value.fireWithdrawableCorpus),
+    // Whole-household income/tax for the cashflow / financial-health charts — they mix income with
+    // HOUSEHOLD expenses/savings/tax, so they MUST read the household income (not the lensed display)
+    // to avoid a spurious negative surplus under a member lens (#23 HIGH follow-up).
+    householdAnnualIncome: computed(() => d.value.householdAnnualIncome),
+    householdAnnualTax: computed(() => d.value.householdAnnualTax),
   };
 }

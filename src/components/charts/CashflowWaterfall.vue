@@ -21,7 +21,10 @@ const fire = useFireDerive();
 // Implemented as a stacked-floating-bar trick: the "transparent" base series
 // positions each bar at the cumulative running total; the "value" series renders the bar.
 const chartData = computed(() => {
-  const monthlyIncome = fire.annualIncome.value.total / 12;
+  // #23 follow-up: cashflow mixes income with HOUSEHOLD expenses/savings, so income MUST be the
+  // whole-household figure — a lensed (one-member) income over a household expense base renders a
+  // spurious negative surplus. householdAnnualIncome === annualIncome.total on the default lens.
+  const monthlyIncome = (fire.householdAnnualIncome.value ?? 0) / 12;
   const monthlyExpenses = fire.annualExpensesToday.value / 12;
   const monthlySavings = (fire.annualSavings.value || 0) / 12;
   const monthlyInvestments = Math.max(0, monthlyIncome - monthlyExpenses - monthlySavings);
@@ -101,7 +104,7 @@ const chartOptions = computed(() => ({
 }));
 
 const isEmpty = computed(
-  () => fire.annualIncome.value.total === 0 && fire.annualExpensesToday.value === 0,
+  () => (fire.householdAnnualIncome.value ?? 0) === 0 && fire.annualExpensesToday.value === 0,
 );
 </script>
 

@@ -8,9 +8,13 @@ import MetricCard from "@/components/shared/MetricCard.vue";
 
 const fire = useFireDerive();
 
-const annualIncome = computed(() => fire.annualIncome.value.total);
+// #23 follow-up: this page derives surplus = income − tax − expenses. Expenses are inherently
+// HOUSEHOLD (not modeled per-member), so income AND tax MUST also be household-scoped — else a
+// member lens renders a spurious negative surplus. household* === the lensed values on the default
+// lens, so the page is unchanged there.
+const annualIncome = computed(() => fire.householdAnnualIncome.value ?? 0);
 const annualExpenses = computed(() => fire.annualExpensesToday.value);
-const annualTax = computed(() => fire.annualTax.value);
+const annualTax = computed(() => fire.householdAnnualTax.value ?? 0);
 const annualSurplus = computed(() =>
   Math.max(0, annualIncome.value - annualExpenses.value - annualTax.value),
 );

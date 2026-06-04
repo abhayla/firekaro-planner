@@ -658,6 +658,15 @@ export function derive(household: Household, assumptions: Assumptions, lens: Der
     totalLiabilitiesValue,
     npsAnnuityIncome,
     fireWithdrawableCorpus,
+    // Whole-household income/tax — the coherent denominator for the cashflow / financial-health
+    // charts (#23 HIGH follow-up). The 4 DISPLAY fields (annualIncome/annualTax) lens to the
+    // selected member, but cashflow mixes income with HOUSEHOLD expenses/savings/tax — so a lensed
+    // income over a household expense base renders a spurious negative surplus ("this member spends
+    // more than they earn"). Charts read THESE instead: householdScope.annualIncome.total /
+    // .annualTax. On the default lens householdScope === lensedScope, so these EQUAL the lensed
+    // annualIncome.total / annualTax and nothing changes.
+    householdAnnualIncome: householdScope.annualIncome.total,
+    householdAnnualTax: householdScope.annualTax,
   };
 }
 

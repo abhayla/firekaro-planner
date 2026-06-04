@@ -146,6 +146,34 @@ describe("headline plausibility — DEFAULT product lens (#22 foolproof gate)", 
       }
       // ...but the income/tax DISPLAY still lenses to the selected member (strictly less income).
       expect(lensed.annualIncome.total).toBeLessThan(household.annualIncome.total);
+
+      // #23 HIGH follow-up — the cashflow / financial-health charts read householdAnnualIncome /
+      // householdAnnualTax, which MUST NOT lens (else a one-member income over a household expense
+      // base renders a spurious negative surplus). Coherence lock: the household income the charts
+      // read equals the whole-household income (matching the household expenses they pair it with),
+      // while the lensed DISPLAY income is strictly less.
+      expect(
+        lensed.householdAnnualIncome,
+        `#23: ${persona.name} — householdAnnualIncome must NOT lens (= whole-household income)`,
+      ).toBe(household.annualIncome.total);
+      expect(
+        lensed.householdAnnualTax,
+        `#23: ${persona.name} — householdAnnualTax must NOT lens (= whole-household tax)`,
+      ).toBe(household.annualTax);
+      // The new household income is strictly greater than the lensed display income — the exact
+      // gap that previously produced the spurious deficit.
+      expect(lensed.householdAnnualIncome).toBeGreaterThan(lensed.annualIncome.total);
+    });
+
+    it(`${persona.name}: on the DEFAULT lens householdAnnualIncome/Tax equal the display fields (byte-identical)`, () => {
+      const h = useHouseholdStore();
+      const a = useAssumptionsStore();
+      persona.load(h, a);
+      const k = derive(h.data, a.values, DEFAULT_PRODUCT_LENS);
+      // With no member selected, householdScope === lensedScope, so the chart-facing household
+      // fields are byte-identical to the existing display fields — nothing changes by default.
+      expect(k.householdAnnualIncome).toBe(k.annualIncome.total);
+      expect(k.householdAnnualTax).toBe(k.annualTax);
     });
 
     it(`${persona.name}: the lifecycle-digest snapshot is domain-SANE on the default lens`, () => {

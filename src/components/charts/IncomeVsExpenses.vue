@@ -28,7 +28,10 @@ const fire = useFireDerive();
 // 8b — Monthly Income vs Expenses bars. ±5-15% variance per month for visual interest.
 // Seeded variance per-month so it stays stable across re-renders.
 const chartData = computed(() => {
-  const monthlyIncome = fire.annualIncome.value.total / 12;
+  // #23 follow-up: this chart compares income with HOUSEHOLD expenses, so income MUST be the
+  // whole-household figure — a lensed (one-member) income over household expenses renders a
+  // spurious deficit. householdAnnualIncome === annualIncome.total on the default lens.
+  const monthlyIncome = (fire.householdAnnualIncome.value ?? 0) / 12;
   const monthlyExpenses = fire.annualExpensesToday.value / 12;
   const labels: string[] = [];
   const incomeData: number[] = [];
@@ -115,11 +118,12 @@ const chartOptions = computed(() => ({
 }));
 
 const isEmpty = computed(
-  () => fire.annualIncome.value.total === 0 && fire.annualExpensesToday.value === 0,
+  () => (fire.householdAnnualIncome.value ?? 0) === 0 && fire.annualExpensesToday.value === 0,
 );
 
 const monthlyNet = computed(() => {
-  const net = (fire.annualIncome.value.total - fire.annualExpensesToday.value) / 12;
+  // Household income vs household expenses — keeps the "monthly net" coherent under a member lens.
+  const net = ((fire.householdAnnualIncome.value ?? 0) - fire.annualExpensesToday.value) / 12;
   return Math.round(net);
 });
 </script>
