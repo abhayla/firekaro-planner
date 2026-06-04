@@ -124,6 +124,15 @@ export function derive(household: Household, assumptions: Assumptions, lens: Der
   const otherExempt = lensedOtherIncome
     .filter((o) => o.isTaxExempt)
     .reduce((s, o) => s + toAnnual({ amount: o.amount, period: o.frequency }), 0);
+  // Sec 24(a): a flat 30% standard deduction on let-out rental NAV. It reduces TAXABLE income
+  // ONLY — the landlord still receives full rent as CASH, so it must NOT shrink annualIncome.total
+  // / annualSavings. It is subtracted from the tax `grossIncome` (and the bridge rental cash) below,
+  // never from the cash total. gh-issue #29.
+  const SEC_24A_DEDUCTION_RATE = 0.3;
+  const taxableRentalAnnual = lensedOtherIncome
+    .filter((o) => o.type === "Rental" && !o.isTaxExempt)
+    .reduce((s, o) => s + toAnnual({ amount: o.amount, period: o.frequency }), 0);
+  const sec24aDeduction = taxableRentalAnnual * SEC_24A_DEDUCTION_RATE;
   const businessShare = lensedBusinesses.reduce(
     (s, b) => s + toAnnual({ amount: b.annualProfit, period: b.frequency }) * (b.sharePercent / 100),
     0,
@@ -183,7 +192,11 @@ export function derive(household: Household, assumptions: Assumptions, lens: Der
   // anchorAge is the lensed member's age, else the primary earner's — the same anchor the
   // rest of the projection uses, consistent with this engine's single-aggregate-earner model.
   const householdTaxRecommendation = recommendRegime({
-    grossIncome: annualIncome.salaryIncome + annualIncome.businessShare + annualIncome.otherTaxable,
+    grossIncome:
+      annualIncome.salaryIncome +
+      annualIncome.businessShare +
+      annualIncome.otherTaxable -
+      sec24aDeduction, // Sec 24(a) reduces taxable rental to 70% NAV — cash total stays full (#29)
     fy: lens.currentFY,
     deductions: estimatedDeductionsForOld,
     employerNpsByMember,
@@ -191,7 +204,11 @@ export function derive(household: Household, assumptions: Assumptions, lens: Der
   });
 
   const fyTax = computeTax({
-    grossIncome: annualIncome.salaryIncome + annualIncome.businessShare + annualIncome.otherTaxable,
+    grossIncome:
+      annualIncome.salaryIncome +
+      annualIncome.businessShare +
+      annualIncome.otherTaxable -
+      sec24aDeduction, // Sec 24(a) reduces taxable rental to 70% NAV — cash total stays full (#29)
     regime: householdTaxRecommendation.recommended,
     fy: lens.currentFY,
     deductions: estimatedDeductionsForOld,
@@ -407,9 +424,17 @@ export function derive(household: Household, assumptions: Assumptions, lens: Der
       ownerDob: dobForOwner(asset.ownerId),
     }));
 
-    const rentalAnnual = lensedOtherIncome
+    // Bridge rental cash, post-tax & PER-LINE. Sec 24(a): a let-out (taxable) rental nets
+    // gross − mr·(0.7·gross); a rental the user flagged tax-exempt nets FULL gross (no tax).
+    // Per-line so the exempt case matches the FY tax path's `!isTaxExempt` filter (was asymmetric). #29
+    const rentalAnnualPostTax = lensedOtherIncome
       .filter((o) => o.type === "Rental")
-      .reduce((s, o) => s + toAnnual({ amount: o.amount, period: o.frequency }), 0);
+      .reduce((s, o) => {
+        const gross = toAnnual({ amount: o.amount, period: o.frequency });
+        return (
+          s + (o.isTaxExempt ? gross : gross * (1 - householdMarginalRate * (1 - SEC_24A_DEDUCTION_RATE)))
+        );
+      }, 0);
     const postTax = (gross: number) => gross * (1 - householdMarginalRate);
 
     // EPS pension + gratuity aggregated over the lensed earners (Phases D, E).
@@ -437,7 +462,8 @@ export function derive(household: Household, assumptions: Assumptions, lens: Der
       planToAge,
       annualExpenses: annualExpensesToday,
       income: {
-        rentalAnnualPostTax: Math.round(postTax(rentalAnnual)),
+        rentalAnnualPostTax: Math.round(rentalAnnualPostTax),
+        // EPS pension is fully taxable (no Sec 24a) — postTax() taxes the full gross, correct here.
         epsAnnualPostTax: Math.round(postTax(epsAnnualGross)),
         epsStartAge: EPS_NORMAL_START_AGE,
       },

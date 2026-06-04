@@ -100,6 +100,56 @@ describe("derive() — pure kernel", () => {
     expect(rohitTaxAfter).toBe(rohitTaxBaseline);
   });
 
+  it("gh-issue #29: let-out rental is taxed on 70% NAV (Sec 24a) — but cash income stays FULL", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    loadSeedPersona(h, a);
+    const lens = { isFamilyView: false, viewingMemberId: null, currentFY: "2025-26" };
+
+    // Control income so the household sits SOLIDLY in the 30% slab (≫ ₹12L rebate, < ₹50L
+    // surcharge) — isolates a CLEAN marginal effect, away from rebate/surcharge cliffs.
+    const rohit = h.data.members.find((m) => m.id === "rohit")!;
+    const priya = h.data.members.find((m) => m.id === "priya")!;
+    rohit.salary!.annualCTC = 3_000_000;
+    priya.salary!.annualCTC = 0;
+
+    const R = 240_000; // ₹20k/mo annualized, let-out
+    const line = {
+      id: "test-29-line",
+      source: "Direct",
+      amount: R,
+      frequency: "A" as const,
+      ownerId: rohit.id,
+      isTaxExempt: false,
+    };
+
+    // Two scenarios differing ONLY in the income TYPE of one line, same gross R:
+    //   Rental   → Sec 24(a): only 70% of R is taxable
+    //   Interest → fully taxable
+    h.data.otherIncome = [{ ...line, type: "Rental" as const }];
+    const rental = derive(h.data, a.values, lens);
+
+    h.data.otherIncome = [{ ...line, type: "Interest" as const }];
+    const interest = derive(h.data, a.values, lens);
+
+    // (1) CASH income IDENTICAL — the 30% standard deduction is a TAX fiction; the landlord still
+    //     receives full rent. Guards against the naive "0.7×otherTaxable" fix, which would drop 30%
+    //     of real cash and push FIRE LATER (a bigger error than the bug).
+    expect(rental.annualIncome.total).toBe(interest.annualIncome.total);
+
+    // (2) Rental taxed LESS — Sec 24(a) removes 0.3·R from taxable income. FAILS pre-fix (both
+    //     currently enter grossIncome at full R → equal tax).
+    expect(rental.annualTax).toBeLessThan(interest.annualTax);
+
+    // (3) SUBSTANCE: at the 30% slab, removing 0.3·R saves ≈ (30% + 4% cess) × 0.3·R. Not just
+    //     "less", but less by the RIGHT amount — and bounded by the hard invariant that a deduction
+    //     of D cannot reduce tax by more than D.
+    const taxSaving = interest.annualTax - rental.annualTax;
+    const deduction = 0.3 * R;
+    expect(taxSaving).toBeGreaterThan(0.28 * deduction); // ~30% slab floor
+    expect(taxSaving).toBeLessThanOrEqual(deduction); // ≤ deducted income (no over-correction)
+  });
+
   it("gh-issue #9: projected expenses grow at a constant NOMINAL inflation (real/nominal coherence)", () => {
     const h = useHouseholdStore();
     const a = useAssumptionsStore();
