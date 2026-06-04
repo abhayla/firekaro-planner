@@ -37,3 +37,21 @@
 **Mistake:** Repeatedly ended turns by DESCRIBING the next reversible step ("immediate next step: edit/delete coverage… the continuation from here") and stopping, instead of executing it. Abhay (multiple times): "why have you stopped? why do you keep forgetting the rules? set it up so you don't forget and keep going."
 **What it missed:** the over-ask Stop hook only caught QUESTIONS; a narrate-and-stop STATEMENT passed through. Advisory "build, don't narrate" prose lost under long context — same failure mode as the over-ask (rule-writing-meta: zero-exception behaviour needs a hook).
 **Fix/Pattern:** Made the Stop hook `no-overask-guard.sh` BLOCKING — on an over-ask OR a narrate-and-stop it emits `{"decision":"block","reason":<rule>}` to force continuation, bounded by a per-turn auto-continue counter (cap 12, reset each UserPromptSubmit) + an escalation/credentials/destructive exemption. Added the "NEVER narrate-and-stop" rule (equal-weight to never-over-ask) to `decision-authority.md` + the every-turn reminder + memory ([[feedback_decision_authority]]). Standing pattern: describing the next reversible step then stopping IS a stop-violation — execute it, chain the whole queue, only a genuine blocker stops.
+
+---
+
+## Gate-gap retro (added 2026-06-04) — does an existing gate cover each class, and did the fix prevent recurrence?
+
+Per the process-improvement item 5 (measure the process). The pattern is decisive and is the empirical case for improvement items 1–2 (prune prose / promote MUSTs to hooks): **every CLOSED gap was closed by a HOOK or a deterministic CI test; every OPEN / at-risk gap is advisory PROSE.**
+
+| Lesson | Gate that should have caught it | Closed by | Recurred? | Status |
+|---|---|---|---|---|
+| 80CCD self-verification (06-01) | independent reviewer — **didn't exist** | rule 29 + FinTech auto-dispatch on `src/lib/*` (semi-deterministic trigger) | no 80CCD-class recurrence | **CLOSED** (trigger-enforced) |
+| handoff-register silent drop (06-03) | SessionStart consult — **advisory only** | proposed SessionStart hook **NOT yet built** | yes (silently re-dropped same day) | **OPEN** — needs the hook (item 2) |
+| shape-not-substance #22 (06-03) | plausibility check — **didn't exist** | `headline-plausibility.spec.ts` CI gate + rule 31 | no age-81-class recurrence | **CLOSED** (deterministic CI test) |
+| over-ask w/ recommendation (06-04) | `no-overask-guard.sh` — caught only trailing-phrase | hook extended to multiple-choice + recommendation+question | sibling form recurred (next row) | **PARTIAL** (hook extended) |
+| fixture-not-UI-entry (06-04) | none — intent miss | `ui-verification.md` rules + `/verify-ui` split — **prose** | led directly to next lesson | **AT RISK** (advisory) |
+| partial-fill storage-only (06-04) | rules 24/25/26 — didn't mandate all-fields+overview | `ui-verification.md` 2 critical rules — **prose** | not yet | **AT RISK** (advisory) |
+| narrate-and-stop (06-04) | over-ask Stop hook — caught questions not statements | hook made BLOCKING on statements too | hook fired + blocked this class again 06-04 | **CLOSED** (hook, proven live) |
+
+**Conclusion:** 3 CLOSED = all hook/CI-test. 2 AT-RISK + 1 OPEN = all advisory prose. 1 PARTIAL = hook (extended). The data says prose-rules do not prevent recurrence; hooks and CI gates do — which is exactly why improvement items 1 (prune prose) and 2 (promote MUSTs to hooks) are the highest-leverage process changes. **Standing addition: every future lesson MUST carry a gate-gap line (which gate should have caught it + closed-by-hook-or-prose) so this signal keeps accruing.**
