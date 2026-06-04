@@ -147,6 +147,11 @@ Prisma scripts hitting Supabase while the dev server holds connections MUST appe
   `getAuthProvider().isAuthenticated()` is false (`LocalAuthProvider` returns true in demo mode, so
   the bounce only bites under the ServerAdapter). Auth routes (`/api/auth/*`) are rate-limited
   (`.claude/rules/rate-limiting-middleware.md`).
+- **Prod smoke** (`server/src/routes/smoke-internal.ts`): `GET /api/internal/smoke` — `SMOKE_TOKEN`-
+  guarded (constant-time, fail-closed if unset), does a `prisma.user.count()` read round-trip. The
+  Tier-1 post-deploy health probe (richer than `/api/health`'s raw `SELECT 1`). Mounted OUTSIDE
+  `authMiddleware`, like the lifecycle scheduler. Placement: `.claude/rules/testing-strategy.md`;
+  runbook: `docs/DEPLOY.md` §8.
 - The `.claude/rules/` for **Hono / Prisma / api-envelope / api-response-unwrapping / dev-bypass-auth
   / structured-logging** apply to `server/` (it IS Hono + Prisma + Better Auth).
 
@@ -218,8 +223,8 @@ GitHub issues #13/#14/#15.
 ## Routing (`src/router/index.ts`)
 
 Top-level routes mirror the 8 sections (income, tax-planning, expenses, investments, liabilities,
-insurance, financial-health, fire-goals) + `/profile`, `/preferences`, `/estate-planning`. Lazy-load
-via `import()`, `meta: { layout: "sidebar" }`. `/preferences` is the canonical home for editable
+insurance, financial-health, fire-goals) + `/profile`, `/preferences`, `/estate-planning`,
+`/glossary`. Lazy-load via `import()`, `meta: { layout: "sidebar" }`. `/preferences` is the canonical home for editable
 assumptions (deep-link `#pref-section-*`). Two `beforeEach` guards: feature-gate (NEW routes only) +
 onboarding (empty→splash, incomplete→wizard, completed→dashboard). Keep legacy aliases.
 
@@ -235,7 +240,9 @@ JetBrains Mono (numerics). Vuetify config `src/plugins/vuetify.ts`. Shared incom
 
 ## Seed personas
 
-4 personas in `src/seeds/`: **Sharmas** (default), **Iyers**, **Mehtas**, **Empty** (wizard). Last
+5 personas in `src/seeds/`: **Sharmas** (default), **Iyers**, **Mehtas**, **Mauryas** (single-income
+mid-40s, full-spread portfolio — the `/verify-ui` headed verification fixture), **Empty** (wizard).
+`sharmas` loads via `seed-persona.ts` (no `sharmas.ts`); the rest have their own `<name>.ts`. Last
 choice persists under `firekaro-mvp:active-seed`.
 
 ## Engineering role router
