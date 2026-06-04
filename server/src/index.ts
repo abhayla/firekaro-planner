@@ -18,6 +18,7 @@ import plannerRoutes from "./routes/planner";
 import whatsappWebhookRoutes from "./routes/whatsapp-webhook";
 import commsConsentRoutes from "./routes/comms-consent-route";
 import lifecycleInternalRoutes from "./routes/lifecycle-internal";
+import smokeInternalRoutes from "./routes/smoke-internal";
 
 /**
  * v6 backend entry — Hono app for the mvp/ FIRE Planner. Structure copy-adapted
@@ -96,6 +97,9 @@ app.route("/api/comms", commsConsentRoutes);
 // re-trigger + retries alongside the daily cron.
 app.use("/api/internal/*", rateLimit({ windowMs: 60_000, max: 5, prefix: "lifecycle" }));
 app.route("/api/internal", lifecycleInternalRoutes);
+// Post-deploy production smoke (testing-strategy.md, Tier 1) — GET /api/internal/smoke,
+// token-guarded by SMOKE_TOKEN. Same outside-auth + rate-limited mount as the scheduler.
+app.route("/api/internal", smokeInternalRoutes);
 
 export { app };
 

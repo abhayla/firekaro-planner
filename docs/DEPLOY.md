@@ -149,13 +149,23 @@ sudo certbot --nginx -d firekaro.com -d www.firekaro.com   # adds 443 + http→h
 
 ## 8. Smoke test (verifies the deploy)
 
+Tier 1 — automated, hands-off, every deploy (`testing-strategy.md`):
 ```bash
 curl https://firekaro.com/api/health           # {"success":true,"data":{"status":"ok","database":"connected"}}
+curl -H "x-smoke-token: $SMOKE_TOKEN" \
+  https://firekaro.com/api/internal/smoke      # {"success":true,"data":{"ok":true,"database":"connected","probe":"user.count",...}}
 ```
-Then in a browser: `https://firekaro.com` → bounced to `/login` → "Sign in with
-Google" → Google consent → back to the app → onboarding/dashboard. Confirm a
-write persists: edit a preference, reload, value survives (ServerAdapter →
-Supabase round-trip).
+The `/api/internal/smoke` probe runs a real Prisma `user.count()` through the
+Supabase pooler — richer than `/api/health`'s raw `SELECT 1` (it catches a missing
+`prisma generate` / a botched migration). It needs `SMOKE_TOKEN` in `server/.env`
+(`openssl rand -hex 32`); if unset it returns 500 (smoke disabled), not an error.
+
+Tier 2 — on-demand (significant releases / incident verification): in a browser
+`https://firekaro.com` → bounced to `/login` → "Sign in with Google" → Google
+consent → back to the app → onboarding/dashboard. Confirm a write persists: edit a
+preference, reload, value survives (ServerAdapter → Supabase round-trip). For the
+dedicated test account, this is the manual session-seed for authenticated prod UI
+runs.
 
 ---
 

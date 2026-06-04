@@ -42,10 +42,13 @@ type runs; `testing.md` owns *how* tests are written (FIRST principles, flaky di
   full-test env.** Revisit a real staging env when traffic grows or a second developer joins.
 - **Prod = smoke + synthetic monitoring only**, per the matrix. The two prod-smoke tiers:
   - **Tier 1 (automated, every deploy, hands-off):** `GET /api/health` + a token-guarded
-    `GET /api/internal/smoke` (write→read→delete round-trip on a dedicated smoke `userId`, guarded by
-    `SMOKE_TOKEN`, mirroring the existing `LIFECYCLE_RUN_TOKEN` pattern) + an unauthenticated
-    Playwright render check of the login page. No Google account needed; the dev-bypass is OFF in prod
-    so this path is deliberately auth-free.
+    `GET /api/internal/smoke` (a Prisma **read** round-trip — `user.count()` — proving the generated
+    client + a real table + a query work through the pooler, richer than `/api/health`'s raw
+    `SELECT 1`; guarded by `SMOKE_TOKEN`, mirroring the existing `LIFECYCLE_RUN_TOKEN` pattern, built in
+    `server/src/routes/smoke-internal.ts`) + an unauthenticated Playwright render check of the login
+    page. No Google account needed; the dev-bypass is OFF in prod so this path is deliberately auth-free.
+    A write→read→delete probe via a dedicated probe table is a documented future upgrade if the
+    read-only check proves insufficient.
   - **Tier 2 (on-demand, significant releases / incident verification):** authenticated prod UI via the
     Playwright runner with a `storageState` seeded by a **one-time manual Google login** of a dedicated
     test account. Session lasts ~7 days; re-seed when it expires. Not run on every deploy.

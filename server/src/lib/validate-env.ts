@@ -56,4 +56,9 @@ export function validateEnv(): void {
       "LIFECYCLE_RUN_TOKEN not set — POST /api/internal/lifecycle/run will return 500 (scheduler disabled)",
     );
   }
+  if (isProduction && !process.env.SMOKE_TOKEN) {
+    logger.warn(
+      "SMOKE_TOKEN not set — GET /api/internal/smoke will return 500 (post-deploy smoke disabled)",
+    );
+  }
 }
