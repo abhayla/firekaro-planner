@@ -12,6 +12,16 @@ import { ref } from "vue";
 const baseUrl = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "http://localhost:3100";
 const devBypass = String(import.meta.env.VITE_DEV_BYPASS) === "true";
 
+// The comms backend exists only under the ServerAdapter. In demo mode (LocalStorageAdapter, no
+// backend) any consent fetch fails with ERR_CONNECTION_REFUSED — so skip it entirely. gh-issue #28.
+// Read per-call (not a module const) so it's unit-testable via vi.stubEnv.
+function isServerMode(): boolean {
+  return (
+    import.meta.env.VITE_USE_SERVER_ADAPTER === "on" ||
+    import.meta.env.VITE_USE_SERVER_ADAPTER === "true"
+  );
+}
+
 function buildHeaders(json = false): Record<string, string> {
   const h: Record<string, string> = {};
   if (json) h["content-type"] = "application/json";
@@ -41,6 +51,7 @@ export function useCommsConsent() {
   }
 
   async function load() {
+    if (!isServerMode()) return; // demo/local: no comms backend — skip the fetch (gh-issue #28)
     loading.value = true;
     error.value = null;
     try {
@@ -59,6 +70,7 @@ export function useCommsConsent() {
   }
 
   async function save() {
+    if (!isServerMode()) return; // demo/local: no comms backend to persist to (gh-issue #28)
     saving.value = true;
     error.value = null;
     try {
