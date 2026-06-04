@@ -73,7 +73,16 @@ carries ONLY the `whatsappMessageId`; fixed to correlate by that id (commit `996
 - **B2. Cowork shares this working tree** — a Cowork agent is committing to the same `main`/working dir; one of my commits got swept into a tax commit earlier. **Fix:** give Cowork its own `git worktree`, or keep it read-only (the daily-report is read-only — ideal).
 - **B3. `TODO(5W)`** — ratify "FireKaro user contacts live in PIFS's CRM under a `FireKaro` source filter" (cross-entity funnel) in the 5Wealths DECISIONS log.
 - **B4. Cloudflare origin-cert token** — standing TODO from the deploy: rotate/delete the scoped CF API token left in `server/.env`.
-- **B5. ESLint drift — pick a direction (1 word).** This extracted repo has **no ESLint config / no `lint` script**, yet `commit-convention.md`, `api-envelope-pattern.md`, and `structured-logging.md` still reference `npm run lint` / `eslint.config.js` (stale from the FIREKaro-Vue monorepo). **(1)** I wire up ESLint — port the envelope `no-restricted-syntax` rule + server `no-console` override + a `lint` script so the invariants are machine-enforced again (*my rec*); or **(2)** I mark those invariants convention-only in the 3 rule files. Say **"1"** or **"2"** and I execute it — reversible either way. *(This is mine to execute; only the direction is yours.)*
+- **B5. ESLint drift — ✅ RESOLVED (2026-06-04, Delivery/Platform-Lead decision).** The premise was
+  **outdated**: `server/eslint.config.mjs` + a `lint` script already exist (enforcing the envelope
+  `no-restricted-syntax` + `no-console` invariants over `server/src/**`), and `api-envelope-pattern.md`
+  / `structured-logging.md` / `commit-convention.md` already reference `server/eslint.config.mjs`
+  correctly — **not stale**. The one genuine gap was the **frontend** storage invariant ("no direct
+  `localStorage` outside `storage-adapter.ts`"), documented "CI-enforced" but with **no actual gate**.
+  Closed by a targeted scan-test `src/lib/storage-invariant.spec.ts` (runs in `npm run test:unit`,
+  non-vacuous: covers >100 files + a positive-fixture regex check). **A full frontend ESLint setup for
+  a single invariant is YAGNI** — the targeted guard is the proportionate machine-enforcement. No
+  1-word direction needed; resolved.
 
 ---
 

@@ -175,7 +175,8 @@ backend is unreachable, it falls back to `LocalStorageAdapter`. **The 6 stores +
 + `router/index.ts` are UNCHANGED by the swap** (the non-negotiable spine).
 
 ### Storage invariant (CI-enforced)
-**Zero direct `localStorage.*` calls anywhere in `src/` outside `storage-adapter.ts`.**
+**Zero direct `localStorage.*` calls anywhere in `src/` outside `storage-adapter.ts`** — enforced by
+the scan-test `src/lib/storage-invariant.spec.ts` (runs in `npm run test:unit`).
 
 ## State — local Pinia only (no TanStack Query)
 
