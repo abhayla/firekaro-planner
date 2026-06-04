@@ -12,7 +12,8 @@ import { useAssumptionsStore } from "@/stores/assumptions";
 import { useUiStore } from "@/stores/ui";
 import { loadSeedPersona } from "@/lib/seed-persona";
 import { useFireDerive } from "@/lib/useFireDerive";
-import { derive } from "@/lib/derive";
+import { derive, bridgeRentalPostTaxAnnual, SEC_24A_DEDUCTION_RATE } from "@/lib/derive";
+import type { OtherIncomeLine } from "@/types/household";
 import { calculateNpsWithdrawal, postTaxAnnuityIncome } from "@/lib/nps-withdrawal";
 import { calculateYearsToTarget } from "@/lib/fire-math";
 
@@ -382,5 +383,49 @@ describe("derive() — pure kernel", () => {
     // optimistic gross-annuity offset.
     expect(k.npsAnnuityIncome).toBe(postTaxAnnuityIncome(gross, k.householdMarginalRate));
     expect(k.npsAnnuityIncome).toBeLessThan(gross);
+  });
+});
+
+describe("bridgeRentalPostTaxAnnual — #29 bridge rental cash (Sec 24a), unit-tested directly (#32)", () => {
+  const rental = (over: Partial<OtherIncomeLine> = {}): OtherIncomeLine => ({
+    id: "r1",
+    type: "Rental",
+    source: "Direct",
+    amount: 240_000,
+    frequency: "A",
+    ownerId: "m1",
+    isTaxExempt: false,
+    ...over,
+  });
+
+  it("let-out rental nets gross·(1−mr·0.7) — strictly MORE than the pre-fix gross·(1−mr)", () => {
+    const mr = 0.3;
+    const R = 240_000;
+    const net = bridgeRentalPostTaxAnnual([rental()], mr);
+    // Sec 24a: only 70% of NAV taxable → 240000·(1 − 0.3·0.7) = 240000·0.79 = 189600
+    expect(net).toBeCloseTo(R * (1 - mr * (1 - SEC_24A_DEDUCTION_RATE)), 0);
+    // pre-fix taxed the full gross → 240000·0.7 = 168000; the fix nets strictly more
+    expect(net).toBeGreaterThan(R * (1 - mr));
+  });
+
+  it("tax-exempt rental nets FULL gross (no tax) — the exempt-asymmetry fix", () => {
+    expect(bridgeRentalPostTaxAnnual([rental({ isTaxExempt: true })], 0.3)).toBe(240_000);
+  });
+
+  it("sums multiple rental lines and ignores non-rental other-income", () => {
+    const net = bridgeRentalPostTaxAnnual(
+      [
+        rental({ id: "a", amount: 100_000 }),
+        rental({ id: "b", amount: 50_000 }),
+        rental({ id: "c", type: "Interest", amount: 999_999 }),
+      ],
+      0.3,
+    );
+    // (100000 + 50000)·0.79 = 118500; the Interest line is excluded
+    expect(net).toBeCloseTo(150_000 * (1 - 0.3 * 0.7), 0);
+  });
+
+  it("zero marginal rate → full rent (nothing taxed)", () => {
+    expect(bridgeRentalPostTaxAnnual([rental({ amount: 120_000 })], 0)).toBe(120_000);
   });
 });

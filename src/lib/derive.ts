@@ -12,7 +12,7 @@
  * whole household; specific member + family-view OFF → that member's slice +
  * the always-visible joint pool.
  */
-import type { Household } from "@/types/household";
+import type { Household, OtherIncomeLine } from "@/types/household";
 import type { Assumptions } from "@/types/assumptions";
 import {
   calculateFIRENumber,
@@ -44,6 +44,27 @@ import {
   blendPortfolioReturn,
   blendPortfolioVolatility,
 } from "@/lib/assumption-math";
+
+/** Sec 24(a): flat 30% standard deduction on let-out rental NAV — only 70% of rent is taxable. #29 */
+export const SEC_24A_DEDUCTION_RATE = 0.3;
+
+/**
+ * Post-tax annual rental CASH for the accessible-money bridge, computed PER-LINE. A let-out
+ * (taxable) rental nets gross − marginalRate·(0.7·gross) = gross·(1 − mr·0.7) (Sec 24a: only 70% of
+ * NAV is taxable); a rental the user flagged tax-exempt nets FULL gross (no tax). Extracted so the
+ * #29 formula is unit-testable independently of the full bridge scenario. gh-issue #29 / #32.
+ */
+export function bridgeRentalPostTaxAnnual(
+  otherIncome: OtherIncomeLine[],
+  marginalRate: number,
+): number {
+  return otherIncome
+    .filter((o) => o.type === "Rental")
+    .reduce((s, o) => {
+      const gross = toAnnual({ amount: o.amount, period: o.frequency });
+      return s + (o.isTaxExempt ? gross : gross * (1 - marginalRate * (1 - SEC_24A_DEDUCTION_RATE)));
+    }, 0);
+}
 
 export interface DeriveLens {
   isFamilyView: boolean;
@@ -127,8 +148,7 @@ export function derive(household: Household, assumptions: Assumptions, lens: Der
   // Sec 24(a): a flat 30% standard deduction on let-out rental NAV. It reduces TAXABLE income
   // ONLY — the landlord still receives full rent as CASH, so it must NOT shrink annualIncome.total
   // / annualSavings. It is subtracted from the tax `grossIncome` (and the bridge rental cash) below,
-  // never from the cash total. gh-issue #29.
-  const SEC_24A_DEDUCTION_RATE = 0.3;
+  // never from the cash total. gh-issue #29. (SEC_24A_DEDUCTION_RATE is module-scope.)
   const taxableRentalAnnual = lensedOtherIncome
     .filter((o) => o.type === "Rental" && !o.isTaxExempt)
     .reduce((s, o) => s + toAnnual({ amount: o.amount, period: o.frequency }), 0);
@@ -424,17 +444,9 @@ export function derive(household: Household, assumptions: Assumptions, lens: Der
       ownerDob: dobForOwner(asset.ownerId),
     }));
 
-    // Bridge rental cash, post-tax & PER-LINE. Sec 24(a): a let-out (taxable) rental nets
-    // gross − mr·(0.7·gross); a rental the user flagged tax-exempt nets FULL gross (no tax).
-    // Per-line so the exempt case matches the FY tax path's `!isTaxExempt` filter (was asymmetric). #29
-    const rentalAnnualPostTax = lensedOtherIncome
-      .filter((o) => o.type === "Rental")
-      .reduce((s, o) => {
-        const gross = toAnnual({ amount: o.amount, period: o.frequency });
-        return (
-          s + (o.isTaxExempt ? gross : gross * (1 - householdMarginalRate * (1 - SEC_24A_DEDUCTION_RATE)))
-        );
-      }, 0);
+    // Bridge rental cash, post-tax & per-line (Sec 24a let-out → gross·(1−mr·0.7); exempt → full).
+    // Extracted to bridgeRentalPostTaxAnnual() so the #29 formula is unit-tested directly. #29
+    const rentalAnnualPostTax = bridgeRentalPostTaxAnnual(lensedOtherIncome, householdMarginalRate);
     const postTax = (gross: number) => gross * (1 - householdMarginalRate);
 
     // EPS pension + gratuity aggregated over the lensed earners (Phases D, E).
