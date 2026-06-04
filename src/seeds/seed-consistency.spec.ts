@@ -20,6 +20,7 @@ import { useAssumptionsStore } from "@/stores/assumptions";
 import { loadSeedPersona } from "@/lib/seed-persona";
 import { loadMehtasSeed } from "@/seeds/mehtas";
 import { loadIyersSeed } from "@/seeds/iyers";
+import { loadMauryasSeed } from "@/seeds/mauryas";
 import { derive } from "@/lib/derive";
 
 type Loader = (h: ReturnType<typeof useHouseholdStore>, a: ReturnType<typeof useAssumptionsStore>) => void;
@@ -42,6 +43,9 @@ const PERSONAS: Array<{
   { name: "sharmas", load: (h, a) => loadSeedPersona(h, a), savingsRate: [40, 55], maxYearsToFire: 27 }, // #21 equity-tilted → ~26y (age 56)
   { name: "mehtas", load: (h, a) => loadMehtasSeed(h, a), savingsRate: [40, 60], maxYearsToFire: 5 },
   { name: "iyers", load: (h, a) => loadIyersSeed(h, a), savingsRate: [40, 50], maxYearsToFire: 20 }, // ~19y, ≈2y past retire-goal 55
+  // Single-income (₹42L CTC) + homemaker spouse + big education goals → honestly
+  // behind the age-50 aspiration: ~23y to FIRE (age ~67), ~38% pre-EMI savings rate.
+  { name: "mauryas", load: (h, a) => loadMauryasSeed(h, a), savingsRate: [34, 42], maxYearsToFire: 24 },
 ];
 
 const WHOLE_HOUSEHOLD = { isFamilyView: true, viewingMemberId: null, currentFY: "2025-26" };

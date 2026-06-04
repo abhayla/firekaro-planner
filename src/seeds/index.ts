@@ -9,11 +9,12 @@ import { loadSeedPersona } from "@/lib/seed-persona";
 import { loadEmptySeed } from "./empty";
 import { loadMehtasSeed } from "./mehtas";
 import { loadIyersSeed } from "./iyers";
+import { loadMauryasSeed } from "./mauryas";
 import { makeAdapter } from "@/lib/storage-adapter";
 import { getAuthProvider } from "@/lib/auth-provider";
 
 // Phase 8 Stage V — 4 personas including new "Iyers" (Q7 grill resolution).
-export type SeedName = "sharmas" | "empty" | "mehtas" | "iyers";
+export type SeedName = "sharmas" | "empty" | "mehtas" | "iyers" | "mauryas";
 
 export interface SeedMeta {
   id: SeedName;
@@ -47,6 +48,12 @@ export const SEED_META: Record<SeedName, SeedMeta> = {
     description: "Late-30s sandwich-gen · 2 kids + 2 parents · joint home loan",
     icon: "mdi-account-group",
   },
+  mauryas: {
+    id: "mauryas",
+    label: "The Mauryas",
+    description: "Single-income mid-40s · homemaker spouse · school-age child · full-spread portfolio",
+    icon: "mdi-home-account",
+  },
 };
 
 const ACTIVE_SEED_ENTITY_KEY = "active-seed";
@@ -61,6 +68,8 @@ export function loadSeed(name: SeedName) {
     loadMehtasSeed(household, assumptions);
   } else if (name === "iyers") {
     loadIyersSeed(household, assumptions);
+  } else if (name === "mauryas") {
+    loadMauryasSeed(household, assumptions);
   } else {
     loadEmptySeed(household, assumptions);
   }
@@ -75,5 +84,11 @@ export function getActiveSeed(): SeedName {
 }
 
 export function isSeedName(value: unknown): value is SeedName {
-  return value === "sharmas" || value === "empty" || value === "mehtas" || value === "iyers";
+  return (
+    value === "sharmas" ||
+    value === "empty" ||
+    value === "mehtas" ||
+    value === "iyers" ||
+    value === "mauryas"
+  );
 }

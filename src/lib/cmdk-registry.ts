@@ -1,7 +1,7 @@
 // Stage E — Cmd-K command registry. Three categories: Navigate / Actions / Glossary.
 import type { Router } from "vue-router";
 import { TERM_GLOSSARY, glossaryCategory } from "@/lib/glossary";
-import { loadSeed, type SeedName } from "@/seeds";
+import { loadSeed, SEED_META, type SeedName } from "@/seeds";
 
 export type CmdCategory = "Navigate" | "Actions" | "Glossary";
 
@@ -60,7 +60,7 @@ export function buildCommands(): CmdItem[] {
     },
   }));
 
-  const seedNames: SeedName[] = ["sharmas", "empty", "mehtas"];
+  const seedNames = Object.keys(SEED_META) as SeedName[];
   const actionCmds: CmdItem[] = [
     {
       id: "act-add-expense",
@@ -119,9 +119,9 @@ export function buildCommands(): CmdItem[] {
     ...seedNames.map((s) => ({
       id: `act-seed-${s}`,
       category: "Actions" as const,
-      label: `Switch to ${s === "sharmas" ? "The Sharmas" : s === "mehtas" ? "The Mehtas" : "Empty Sheet"}`,
+      label: `Switch to ${SEED_META[s].label}`,
       hint: "Seed",
-      icon: s === "sharmas" ? "mdi-home-heart" : s === "mehtas" ? "mdi-rocket-launch" : "mdi-file-document-outline",
+      icon: SEED_META[s].icon,
       keywords: `seed switch persona ${s}`,
       run: ({ router }: CmdContext) => {
         loadSeed(s);

@@ -25,6 +25,7 @@ import { useAssumptionsStore } from "@/stores/assumptions";
 import { loadSeedPersona } from "@/lib/seed-persona";
 import { loadMehtasSeed } from "@/seeds/mehtas";
 import { loadIyersSeed } from "@/seeds/iyers";
+import { loadMauryasSeed } from "@/seeds/mauryas";
 import { derive } from "@/lib/derive";
 import { runMonteCarloFire } from "@/lib/monte-carlo";
 import { captureSnapshot, milestoneBandFor } from "@/lib/lifecycle-digest";
@@ -38,6 +39,7 @@ const PERSONAS: Array<{ name: string; load: Loader }> = [
   { name: "sharmas", load: (h, a) => loadSeedPersona(h, a) },
   { name: "mehtas", load: (h, a) => loadMehtasSeed(h, a) },
   { name: "iyers", load: (h, a) => loadIyersSeed(h, a) },
+  { name: "mauryas", load: (h, a) => loadMauryasSeed(h, a) },
 ];
 
 describe("headline plausibility — DEFAULT product lens (#22 foolproof gate)", () => {
