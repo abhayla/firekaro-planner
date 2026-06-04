@@ -13,6 +13,17 @@ the behavior rules feel like they pull toward "ask" vs "proceed."
 > the next queued item) and report. Enforced deterministically by the `Stop` hook
 > `.claude/hooks/no-overask-guard.sh` + the every-turn UserPromptSubmit reminder — because the
 > advisory rule alone kept losing (`rule-writing-meta.md`: zero-exception behaviour needs a hook).
+>
+> **The over-ask wears costumes — these ALL count (added 2026-06-04):** a **multiple-choice
+> question** ("which — A, B, or C?"), a **grill sequence** ("Q2 of N …"), and above all **a question
+> that carries your own recommended answer**. If you can write "Recommended: X" for a
+> reversible/internal/best-practice-clear decision, you have already decided — DO X and let Abhay
+> correct it; asking is the over-ask in disguise. **`grill-me` / `AskUserQuestion` are reserved for
+> genuine forks that are irreversible/outward/strategic OR have no clear best-practice winner** — NOT
+> for choosing reversible defaults, tooling/process design, or persona/data values you can pick with
+> a sane default. When Abhay invokes grill-me, still propose the *whole* answer in one pass and ask
+> only where a branch genuinely has no clear winner — never decompose decidable defaults into a
+> question series.
 
 Framing (DACI): on execution I am the **Driver**; Abhay is the **Approver** only for items on the
 ESCALATE list below; on everything else I drive and **Inform**. The **Product Manager** role owns
