@@ -429,3 +429,19 @@ describe("bridgeRentalPostTaxAnnual — #29 bridge rental cash (Sec 24a), unit-t
     expect(bridgeRentalPostTaxAnnual([rental({ amount: 120_000 })], 0)).toBe(120_000);
   });
 });
+
+describe("seed-anchor regression locks (gh-issue #17 — catch silent adequacy-leg drift)", () => {
+  beforeEach(() => setActivePinia(createPinia()));
+  it("Sharmas default-lens headline is pinned (a future #23 refactor can't silently drift it)", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    loadSeedPersona(h, a);
+    const k = derive(h.data, a.values, { isFamilyView: false, viewingMemberId: null, currentFY: "2025-26" });
+    // Pinned to the known-good values (anchored 2026-06-04, post-#29 Sec 24a). The byte-identical
+    // wrapper/kernel test only proves the two agree with EACH OTHER; this anchors the ACTUAL headline
+    // so a future adequacy-leg refactor (#23) that silently drifts it is a CI failure. FIRE age ≈ 59
+    // (anchor 33 + ~25.58y), comfortably under the #22 sanity ceiling.
+    expect(k.yearsToRegular).toBeCloseTo(25.58, 2);
+    expect(Math.round(k.fireNumber)).toBe(105_482_068);
+  });
+});
