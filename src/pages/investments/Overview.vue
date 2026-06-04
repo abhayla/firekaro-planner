@@ -31,7 +31,10 @@ const rollup = computed<ClassRollup[]>(() => {
     gold: 0,
     cashOther: 0,
   };
-  for (const inv of household.data.investments) {
+  // Use the SAME lens-scoped set as totalCorpus (derive's lensedInvestments) — else under a member
+  // lens the rollup stays whole-household while totalCorpus shrinks, and homeExcludedFromCorpus
+  // (rollupTotal − totalCorpus) reports a wrong rupee figure. Default lens = whole household. #27
+  for (const inv of fire.lensedInvestments.value) {
     switch (assetClass(inv)) {
       case "equity":
         buckets.equity += inv.value;
@@ -62,6 +65,11 @@ const rollup = computed<ClassRollup[]>(() => {
 });
 
 const totalCorpus = computed(() => fire.totalCorpus.value);
+// All-holdings total (incl. the primary residence that the FIRE corpus excludes). The per-class
+// footnote % MUST divide by THIS (what the rollup shows), not totalCorpus — else the numerator
+// (incl. home) and denominator (excl. home) disagree and the percentages exceed 100%. gh-issue #27.
+const rollupTotal = computed(() => rollup.value.reduce((s, r) => s + r.value, 0));
+const homeExcludedFromCorpus = computed(() => Math.max(0, rollupTotal.value - totalCorpus.value));
 const equityValue = computed(() => rollup.value.find((r) => r.label === "Equity")?.value ?? 0);
 const allocStatus = computed(() => allocationByAge(fire.anchorAge.value, equityValue.value, totalCorpus.value));
 
@@ -96,8 +104,12 @@ const allocationSegments = computed<ProportionSegment[]>(() =>
         <v-card variant="outlined" class="pa-4 mb-3 hero-corpus interactive-card">
           <div class="d-flex align-start justify-space-between">
             <div>
-              <div class="hero-corpus__label">Total corpus</div>
+              <div class="hero-corpus__label">FIRE corpus</div>
               <div class="hero-corpus__value text-currency">{{ formatINRCompact(totalCorpus) }}</div>
+              <div v-if="homeExcludedFromCorpus > 0" class="hero-corpus__sublabel">
+                Excludes your home ({{ formatINRCompact(homeExcludedFromCorpus) }}) — it can't fund
+                early retirement. All holdings below total {{ formatINRCompact(rollupTotal) }}.
+              </div>
               <v-chip
                 :color="allocStatus.status === 'adequate' ? 'success' : 'warning'"
                 size="small"
@@ -108,7 +120,7 @@ const allocationSegments = computed<ProportionSegment[]>(() =>
               </v-chip>
             </div>
           </div>
-          <div class="section-eyebrow" style="margin: 18px 0 8px">Allocation</div>
+          <div class="section-eyebrow" style="margin: 18px 0 8px">Allocation — all holdings</div>
           <ProportionBar :segments="allocationSegments" :format-value="formatINRCompact" :height="12" />
         </v-card>
 
@@ -117,7 +129,7 @@ const allocationSegments = computed<ProportionSegment[]>(() =>
             <MetricCard
               :label="r.label"
               :value="formatINRCompact(r.value)"
-              :footnote="totalCorpus > 0 ? `${Math.round((r.value / totalCorpus) * 100)}% of portfolio` : undefined"
+              :footnote="rollupTotal > 0 ? `${Math.round((r.value / rollupTotal) * 100)}% of holdings` : undefined"
               min-height="142px"
             />
           </v-col>
@@ -163,5 +175,13 @@ const allocationSegments = computed<ProportionSegment[]>(() =>
   letter-spacing: var(--tracking-wide);
   color: var(--text-secondary);
   font-weight: var(--weight-semibold);
+}
+
+.hero-corpus__sublabel {
+  font-size: var(--type-xs);
+  color: var(--text-secondary);
+  line-height: var(--leading-snug);
+  margin-top: 6px;
+  max-width: 52ch;
 }
 </style>

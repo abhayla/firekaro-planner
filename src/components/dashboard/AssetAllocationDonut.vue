@@ -96,7 +96,7 @@ function pctOf(bucket: number): string {
 
 <template>
   <v-card variant="outlined" class="pa-4 h-100">
-    <h3 class="text-subtitle-1 font-weight-bold mb-2">How your corpus is invested</h3>
+    <h3 class="text-subtitle-1 font-weight-bold mb-2">How your assets are allocated</h3>
     <div v-if="total === 0" class="text-caption text-medium-emphasis my-6 text-center">
       Add investments to see allocation.
     </div>
