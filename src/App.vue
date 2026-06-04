@@ -75,5 +75,7 @@ const isDemo = computed(
   z-index: 9999;
   font-weight: 600;
   letter-spacing: 0.05em;
+  /* Decorative badge — must never intercept clicks on the AppBar controls it overlaps. */
+  pointer-events: none;
 }
 </style>
