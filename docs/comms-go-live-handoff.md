@@ -95,27 +95,29 @@ carries ONLY the `whatsappMessageId`; fixed to correlate by that id (commit `996
   sent nothing (dedup). Two additive Supabase migrations applied (`whatsappNumber`, `dedupeKey`). Phase 2
   (marketing digest / winback / salary-update + `lastSeenAt`) stays deferred behind `marketingOptIn` + A6.
   Full unit coverage; both trees green. **Needs Abhay (to take it live on prod):**
-  - **C2a. VPS redeploy** — ship the new code (A4-style `git archive | ssh … tar` → `npm ci && build` →
-    `prisma:migrate:deploy` (no pending — already applied) → `pm2 reload firekaro-api`). New backend route
-    `/api/internal` + Preferences number field.
+  - **C2a. VPS redeploy  ✅ CODE SHIPPED (2026-06-04, deploy `c73ac77`).** Done alongside the smoke endpoint
+    (backup taken `firekaro-backup-presmoke-*.tgz`; `git archive | ssh tar` → `npm ci && build` both trees →
+    `prisma:generate` → `prisma:migrate:deploy` = no pending → `pm2 restart`). App health + smoke green
+    post-deploy. The comms-loop code (`/api/internal/lifecycle/run` + Preferences number field) is now LIVE but
+    **dormant** — it does nothing until C2b + C2c below (and sends still gated by A6).
   - **C2b. `LIFECYCLE_RUN_TOKEN`** — add a real secret to the VPS `server/.env` (`openssl rand -base64 32`).
     Unset ⇒ the endpoint returns 500 (fail-closed). Documented in `docs/DEPLOY.md` §1.
   - **C2c. Daily cron** — add the crontab line from `docs/DEPLOY.md` §5a (POSTs the token-guarded endpoint
     daily). Enabling it does **not** message real users — sends stay restricted to the test allowlist until A6.
   - **C2d.** A6 (`WATI_ALLOW_ALL_RECIPIENTS`) stays the go-live spend flip — the loop explicitly does NOT touch it.
-- **C3. Post-deploy production smoke (Tier-1) + authenticated UI (Tier-2)  ⏳ NEW (2026-06-04).** The
+- **C3. Post-deploy production smoke — Tier-1 ✅ LIVE (2026-06-04); Tier-2 ⏳ pending session-seed.** The
   token-guarded `GET /api/internal/smoke` (read-only `prisma.user.count()` round-trip, richer than
-  `/api/health`'s `SELECT 1`) is **code-complete + independently reviewed** (commit `2d52f0f`), wired into
-  `docs/DEPLOY.md` §8 + `validate-env` (warns if unset). Governance: `.claude/rules/testing-strategy.md`
-  (prod = smoke + synthetic only). **Rides the SAME next redeploy as C2a** — one deploy ships both the comms
-  loop and the smoke endpoint. Activation:
-  - **C3a. `SMOKE_TOKEN`** — a secret in the VPS `server/.env` (`openssl rand -hex 32`); unset ⇒ 500 fail-closed.
-    I can add it on the box during the redeploy (same as C2b `LIFECYCLE_RUN_TOKEN`). Verify post-deploy:
-    `curl -H "x-smoke-token: …" https://firekaro.com/api/internal/smoke` → `{ok:true,database:"connected",…}`.
-  - **C3b. Dedicated test Google account** (Tier-2 authenticated prod UI) — **your-only item**: create a throwaway
-    Gmail, share the *address* (never the password — you type it yourself at the one-time session-seed; I keep
-    only the resulting cookie in `e2e/.auth/user.json`, gitignored, ~7-day). Tier-2 is on-demand (big releases /
-    incident verification), not every deploy.
+  `/api/health`'s `SELECT 1`) is code-complete, independently reviewed, **deployed, and live-verified in prod**.
+  Governance: `.claude/rules/testing-strategy.md` (prod = smoke + synthetic only). Shipped on deploy `c73ac77`
+  (which also carried C2a's comms-loop code — see C2a note).
+  - **C3a. `SMOKE_TOKEN`  ✅ DONE (2026-06-04).** Generated on-box (`openssl rand -hex 32`) → VPS `server/.env`,
+    `pm2 restart`. **Live-verified:** `curl -H "x-smoke-token: …" https://firekaro.com/api/internal/smoke` →
+    `{ok:true,database:"connected",probe:"user.count",count:2,ms:22}`; no-token/wrong-token → 401. Token lives
+    only on the box (never in git/chat). Wired into `docs/DEPLOY.md` §8.
+  - **C3b. Dedicated test Google account** (Tier-2 authenticated prod UI) — address received: **`abhayfaircent@gmail.com`**.
+    Still pending the **one-time session-seed**: I drive Playwright to prod `/login`, you type the password yourself
+    (never shared), I keep only the resulting cookie (`e2e/.auth/user.json`, gitignored, ~7-day). Tier-2 is on-demand
+    (big releases / incident verification), not every deploy — run at the next significant release.
 
 ---
 
