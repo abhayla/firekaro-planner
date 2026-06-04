@@ -15,6 +15,7 @@ import { useAssumptionsStore } from "@/stores/assumptions";
 import { useHouseholdStore } from "@/stores/household";
 import { useScenariosStore, type LeverValues } from "@/stores/scenarios";
 import { calculateFIRENumber, calculateYearsToTarget, projectCorpus } from "@/lib/fire-math";
+import { retireByAgeRequiredSIP } from "@/lib/adequacy";
 import { formatINRCompact, formatYearsMonths } from "@/lib/formatters";
 import InfoTip from "@/components/shared/InfoTip.vue";
 import DeltaChip from "@/components/shared/DeltaChip.vue";
@@ -205,6 +206,43 @@ function loadScenario(id: string) {
   if (v.lumpSumWindfall !== undefined) levers.value.lumpSumWindfall = v.lumpSumWindfall;
   if (v.healthcareInflation !== undefined) levers.value.healthcareInflation = v.healthcareInflation;
   if (v.equityAllocationPct !== undefined) levers.value.equityAllocationPct = v.equityAllocationPct;
+}
+
+// ---- Retire-by-age reverse solver (gh-issue #30) ----
+// "Pick a target retirement age → see the required monthly SIP to get there."
+// Reuses the shared engine (retireByAgeRequiredSIP); no math duplicated here.
+const ageFloor = computed(() => Math.round((fire.anchorAge.value ?? 30) + 1));
+const ageCeiling = 75;
+const defaultTargetAge = computed(() => {
+  const fromHousehold = fire.targetRetirementAge.value;
+  const fallback = (fire.anchorAge.value ?? 30) + 15;
+  const raw = Number.isFinite(fromHousehold) && (fromHousehold ?? 0) > 0 ? fromHousehold : fallback;
+  return Math.min(ageCeiling, Math.max(ageFloor.value, Math.round(raw)));
+});
+
+const targetAge = ref(defaultTargetAge.value);
+
+// Re-seed when the baseline anchor/target shifts (e.g. family-view toggle elsewhere).
+watch(defaultTargetAge, (next) => {
+  targetAge.value = next;
+});
+
+const retireByAge = computed(() =>
+  retireByAgeRequiredSIP({
+    targetRetirementAge: targetAge.value,
+    currentAge: fire.anchorAge.value ?? 30,
+    fireNumber: fire.fireNumber.value ?? 0,
+    currentCorpus: fire.fireWithdrawableCorpus.value ?? 0,
+    expectedReturn: fire.realBlendedReturn.value ?? 0.05,
+    currentMonthlySIP: fire.monthlyContribution.value ?? 0,
+  }),
+);
+
+// True only once we actually have a FIRE target to solve against (empty-household guard).
+const hasFireTarget = computed(() => (fire.fireNumber.value ?? 0) > 0);
+
+function resetTargetAge() {
+  targetAge.value = defaultTargetAge.value;
 }
 </script>
 
@@ -452,6 +490,96 @@ function loadScenario(id: string) {
           </v-row>
         </v-card>
 
+        <!-- Retire-by-age reverse solver (gh-issue #30) -->
+        <v-card variant="outlined" class="pa-4 mb-3 retire-by-age" data-testid="retire-by-age-card">
+          <div class="d-flex align-center justify-space-between mb-1">
+            <h2 class="text-subtitle-1 font-weight-bold mb-0">
+              <v-icon icon="mdi-target-account" size="18" class="mr-1" />
+              Retire by age
+            </h2>
+            <v-btn
+              variant="text"
+              size="x-small"
+              icon="mdi-refresh"
+              aria-label="Reset target age to baseline"
+              @click="resetTargetAge"
+            />
+          </div>
+          <p class="text-caption text-medium-emphasis mb-3">
+            Pick a target retirement age — see the monthly SIP it takes to get there, and how much more
+            than today's saving that is.
+          </p>
+
+          <div class="d-flex align-center justify-space-between mb-1">
+            <span class="text-caption">
+              Retire by age:
+              <strong class="font-mono" data-testid="retire-target-age">{{ targetAge }}</strong>
+            </span>
+            <span class="text-caption text-medium-emphasis font-mono">
+              {{ retireByAge.yearsToTarget }} yr{{ retireByAge.yearsToTarget === 1 ? "" : "s" }} from now
+            </span>
+          </div>
+          <v-slider
+            v-model="targetAge"
+            :min="ageFloor"
+            :max="ageCeiling"
+            :step="1"
+            thumb-label="always"
+            density="compact"
+            color="primary"
+            hide-details
+            aria-label="Target retirement age"
+            data-testid="retire-age-slider"
+          />
+
+          <div v-if="hasFireTarget" class="retire-grid mt-3">
+            <div class="retire-cell">
+              <div class="layer-label">Required monthly SIP</div>
+              <div class="layer-value text-currency" data-testid="retire-required-sip">
+                {{ formatINRCompact(retireByAge.requiredMonthlySIP ?? 0) }}
+              </div>
+              <div class="layer-detail">to hit your FIRE number by {{ targetAge }}</div>
+            </div>
+            <div class="retire-cell">
+              <div class="layer-label">Additional SIP needed</div>
+              <div
+                class="layer-value text-currency"
+                :class="retireByAge.additionalMonthlySIP > 0 ? 'text-warning' : 'text-success'"
+                data-testid="retire-additional-sip"
+              >
+                {{ retireByAge.additionalMonthlySIP > 0 ? "+" : ""
+                }}{{ formatINRCompact(retireByAge.additionalMonthlySIP ?? 0) }}
+              </div>
+              <div class="layer-detail">
+                beyond your current {{ formatINRCompact(retireByAge.currentMonthlySIP ?? 0) }}/mo
+              </div>
+            </div>
+          </div>
+
+          <div v-if="hasFireTarget" class="d-flex align-center justify-space-between mt-3">
+            <v-chip
+              size="small"
+              variant="tonal"
+              :color="retireByAge.onTrack ? 'success' : 'warning'"
+              :prepend-icon="retireByAge.onTrack ? 'mdi-check-circle' : 'mdi-alert'"
+              data-testid="retire-ontrack-chip"
+            >
+              {{ retireByAge.onTrack ? "On track" : "Needs more" }}
+            </v-chip>
+            <span class="text-caption text-medium-emphasis text-right">
+              <template v-if="retireByAge.onTrack">
+                Today's {{ formatINRCompact(retireByAge.currentMonthlySIP ?? 0) }}/mo already gets you there.
+              </template>
+              <template v-else>
+                Step up to {{ formatINRCompact(retireByAge.requiredMonthlySIP ?? 0) }}/mo to retire by {{ targetAge }}.
+              </template>
+            </span>
+          </div>
+          <div v-else class="text-caption text-medium-emphasis mt-3">
+            Add income, expenses and investments first — then this solves the SIP you'd need.
+          </div>
+        </v-card>
+
         <v-card variant="outlined" class="pa-4 mb-3">
           <div class="d-flex align-center justify-space-between mb-2">
             <h2 class="text-subtitle-1 font-weight-bold mb-0">
@@ -646,5 +774,39 @@ function loadScenario(id: string) {
   font-size: var(--type-md);
   font-weight: var(--weight-semibold);
   text-align: right;
+}
+
+/* Retire-by-age reverse solver (gh-issue #30) — mirrors FamilyLayerCard's layer idiom. */
+.retire-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.retire-cell .layer-label {
+  font-size: var(--type-xs);
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+  margin-bottom: 4px;
+}
+
+.retire-cell .layer-value {
+  font-size: var(--type-xl);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-tight);
+  line-height: var(--leading-tight);
+}
+
+.retire-cell .layer-detail {
+  font-size: var(--type-xs);
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+@media (max-width: 599px) {
+  .retire-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>
