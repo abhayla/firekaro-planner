@@ -52,7 +52,14 @@ const DEFAULT_ROUTES = [
   ["/liabilities/overview", "liabilities"],
   ["/insurance/overview", "insurance"],
   ["/financial-health", "financial-health"],
+  ["/financial-health/net-worth", "net-worth"],
+  ["/financial-health/cash-flow", "cash-flow"],
+  ["/investments/buckets", "buckets"],
   ["/fire-goals/goals", "fire-goals"],
+  ["/fire-goals/what-if", "what-if"],
+  ["/fire-goals/stress-test", "stress-test"],
+  ["/estate-planning", "estate-planning"],
+  ["/preferences", "preferences"],
   ["/profile", "profile"],
 ];
 const routes =
