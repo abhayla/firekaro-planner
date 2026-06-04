@@ -15,6 +15,13 @@ gotchas so no session re-derives them.
 (`--headless --isolated`) — for a watchable headed run with preserved screenshots, use the
 script, NOT the MCP.
 
+**Run headed scripts via the PowerShell tool, NOT the Bash tool (added 2026-06-04).** On this
+Windows machine the **Bash tool runs sandboxed on a virtual/invisible display** — a `headless:false`
+Chromium launched from Bash opens where the user CANNOT see it. The **PowerShell tool runs natively**,
+so the maximized window renders on the user's real desktop. MUST launch
+`node scripts/enter-persona-via-ui.mjs` (and any headed run) through the **PowerShell tool** when the
+user needs to watch.
+
 **The two gotchas (already handled by the script — do not re-discover):**
 1. A fresh browser context has no data → lands on the **splash**; you MUST click **"Try the
    sample"** to enter the app before the AppBar/`.seed-switcher-btn` exists.
