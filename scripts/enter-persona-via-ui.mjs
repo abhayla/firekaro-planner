@@ -107,6 +107,14 @@ async function count(key) {
 const r = {};
 const overview = {};
 let fieldOk = true, corpusOk = true, fireOk = true;
+const crud = {};
+const readHH = () => page.evaluate(() => {
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k && k.endsWith(":household")) { try { return JSON.parse(localStorage.getItem(k)); } catch {} }
+  }
+  return null;
+});
 const go = async (path) => { await page.goto(`${BASE}${path}`, { waitUntil: "domcontentloaded" }); await page.waitForTimeout(700); await dismissTour(); };
 
 // Standard 2 (Abhay 2026-06-04): after each section's save, open that section's OVERVIEW
@@ -414,6 +422,52 @@ try {
   const fireAge = m ? Number(m[1]) : null;
   fireOk = fireAge !== null && fireAge >= 45 && fireAge <= 72;
   log(`   FIRE headline age=${fireAge} → ${fireOk ? "✅ plausible" : "❌ implausible/absurd"}`);
+
+  // ───────── CRUD: EDIT + DELETE on the 5 EntityRow forms (#31 H1) ─────────
+  // EntityRow = `.entity-row` with `.entity-row__title` + trailing Edit/Delete (immediate, no confirm).
+  async function editRow(name, path, rowTitle, editLabelRe, newVal, check) {
+    try {
+      await go(path);
+      const row = page.locator(".entity-row").filter({ hasText: rowTitle }).first();
+      await row.getByRole("button", { name: "Edit" }).click();
+      await page.waitForTimeout(500);
+      // Scope to the ACTIVE dialog — the same label often also exists on the page's add form.
+      const dlg = page.locator(".v-overlay--active").last();
+      await dlg.getByLabel(editLabelRe).first().fill(String(newVal));
+      await dlg.getByRole("button", { name: /save changes/i }).click();
+      await page.waitForTimeout(500);
+      const h = await readHH();
+      crud[`${name}-edit`] = check(h);
+    } catch (e) { crud[`${name}-edit`] = false; log(`   ⚠ edit ${name}: ${e.message?.split("\n")[0]}`); }
+    log(`   CRUD edit[${name}] ${crud[`${name}-edit`] ? "✅" : "❌"}`);
+  }
+  async function deleteRow(name, path, rowTitle, key, expectAfter) {
+    try {
+      await go(path);
+      const row = page.locator(".entity-row").filter({ hasText: rowTitle }).first();
+      await row.getByRole("button", { name: "Delete" }).click();
+      await page.waitForTimeout(500);
+      const c = await count(key);
+      crud[`${name}-delete`] = c === expectAfter;
+      log(`   CRUD delete[${name}] ${crud[`${name}-delete`] ? "✅" : "❌"} (count=${c}, expect ${expectAfter})`);
+    } catch (e) { crud[`${name}-delete`] = false; log(`   ⚠ delete ${name}: ${e.message?.split("\n")[0]}`); }
+  }
+  const reit = (h) => Number((h.investments || []).find((i) => (i.label || "").includes("Listed REIT"))?.value) === 350000;
+  const carEmi = (h) => Number((h.liabilities || []).find((l) => l.name === "Car Loan")?.monthlyEMI) === 20000;
+  const vehPrem = (h) => Number((h.insurance || []).find((p) => (p.provider || "").includes("HDFC Ergo"))?.annualPremium) === 20000;
+  const propTax = (h) => Number((h.expenses?.recurring || []).find((x) => (x.label || "").includes("Property tax"))?.amount) === 30000;
+  const vac = (h) => Number((h.expenses?.plannedFuture || []).find((g) => (g.label || "").includes("Foreign vacation"))?.todayAmount) === 500000;
+
+  await editRow("investment", "/investments/holdings", "Listed REIT", /current value/i, 350000, reit);
+  await deleteRow("investment", "/investments/holdings", "Listed REIT", "investments", 14);
+  await editRow("loan", "/liabilities/loans", "Car Loan", /monthly emi/i, 20000, carEmi);
+  await deleteRow("loan", "/liabilities/loans", "Car Loan", "liabilities", 1);
+  await editRow("insurance", "/insurance/policies", "HDFC Ergo", /annual premium/i, 20000, vehPrem);
+  await deleteRow("insurance", "/insurance/policies", "HDFC Ergo", "insurance", 3);
+  await editRow("recurring", "/expenses/recurring", "Property tax", /^amount/i, 30000, propTax);
+  await deleteRow("recurring", "/expenses/recurring", "Property tax", "recurring", 3);
+  await editRow("goal", "/expenses/planned", "Foreign vacation", /today/i, 500000, vac);
+  await deleteRow("goal", "/expenses/planned", "Foreign vacation", "planned", 3);
 } catch (err) {
   console.error("ENTRY_FAILED:", err?.message ?? err);
   await shot("FAILURE");
@@ -439,6 +493,10 @@ if (!ovOk) allOk = false;
 log("--- SUBSTANCE checks (per-field values + corpus + FIRE plausibility) ---");
 log(`${fieldOk ? "✅" : "❌"} per-optional-field VALUES   ${corpusOk ? "✅" : "❌"} corpus fidelity   ${fireOk ? "✅" : "❌"} FIRE headline plausible`);
 if (!fieldOk || !corpusOk || !fireOk) allOk = false;
+log("--- CRUD edit+delete checks (#31 H1) ---");
+for (const [k, v] of Object.entries(crud)) log(`${v ? "✅" : "❌"} crud[${k}]`);
+const crudOk = Object.keys(crud).length > 0 && Object.values(crud).every(Boolean);
+if (!crudOk) allOk = false;
 log(`page errors: ${errors.length ? JSON.stringify(errors) : "none"}`);
 log(`screenshots: ${OUT}`);
 log(`VERDICT: ${allOk && errors.length === 0 ? "PASS ✅" : "PARTIAL — iterate"}`);
