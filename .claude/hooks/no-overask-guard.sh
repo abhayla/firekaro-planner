@@ -42,7 +42,7 @@ ends_q=$(printf '%s' "$tail_part" | grep -qE '\?[[:space:]]*$' && echo 1 || echo
 [ -z "$flag" ] && [ "$ends_q" = "1" ] && printf '%s' "$full" | grep -qE "recommend" && flag="over-ask: recommendation+question"
 
 # ── B. Narrate-and-stop detection (deferred next-step language) ──
-[ -z "$flag" ] && printf '%s' "$tail_part" | grep -qE "next step|next, i|next i('|’)?ll|the continuation|continuation from here|from here[.:]|immediate next|next up|i('|’)?ll (work|tackle|start|do|continue|extend|implement|build|close|fix|add|wire|drive|cover)|remaining[^.]{0,40}(tracked|stays|remain|in #)|the rest[^.]{0,40}(tracked|stays|remain|in #)|that('|’)?s the continuation|is the continuation|work #[0-9]" && flag="narrate-and-stop"
+[ -z "$flag" ] && printf '%s' "$tail_part" | grep -qE "next step|next, i|next i('|’)?ll|the continuation|continuation from here|from here[.:]|immediate next|next up|i('|’)?ll (work|tackle|start|do|continue|extend|implement|build|close|fix|add|wire|drive|cover)|remaining[^.]{0,40}(tracked|stays|remain|in #)|the rest[^.]{0,40}(tracked|stays|remain|in #)|that('|’)?s the continuation|is the continuation|work #[0-9]|items? (left|remain)|the only[^.]{0,40}(left|remain|item)|remainder|narrow (remainder|bit|layer|follow|scope|item)|separate[, ]{0,3}(thin )?scope|thin scope|follow-?up|noted in #[0-9]|tracked in #[0-9]|are (genuinely )?separate|stays? (a |as )?follow|two items|one (narrow|thin)" && flag="narrate-and-stop"
 
 [ -z "$flag" ] && exit 0
 
