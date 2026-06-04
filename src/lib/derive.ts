@@ -110,62 +110,43 @@ export function derive(household: Household, assumptions: Assumptions, lens: Der
   const lensedBusinesses = household.businesses.filter((b) => ownerMatches(b.ownerId));
   const lensedOtherIncome = household.otherIncome.filter((o) => ownerMatches(o.ownerId));
 
-  // Anchor age — effective-lens member's age if lensed, else primary earner.
-  function anchorAgeFor(): number {
-    if (applyMemberLens) {
+  // #23 ROOT FIX: FIRE adequacy is inherently HOUSEHOLD — the family funds one shared corpus and
+  // retires together — so an EXPLICIT member drill-down must NOT move the FIRE number/corpus/savings/
+  // age. Only the income/tax DISPLAY (annualIncome, fyTax/annualTax, deductions, the tax recommendation)
+  // lenses to the selected member. To honour both, the scope-dependent block below is computed via the
+  // `computeScope(memberIds)` helper, run TWICE: once over the LENSED set (→ the 4 DISPLAY fields) and
+  // once over the WHOLE HOUSEHOLD (→ everything adequacy reads). When `applyMemberLens` is false the two
+  // member-sets are identical, so the household scope IS the lensed scope and the default path stays
+  // byte-identical. FinTech-validated "option B" (route adequacy through the unlensed path), gh-issue #23.
+  const householdMemberIds: Set<string> = new Set(members.map((m) => m.id));
+
+  // Anchor age — effective-lens member's age if lensed, else primary earner. For the HOUSEHOLD
+  // adequacy scope the anchor is always the primary earner (passing applyForScope=false collapses
+  // to the no-lens branch), so the household ages match the default path exactly.
+  function anchorAgeFor(applyForScope: boolean): number {
+    if (applyForScope) {
       const m = members.find((x) => x.id === effectiveLensMemberId);
       if (m) return ageFromDOB(m.dateOfBirth);
     }
     const primary = earners[0];
     return primary ? ageFromDOB(primary.dateOfBirth) : 30;
   }
-  const anchorAge = anchorAgeFor();
-
-  const targetRetirementAge = (() => {
-    if (applyMemberLens) {
+  function targetRetirementAgeFor(applyForScope: boolean): number {
+    if (applyForScope) {
       const m = members.find((x) => x.id === effectiveLensMemberId);
       if (m?.targetRetirementAge) return m.targetRetirementAge;
     }
     return earners[0]?.targetRetirementAge ?? 50;
-  })();
-
-  const planToAge = (() => {
-    if (applyMemberLens) {
+  }
+  function planToAgeFor(applyForScope: boolean): number {
+    if (applyForScope) {
       const m = members.find((x) => x.id === effectiveLensMemberId);
       if (m?.planToAge) return m.planToAge;
     }
     return earners[0]?.planToAge ?? 90;
-  })();
+  }
 
-  // Annual income totals (lensed).
-  const salaryIncome = lensedEarners.reduce((s, m) => s + (m.salary?.annualCTC ?? 0), 0);
-  const otherTaxable = lensedOtherIncome
-    .filter((o) => !o.isTaxExempt)
-    .reduce((s, o) => s + toAnnual({ amount: o.amount, period: o.frequency }), 0);
-  const otherExempt = lensedOtherIncome
-    .filter((o) => o.isTaxExempt)
-    .reduce((s, o) => s + toAnnual({ amount: o.amount, period: o.frequency }), 0);
-  // Sec 24(a): a flat 30% standard deduction on let-out rental NAV. It reduces TAXABLE income
-  // ONLY — the landlord still receives full rent as CASH, so it must NOT shrink annualIncome.total
-  // / annualSavings. It is subtracted from the tax `grossIncome` (and the bridge rental cash) below,
-  // never from the cash total. gh-issue #29. (SEC_24A_DEDUCTION_RATE is module-scope.)
-  const taxableRentalAnnual = lensedOtherIncome
-    .filter((o) => o.type === "Rental" && !o.isTaxExempt)
-    .reduce((s, o) => s + toAnnual({ amount: o.amount, period: o.frequency }), 0);
-  const sec24aDeduction = taxableRentalAnnual * SEC_24A_DEDUCTION_RATE;
-  const businessShare = lensedBusinesses.reduce(
-    (s, b) => s + toAnnual({ amount: b.annualProfit, period: b.frequency }) * (b.sharePercent / 100),
-    0,
-  );
-  const annualIncome = {
-    salaryIncome,
-    otherTaxable,
-    otherExempt,
-    businessShare,
-    total: salaryIncome + otherTaxable + otherExempt + businessShare,
-  };
-
-  // Household-level monthly expenses (joint pool).
+  // Household-level monthly expenses (joint pool) — scope-independent base.
   const totalMonthlyExpenses =
     household.expenses.avgMonthly +
     household.expenses.recurring.reduce(
@@ -173,93 +154,204 @@ export function derive(household: Household, assumptions: Assumptions, lens: Der
       0,
     );
 
-  // Expenses: household pool is always whole-household (joint) per D6; auto-flow
-  // lines tied to lensed insurance/loans only count when those are visible.
-  const annualExpensesToday = (() => {
-    if (!applyMemberLens) {
-      return totalMonthlyExpenses * 12;
-    }
-    const insuranceIds = new Set(lensedInsurance.map((p) => p.id));
-    const loanIds = new Set(lensedLiabilities.map((l) => l.id));
-    const recurringMonthly = household.expenses.recurring.reduce((s, r) => {
-      if (r.source === "auto-insurance" && r.sourceRefId && !insuranceIds.has(r.sourceRefId)) return s;
-      if (r.source === "auto-loan" && r.sourceRefId && !loanIds.has(r.sourceRefId)) return s;
-      return s + toMonthly({ amount: r.amount, period: r.frequency });
-    }, 0);
-    return (household.expenses.avgMonthly + recurringMonthly) * 12;
-  })();
-
-  // Single source of truth for deductions — audit-grounded deriveDeductions()
-  // over the LENSED subset so the recommendation + fyTax match /tax-planning.
-  const lensedDeductions = deriveDeductions({
-    ...household,
-    // members MUST be lensed too: section80CCD2 sums members' employerNpsAnnual, and
-    // grossIncome below is built from lensedEarners only. Passing full household.members
-    // here would deduct the whole household's employer NPS from a single lensed earner's
-    // income (understating tax / overstating FIRE). Scope it to the lensed earners.
-    members: lensedEarners,
-    investments: lensedInvestments,
-    liabilities: lensedLiabilities,
-    insurance: lensedInsurance,
-  });
-  const estimatedDeductionsForOld = lensedDeductions.totalDeductions;
-  // 80CCD(2) employer NPS — applies in both regimes, passed separately (gh-issue #2);
-  // employerNpsByMember lets computeTax cap each member at their own basic's ceiling
-  // (gh-issue #4), more correct than the aggregate scalars for a multi-earner household.
-  const employerNpsByMember = lensedDeductions.employerNpsByMember;
-
-  // taxpayerAge drives the OLD-regime senior (60+/80+) basic-exemption variant (gh-issue #6).
-  // anchorAge is the lensed member's age, else the primary earner's — the same anchor the
-  // rest of the projection uses, consistent with this engine's single-aggregate-earner model.
-  const householdTaxRecommendation = recommendRegime({
-    grossIncome:
-      annualIncome.salaryIncome +
-      annualIncome.businessShare +
-      annualIncome.otherTaxable -
-      sec24aDeduction, // Sec 24(a) reduces taxable rental to 70% NAV — cash total stays full (#29)
-    fy: lens.currentFY,
-    deductions: estimatedDeductionsForOld,
-    employerNpsByMember,
-    taxpayerAge: anchorAge,
-  });
-
-  const fyTax = computeTax({
-    grossIncome:
-      annualIncome.salaryIncome +
-      annualIncome.businessShare +
-      annualIncome.otherTaxable -
-      sec24aDeduction, // Sec 24(a) reduces taxable rental to 70% NAV — cash total stays full (#29)
-    regime: householdTaxRecommendation.recommended,
-    fy: lens.currentFY,
-    deductions: estimatedDeductionsForOld,
-    employerNpsByMember,
-    taxpayerAge: anchorAge,
-  });
-  const annualTax = fyTax.totalTax;
-
-  // Household marginal slab rate — computed early so BOTH the NPS-annuity
-  // post-tax offset (A2, #7) and the EPF after-tax yield drag (A15.3) use it.
   const cfg = getTaxConfigForFY(lens.currentFY);
-  const slabs =
-    householdTaxRecommendation.recommended === "NEW" ? cfg.newRegime.slabs : cfg.oldRegime.slabs;
-  const householdMarginalRate = marginalSlabRate(fyTax.taxableIncome, slabs);
 
-  const annualSavings = Math.max(0, annualIncome.total - annualTax - annualExpensesToday);
-  // gh-issue #11: the monthly amount flowing to the corpus is the savings residual ALONE. The
-  // expense input EXCLUDES SIPs (UI contract: /expenses "Exclude rent, EMIs, insurance, and SIPs"),
-  // so investments[].monthlyContribution is ALREADY inside annualSavings — adding it again
-  // double-counted every SIP (≈10× over-statement for the Sharmas) and pulled the FIRE date years
-  // early. SIPs are a subset of the surplus, never additive to it.
-  const monthlyContribution = Math.round(annualSavings / 12);
-  const monthlyTakeHome = Math.round((annualIncome.total - annualTax) / 12);
-  const savingsRate = calculateSavingsRate(monthlyTakeHome, Math.round(annualSavings / 12));
+  /**
+   * Compute the income → deductions → tax → marginal-rate → savings → corpus → ages bundle for a
+   * given member-set. `scoped` is true ONLY for the lensed-drill-down call (so the anchor/expense
+   * scoping that lensing implies fires); the household call passes false and reproduces the no-lens
+   * path. Called twice (lensed + household, gh-issue #23) — when no member lens applies the two calls
+   * have identical inputs and return identical bundles, keeping the default path byte-identical.
+   */
+  function computeScope(scopeMemberIds: Set<string>, scoped: boolean) {
+    const scopeIsLensed = scoped && applyMemberLens;
+    const scopeMembers = members.filter((m) => scopeMemberIds.has(m.id));
+    const scopeEarners = scopeMembers.filter((m) => m.role === "EARNER");
+    const scopeOwnerMatches = (ownerId: string): boolean => {
+      if (!scopeIsLensed) return true;
+      if (ownerId === "Joint") return true;
+      return scopeMemberIds.has(ownerId);
+    };
+    const scopeInvestments = household.investments.filter((i) => scopeOwnerMatches(i.ownerId));
+    const scopeLiabilities = household.liabilities.filter(
+      (l) => scopeOwnerMatches(l.ownerId) || l.isSharedWithSpouse,
+    );
+    const scopeInsurance = household.insurance.filter((p) =>
+      scopeIsLensed ? scopeMemberIds.has(p.insuredPersonId) : true,
+    );
+    const scopeBusinesses = household.businesses.filter((b) => scopeOwnerMatches(b.ownerId));
+    const scopeOtherIncome = household.otherIncome.filter((o) => scopeOwnerMatches(o.ownerId));
 
-  // Primary-residence exclusion (A20.2).
-  const fireCorpusInvestments = lensedInvestments.filter(
-    (i) => !(i.type === "RealEstate" && i.realEstateRole === "PrimaryResidence"),
-  );
-  const totalCorpus = fireCorpusInvestments.reduce((s, i) => s + i.value, 0);
-  const totalLiabilitiesValue = lensedLiabilities.reduce((s, l) => s + l.outstandingBalance, 0);
+    const anchorAge = anchorAgeFor(scopeIsLensed);
+    const targetRetirementAge = targetRetirementAgeFor(scopeIsLensed);
+    const planToAge = planToAgeFor(scopeIsLensed);
+
+    // Annual income totals (scoped).
+    const salaryIncome = scopeEarners.reduce((s, m) => s + (m.salary?.annualCTC ?? 0), 0);
+    const otherTaxable = scopeOtherIncome
+      .filter((o) => !o.isTaxExempt)
+      .reduce((s, o) => s + toAnnual({ amount: o.amount, period: o.frequency }), 0);
+    const otherExempt = scopeOtherIncome
+      .filter((o) => o.isTaxExempt)
+      .reduce((s, o) => s + toAnnual({ amount: o.amount, period: o.frequency }), 0);
+    // Sec 24(a): a flat 30% standard deduction on let-out rental NAV. It reduces TAXABLE income
+    // ONLY — the landlord still receives full rent as CASH, so it must NOT shrink annualIncome.total
+    // / annualSavings. It is subtracted from the tax `grossIncome` (and the bridge rental cash) below,
+    // never from the cash total. gh-issue #29. (SEC_24A_DEDUCTION_RATE is module-scope.)
+    const taxableRentalAnnual = scopeOtherIncome
+      .filter((o) => o.type === "Rental" && !o.isTaxExempt)
+      .reduce((s, o) => s + toAnnual({ amount: o.amount, period: o.frequency }), 0);
+    const sec24aDeduction = taxableRentalAnnual * SEC_24A_DEDUCTION_RATE;
+    const businessShare = scopeBusinesses.reduce(
+      (s, b) => s + toAnnual({ amount: b.annualProfit, period: b.frequency }) * (b.sharePercent / 100),
+      0,
+    );
+    const annualIncome = {
+      salaryIncome,
+      otherTaxable,
+      otherExempt,
+      businessShare,
+      total: salaryIncome + otherTaxable + otherExempt + businessShare,
+    };
+
+    // Expenses: household pool is always whole-household (joint) per D6; auto-flow
+    // lines tied to lensed insurance/loans only count when those are visible.
+    const annualExpensesToday = (() => {
+      if (!scopeIsLensed) {
+        return totalMonthlyExpenses * 12;
+      }
+      const insuranceIds = new Set(scopeInsurance.map((p) => p.id));
+      const loanIds = new Set(scopeLiabilities.map((l) => l.id));
+      const recurringMonthly = household.expenses.recurring.reduce((s, r) => {
+        if (r.source === "auto-insurance" && r.sourceRefId && !insuranceIds.has(r.sourceRefId)) return s;
+        if (r.source === "auto-loan" && r.sourceRefId && !loanIds.has(r.sourceRefId)) return s;
+        return s + toMonthly({ amount: r.amount, period: r.frequency });
+      }, 0);
+      return (household.expenses.avgMonthly + recurringMonthly) * 12;
+    })();
+
+    // Single source of truth for deductions — audit-grounded deriveDeductions()
+    // over the SCOPED subset so the recommendation + fyTax match /tax-planning.
+    const scopeDeductions = deriveDeductions({
+      ...household,
+      // members MUST be scoped too: section80CCD2 sums members' employerNpsAnnual, and
+      // grossIncome below is built from scopeEarners only. Passing full household.members
+      // here would deduct the whole household's employer NPS from a single lensed earner's
+      // income (understating tax / overstating FIRE). Scope it to the scope's earners.
+      members: scopeEarners,
+      investments: scopeInvestments,
+      liabilities: scopeLiabilities,
+      insurance: scopeInsurance,
+    });
+    const estimatedDeductionsForOld = scopeDeductions.totalDeductions;
+    // 80CCD(2) employer NPS — applies in both regimes, passed separately (gh-issue #2);
+    // employerNpsByMember lets computeTax cap each member at their own basic's ceiling
+    // (gh-issue #4), more correct than the aggregate scalars for a multi-earner household.
+    const employerNpsByMember = scopeDeductions.employerNpsByMember;
+
+    // taxpayerAge drives the OLD-regime senior (60+/80+) basic-exemption variant (gh-issue #6).
+    // anchorAge is the lensed member's age, else the primary earner's — the same anchor the
+    // rest of the projection uses, consistent with this engine's single-aggregate-earner model.
+    const householdTaxRecommendation = recommendRegime({
+      grossIncome:
+        annualIncome.salaryIncome +
+        annualIncome.businessShare +
+        annualIncome.otherTaxable -
+        sec24aDeduction, // Sec 24(a) reduces taxable rental to 70% NAV — cash total stays full (#29)
+      fy: lens.currentFY,
+      deductions: estimatedDeductionsForOld,
+      employerNpsByMember,
+      taxpayerAge: anchorAge,
+    });
+
+    const fyTax = computeTax({
+      grossIncome:
+        annualIncome.salaryIncome +
+        annualIncome.businessShare +
+        annualIncome.otherTaxable -
+        sec24aDeduction, // Sec 24(a) reduces taxable rental to 70% NAV — cash total stays full (#29)
+      regime: householdTaxRecommendation.recommended,
+      fy: lens.currentFY,
+      deductions: estimatedDeductionsForOld,
+      employerNpsByMember,
+      taxpayerAge: anchorAge,
+    });
+    const annualTax = fyTax.totalTax;
+
+    // Marginal slab rate — computed here so BOTH the NPS-annuity post-tax offset (A2, #7)
+    // and the EPF after-tax yield drag (A15.3) use the SAME scope's rate.
+    const slabs =
+      householdTaxRecommendation.recommended === "NEW" ? cfg.newRegime.slabs : cfg.oldRegime.slabs;
+    const marginalRate = marginalSlabRate(fyTax.taxableIncome, slabs);
+
+    const annualSavings = Math.max(0, annualIncome.total - annualTax - annualExpensesToday);
+    // gh-issue #11: the monthly amount flowing to the corpus is the savings residual ALONE. The
+    // expense input EXCLUDES SIPs (UI contract: /expenses "Exclude rent, EMIs, insurance, and SIPs"),
+    // so investments[].monthlyContribution is ALREADY inside annualSavings — adding it again
+    // double-counted every SIP (≈10× over-statement for the Sharmas) and pulled the FIRE date years
+    // early. SIPs are a subset of the surplus, never additive to it.
+    const monthlyContribution = Math.round(annualSavings / 12);
+    const monthlyTakeHome = Math.round((annualIncome.total - annualTax) / 12);
+    const savingsRate = calculateSavingsRate(monthlyTakeHome, Math.round(annualSavings / 12));
+
+    // Primary-residence exclusion (A20.2).
+    const fireCorpusInvestments = scopeInvestments.filter(
+      (i) => !(i.type === "RealEstate" && i.realEstateRole === "PrimaryResidence"),
+    );
+    const totalCorpus = fireCorpusInvestments.reduce((s, i) => s + i.value, 0);
+    const totalLiabilitiesValue = scopeLiabilities.reduce((s, l) => s + l.outstandingBalance, 0);
+
+    return {
+      scopeOtherIncome,
+      scopeEarners,
+      anchorAge,
+      targetRetirementAge,
+      planToAge,
+      annualIncome,
+      annualExpensesToday,
+      estimatedDeductionsForOld,
+      householdTaxRecommendation,
+      fyTax,
+      annualTax,
+      marginalRate,
+      annualSavings,
+      monthlyContribution,
+      monthlyTakeHome,
+      savingsRate,
+      fireCorpusInvestments,
+      totalCorpus,
+      totalLiabilitiesValue,
+    };
+  }
+
+  // DISPLAY scope (lensed → the selected member's income/tax) vs ADEQUACY scope (whole household).
+  // When no member lens is applied both calls share inputs and the two bundles are identical.
+  const lensedScope = computeScope(lensedMemberIds, true);
+  const householdScope = applyMemberLens ? computeScope(householdMemberIds, false) : lensedScope;
+
+  // The 4 DISPLAY fields lens to the selected member (gh-issue #23 — display drill-down only).
+  const annualIncome = lensedScope.annualIncome;
+  const fyTax = lensedScope.fyTax;
+  const annualTax = lensedScope.annualTax;
+  const estimatedDeductionsForOld = lensedScope.estimatedDeductionsForOld;
+  const householdTaxRecommendation = lensedScope.householdTaxRecommendation;
+
+  // Everything else (the ADEQUACY leg) reads the HOUSEHOLD scope — the family's one shared corpus.
+  const anchorAge = householdScope.anchorAge;
+  const targetRetirementAge = householdScope.targetRetirementAge;
+  const planToAge = householdScope.planToAge;
+  const annualExpensesToday = householdScope.annualExpensesToday;
+  const householdMarginalRate = householdScope.marginalRate;
+  const annualSavings = householdScope.annualSavings;
+  const monthlyContribution = householdScope.monthlyContribution;
+  const monthlyTakeHome = householdScope.monthlyTakeHome;
+  const savingsRate = householdScope.savingsRate;
+  const fireCorpusInvestments = householdScope.fireCorpusInvestments;
+  const totalCorpus = householdScope.totalCorpus;
+  const totalLiabilitiesValue = householdScope.totalLiabilitiesValue;
+  // The bridge layer reads household-scope earners + other-income (adequacy, not display).
+  const householdOtherIncome = householdScope.scopeOtherIncome;
+  const householdEarners = householdScope.scopeEarners;
 
   // Horizon-driven SWR (A1.1).
   const effectiveSWR = resolveEffectiveSWRByHorizon(assumptions, targetRetirementAge, planToAge);
@@ -326,7 +418,7 @@ export function derive(household: Household, assumptions: Assumptions, lens: Der
   const annualEpfVpfContribution = fireCorpusInvestments
     .filter((i) => i.type === "EPF_VPF")
     .reduce((s, i) => s + (i.monthlyContribution ?? 0) * 12, 0);
-  // cfg / slabs / householdMarginalRate are computed earlier (NPS A2 offset).
+  // cfg / householdMarginalRate are computed earlier (NPS A2 offset); slabs now live in computeScope.
   const epfAfterTaxReturn = epfBucketAfterTaxReturn({
     annualContribution: annualEpfVpfContribution,
     marginalSlabRate: householdMarginalRate,
@@ -433,9 +525,9 @@ export function derive(household: Household, assumptions: Assumptions, lens: Der
     const dobForOwner = (ownerId: string): string | null => {
       const direct = members.find((m) => m.id === ownerId);
       if (direct) return direct.dateOfBirth;
-      // "Joint" (or an unmatched owner) anchors to the lens/primary earner.
-      const anchorMember =
-        members.find((m) => m.id === effectiveLensMemberId) ?? earners[0] ?? members[0];
+      // "Joint" (or an unmatched owner) anchors to the primary earner — the bridge is the
+      // ADEQUACY leg, so it stays household-scoped even under an explicit member lens (#23).
+      const anchorMember = earners[0] ?? members[0];
       return anchorMember?.dateOfBirth ?? null;
     };
 
@@ -446,13 +538,15 @@ export function derive(household: Household, assumptions: Assumptions, lens: Der
 
     // Bridge rental cash, post-tax & per-line (Sec 24a let-out → gross·(1−mr·0.7); exempt → full).
     // Extracted to bridgeRentalPostTaxAnnual() so the #29 formula is unit-tested directly. #29
-    const rentalAnnualPostTax = bridgeRentalPostTaxAnnual(lensedOtherIncome, householdMarginalRate);
+    // Uses HOUSEHOLD-scope other-income (adequacy, not the lensed display) — #23.
+    const rentalAnnualPostTax = bridgeRentalPostTaxAnnual(householdOtherIncome, householdMarginalRate);
     const postTax = (gross: number) => gross * (1 - householdMarginalRate);
 
-    // EPS pension + gratuity aggregated over the lensed earners (Phases D, E).
+    // EPS pension + gratuity aggregated over the HOUSEHOLD earners (Phases D, E) — adequacy stays
+    // whole-household even under a member lens (#23).
     let epsAnnualGross = 0;
     let gratuityNet = 0;
-    for (const m of lensedEarners) {
+    for (const m of householdEarners) {
       const eps = deriveEpsPensionForMember(m);
       if (eps) epsAnnualGross += eps.annualPension;
       const grat = deriveGratuityForMember(m, householdMarginalRate);

@@ -118,6 +118,36 @@ describe("headline plausibility — DEFAULT product lens (#22 foolproof gate)", 
       expect(def.totalCorpus).toBe(fam.totalCorpus);
     });
 
+    it(`${persona.name}: an explicit member lens keeps FIRE adequacy HOUSEHOLD — only income/tax lens (#23)`, () => {
+      const h = useHouseholdStore();
+      const a = useAssumptionsStore();
+      persona.load(h, a);
+      const earners = h.data.members.filter((m) => m.role === "EARNER");
+      if (earners.length < 2) return; // a member lens is only meaningful for a multi-earner household
+      const household = derive(h.data, a.values, DEFAULT_PRODUCT_LENS);
+      const lensed = derive(h.data, a.values, { ...DEFAULT_PRODUCT_LENS, viewingMemberId: earners[0].id });
+
+      // FIRE adequacy is inherently household — the family funds one shared corpus and retires
+      // together — so selecting one earner must NOT move the FIRE number/corpus/savings/age. Only
+      // the income/tax DISPLAY lenses (issue #23, FinTech-validated).
+      const householdFields = [
+        "fireNumber",
+        "baseFireNumber",
+        "totalCorpus",
+        "annualSavings",
+        "savingsRate",
+        "monthlyContribution",
+        "monthlyTakeHome",
+        "yearsToRegular",
+        "progressPercent",
+      ] as const;
+      for (const f of householdFields) {
+        expect(lensed[f], `#23: ${persona.name} — lensed.${f} must stay household`).toBe(household[f]);
+      }
+      // ...but the income/tax DISPLAY still lenses to the selected member (strictly less income).
+      expect(lensed.annualIncome.total).toBeLessThan(household.annualIncome.total);
+    });
+
     it(`${persona.name}: the lifecycle-digest snapshot is domain-SANE on the default lens`, () => {
       const h = useHouseholdStore();
       const a = useAssumptionsStore();
