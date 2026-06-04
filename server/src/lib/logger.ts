@@ -17,6 +17,11 @@ export const logger = pino({
       "cookie",
       "req.headers.authorization",
       "req.headers.cookie",
+      // Internal shared-secret headers — hyphenated keys aren't caught by the
+      // `token`/`*.token` paths, so redact them explicitly (else they log in plaintext).
+      'req.headers["x-smoke-token"]',
+      'req.headers["x-internal-token"]',
+      'req.headers["x-dev-bypass"]',
       "*.password",
       "*.secret",
       "*.token",
