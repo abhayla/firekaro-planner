@@ -106,6 +106,7 @@ async function count(key) {
 }
 const r = {};
 const overview = {};
+let fieldOk = true, corpusOk = true, fireOk = true;
 const go = async (path) => { await page.goto(`${BASE}${path}`, { waitUntil: "domcontentloaded" }); await page.waitForTimeout(700); await dismissTour(); };
 
 // Standard 2 (Abhay 2026-06-04): after each section's save, open that section's OVERVIEW
@@ -372,8 +373,47 @@ try {
   log(`10. otherIncome: ${r.otherIncome}/${OTHER_INCOME.length}`);
   await verifyOverview("income", "/income/overview", ["42.00"], []);
 
+  // ── Substance: per-OPTIONAL-field VALUES (not just counts) + corpus fidelity ──
+  const h = await page.evaluate(() => {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.endsWith(":household")) { try { return JSON.parse(localStorage.getItem(k)); } catch {} }
+    }
+    return null;
+  });
+  if (h) {
+    const inv = h.investments || [];
+    const fnd = (s) => inv.find((i) => (i.label || "").includes(s)) || {};
+    const checks = [
+      ["crypto coin=BTC", fnd("Crypto").coin === "BTC"],
+      ["FD bank=SBI", fnd("Emergency fund").bank === "SBI"],
+      ["FD interestRate=7", Number(fnd("Emergency fund").interestRate) === 7],
+      ["FD maturityYear=2028", Number(fnd("Emergency fund").maturityYear) === 2028],
+      ["PPF(Abhay) openingYear=2010", Number(fnd("PPF (Abhay)").openingYear) === 2010],
+      ["NPS openingYear=2016", Number(fnd("NPS").openingYear) === 2016],
+      ["ESOP grantorCountry=US", fnd("Cognizant").grantorCountry === "US"],
+      ["ESOP fmvAtVest=800", Number(fnd("Cognizant").fmvAtVest) === 800],
+      ["RE(3BHK) purchaseYear=2015", Number(fnd("Wakad").purchaseYear) === 2015],
+      ["RE(3BHK) role=PrimaryResidence", fnd("Wakad").realEstateRole === "PrimaryResidence"],
+      ["stocks holdingsCount=25", Number(fnd("Direct equity").holdingsCount) === 25],
+      ["stocks bucket=3", Number(fnd("Direct equity").bucket) === 3],
+    ];
+    for (const [n, ok] of checks) if (!ok) { fieldOk = false; log(`   ❌ optional field ${n}`); }
+    log(`   per-optional-field VALUES: ${fieldOk ? "✅ all 12 correct" : "❌ see above"}`);
+    const corpus = inv.filter((i) => !(i.type === "RealEstate" && i.realEstateRole === "PrimaryResidence")).reduce((s, i) => s + (i.value || 0), 0);
+    corpusOk = corpus >= 30000000 && corpus <= 37000000; // seed 3.6Cr − Madhu's unrepresentable ₹30L EPF ≈ 3.3Cr
+    log(`   corpus fidelity (ex-home) ₹${(corpus / 1e7).toFixed(2)}Cr → ${corpusOk ? "✅ in [3.0,3.7]Cr" : "❌ out of band"}`);
+  } else { fieldOk = corpusOk = false; }
+
+  // ── Substance: FIRE headline PLAUSIBILITY on the default lens (rule 31, the bug-#22 class) ──
   await go("/fire-goals/dashboard");
+  await page.waitForTimeout(1500);
   await shot("00-dashboard-after-entry");
+  const dtxt = (await page.locator("body").innerText().catch(() => "")).replace(/\s+/g, " ");
+  const m = dtxt.match(/at age (\d{2})/i);
+  const fireAge = m ? Number(m[1]) : null;
+  fireOk = fireAge !== null && fireAge >= 45 && fireAge <= 72;
+  log(`   FIRE headline age=${fireAge} → ${fireOk ? "✅ plausible" : "❌ implausible/absurd"}`);
 } catch (err) {
   console.error("ENTRY_FAILED:", err?.message ?? err);
   await shot("FAILURE");
@@ -396,6 +436,9 @@ log("--- per-section OVERVIEW render checks ---");
 for (const [k, v] of Object.entries(overview)) log(`${v ? "✅" : "❌"} overview[${k}] data renders on screen`);
 const ovOk = Object.values(overview).every(Boolean);
 if (!ovOk) allOk = false;
+log("--- SUBSTANCE checks (per-field values + corpus + FIRE plausibility) ---");
+log(`${fieldOk ? "✅" : "❌"} per-optional-field VALUES   ${corpusOk ? "✅" : "❌"} corpus fidelity   ${fireOk ? "✅" : "❌"} FIRE headline plausible`);
+if (!fieldOk || !corpusOk || !fireOk) allOk = false;
 log(`page errors: ${errors.length ? JSON.stringify(errors) : "none"}`);
 log(`screenshots: ${OUT}`);
 log(`VERDICT: ${allOk && errors.length === 0 ? "PASS ✅" : "PARTIAL — iterate"}`);
