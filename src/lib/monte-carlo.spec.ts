@@ -110,6 +110,53 @@ describe("runMonteCarloFire", () => {
     const mc = runMonteCarloFire({ ...base, volatility: 0.18 });
     expect(mc.probabilityNeverReachFire).toBeLessThan(0.05);
   });
+
+  // #24 Part 1 — the per-year MEAN schedule (glide taper).
+  describe("meanReturnSchedule (#24 Part 1 — glide taper)", () => {
+    it("a DECLINING mean schedule de-risks → LATER p50 than a flat-high scalar", () => {
+      // Flat 0.09 throughout vs a glide that tapers 0.09 → 0.04 over the horizon. The
+      // tapered plan earns LESS in later years, so it must reach FIRE LATER (higher p50).
+      const flat = runMonteCarloFire({ ...base, meanReturn: 0.09, volatility: 0.12 });
+      const declining = (y: number) => 0.09 - (0.05 * Math.min(y, 30)) / 30; // 0.09 → 0.04 by y=30
+      const tapered = runMonteCarloFire({
+        ...base,
+        meanReturn: 0.09, // ignored when the schedule is present; kept as the documented fallback
+        meanReturnSchedule: declining,
+        volatility: 0.12,
+      });
+      expect(
+        tapered.p50Years,
+        `tapered p50 ${tapered.p50Years.toFixed(1)} must exceed flat-0.09 p50 ${flat.p50Years.toFixed(1)}`,
+      ).toBeGreaterThan(flat.p50Years);
+    });
+
+    it("a CONSTANT-valued schedule equals the scalar of that value (resolution sanity)", () => {
+      const scalar = runMonteCarloFire({ ...base, meanReturn: 0.1, volatility: 0.15 });
+      const constSchedule = runMonteCarloFire({
+        ...base,
+        meanReturn: 0.1,
+        meanReturnSchedule: () => 0.1,
+        volatility: 0.15,
+      });
+      expect(constSchedule.p50Years).toBe(scalar.p50Years);
+      expect(constSchedule.successProbabilityByYear).toEqual(scalar.successProbabilityByYear);
+    });
+
+    it("an ABSENT schedule is byte-identical to the scalar path (backward-compat)", () => {
+      const withoutSchedule = runMonteCarloFire({ ...base, meanReturn: 0.11, volatility: 0.18 });
+      const explicitUndefined = runMonteCarloFire({
+        ...base,
+        meanReturn: 0.11,
+        meanReturnSchedule: undefined,
+        volatility: 0.18,
+      });
+      expect(explicitUndefined.p50Years).toBe(withoutSchedule.p50Years);
+      expect(explicitUndefined.p10Years).toBe(withoutSchedule.p10Years);
+      expect(explicitUndefined.p90Years).toBe(withoutSchedule.p90Years);
+      expect(explicitUndefined.successProbabilityByYear).toEqual(withoutSchedule.successProbabilityByYear);
+      expect(explicitUndefined.probabilityNeverReachFire).toBe(withoutSchedule.probabilityNeverReachFire);
+    });
+  });
 });
 
 describe("RETURN_BUCKET_VOLATILITY — non-understatement floors (#18)", () => {

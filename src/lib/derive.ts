@@ -107,8 +107,7 @@ export function derive(household: Household, assumptions: Assumptions, lens: Der
   const lensedInsurance = household.insurance.filter((p) =>
     applyMemberLens ? lensedMemberIds.has(p.insuredPersonId) : true,
   );
-  const lensedBusinesses = household.businesses.filter((b) => ownerMatches(b.ownerId));
-  const lensedOtherIncome = household.otherIncome.filter((o) => ownerMatches(o.ownerId));
+  // (businesses + other-income are scoped INSIDE computeScope below, per #23 — no top-level lensed set.)
 
   // #23 ROOT FIX: FIRE adequacy is inherently HOUSEHOLD — the family funds one shared corpus and
   // retires together — so an EXPLICIT member drill-down must NOT move the FIRE number/corpus/savings/
@@ -638,6 +637,10 @@ export function derive(household: Household, assumptions: Assumptions, lens: Der
     variants,
     blendedReturn,
     realBlendedReturn,
+    // The glide-tapered REAL per-year return the deterministic corpusOnlyYearsToRegular
+    // uses — exposed so the #18 Monte Carlo band can taper its per-year MEAN identically
+    // and the MC p50 converges to the headline for glide-ON households (#24 Part 1).
+    realReturnSchedule,
     portfolioVolatility,
     householdInflation,
     annualEpfVpfContribution,

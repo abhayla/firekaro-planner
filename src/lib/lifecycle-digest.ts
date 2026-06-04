@@ -50,6 +50,7 @@ export type SnapshotInputs = Pick<
   | "fireNumber"
   | "savingsRate"
   | "realBlendedReturn"
+  | "realReturnSchedule"
   | "portfolioVolatility"
   | "monthlyContribution"
 >;
@@ -175,6 +176,9 @@ function computeMonteCarloP50Age(derived: SnapshotInputs, skip: boolean): number
     targetCorpus: derived.fireNumber,
     monthlySavings: derived.monthlyContribution,
     meanReturn: derived.realBlendedReturn,
+    // #24 Part 1: taper the MC per-year MEAN along the glide schedule so the digest's MC
+    // p50 age converges to the headline for glide-ON households (same as useFireDerive).
+    meanReturnSchedule: derived.realReturnSchedule,
     volatility: derived.portfolioVolatility,
   });
   return Number.isFinite(mc.p50Years) && mc.p50Years < MAX_PROJECTION_YEARS

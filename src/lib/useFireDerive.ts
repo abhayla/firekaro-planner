@@ -58,16 +58,21 @@ export function useFireDerive() {
     variants: computed(() => d.value.variants),
     blendedReturn: computed(() => d.value.blendedReturn),
     realBlendedReturn: computed(() => d.value.realBlendedReturn),
+    realReturnSchedule: computed(() => d.value.realReturnSchedule),
     portfolioVolatility: computed(() => d.value.portfolioVolatility),
     // #18 Monte Carlo headline confidence band — LAZY (Vue computed only runs the
     // simulation when a consumer reads it, e.g. FireHero). Same real frame as the
-    // corrected headline so p50 ≈ the deterministic years-to-FIRE.
+    // corrected headline so p50 ≈ the deterministic years-to-FIRE. The MC now tapers its
+    // per-year MEAN along the GLIDE schedule (#24 Part 1) so p50 converges to the headline
+    // for glide-ON households instead of running fast off a scalar pre-glide return.
+    // meanReturn stays as the scalar fallback (glide-OFF households resolve it identically).
     monteCarlo: computed(() =>
       runMonteCarloFire({
         currentCorpus: d.value.fireWithdrawableCorpus,
         targetCorpus: d.value.fireNumber,
         monthlySavings: d.value.monthlyContribution,
         meanReturn: d.value.realBlendedReturn,
+        meanReturnSchedule: d.value.realReturnSchedule,
         volatility: d.value.portfolioVolatility,
       }),
     ),

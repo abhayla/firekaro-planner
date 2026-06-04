@@ -27,12 +27,14 @@
  *      frame. For FIRE, pass a REAL return (≈ nominal − inflation) with today's
  *      (un-inflated) target, OR inflate the target each year. Passing a NOMINAL
  *      return against a non-inflating target reaches too fast = optimistic (H3).
- *   3. GLIDE PATH: a single scalar mean/vol ignores equity→debt de-risking; the
- *      wiring should taper BOTH along the horizon (H3/integration).
+ *   3. GLIDE PATH: the per-year MEAN now tapers via the optional `meanReturnSchedule`
+ *      (#24 Part 1 — p50 converges to the glide-tapered headline). The VOLATILITY is
+ *      still a single scalar (a per-year vol taper needs a per-year ALLOCATION schedule
+ *      derive() doesn't yet expose) — the remaining #24-v2 mean/vol refinement.
  *   4. Headline MUST use a conservative percentile + honest disclosure, never p50
  *      alone, and surface P(never reach FIRE).
  */
-import { calculateYearsToTarget } from "./fire-math";
+import { calculateYearsToTarget, type ReturnSchedule } from "./fire-math";
 
 /** calculateYearsToTarget caps the horizon at 1200 months (100 yrs). Exported so
  *  UI can treat any percentile >= this as "off the chart" and never render the
@@ -93,8 +95,19 @@ export interface MonteCarloFireInput {
   currentCorpus: number;
   targetCorpus: number;
   monthlySavings: number;
-  /** Expected annual return. MUST share an inflation frame with targetCorpus (see header). */
+  /** Expected annual return. MUST share an inflation frame with targetCorpus (see header).
+   *  Used as the per-year MEAN when `meanReturnSchedule` is absent (the v1 scalar path). */
   meanReturn: number;
+  /**
+   * Optional per-year MEAN return SCHEDULE (#24 Part 1 — glide-path taper). When provided,
+   * the per-path draw uses this schedule's value for each year's mean instead of the scalar
+   * `meanReturn`, so a glide-ON household's MC band de-risks along the horizon exactly like
+   * the deterministic headline (`calculateYearsToTarget` already drives the same schedule) —
+   * making the MC p50 CONVERGE to the headline instead of running optimistically fast off a
+   * scalar pre-glide return. Absent ⇒ byte-identical to the v1 scalar path (backward-compat).
+   * MUST share the same inflation frame as `targetCorpus` (a REAL schedule for FIRE).
+   */
+  meanReturnSchedule?: ReturnSchedule;
   /** Annual return stdev (e.g. blended from INDIA_RETURN_VOLATILITY). 0 ⇒ deterministic. */
   volatility: number;
   /** Years over which to report the success-probability curve (default 50). */
@@ -178,13 +191,28 @@ export function runMonteCarloFire(input: MonteCarloFireInput): MonteCarloFireRes
   const yearsPerPath: number[] = new Array(paths);
   let neverReached = 0;
 
+  // #24 Part 1: resolve the per-year MEAN from the optional glide-tapered schedule
+  // (falling back to the scalar meanReturn) so the band de-risks like the headline and
+  // the MC p50 converges to the deterministic years-to-FIRE for glide-ON households.
+  // The VOLATILITY stays scalar for Part 1 — a per-year vol taper needs a per-year
+  // ALLOCATION schedule that derive() does not currently expose (the band SPREAD widens
+  // slightly vs a true equity→debt vol taper, but the MEAN schedule is what shifts p50;
+  // the per-year vol taper is the remaining #24-v2 refinement).
+  const meanSchedule = input.meanReturnSchedule;
+  const meanForYear =
+    typeof meanSchedule === "function"
+      ? (y: number): number => meanSchedule(y)
+      : meanSchedule !== undefined
+        ? (_y: number): number => meanSchedule
+        : (_y: number): number => input.meanReturn;
+
   for (let p = 0; p < paths; p++) {
     // Pre-draw ONE return per year and reuse it across that year's 12 months.
     // calculateYearsToTarget calls the schedule per-month; drawing inside it
     // would average 12 sub-draws and silently understate annual volatility.
     const yearly: number[] = new Array(MAX_PROJECTION_YEARS);
     for (let y = 0; y < MAX_PROJECTION_YEARS; y++) {
-      yearly[y] = annualReturnFromStdNormal(input.meanReturn, input.volatility, nextNormal(rng));
+      yearly[y] = annualReturnFromStdNormal(meanForYear(y), input.volatility, nextNormal(rng));
     }
     const schedule = (yearIndex: number): number => yearly[Math.min(yearIndex, MAX_PROJECTION_YEARS - 1)];
 

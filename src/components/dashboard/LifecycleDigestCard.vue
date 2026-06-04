@@ -47,6 +47,7 @@ const inputs = computed<SnapshotInputs>(() => ({
   fireNumber: fire.fireNumber.value,
   savingsRate: fire.savingsRate.value,
   realBlendedReturn: fire.realBlendedReturn.value,
+  realReturnSchedule: fire.realReturnSchedule.value,
   portfolioVolatility: fire.portfolioVolatility.value,
   monthlyContribution: fire.monthlyContribution.value,
 }));

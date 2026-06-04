@@ -84,24 +84,42 @@ describe("headline plausibility — DEFAULT product lens (#22 foolproof gate)", 
       // the glide-ON Iyers. Earlier this invariant was asserted only on the glide-OFF
       // Sharmas (where MC's scalar return == the headline schedule, so the gap is
       // structurally zero) — a shape-vs-substance gap: the lock ran on the one persona
-      // that COULDN'T violate it (FinTech consolidated review, 2026-06-03). For a
-      // glide-ON persona the MC uses the scalar pre-glide return while the headline uses
-      // the tapered schedule, so MC p50 runs a few years FASTER (Iyers ≈ −2.5y) — a
-      // documented #18-v2 limitation (MC doesn't taper). This bound passes today and
-      // trips RED if that gap ever widens materially.
+      // that COULDN'T violate it (FinTech consolidated review, 2026-06-03).
+      // #24 Part 1: the MC now TAPERS its per-year MEAN along the glide schedule
+      // (`meanReturnSchedule`), so a glide-ON persona's p50 CONVERGES to the headline
+      // instead of running fast off a scalar pre-glide return (Iyers gap 2.50y → 1.50y).
+      // The residual gap is just IID-vs-headline discretization noise (the glide-OFF
+      // personas show the same ~0.8–1.4y), NOT the glide asymmetry — so the bound is now
+      // TIGHT (≤ 2.5y across all personas). It trips RED if the convergence ever regresses.
       const mc = runMonteCarloFire({
         currentCorpus: k.fireWithdrawableCorpus,
         targetCorpus: k.fireNumber,
         monthlySavings: k.monthlyContribution,
         meanReturn: k.realBlendedReturn,
+        meanReturnSchedule: k.realReturnSchedule,
         volatility: k.portfolioVolatility,
       });
       expect(mc.p10Years, `${ctx} — MC ordered p10≤p50≤p90`).toBeLessThanOrEqual(mc.p50Years);
       expect(mc.p50Years).toBeLessThanOrEqual(mc.p90Years);
       expect(
         Math.abs(mc.p50Years - k.corpusOnlyYearsToRegular),
-        `${ctx} — MC p50 ${mc.p50Years.toFixed(1)} must track headline ${k.corpusOnlyYearsToRegular.toFixed(1)} (glide asymmetry bounded)`,
-      ).toBeLessThan(6);
+        `${ctx} — MC p50 ${mc.p50Years.toFixed(1)} must track tapered headline ${k.corpusOnlyYearsToRegular.toFixed(1)} (IID-vs-headline noise only, glide asymmetry removed)`,
+      ).toBeLessThan(2.0); // tightened from 2.5 (FinTech #24) — deterministic seed, max measured gap 1.5y
+
+      // #24 directional lock: the taper de-risks, so the tapered p50 is LATER (≥) than the scalar
+      // pre-glide p50. Glide-OFF personas are equal (scalar schedule); glide-ON (Iyers) is strictly
+      // later — pins the #24 intent without depending on the synthetic monte-carlo.spec inputs.
+      const mcScalar = runMonteCarloFire({
+        currentCorpus: k.fireWithdrawableCorpus,
+        targetCorpus: k.fireNumber,
+        monthlySavings: k.monthlyContribution,
+        meanReturn: k.realBlendedReturn,
+        volatility: k.portfolioVolatility,
+      });
+      expect(
+        mc.p50Years,
+        `${ctx} — tapered p50 ${mc.p50Years.toFixed(1)} ≥ scalar p50 ${mcScalar.p50Years.toFixed(1)} (de-risking)`,
+      ).toBeGreaterThanOrEqual(mcScalar.p50Years);
     });
 
     it(`${persona.name}: the default lens is BYTE-IDENTICAL to family view on FIRE adequacy`, () => {
