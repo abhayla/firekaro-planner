@@ -8,6 +8,7 @@
 //   node e2e/seed-prod-session.mjs
 import { chromium } from "@playwright/test";
 import { mkdirSync } from "node:fs";
+import { promises as dns } from "node:dns";
 
 const STATE_PATH = "e2e/.auth/prod-user.json";
 const URL = "https://firekaro.com";
@@ -15,12 +16,44 @@ const WAIT_MS = 5 * 60 * 1000;
 
 mkdirSync("e2e/.auth", { recursive: true });
 
+// This network's IPv6 is broken (firekaro.com + Google login are dual-stack, so a
+// browser hangs trying IPv6 first). We can't disable OS IPv6 without admin — instead
+// resolve the IPv4 (A record) for every host the OAuth flow touches and force Chrome
+// to use it via --host-resolver-rules, so no IPv6 connection is ever attempted.
+const HOSTS = [
+  "firekaro.com",
+  "accounts.google.com",
+  "www.google.com",
+  "apis.google.com",
+  "ssl.gstatic.com",
+  "www.gstatic.com",
+  "fonts.gstatic.com",
+  "lh3.googleusercontent.com",
+  "play.google.com",
+  "accounts.youtube.com",
+];
+const rules = [];
+for (const h of HOSTS) {
+  try {
+    const [ip] = await dns.resolve4(h);
+    if (ip) rules.push(`MAP ${h} ${ip}`);
+  } catch {
+    /* skip hosts with no A record reachable */
+  }
+}
+console.log(`Forcing IPv4 for ${rules.length}/${HOSTS.length} hosts (broken-IPv6 workaround, no admin needed).`);
+
 const browser = await chromium.launch({
   headless: false,
   channel: "chrome",
   // --disable-blink-features=AutomationControlled hides navigator.webdriver so
   // Google's "this browser may not be secure" check doesn't block a real human login.
-  args: ["--start-maximized", "--disable-blink-features=AutomationControlled"],
+  // --host-resolver-rules forces every OAuth host to its IPv4 (broken-IPv6 workaround).
+  args: [
+    "--start-maximized",
+    "--disable-blink-features=AutomationControlled",
+    ...(rules.length ? [`--host-resolver-rules=${rules.join(",")}`] : []),
+  ],
   ignoreDefaultArgs: ["--enable-automation"],
 });
 const ctx = await browser.newContext({ viewport: null });
