@@ -21,6 +21,9 @@ test-results/
 test-evidence/
 e2e/.auth/
 
+# headed UI-verification screenshots (preserved per-run on disk; regenerable — see /verify-ui)
+verification-screenshots/
+
 # run artifacts
 docs/goals/.run/
 
