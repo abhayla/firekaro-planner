@@ -24,6 +24,18 @@ the behavior rules feel like they pull toward "ask" vs "proceed."
 > a sane default. When Abhay invokes grill-me, still propose the *whole* answer in one pass and ask
 > only where a branch genuinely has no clear winner — never decompose decidable defaults into a
 > question series.
+>
+> **NEVER narrate-and-stop either (added 2026-06-04, equal-weight to never-over-ask).** Ending a turn
+> by DESCRIBING the next step — "next step is…", "next I'll…", "the continuation is…", "remaining work
+> tracked in #N", "from here…" — and then stopping IS a stop-violation, identical in spirit to the
+> over-ask: it hands work back that you should just DO. If the next item is reversible/internal
+> (edit/delete coverage, the next tracked-issue item, the next fix, a commit, the next queued task),
+> **execute it in the SAME turn** and chain through the **whole** queue until only a genuine blocker
+> remains (your credentials, a destructive/irreversible op, spend/deploy, a true product fork). The
+> Stop hook `no-overask-guard.sh` now **BLOCKS** a narrate-and-stop (and an over-ask) and re-injects
+> this rule to force continuation — bounded by a per-turn auto-continue cap (12) so it can never loop.
+> Tracking a remaining gap in a GitHub issue is fine for HAND-OFF of genuinely separate scope, NOT a
+> licence to stop while reversible work in the current queue is still doable.
 
 Framing (DACI): on execution I am the **Driver**; Abhay is the **Approver** only for items on the
 ESCALATE list below; on everything else I drive and **Inform**. The **Product Manager** role owns

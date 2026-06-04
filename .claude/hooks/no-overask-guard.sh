@@ -1,45 +1,63 @@
 #!/usr/bin/env bash
-# Stop hook — deterministic over-ask guard.
-# Flags when the final assistant message asks the user to decide REVERSIBLE work,
-# which decision-authority.md bans: DECIDE reversible work, don't ask. Non-blocking
-# (warning to the log + stdout; never forces continuation, so a legitimate
-# escalate-class question is never wrongly blocked). The point is a deterministic,
-# un-ignorable signal — the advisory rule alone kept losing to default behaviour.
+# Stop hook — deterministic STOP-DISCIPLINE guard (over-ask + narrate-and-stop).
 #
-# Catches THREE patterns (the 2nd+3rd added 2026-06-04 after the persona+process
-# grill, where I asked "Q2 of N … which — A, B, or C?" WITH my own recommendation
-# each time and the old phrase-only check at the very tail missed all of it):
-#   (1) trailing offer phrases ("want me to / should I / say the word")
-#   (2) multiple-choice / grill enumerations ("Q3 of N", "which option", "A, B, or C?")
-#   (3) THE SHARPEST TELL — my own recommendation + a trailing question. If I have a
-#       recommended answer on reversible work, that IS the over-ask: execute it.
+# WHY (2026-06-04): advisory rules ("decide reversible work, don't ask" +
+# "build, don't narrate-and-stop") kept LOSING under long context — I repeatedly
+# ended turns either asking a question I should have decided, OR DESCRIBING the
+# next step ("next step is edit/delete") and stopping instead of doing it. Per
+# rule-writing-meta.md, zero-exception behaviour needs a HOOK, not prose. So this
+# hook now BLOCKS the stop and RE-INJECTS the rule so the model keeps going.
+#
+# Two stop-violation classes detected:
+#   A. OVER-ASK — trailing offer / multiple-choice / recommendation+question.
+#   B. NARRATE-AND-STOP — ending by describing the NEXT reversible step
+#      ("next step is…", "next I'll…", "continuation…", "remaining … tracked",
+#      "from here…") instead of executing it.
+# On either (and NOT a genuine blocker), it emits {"decision":"block","reason":…}
+# to force continuation. A per-user-turn counter (.claude/.keepgoing-count, reset
+# by prompt-enhance-reminder.sh) caps auto-continues at 12 to prevent any loop.
 exec 2>/dev/null
 input=$(cat)
 command -v jq >/dev/null || exit 0
 tp=$(printf '%s' "$input" | jq -r '.transcript_path // ""')
 if [ -z "$tp" ] || [ ! -f "$tp" ]; then exit 0; fi
 
-# Last assistant text block = the just-finished visible response.
 last_text=$(jq -r 'select(.type=="assistant") | .message.content[]? | select(.type=="text") | .text' "$tp" 2>/dev/null | tail -1)
 [ -z "$last_text" ] && exit 0
 
 full=$(printf '%s' "$last_text" | tr '[:upper:]' '[:lower:]')
-tail_part=$(printf '%s' "$full" | tail -c 700)
+tail_part=$(printf '%s' "$full" | tail -c 900)
+root="$(git rev-parse --show-toplevel 2>/dev/null)"
 
-# Exemption: questions ABOUT genuinely irreversible/outward/strategic actions are LEGITIMATE.
-if printf '%s' "$full" | grep -qE "push to prod|deploy|dns|cutover|force[- ]push|--force|spend|publish|destructive|drop (table|column)|delete (the )?(branch|remote)|escalat"; then
+# ── Exemption: a GENUINE blocker / escalation / user-input-needed stop is legitimate. ──
+if printf '%s' "$full" | grep -qE "push to prod|deploy|dns|cutover|force[- ]push|--force|spend|publish|destructive|drop (table|column)|delete (the )?(branch|remote)|escalat|blocked on|need (your|you to)|your (credential|password|gmail|approval|login|call)|waiting on (you|abhay)|log in yourself|run .* yourself|requires? your"; then
   exit 0
 fi
 
+# ── A. Over-ask detection ──
 flag=""
-printf '%s' "$tail_part" | grep -qE "want me to|should i |shall i |would you like me to|do you want me to|let me know if|say the word|which (would|do) you|or (should|do|leave) (i|we|them|it)" && flag="trailing offer"
-[ -z "$flag" ] && printf '%s' "$tail_part" | grep -qE "q[0-9]+ of|which (option|default|one|approach|do you want)|,? or [a-d]\?|\b[a-d], [a-d],? (or )?[a-d]\?|which —|which\?" && flag="multiple-choice ask"
+printf '%s' "$tail_part" | grep -qE "want me to|should i |shall i |would you like me to|do you want me to|let me know if|say the word|which (would|do) you|or (should|do|leave) (i|we|them|it)" && flag="over-ask: trailing offer"
+[ -z "$flag" ] && printf '%s' "$tail_part" | grep -qE "q[0-9]+ of|which (option|default|one|approach|do you want)|,? or [a-d]\?|\b[a-d], [a-d],? (or )?[a-d]\?|which —|which\?" && flag="over-ask: multiple-choice"
 ends_q=$(printf '%s' "$tail_part" | grep -qE '\?[[:space:]]*$' && echo 1 || echo 0)
-[ -z "$flag" ] && [ "$ends_q" = "1" ] && printf '%s' "$full" | grep -qE "recommend" && flag="recommendation+question"
+[ -z "$flag" ] && [ "$ends_q" = "1" ] && printf '%s' "$full" | grep -qE "recommend" && flag="over-ask: recommendation+question"
 
-if [ -n "$flag" ]; then
-  log="$(git rev-parse --show-toplevel 2>/dev/null)/.claude/.overask-violations.log"
-  printf '%s\tover-ask detected (%s) in final message\n' "$(jq -rn 'now|todate' 2>/dev/null || echo now)" "$flag" >> "$log" 2>/dev/null
-  echo "OVER-ASK GUARD (decision-authority.md): your last response is a '$flag' on (likely) reversible work. A question that CARRIES YOUR OWN RECOMMENDED ANSWER on reversible/internal/best-practice-clear work IS the over-ask — next turn, EXECUTE the recommendation, don't ask. grill-me / AskUserQuestion are ONLY for irreversible/outward/strategic forks with no clear best-practice winner (deploy, spend, DNS, destructive git, publishing PII, a true product fork). If it is reversible: just DO it (build it, file the issue, commit, take the next queued item) and report."
+# ── B. Narrate-and-stop detection (deferred next-step language) ──
+[ -z "$flag" ] && printf '%s' "$tail_part" | grep -qE "next step|next, i|next i('|’)?ll|the continuation|continuation from here|from here[.:]|immediate next|next up|i('|’)?ll (work|tackle|start|do|continue|extend|implement|build|close|fix|add|wire|drive|cover)|remaining[^.]{0,40}(tracked|stays|remain|in #)|the rest[^.]{0,40}(tracked|stays|remain|in #)|that('|’)?s the continuation|is the continuation|work #[0-9]" && flag="narrate-and-stop"
+
+[ -z "$flag" ] && exit 0
+
+# ── Loop-guard: cap auto-continues per user turn ──
+cf="$root/.claude/.keepgoing-count"
+n=$(cat "$cf" 2>/dev/null || echo 0); case "$n" in ''|*[!0-9]*) n=0 ;; esac
+log="$root/.claude/.overask-violations.log"
+printf '%s\tstop-violation (%s) — autocontinue #%s\n' "$(jq -rn 'now|todate' 2>/dev/null || echo now)" "$flag" "$((n+1))" >> "$log" 2>/dev/null
+
+if [ "$n" -ge 12 ]; then
+  echo "STOP-DISCIPLINE: auto-continue cap (12) hit this turn — yielding. If real reversible work remains, you are over-stopping; if you're blocked, state the blocker explicitly."
+  exit 0
 fi
+printf '%s' "$((n+1))" > "$cf" 2>/dev/null
+
+reason="STOP BLOCKED ($flag). decision-authority.md + build-don't-narrate: you ended your turn with a stop-violation on REVERSIBLE work. DO NOT ask, and DO NOT narrate-and-stop (describe the next step then stop). EXECUTE the next item NOW in this same turn — if it's reversible/internal (edit/delete coverage, the next tracked #issue item, the next fix, a commit, the next queued task) just DO it; chain through the WHOLE queue until ONLY a genuine blocker remains (your credentials, a destructive/irreversible op, spend, deploy, a true product fork — then state it in one line). Keep going."
+jq -nc --arg r "$reason" '{decision:"block", reason:$r}'
 exit 0
