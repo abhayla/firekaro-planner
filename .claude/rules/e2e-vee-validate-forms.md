@@ -1,3 +1,8 @@
+---
+description: How to drive Vue forms that use vee-validate + defineField from Playwright (pressSequentially + blur, not fill).
+globs: ["e2e/**"]
+---
+
 # E2E Driving Forms That Use VeeValidate + defineField
 
 Vue forms in FIREKaro that wire their fields through `useForm({ validationSchema })` + `defineField('name')` from `vee-validate` CANNOT be driven reliably via Playwright's `page.locator(...).fill()` alone. Playwright's synthetic `input` events do not propagate consistently through `defineField`'s reactive layer — especially for numeric inputs with `v-model.number`, which silently fail to coerce, stalling any downstream watcher, computed, or Zod validation chain.

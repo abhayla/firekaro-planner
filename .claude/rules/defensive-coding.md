@@ -1,3 +1,8 @@
+---
+description: Defensive guards (optional chaining, NaN/Infinity, division-by-zero, Array.isArray) for frontend code consuming API/derived data.
+globs: ["src/**/*.vue", "src/**/*.ts"]
+---
+
 # Defensive Coding
 
 ## Principle

@@ -1,3 +1,8 @@
+---
+description: Indian financial instruments, tax deduction limits, FY format, and tax-config SSOT — reference for the calculation modules.
+globs: ["src/lib/**", "src/types/**"]
+---
+
 # Indian Financial Context
 
 ## Key Instruments

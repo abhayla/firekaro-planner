@@ -1,3 +1,8 @@
+---
+description: Any documented E2E CLI flag / env-var / option that claims to change behavior MUST have a matching guard wired in the spec code.
+globs: ["e2e/**", ".claude/skills/**"]
+---
+
 # E2E Documented Flags Must Be Wired
 
 Any CLI flag, env var, or option documented in a skill, README, or test plan that claims to change E2E behavior MUST have a matching guard in the spec code. Documented-but-unwired flags are a silent footgun — callers pass the flag, nothing happens, and the bug surfaces as "my `--no-X` option didn't work."
