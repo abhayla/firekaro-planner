@@ -468,6 +468,21 @@ try {
   await deleteRow("recurring", "/expenses/recurring", "Property tax", "recurring", 3);
   await editRow("goal", "/expenses/planned", "Foreign vacation", /today/i, 500000, vac);
   await deleteRow("goal", "/expenses/planned", "Foreign vacation", "planned", 3);
+
+  // ───────── M1: validation — invalid input disables submit (#31) ─────────
+  try {
+    await go("/investments/holdings");
+    await sel("Type", "Stocks");
+    const addBtn = page.getByRole("button", { name: /^add investment$/i });
+    await page.locator('input[type="number"]').first().fill("0"); // invalid (rule: > 0)
+    await page.waitForTimeout(300);
+    const disabledOnInvalid = await addBtn.isDisabled().catch(() => false);
+    await page.locator('input[type="number"]').first().fill("100000"); // valid
+    await page.waitForTimeout(300);
+    const enabledOnValid = await addBtn.isEnabled().catch(() => false);
+    crud["validation-gate"] = disabledOnInvalid && enabledOnValid;
+    log(`   M1 validation: invalid→disabled=${disabledOnInvalid}, valid→enabled=${enabledOnValid} → ${crud["validation-gate"] ? "✅" : "❌"}`);
+  } catch (e) { crud["validation-gate"] = false; log(`   ⚠ validation: ${e.message?.split("\n")[0]}`); }
 } catch (err) {
   console.error("ENTRY_FAILED:", err?.message ?? err);
   await shot("FAILURE");
