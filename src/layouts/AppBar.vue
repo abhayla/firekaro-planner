@@ -85,8 +85,9 @@ const savedLabel = computed(() => {
     </div>
 
     <div class="d-flex align-center ga-2 flex-wrap">
-      <!-- v4 F.5 — seed switcher dropdown -->
-      <v-menu offset="4">
+      <!-- v4 F.5 — seed switcher dropdown. DEMO-ONLY: in server/authenticated mode it
+           must NOT render — loadSeed() would overwrite the real user's household (gh #36). -->
+      <v-menu v-if="!isServerMode" offset="4">
         <template #activator="{ props: menuProps }">
           <v-btn
             v-bind="menuProps"

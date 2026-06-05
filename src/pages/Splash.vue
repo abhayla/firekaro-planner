@@ -1,9 +1,19 @@
 <script setup lang="ts">
+import { computed } from "vue";
 import { useRouter } from "vue-router";
 import { useHouseholdStore } from "@/stores/household";
 import { useAssumptionsStore } from "@/stores/assumptions";
 import { loadSeedPersona } from "@/lib/seed-persona";
 import TrustPill from "@/components/shared/TrustPill.vue";
+
+// DEMO-ONLY: the "Explore with sample data" path loads a demo persona. In server/
+// authenticated mode it must NOT show — it would pollute the real user's account
+// with the Sharma seed (gh #36). A real new user starts their own plan.
+const isServerMode = computed(
+  () =>
+    import.meta.env.VITE_USE_SERVER_ADAPTER === "on" ||
+    import.meta.env.VITE_USE_SERVER_ADAPTER === "true",
+);
 
 const router = useRouter();
 const household = useHouseholdStore();
@@ -48,8 +58,8 @@ function continuePlan() {
           </p>
         </div>
 
-        <v-row dense>
-          <v-col cols="12" md="6">
+        <v-row dense justify="center">
+          <v-col v-if="!isServerMode" cols="12" md="6">
             <v-card
               variant="outlined"
               class="splash-card lift-on-hover interactive-card pa-6 h-100 d-flex flex-column"
@@ -68,7 +78,7 @@ function continuePlan() {
             </v-card>
           </v-col>
 
-          <v-col cols="12" md="6">
+          <v-col cols="12" :md="isServerMode ? 8 : 6">
             <v-card
               variant="outlined"
               class="splash-card lift-on-hover interactive-card pa-6 h-100 d-flex flex-column"

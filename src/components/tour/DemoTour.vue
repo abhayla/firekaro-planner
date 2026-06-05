@@ -8,6 +8,13 @@ import {
 } from "@/lib/tour-steps";
 import TourStep from "./TourStep.vue";
 
+// DEMO-ONLY: the seed-driven product tour must not run in server/authenticated
+// mode (it's keyed off a demo seed; gh #36). Self-gate so any caller is safe.
+const isServerMode = computed(
+  () =>
+    import.meta.env.VITE_USE_SERVER_ADAPTER === "on" ||
+    import.meta.env.VITE_USE_SERVER_ADAPTER === "true",
+);
 const activeSeed = ref(getActiveSeed());
 const steps = computed(() => getTourSteps(activeSeed.value));
 const currentIndex = ref(0);
@@ -16,6 +23,7 @@ const visible = ref(false);
 const currentStep = computed(() => steps.value[currentIndex.value]);
 
 function start() {
+  if (isServerMode.value) return;
   if (!steps.value.length) return;
   currentIndex.value = 0;
   visible.value = true;
@@ -45,6 +53,7 @@ function done() {
 
 onMounted(() => {
   // Auto-launch on first visit for non-dismissed seeds with defined tours.
+  if (isServerMode.value) return;
   if (!steps.value.length) return;
   if (getTourDismissed(activeSeed.value)) return;
   // Defer one frame so the dashboard finishes hydrating before the tour
