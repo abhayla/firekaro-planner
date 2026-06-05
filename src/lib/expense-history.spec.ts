@@ -6,6 +6,7 @@ import {
   detectGoalPostShift,
   periodKey,
   financialYearOf,
+  getCurrentFinancialYear,
   hasSnapshotForPeriod,
 } from "./expense-history";
 import { LocalAuthProvider, setAuthProvider } from "./auth-provider";
@@ -81,6 +82,26 @@ describe("periodKey + financialYearOf (A29.1/A30.1)", () => {
     expect(financialYearOf(new Date(2026, 4, 1))).toBe("2026-27"); // May → FY 2026-27
     expect(financialYearOf(new Date(2026, 2, 31))).toBe("2025-26"); // Mar → prior FY
     expect(financialYearOf(new Date(2026, 3, 1))).toBe("2026-27"); // Apr 1 → new FY
+  });
+});
+
+describe("getCurrentFinancialYear (auto-derived current FY)", () => {
+  it("returns the FY for a mid-year date", () => {
+    expect(getCurrentFinancialYear(new Date("2025-06-15"))).toBe("2025-26");
+  });
+
+  it("maps a Jan–Mar date to the prior FY", () => {
+    expect(getCurrentFinancialYear(new Date("2025-02-10"))).toBe("2024-25");
+  });
+
+  it("maps the Apr 1 boundary to the new FY", () => {
+    expect(getCurrentFinancialYear(new Date("2025-04-01"))).toBe("2025-26");
+  });
+
+  it("delegates to financialYearOf (no clamping to configured FYs)", () => {
+    // A far-future date must still yield its true wall-clock FY — clamping is
+    // the tax-screen picker's job, not this helper's.
+    expect(getCurrentFinancialYear(new Date("2099-08-01"))).toBe("2099-00");
   });
 });
 
