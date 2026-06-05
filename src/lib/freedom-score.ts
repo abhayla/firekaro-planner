@@ -17,6 +17,10 @@ export interface FreedomScoreInput {
   savingsRatePercent: number;
   /** EMIs / monthly take-home, expressed 0-100 — LOWER is better */
   dtiPercent: number;
+  /** Whether the household has income to assess DTI against. gh #40: a zero-income
+   *  user has dtiPercent 0 (0 debt / 0 income) which otherwise scores "excellent" —
+   *  but DTI is not assessable without income, so it must NOT award marks then. */
+  hasIncome: boolean;
   /** Liquid assets / monthly burn — months of coverage */
   emergencyMonths: number;
   /** Whether Life + Health insurance are adequate per adequacy.ts */
@@ -59,14 +63,17 @@ export function computeFreedomScore(input: FreedomScoreInput): FreedomScoreResul
   const savingsTarget = 30;
   const savingsScore = clampScore((input.savingsRatePercent / savingsTarget) * 25, 25);
 
-  // DTI — target ≤ 30% (lower is better)
+  // DTI — target ≤ 30% (lower is better). gh #40: not assessable without income —
+  // a zero-income household scores 0 here, never the false "excellent 20/20".
   const dtiTarget = 30;
-  const dtiScore = clampScore(
-    input.dtiPercent <= dtiTarget
-      ? 20
-      : Math.max(0, 20 - ((input.dtiPercent - dtiTarget) / dtiTarget) * 20),
-    20,
-  );
+  const dtiScore = !input.hasIncome
+    ? 0
+    : clampScore(
+        input.dtiPercent <= dtiTarget
+          ? 20
+          : Math.max(0, 20 - ((input.dtiPercent - dtiTarget) / dtiTarget) * 20),
+        20,
+      );
 
   // Emergency fund — target 6 months
   const efTarget = 6;
@@ -96,7 +103,8 @@ export function computeFreedomScore(input: FreedomScoreInput): FreedomScoreResul
       target: dtiTarget,
       weight: 20,
       score: Math.round(dtiScore),
-      status: inverseStatusForRatio(input.dtiPercent, dtiTarget),
+      // gh #40: no income → not assessable → "poor" (never the false "excellent").
+      status: input.hasIncome ? inverseStatusForRatio(input.dtiPercent, dtiTarget) : "poor",
     },
     {
       name: "Emergency fund",

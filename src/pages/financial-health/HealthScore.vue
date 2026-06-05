@@ -61,6 +61,7 @@ const scoreResult = computed(() =>
   computeFreedomScore({
     savingsRatePercent: fire.savingsRate.value,
     dtiPercent: dtiPercent.value,
+    hasIncome: fire.monthlyTakeHome.value > 0,
     emergencyMonths: emergencyMonths.value,
     lifeAdequate: lifeAdequate.value,
     healthAdequate: healthAdequate.value,

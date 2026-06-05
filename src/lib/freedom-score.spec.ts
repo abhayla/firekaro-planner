@@ -15,6 +15,7 @@ function baseInput(overrides: Partial<FreedomScoreInput> = {}): FreedomScoreInpu
   return {
     savingsRatePercent: 0,
     dtiPercent: 0,
+    hasIncome: true, // default = a normal income-having household; gh #40 zero-income case sets false
     emergencyMonths: 0,
     lifeAdequate: false,
     healthAdequate: false,
@@ -75,6 +76,19 @@ describe("computeFreedomScore — per-factor scoring", () => {
     expect(computeFreedomScore(baseInput({ dtiPercent: 30 })).factors[1].score).toBe(20);
     expect(computeFreedomScore(baseInput({ dtiPercent: 45 })).factors[1].score).toBe(10); // 20 - (15/30)*20
     expect(computeFreedomScore(baseInput({ dtiPercent: 90 })).factors[1].score).toBe(0); // fully decayed, clamped
+  });
+
+  // gh #40: a brand-new zero-data user has 0 debt / 0 income → dtiPercent 0, which
+  // otherwise scores the false "excellent 20/20" — DTI is NOT assessable without income.
+  // hasIncome:false MUST zero the DTI score and demote the status (never "excellent"),
+  // so the headline Freedom Score reads honestly low instead of inflated by a phantom 20.
+  it("gh #40: no income → DTI scores 0 and status is not excellent (even at dtiPercent 0)", () => {
+    const r = computeFreedomScore(baseInput({ hasIncome: false, dtiPercent: 0 }));
+    expect(r.factors[1].score).toBe(0);
+    expect(r.factors[1].status).toBe("poor");
+    // The phantom +20 is removed from the total: an otherwise all-zero profile now
+    // scores 0, not the misleading 20 the income-having all-zero case earns.
+    expect(r.score).toBe(0);
   });
 
   it("emergency fund scores linearly to 6 months, clamps at 20", () => {

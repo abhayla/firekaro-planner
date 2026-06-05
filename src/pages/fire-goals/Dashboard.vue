@@ -123,6 +123,7 @@ const freedomScore = computed(() =>
   computeFreedomScore({
     savingsRatePercent: fire.savingsRate.value,
     dtiPercent: dtiPercent.value,
+    hasIncome: fire.monthlyTakeHome.value > 0,
     emergencyMonths: emergencyMonths.value,
     lifeAdequate:
       primaryIncome.value > 0 && lifeCoverAdequacy(totalLifeCover.value, primaryIncome.value).status === "adequate",
