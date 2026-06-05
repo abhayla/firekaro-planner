@@ -23,6 +23,14 @@ e2e/.auth/
 
 # headed UI-verification screenshots (preserved per-run on disk; regenerable — see /verify-ui)
 verification-screenshots/
+verification-evidence/
+prod-verify/
+verify-*/
+
+# all test/verification screenshots are regenerable — never commit them
+# (the only tracked PNG, .claude/skills/app-login/last-run.png, stays — gitignore
+#  does not untrack already-committed files)
+*.png
 
 # run artifacts
 docs/goals/.run/
