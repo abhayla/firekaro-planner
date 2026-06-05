@@ -18,6 +18,7 @@ import { useFireDerive } from "@/lib/useFireDerive";
 import { useFeaturesStore } from "@/stores/features";
 import { calculateCoastFire, calculateBaristaFire, realReturnForCoast } from "@/lib/coast-fire";
 import { formatINRCompact } from "@/lib/formatters";
+import { coastFireBlurb, baristaFireBlurb } from "@/lib/fire-milestone-copy";
 import CoastTrajectoryChart from "@/components/charts/CoastTrajectoryChart.vue";
 
 const household = useHouseholdStore();
@@ -147,10 +148,12 @@ const baristaProgress = computed(() => {
             {{ coastProgress.toFixed(0) }}% of way there
           </v-chip>
         </div>
+        <!-- gh #39 (new-user path): the descriptive prose + trajectory chart are only
+             meaningful with a real FIRE target. Without one (zero-data user) they'd assert
+             "at ₹0 your corpus compounds to your full FIRE number (no contributions needed)" —
+             an absurd false positive. Gate on hasFireTarget; show an honest prompt otherwise. -->
         <div class="text-body-2 text-medium-emphasis">
-          Stop-saving point — at {{ formatINRCompact(coast.coastCorpus) }}, your
-          existing corpus alone compounds to your full FIRE number by
-          retirement (no additional contributions needed).
+          {{ coastFireBlurb(hasFireTarget, formatINRCompact(coast.coastCorpus)) }}
         </div>
         <v-progress-linear
           :model-value="coastProgress"
@@ -159,8 +162,9 @@ const baristaProgress = computed(() => {
           rounded
           class="mt-2"
         />
-        <!-- A21.1 — corpus-vs-Coast trajectory chart -->
+        <!-- A21.1 — corpus-vs-Coast trajectory chart (only with a real FIRE target — gh #39) -->
         <CoastTrajectoryChart
+          v-if="hasFireTarget"
           :current-corpus="currentCorpus"
           :fire-number="fire.fireNumber.value"
           :years-to-retirement="yearsToRetirement"
@@ -187,9 +191,7 @@ const baristaProgress = computed(() => {
           </v-chip>
         </div>
         <div class="text-body-2 text-medium-emphasis">
-          Part-time alternative — at {{ formatINRCompact(barista.baristaCorpus) }},
-          your corpus + half-time income covers expenses. You stop the
-          full-time grind but keep light income.
+          {{ baristaFireBlurb(hasFireTarget, formatINRCompact(barista.baristaCorpus)) }}
         </div>
         <v-progress-linear
           :model-value="baristaProgress"
