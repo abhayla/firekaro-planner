@@ -95,10 +95,12 @@ npm run test:e2e          # playwright
 ```bash
 npm run dev               # tsx watch src/index.ts on http://localhost:3100
 npm run type-check        # tsc --noEmit
+npm run lint              # eslint src (server-only gate: no raw c.json(), no console.*)
 npm run test:unit         # vitest — diff-engine units (no DB) + live integration (gated on DATABASE_URL)
 npm run test:unit -- household-diff.spec.ts   # single spec file (no-DB units)
 npm run prisma:generate   # prisma generate
 npm run prisma:validate   # prisma validate (static)
+npm run prisma:migrate:create   # prisma migrate dev --create-only (author a migration, don't apply)
 npm run prisma:migrate:deploy   # apply migrations to the DB
 ```
 
