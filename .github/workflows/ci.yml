@@ -42,8 +42,18 @@ jobs:
         with:
           node-version: 20
           cache: npm
-          cache-dependency-path: server/package-lock.json
+          cache-dependency-path: |
+            package-lock.json
+            server/package-lock.json
       - run: npm ci
+      # The server tsconfig type-checks shared ../src files (derive.ts + the
+      # household/assumptions types, imported via @planner). Those live in the
+      # src/ tree, so their imports (zod, etc.) resolve against the ROOT
+      # node_modules — which a server-only `npm ci` does not install. Install
+      # root deps too, or the shared files collapse to `any` (noImplicitAny).
+      - name: Install root deps (for ../src shared type-check)
+        run: npm ci
+        working-directory: .
       - run: npm run prisma:generate
       - run: npm run type-check
       # ESLint gate (server-only): no raw c.json() (envelope discipline) +
