@@ -31,7 +31,7 @@ jobs:
           VITE_API_BASE_URL: ""
 
   backend:
-    name: Backend (type-check · unit)
+    name: Backend (type-check · lint · unit)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -46,6 +46,10 @@ jobs:
       - run: npm ci
       - run: npm run prisma:generate
       - run: npm run type-check
+      # ESLint gate (server-only): no raw c.json() (envelope discipline) +
+      # no console.* (pino-logger discipline) over server/src/**. See
+      # .claude/rules/api-envelope-pattern.md + structured-logging.md.
+      - run: npm run lint
       # No DATABASE_URL in CI → the live integration specs self-skip; the
       # diff-engine + validate-env + rate-limit units (no DB) run and gate.
       - run: npm run test:unit
