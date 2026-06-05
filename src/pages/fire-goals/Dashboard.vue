@@ -159,6 +159,10 @@ const estateRedFlag = computed(
 // A27.3 — stress-test red-flag chip: "Plan fails X of 10" → /fire-goals/stress-test.
 // Shown only when the stress-test feature is enabled (else the route redirects).
 const stressEnabled = computed(() => features.isEnabled("fire.stressTest"));
+// gh #39 sibling: with no FIRE target (zero expenses) the stress test is meaningless —
+// runStressScenarios on ₹0 reports scenarios as "survivable" (0 ≥ 0), so a brand-new
+// zero-data user falsely sees "plan survives 9 of 10". Gate the chip on a real plan.
+const hasFireTarget = computed(() => fire.fireNumber.value > 0);
 const stressSummary = computed(() =>
   runStressScenarios({
     annualExpenses: fire.annualExpensesToday.value,
@@ -232,7 +236,7 @@ onMounted(() => {
           <template v-if="estateRedFlag">&nbsp;· corpus &gt; ₹1 Cr needs a will</template>
         </v-chip>
         <v-chip
-          v-if="stressEnabled"
+          v-if="stressEnabled && hasFireTarget"
           size="small"
           variant="tonal"
           :color="stressSummary.failed === 0 ? 'success' : stressSummary.failed >= 4 ? 'error' : 'warning'"

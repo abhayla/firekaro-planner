@@ -84,12 +84,19 @@ const barista = computed(() =>
 
 const currentCorpus = computed(() => fire.totalCorpus.value);
 
+// gh #39: with no FIRE target (zero expenses) coast/barista corpora are 0, so
+// hasReachedCoast/Barista(0) is trivially true and baristaProgress would read 100% —
+// a brand-new zero-data user is falsely shown "Reached". Gate on a real target.
+const hasFireTarget = computed(() => fire.fireNumber.value > 0);
+
 const coastProgress = computed(() => {
+  if (!hasFireTarget.value) return 0;
   if (coast.value.coastCorpus <= 0) return 0;
   return Math.min(100, (currentCorpus.value / coast.value.coastCorpus) * 100);
 });
 
 const baristaProgress = computed(() => {
+  if (!hasFireTarget.value) return 0;
   if (barista.value.baristaCorpus <= 0) return 100;
   return Math.min(100, (currentCorpus.value / barista.value.baristaCorpus) * 100);
 });
@@ -123,7 +130,7 @@ const baristaProgress = computed(() => {
         <div class="d-flex align-center justify-space-between mb-1">
           <strong>Coast FIRE</strong>
           <v-chip
-            v-if="coast.hasReachedCoast(currentCorpus)"
+            v-if="hasFireTarget && coast.hasReachedCoast(currentCorpus)"
             color="success"
             size="small"
             variant="tonal"
@@ -167,7 +174,7 @@ const baristaProgress = computed(() => {
         <div class="d-flex align-center justify-space-between mb-1">
           <strong>Barista FIRE</strong>
           <v-chip
-            v-if="barista.hasReachedBarista(currentCorpus)"
+            v-if="hasFireTarget && barista.hasReachedBarista(currentCorpus)"
             color="success"
             size="small"
             variant="tonal"

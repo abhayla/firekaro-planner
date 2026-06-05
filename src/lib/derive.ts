@@ -532,9 +532,22 @@ export function derive(household: Household, assumptions: Assumptions, lens: Der
   // Headline FIRE dates (FireHero) — the ADEQUACY leg (corpus grows to the FIRE
   // number) in the REAL frame. The bridge layer below can push the HEADLINE later
   // when the adequate corpus is not yet liquid (#15). Lean/Fat stay corpus-only.
-  const corpusOnlyYearsToRegular = calculateYearsToTarget(fireWithdrawableCorpus, fireNumber, monthlyContribution, realReturnSchedule);
-  const yearsToLean = calculateYearsToTarget(fireWithdrawableCorpus, variants.leanFIRE, monthlyContribution, realReturnSchedule);
-  const yearsToFat = calculateYearsToTarget(fireWithdrawableCorpus, variants.fatFIRE, monthlyContribution, realReturnSchedule);
+  // gh #39: a household with no expenses has fireNumber 0 → calculateYearsToTarget
+  // returns 0 (corpus 0 ≥ target 0) → the dashboard falsely claims "already at FIRE"
+  // for a brand-new zero-data user. There is no real FIRE target to reach, so the
+  // honest value is UNREACHABLE (Infinity) — FireHero then shows "increase income or
+  // savings" and the crossovers show "not within horizon". A genuine achiever has
+  // fireNumber > 0 (real expenses) and is unaffected.
+  const hasFireTarget = fireNumber > 0;
+  const corpusOnlyYearsToRegular = hasFireTarget
+    ? calculateYearsToTarget(fireWithdrawableCorpus, fireNumber, monthlyContribution, realReturnSchedule)
+    : Number.POSITIVE_INFINITY;
+  const yearsToLean = hasFireTarget
+    ? calculateYearsToTarget(fireWithdrawableCorpus, variants.leanFIRE, monthlyContribution, realReturnSchedule)
+    : Number.POSITIVE_INFINITY;
+  const yearsToFat = hasFireTarget
+    ? calculateYearsToTarget(fireWithdrawableCorpus, variants.fatFIRE, monthlyContribution, realReturnSchedule)
+    : Number.POSITIVE_INFINITY;
 
   // ----- #15 accumulation bridge: corpus-adequate ≠ FIRE-ready -----
   // At the age the corpus first meets the FIRE number, check that the LIQUID
@@ -649,7 +662,10 @@ export function derive(household: Household, assumptions: Assumptions, lens: Der
     decumulation,
   });
 
-  const crossovers = findCrossovers(projection);
+  // gh #39: with no FIRE target (zero expenses) the projection corpus 0 "crosses"
+  // target 0 at year 0, so the Lean/Fat labels falsely show "achieved now". No target
+  // → no crossovers (findCrossovers([]) yields all-null years → "not within horizon").
+  const crossovers = hasFireTarget ? findCrossovers(projection) : findCrossovers([]);
 
   const progressPercent =
     fireNumber <= 0 ? 0 : Math.min(100, Math.round((fireWithdrawableCorpus / fireNumber) * 100));

@@ -224,3 +224,30 @@ describe("headline plausibility — DEFAULT product lens (#22 foolproof gate)", 
     });
   }
 });
+
+// gh #39 — the EMPTY / zero-data boundary the populated personas above never covered
+// (the RCA: input-state blindness — every persona here has full data). A brand-new
+// user (profile only, no income/expenses/investments) must NOT be told they've achieved
+// FIRE. Bug: expenses=0 → fireNumber=0 → years-to-FIRE=0 → "You're already at Regular
+// FIRE — congratulations!" on ₹0.
+describe("headline plausibility — EMPTY state (gh #39: no 'achieved' on zero data)", () => {
+  beforeEach(() => setActivePinia(createPinia()));
+
+  it("profile-only household: years-to-FIRE are non-finite → FireHero shows the empty-state, never 'achieved'", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    h.addMember({
+      id: "you", name: "You", dateOfBirth: "1990-01-01", role: "EARNER",
+      targetRetirementAge: 50, planToAge: 90, city: "Metro", health: "Healthy",
+      riskAppetite: "Moderate", marital: "Married", employmentStatus: "Employed",
+    } as never);
+    const k = derive(h.data, a.values, DEFAULT_PRODUCT_LENS);
+
+    expect(k.fireNumber, "zero expenses → zero FIRE target").toBe(0);
+    // FireHero: !Number.isFinite(yearsToRegular) → "Increase income or savings…".
+    // A FINITE (≤ 0) value here is the bug — it renders "already at Regular FIRE".
+    expect(Number.isFinite(k.yearsToRegular), "Regular: must be non-finite, not 0").toBe(false);
+    expect(Number.isFinite(k.yearsToLean), "Lean: must be non-finite, not 0").toBe(false);
+    expect(Number.isFinite(k.yearsToFat), "Fat: must be non-finite, not 0").toBe(false);
+  });
+});
