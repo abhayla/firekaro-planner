@@ -15,6 +15,8 @@ function loanColor(t: LoanType): string {
   switch (t) {
     case "HomeLoan":
       return "primary";
+    case "CommercialPropertyLoan":
+      return "deep-purple";
     case "CarLoan":
       return "info";
     case "PersonalLoan":
@@ -30,6 +32,7 @@ function loanColor(t: LoanType): string {
 
 const TYPES: { value: LoanType; label: string; defaultRate: number; helper?: string }[] = [
   { value: "HomeLoan", label: "Home Loan", defaultRate: 8.5 },
+  { value: "CommercialPropertyLoan", label: "Commercial / Business Property", defaultRate: 11, helper: "For a shop or business premises. Interest here is NOT the residential §24(b) home-loan deduction. (Commercial-loan interest may be a business expense in your ITR — that path isn't modelled here.)" },
   { value: "PersonalLoan", label: "Personal Loan", defaultRate: 12 },
   { value: "CarLoan", label: "Car Loan", defaultRate: 9.5 },
   { value: "EducationLoan", label: "Education Loan", defaultRate: 10 },

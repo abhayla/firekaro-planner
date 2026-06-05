@@ -212,6 +212,28 @@ describe("deriveDeductions — Sec 24 home loan interest", () => {
     const result = deriveDeductions(hh);
     expect(result.section24).toBe(0);
   });
+
+  // gh #38: a commercial / business-property (shop) loan is NOT a residential house
+  // property, so its interest must NOT receive the §24(b) ₹2L residential deduction.
+  // Before the dedicated type existed, such a loan had to be filed as "HomeLoan" and
+  // wrongly claimed ₹2L → optimistic tax understatement. A CommercialPropertyLoan must
+  // contribute ₹0 to section24 even with large interest. (The legitimate §36(1)(iii)
+  // business-interest deduction needs business-income modelling — out of scope here.)
+  it("gh #38: a commercial/business-property loan gets ₹0 §24(b) (no phantom residential deduction)", () => {
+    const hh = emptyHH();
+    hh.liabilities = [{
+      id: "l1",
+      name: "Shop Loan",
+      type: "CommercialPropertyLoan",
+      outstandingBalance: 5_000_000,
+      monthlyEMI: 50_000,
+      interestRate: 11.0, // interest ≈ 5.5L — would be capped to ₹2L IF wrongly treated as a home loan
+      ownerId: "self",
+      isSharedWithSpouse: false,
+    }];
+    const result = deriveDeductions(hh);
+    expect(result.section24).toBe(0);
+  });
 });
 
 describe("deriveDeductions — 80D health insurance", () => {

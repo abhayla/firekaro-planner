@@ -25,6 +25,7 @@ const netWorthDelta = computed(() =>
 
 const LOAN_LABEL: Record<LoanType, string> = {
   HomeLoan: "Home Loan",
+  CommercialPropertyLoan: "Commercial / Business Property",
   PersonalLoan: "Personal Loan",
   CarLoan: "Car Loan",
   EducationLoan: "Education Loan",

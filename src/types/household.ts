@@ -294,6 +294,12 @@ export type InvestmentRecord =
 // ---------- Liabilities (D15) ----------
 export const loanTypeSchema = z.enum([
   "HomeLoan",
+  // gh #38: a loan for a commercial / business property (e.g. a shop). Distinct from
+  // HomeLoan because it is NOT a residential house property — its interest must NOT
+  // receive the §24(b) ₹2L residential deduction (see tax-deductions.ts). The
+  // legitimate §36(1)(iii) business-interest deduction needs business-income modelling
+  // (out of scope for the salaried-accumulator wedge).
+  "CommercialPropertyLoan",
   "PersonalLoan",
   "CarLoan",
   "EducationLoan",

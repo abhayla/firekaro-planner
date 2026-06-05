@@ -255,7 +255,7 @@ model Liability {
   entityId String
 
   name               String
-  type               String // HomeLoan | PersonalLoan | CarLoan | EducationLoan | CreditCard | Other
+  type               String // HomeLoan | CommercialPropertyLoan | PersonalLoan | CarLoan | EducationLoan | CreditCard | Other
   outstandingBalance Float
   monthlyEMI         Float
   interestRate       Float
