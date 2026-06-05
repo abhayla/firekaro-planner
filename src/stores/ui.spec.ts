@@ -11,6 +11,7 @@ import { nextTick } from "vue";
 import { setActivePinia, createPinia } from "pinia";
 import { useUiStore } from "@/stores/ui";
 import { setAdapter, type StorageAdapter } from "@/lib/storage-adapter";
+import { getCurrentFinancialYear } from "@/lib/expense-history";
 import type { LifecycleSnapshot } from "@/lib/lifecycle-digest";
 
 /** Map-backed in-memory adapter (JSON-encoded, mirroring LocalStorageAdapter). */
@@ -72,21 +73,28 @@ describe("ui store — lifecycleSnapshot persistence (Stage B)", () => {
   it("capturing the snapshot does NOT perturb the other ui fields", async () => {
     const ui = useUiStore();
     ui.toggleFamilyView(); // isFamilyView → true
-    ui.setCurrentFY("2024-25");
     ui.captureLifecycleSnapshot(SNAP);
     await nextTick();
 
     const blob = mem.get<Record<string, unknown>>("ui");
     expect(blob?.isFamilyView).toBe(true);
-    expect(blob?.currentFY).toBe("2024-25");
+    // currentFY is auto-derived, not user state → never written to the blob.
+    expect(blob).not.toHaveProperty("currentFY");
     expect((blob?.lifecycleSnapshot as LifecycleSnapshot)?.capturedAt).toBe(SNAP.capturedAt);
   });
 
   it("migration-on-hydrate: an older blob without the field backfills to null", () => {
-    mem.set("ui", { isFamilyView: false, currentFY: "2025-26" }); // legacy shape
+    mem.set("ui", { isFamilyView: false }); // legacy shape (no lifecycleSnapshot)
     const ui = useUiStore();
     ui.hydrate();
     expect(ui.lifecycleSnapshot).toBeNull();
-    expect(ui.currentFY).toBe("2025-26");
+  });
+
+  it("hydrate ignores a stale persisted currentFY and resolves to the auto current FY", () => {
+    // A legacy blob pinned to an old FY must NOT override the wall-clock current FY.
+    mem.set("ui", { isFamilyView: false, currentFY: "2024-25" });
+    const ui = useUiStore();
+    ui.hydrate();
+    expect(ui.currentFY).toBe(getCurrentFinancialYear());
   });
 });
