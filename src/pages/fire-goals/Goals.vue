@@ -4,6 +4,7 @@ import { useHouseholdStore } from "@/stores/household";
 import { useAssumptionsStore } from "@/stores/assumptions";
 import { useFireDerive } from "@/lib/useFireDerive";
 import { formatINRCompact } from "@/lib/formatters";
+import { retirementGoalAgeYear } from "@/lib/retirement-goal";
 import EmptyState from "@/components/shared/EmptyState.vue";
 import LeafPageHeader from "@/components/income-layout/LeafPageHeader.vue";
 import PanelCard from "@/components/shared/PanelCard.vue";
@@ -31,11 +32,18 @@ function inflatedAt(amount: number, year: number): number {
 }
 
 const retirementCard = computed<GoalCard>(() => {
-  const targetYear = new Date().getFullYear() + (Number.isFinite(fire.yearsToRegular.value) ? Math.ceil(fire.yearsToRegular.value) : 30);
+  // gh-issue #33: derive the displayed age AND year from the same source the
+  // dashboard uses (anchorAge + yearsToRegular) so they always correspond —
+  // never an aspirational target age next to a computed achievable year.
+  const { age, year } = retirementGoalAgeYear(
+    fire.anchorAge.value,
+    fire.yearsToRegular.value,
+    new Date().getFullYear(),
+  );
   return {
     id: "retirement",
-    label: `Retirement at age ${fire.targetRetirementAge.value}`,
-    targetYear,
+    label: `Retirement at age ${age}`,
+    targetYear: year,
     todayAmount: fire.fireNumber.value,
     inflatedAmount: fire.fireNumber.value, // FIRE number is already in today's ₹; the projection handles inflation separately
     progressPercent: fire.progressPercent.value,
