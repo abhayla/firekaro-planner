@@ -267,7 +267,7 @@ try {
     const tabs = page.locator('[role="tab"]');
     const ntabs = await tabs.count().catch(() => 0);
     for (let i = 0; i < Math.min(ntabs, 5); i++) {
-      await exercise(s, `tab[${i}]`, "click", async () => { await tabs.nth(i).click({ timeout: 2000 }); });
+      await exercise(s, `tab[${i}]`, "click", async () => { await tabs.nth(i).click({ timeout: 4000 }); });
     }
     // FY / period selectors (v-select with year-like or period labels)
     for (const re of [/financial year/i, /^year/i, /period/i, /^FY/i]) {
@@ -287,19 +287,24 @@ try {
     // expand/collapse panels
     const panels = page.locator(".v-expansion-panel-title");
     const np = await panels.count().catch(() => 0);
-    if (np > 0) await exercise(s, "expansion-panel", "toggle", async () => { await panels.first().click({ timeout: 2000 }); });
+    if (np > 0) await exercise(s, "expansion-panel", "toggle", async () => { await panels.first().click({ timeout: 4000 }); });
     // a non-destructive primary "add" dialog: open then cancel
     const addBtn = page.getByRole("button", { name: /^(add|new|create)/i }).first();
     if (await addBtn.isVisible({ timeout: 300 }).catch(() => false)) {
       await exercise(s, "add-dialog", "open", async () => {
-        await addBtn.click({ timeout: 2000 });
-        await page.waitForTimeout(400);
-        return (await page.locator(".v-overlay--active").count()) > 0;
+        await addBtn.click({ timeout: 5000 });
+        // Vuetify dialog mount can exceed a 2s budget under load — wait on the overlay.
+        return await page
+          .locator(".v-overlay--active")
+          .first()
+          .waitFor({ state: "visible", timeout: 5000 })
+          .then(() => true)
+          .catch(() => false);
       });
       // cancel/close
       const cancel = page.getByRole("button", { name: /^(cancel|close|discard)$/i }).first();
       if (await cancel.isVisible({ timeout: 300 }).catch(() => false)) {
-        await exercise(s, "add-dialog", "cancel", async () => { await cancel.click({ timeout: 2000 }); await page.keyboard.press("Escape").catch(() => {}); });
+        await exercise(s, "add-dialog", "cancel", async () => { await cancel.click({ timeout: 4000 }); await page.keyboard.press("Escape").catch(() => {}); });
       } else { await page.keyboard.press("Escape").catch(() => {}); }
     }
   }
