@@ -3,7 +3,6 @@ import { computed, ref } from "vue";
 import { useRouter } from "vue-router";
 import { useUiStore } from "@/stores/ui";
 import { useHouseholdStore } from "@/stores/household";
-import { AVAILABLE_FYS } from "@/lib/tax";
 import AssumptionsPanel from "@/components/shared/AssumptionsPanel.vue";
 import { SEED_META, loadSeed, getActiveSeed, type SeedName } from "@/seeds";
 import { authClient } from "@/lib/auth-client";
@@ -139,15 +138,9 @@ const savedLabel = computed(() => {
         style="min-width: 180px; max-width: 200px"
       />
 
-      <v-select
-        v-model="ui.currentFY"
-        :items="AVAILABLE_FYS"
-        density="compact"
-        hide-details
-        prepend-inner-icon="mdi-calendar"
-        label="FY"
-        style="min-width: 130px; max-width: 140px"
-      />
+      <!-- FY selector removed: the current FY is now auto-derived from the wall
+           clock (getCurrentFinancialYear). Manual FY selection lives on the
+           tax-planning screen only (page-local, regime comparison). -->
 
       <!-- v4 E.8 — Cmd-K trigger -->
       <v-btn

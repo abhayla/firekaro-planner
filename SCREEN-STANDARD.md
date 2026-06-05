@@ -36,7 +36,7 @@ This is a **living document**, not a one-time spec. The rules:
 `fluid` container, `py-6`, consistent max-width + side padding. One vertical rhythm via spacing tokens.
 
 ## 3. Page header
-`LeafPageHeader` (or equivalent): eyebrow + H1 (display font, `--tracking-tight`) + one-line description. Identical pattern on every screen. `LeafPageHeader` exposes an optional `#actions` slot for header-level controls (right-aligned, wraps below on mobile) — used by the FIRE Dashboard / What-If screens for their edit-profile / reset-levers buttons.
+`LeafPageHeader` (or equivalent): eyebrow + H1 (display font, `--tracking-tight`) + one-line description. Identical pattern on every screen. `LeafPageHeader` exposes an optional `#actions` slot for header-level controls (right-aligned, wraps below on mobile) — used by the FIRE Dashboard / What-If screens for their edit-profile / reset-levers buttons, and by `/tax-planning` for its **page-local "Tax year" picker** (the only manual FY control in the app; the Financial Year is otherwise auto-derived from the wall clock, not a global app-bar selector — see `.claude/rules/financial-year-handling.md`).
 
 ## 4. Hero stat strip
 Every screen opens with a `StatDashboard`-style KPI strip: 3–5 tiles (`eyebrow` + mono `value` + `meta`), **exactly one `accent` primary metric**, optional donut/viz on the right.

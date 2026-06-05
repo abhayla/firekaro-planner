@@ -80,6 +80,19 @@ export function financialYearOf(date: Date): string {
   return `${startYear}-${endYY}`;
 }
 
+/**
+ * The CURRENT Indian financial year, auto-derived from the wall clock. This is
+ * the single source of "what FY are we in" for `derive()`, the salary/income
+ * forms, and nudges — there is no global manual FY pick (the FY selector is
+ * scoped to the tax-planning screen only). `now` is injectable for testability.
+ *
+ * No clamping to the configured tax FYs — that is the tax-screen picker's job;
+ * `getTaxConfigForFY` already falls back for an unconfigured FY.
+ */
+export function getCurrentFinancialYear(now: Date = new Date()): string {
+  return financialYearOf(now);
+}
+
 /** True when a snapshot already exists for the given `YYYY-MM` period. */
 export function hasSnapshotForPeriod(period: string): boolean {
   return loadAllSnapshots().some((s) => s.period === period);

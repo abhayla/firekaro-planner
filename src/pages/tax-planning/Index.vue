@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { useHouseholdStore } from "@/stores/household";
-import { useUiStore } from "@/stores/ui";
-import { computeTax, npsCeilingFor } from "@/lib/tax";
+import { computeTax, npsCeilingFor, AVAILABLE_FYS } from "@/lib/tax";
+import { getCurrentFinancialYear } from "@/lib/expense-history";
 import { toAnnual } from "@/lib/cashflow";
 import { formatINRCompact, formatPercent, formatINR } from "@/lib/formatters";
 import {
@@ -26,7 +26,20 @@ import LimitMeter from "@/components/shared/LimitMeter.vue";
 import TaxCliffChart from "@/components/charts/TaxCliffChart.vue";
 
 const household = useHouseholdStore();
-const ui = useUiStore();
+
+// Page-local tax-year selector — drives ONLY this screen's regime comparison
+// and cliff chart. It NEVER mutates global state: the dashboard FIRE plan always
+// uses the auto current FY (getCurrentFinancialYear), independent of this pick.
+const autoCurrentFY = getCurrentFinancialYear();
+// Options = current + next configured FY (forward tax planning). If the current
+// FY is beyond all configured years, fall back to the newest configured FY.
+const fyOptions = computed<string[]>(() => {
+  const forward = AVAILABLE_FYS.filter((fy) => fy >= autoCurrentFY);
+  return forward.length > 0 ? forward : [AVAILABLE_FYS[AVAILABLE_FYS.length - 1]];
+});
+const selectedFY = ref(
+  AVAILABLE_FYS.includes(autoCurrentFY) ? autoCurrentFY : AVAILABLE_FYS[AVAILABLE_FYS.length - 1],
+);
 
 type RegimeMode = "AUTO" | "OLD" | "NEW";
 const mode = ref<RegimeMode>("AUTO");
@@ -116,10 +129,10 @@ const totalTaxable = computed(() =>
 // new-regime taxable income (gross − standard deduction − 80CCD(2) employer NPS), which
 // newResult already computes — not an old-regime totalDeductions proxy (gh-issue #2 review).
 const marginalReliefActive = computed(() =>
-  isInMarginalReliefBand(newResult.value.taxableIncome, ui.currentFY),
+  isInMarginalReliefBand(newResult.value.taxableIncome, selectedFY.value),
 );
 const marginalReliefSuggestions = computed(() =>
-  marginalReliefMitigations(newResult.value.taxableIncome, ui.currentFY),
+  marginalReliefMitigations(newResult.value.taxableIncome, selectedFY.value),
 );
 
 // Decision rule-of-thumb (audit Entry #12 A12.5), corrected to the research rule:
@@ -151,7 +164,7 @@ const oldResult = computed(() =>
   computeTax({
     grossIncome: totalTaxable.value,
     regime: "OLD",
-    fy: ui.currentFY,
+    fy: selectedFY.value,
     deductions: derivedDeductions.value.totalDeductions,
     employerNpsByMember: derivedDeductions.value.employerNpsByMember,
   }),
@@ -160,7 +173,7 @@ const newResult = computed(() =>
   computeTax({
     grossIncome: totalTaxable.value,
     regime: "NEW",
-    fy: ui.currentFY,
+    fy: selectedFY.value,
     employerNpsByMember: derivedDeductions.value.employerNpsByMember,
   }),
 );
@@ -196,8 +209,8 @@ const perEarner = computed(() => {
     const gross = m.salary?.annualCTC ?? 0;
     const earnerNps = m.salary?.employerNpsAnnual ?? 0;
     const earnerBasic = m.salary?.basicAnnual ?? 0;
-    const earnerOld = computeTax({ grossIncome: gross, regime: "OLD", fy: ui.currentFY, deductions: derivedDeductions.value.totalDeductions, employerNps: earnerNps, employerNpsBasic: earnerBasic });
-    const earnerNew = computeTax({ grossIncome: gross, regime: "NEW", fy: ui.currentFY, employerNps: earnerNps, employerNpsBasic: earnerBasic });
+    const earnerOld = computeTax({ grossIncome: gross, regime: "OLD", fy: selectedFY.value, deductions: derivedDeductions.value.totalDeductions, employerNps: earnerNps, employerNpsBasic: earnerBasic });
+    const earnerNew = computeTax({ grossIncome: gross, regime: "NEW", fy: selectedFY.value, employerNps: earnerNps, employerNpsBasic: earnerBasic });
     const rec = earnerOld.totalTax <= earnerNew.totalTax ? "OLD" : "NEW";
     const active = effectiveRegime.value === "OLD" ? earnerOld : earnerNew;
     return {
@@ -231,7 +244,7 @@ const kpis = computed<KpiTile[]>(() => {
       eyebrow: "Effective rate",
       value: formatPercent(r.effectiveRate, 1),
       accent: true,
-      meta: `${effectiveRegime.value === "OLD" ? "Old" : "New"} regime · FY ${ui.currentFY}`,
+      meta: `${effectiveRegime.value === "OLD" ? "Old" : "New"} regime · FY ${selectedFY.value}`,
     },
     {
       eyebrow: "Total tax · per year",
@@ -329,10 +342,22 @@ const takeHomeSegments = computed<ProportionSegment[]>(() => {
 <template>
   <v-container fluid class="py-6 taxes-page">
     <LeafPageHeader
-      :eyebrow="`Tax Planning · FY ${ui.currentFY}`"
+      :eyebrow="`Tax Planning · FY ${selectedFY}`"
       title="Taxes"
       description="High-level only. For filing, use your CA or Cleartax — this surface is for planning, not submission."
-    />
+    >
+      <template #actions>
+        <v-select
+          v-model="selectedFY"
+          :items="fyOptions"
+          density="compact"
+          hide-details
+          prepend-inner-icon="mdi-calendar"
+          label="Tax year"
+          style="min-width: 130px; max-width: 140px"
+        />
+      </template>
+    </LeafPageHeader>
 
     <!-- Marginal-relief cliff warning (audit Entry #13 A13.2). -->
     <v-alert
@@ -478,7 +503,7 @@ const takeHomeSegments = computed<ProportionSegment[]>(() => {
     <div class="section-eyebrow">Tax cliff</div>
     <v-row dense>
       <v-col cols="12">
-        <TaxCliffChart :fy="ui.currentFY" :old-deductions="derivedDeductions.totalDeductions" />
+        <TaxCliffChart :fy="selectedFY" :old-deductions="derivedDeductions.totalDeductions" />
       </v-col>
     </v-row>
 
