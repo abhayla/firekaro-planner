@@ -2,6 +2,7 @@
 import type { Router } from "vue-router";
 import { TERM_GLOSSARY, glossaryCategory } from "@/lib/glossary";
 import { loadSeed, SEED_META, type SeedName } from "@/seeds";
+import { isServerMode } from "@/lib/runtime-mode";
 
 export type CmdCategory = "Navigate" | "Actions" | "Glossary";
 
@@ -116,19 +117,24 @@ export function buildCommands(): CmdItem[] {
       keywords: "simulator lever scenario",
       run: ({ router }) => router.push("/fire-goals/what-if"),
     },
-    ...seedNames.map((s) => ({
-      id: `act-seed-${s}`,
-      category: "Actions" as const,
-      label: `Switch to ${SEED_META[s].label}`,
-      hint: "Seed",
-      icon: SEED_META[s].icon,
-      keywords: `seed switch persona ${s}`,
-      run: ({ router }: CmdContext) => {
-        loadSeed(s);
-        const path = s === "empty" ? "/wizard" : "/fire-goals/dashboard";
-        router.push(path).then(() => setTimeout(() => window.location.reload(), 50));
-      },
-    })),
+    // DEMO-ONLY: seed-switch commands call loadSeed(), which overwrites the
+    // household — they MUST NOT exist in server/authenticated mode (gh #36), else
+    // a logged-in user could destroy their real account via Cmd-K.
+    ...(isServerMode()
+      ? []
+      : seedNames.map((s) => ({
+          id: `act-seed-${s}`,
+          category: "Actions" as const,
+          label: `Switch to ${SEED_META[s].label}`,
+          hint: "Seed",
+          icon: SEED_META[s].icon,
+          keywords: `seed switch persona ${s}`,
+          run: ({ router }: CmdContext) => {
+            loadSeed(s);
+            const path = s === "empty" ? "/wizard" : "/fire-goals/dashboard";
+            router.push(path).then(() => setTimeout(() => window.location.reload(), 50));
+          },
+        }))),
   ];
 
   const glossaryCmds: CmdItem[] = Object.entries(TERM_GLOSSARY).map(([key, entry]) => {
