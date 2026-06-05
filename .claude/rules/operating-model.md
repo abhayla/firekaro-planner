@@ -136,6 +136,10 @@ nothing about who *owns* the project.
   self-reported "passes/clean/done" is a claim, not proof.
 - MUST route non-trivial output to an **independent reviewer agent** in a fresh context; the author/CEO is
   never the sole verifier — even when T0 built it inline.
+- MUST, for any **test run** (Playwright/E2E/UI/persistence/any pass-fail verdict), re-check the verdict
+  with a **separate, context-blind agent** given the same inputs + raw evidence (not the tester's
+  conclusions) — the testing-specific, auto-applied form of this edge. Full rule:
+  `.claude/rules/independent-test-verification.md` (behaviour rule 33).
 - MUST verify **both API and UI axes** when the change touches both (independent GET + Playwright
   screenshot/ARIA/console, iterate to intent); name any axis genuinely N/A.
 - MUST surface every skipped step as **"X SKIPPED because &lt;reason&gt;"** and MUST NOT claim
