@@ -57,7 +57,8 @@ function migrateMember(raw: LegacyMember): Member {
     health: raw.health ?? "Healthy",
     educationStage: raw.educationStage ?? (raw.role === "DEPENDENT" ? "Preschool" : undefined),
     riskAppetite: raw.riskAppetite ?? (raw.role === "EARNER" ? "Moderate" : "Conservative"),
-    marital: raw.marital ?? (raw.role === "EARNER" ? "Married" : "Single"),
+    // gh #34: adults (earner OR non-earning spouse) default Married; only child dependents Single.
+    marital: raw.marital ?? (raw.role === "DEPENDENT" ? "Single" : "Married"),
     employmentStatus: raw.employmentStatus ?? (raw.role === "EARNER" ? "Employed" : undefined),
   };
 }

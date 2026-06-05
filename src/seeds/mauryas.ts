@@ -50,7 +50,9 @@ export function loadMauryasSeed(household: HStore, assumptions: AStore) {
     id: "madhu",
     name: "Madhu Kushwaha",
     dateOfBirth: "1981-04-15",
-    role: "DEPENDENT", // left the corporate workforce in 2023 — homemaker, no current income
+    // gh #34: a homemaker / non-earning spouse is a first-class NON_EARNING_ADULT — an adult
+    // whose longevity (planToAge 92) MUST extend the household plan horizon, not a child DEPENDENT.
+    role: "NON_EARNING_ADULT",
     relation: "Spouse",
     planToAge: 92,
     city: "Metro",

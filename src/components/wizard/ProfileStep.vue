@@ -3,6 +3,7 @@ import { computed, ref, watch } from "vue";
 import { useHouseholdStore } from "@/stores/household";
 import type { MemberDraft, SetupMode, MemberRole } from "@/types/household";
 import { ageFromDOB, dobFromAge } from "@/lib/age";
+import { finalizeMemberDraft } from "@/lib/member-draft";
 import { validateMemberHorizon, hasBlockingHorizonIssue } from "@/lib/member-horizon";
 import HouseholdSetupForm from "@/components/forms/HouseholdSetupForm.vue";
 import MembersForm from "@/components/forms/MembersForm.vue";
@@ -28,6 +29,18 @@ function defaultsForRole(role: MemberRole): Pick<
       riskAppetite: "Moderate",
       marital: "Married",
       employmentStatus: "Employed",
+    };
+  }
+  if (role === "NON_EARNING_ADULT") {
+    // gh #34: a homemaker / non-earning spouse — an adult (no educationStage, no job),
+    // typically married, conservative by default. Their planToAge funds their longevity.
+    return {
+      city: "Metro",
+      health: "Healthy",
+      educationStage: null,
+      riskAppetite: "Conservative",
+      marital: "Married",
+      employmentStatus: null,
     };
   }
   return {
@@ -134,20 +147,7 @@ function saveProfile() {
 
   for (const m of draftMembers.value) {
     const existing = household.data.members.find((x) => x.id === m.id);
-    const patch = {
-      name: m.name || (m.role === "EARNER" ? "Earner" : "Dependent"),
-      dateOfBirth: m.dateOfBirth,
-      role: m.role,
-      targetRetirementAge: m.role === "EARNER" ? (m.targetRetirementAge ?? 50) : undefined,
-      planToAge: m.role === "EARNER" ? (m.planToAge ?? 90) : undefined,
-      relation: m.relation || undefined,
-      city: m.city,
-      health: m.health,
-      educationStage: m.role === "DEPENDENT" ? (m.educationStage ?? undefined) : undefined,
-      riskAppetite: m.riskAppetite,
-      marital: m.marital,
-      employmentStatus: m.role === "EARNER" ? (m.employmentStatus ?? undefined) : undefined,
-    };
+    const patch = finalizeMemberDraft(m);
 
     if (existing) {
       household.updateMember(m.id, patch);

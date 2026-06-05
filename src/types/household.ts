@@ -1,8 +1,21 @@
 import { z } from "zod";
 
 // ---------- Member ----------
-export const memberRoleSchema = z.enum(["EARNER", "DEPENDENT"]);
+// gh #34: three member kinds, each with a coherent field set:
+//   EARNER            — earns income: salary + employmentStatus + targetRetirementAge + planToAge.
+//   NON_EARNING_ADULT — a homemaker / non-earning spouse: an ADULT with longevity (planToAge) +
+//                       own health, but NO salary, NO educationStage, NO retirement-from-job age.
+//                       Their longevity MUST extend the household plan horizon (derive.ts) so the
+//                       corpus covers a surviving spouse — otherwise the plan is under-provisioned.
+//   DEPENDENT         — a child: educationStage, NO planToAge, NO salary.
+export const memberRoleSchema = z.enum(["EARNER", "NON_EARNING_ADULT", "DEPENDENT"]);
 export type MemberRole = z.infer<typeof memberRoleSchema>;
+
+/** Adult members (earners + non-earning adults) — their longevity drives the plan horizon. */
+export const ADULT_ROLES: readonly MemberRole[] = ["EARNER", "NON_EARNING_ADULT"];
+export function isAdultRole(role: MemberRole): boolean {
+  return role === "EARNER" || role === "NON_EARNING_ADULT";
+}
 
 export const memberSalarySchema = z.object({
   annualCTC: z.number().min(0),

@@ -12,7 +12,7 @@
  * whole household; specific member + family-view OFF → that member's slice +
  * the always-visible joint pool.
  */
-import type { Household, OtherIncomeLine } from "@/types/household";
+import { isAdultRole, type Household, type OtherIncomeLine } from "@/types/household";
 import type { Assumptions } from "@/types/assumptions";
 import {
   calculateFIRENumber,
@@ -155,7 +155,14 @@ export function derive(household: Household, assumptions: Assumptions, lens: Der
       const m = members.find((x) => x.id === effectiveLensMemberId);
       if (m?.planToAge) return m.planToAge;
     }
-    return earners[0]?.planToAge ?? 90;
+    // gh #34: the household plan horizon must cover the LONGEST-LIVED adult — including a
+    // non-earning (homemaker) spouse, who has no income but whose longevity still has to be
+    // funded. Keying off earners[0] alone under-provisioned a surviving non-earning spouse.
+    const adultPlanTos = members
+      .filter((m) => isAdultRole(m.role))
+      .map((m) => m.planToAge)
+      .filter((p): p is number => typeof p === "number" && p > 0);
+    return adultPlanTos.length ? Math.max(...adultPlanTos) : 90;
   }
 
   // Household-level monthly expenses (joint pool) — scope-independent base.

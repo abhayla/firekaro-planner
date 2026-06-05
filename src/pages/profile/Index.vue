@@ -3,6 +3,7 @@ import { computed, ref, watch } from "vue";
 import { useHouseholdStore } from "@/stores/household";
 import type { MemberDraft, SetupMode } from "@/types/household";
 import { ageFromDOB } from "@/lib/age";
+import { finalizeMemberDraft } from "@/lib/member-draft";
 import { formatINRCompact } from "@/lib/formatters";
 import LeafPageHeader from "@/components/income-layout/LeafPageHeader.vue";
 import HouseholdSetupForm from "@/components/forms/HouseholdSetupForm.vue";
@@ -53,20 +54,7 @@ function persistDraft() {
   for (const m of draftMembers.value) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(m.dateOfBirth)) continue;
     const existing = household.data.members.find((x) => x.id === m.id);
-    const patch = {
-      name: m.name || (m.role === "EARNER" ? "Earner" : "Dependent"),
-      dateOfBirth: m.dateOfBirth,
-      role: m.role,
-      targetRetirementAge: m.role === "EARNER" ? (m.targetRetirementAge ?? 50) : undefined,
-      planToAge: m.role === "EARNER" ? (m.planToAge ?? 90) : undefined,
-      relation: m.relation || undefined,
-      city: m.city,
-      health: m.health,
-      educationStage: m.role === "DEPENDENT" ? (m.educationStage ?? undefined) : undefined,
-      riskAppetite: m.riskAppetite,
-      marital: m.marital,
-      employmentStatus: m.role === "EARNER" ? (m.employmentStatus ?? undefined) : undefined,
-    };
+    const patch = finalizeMemberDraft(m);
     if (existing) {
       household.updateMember(m.id, patch);
     } else {
@@ -99,6 +87,9 @@ watch(
 // ───── Household summary strip (at-a-glance anchor) ─────
 const draftEarners = computed(() => draftMembers.value.filter((m) => m.role === "EARNER"));
 const earnerCount = computed(() => draftEarners.value.length);
+const nonEarningAdultCount = computed(
+  () => draftMembers.value.filter((m) => m.role === "NON_EARNING_ADULT").length,
+);
 const dependentCount = computed(() => draftMembers.value.filter((m) => m.role === "DEPENDENT").length);
 const primaryEarner = computed(() => draftEarners.value[0] ?? null);
 const earliestRetirement = computed(() => {
@@ -139,7 +130,7 @@ const combinedCTC = computed(() => household.totalAnnualIncome.salaryIncome);
       <div class="hh-tile hh-tile--accent">
         <div class="hh-tile__eyebrow">Members</div>
         <div class="hh-tile__value">{{ draftMembers.length }}</div>
-        <div class="hh-tile__meta">{{ earnerCount }} earner{{ earnerCount === 1 ? "" : "s" }} · {{ dependentCount }} dependent{{ dependentCount === 1 ? "" : "s" }}</div>
+        <div class="hh-tile__meta">{{ earnerCount }} earner{{ earnerCount === 1 ? "" : "s" }}<template v-if="nonEarningAdultCount"> · {{ nonEarningAdultCount }} non-earning adult{{ nonEarningAdultCount === 1 ? "" : "s" }}</template> · {{ dependentCount }} dependent{{ dependentCount === 1 ? "" : "s" }}</div>
       </div>
       <div class="hh-tile">
         <div class="hh-tile__eyebrow">Primary earner</div>

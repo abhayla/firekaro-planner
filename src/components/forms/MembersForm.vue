@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import type { MemberDraft, MemberRole } from "@/types/household";
+import { isAdultRole, type MemberDraft, type MemberRole } from "@/types/household";
 import { ageFromDOB, dobFromAge } from "@/lib/age";
 import { validateMemberHorizon, type HorizonIssue } from "@/lib/member-horizon";
 import EmptyState from "@/components/shared/EmptyState.vue";
@@ -49,6 +49,17 @@ function defaultsForRole(role: MemberRole) {
       employmentStatus: "Employed" as const,
     };
   }
+  if (role === "NON_EARNING_ADULT") {
+    // gh #34: homemaker / non-earning spouse — adult, no education stage, no job.
+    return {
+      city: "Metro" as const,
+      health: "Healthy" as const,
+      educationStage: null,
+      riskAppetite: "Conservative" as const,
+      marital: "Married" as const,
+      employmentStatus: null,
+    };
+  }
   return {
     city: "Metro" as const,
     health: "Healthy" as const,
@@ -59,16 +70,24 @@ function defaultsForRole(role: MemberRole) {
   };
 }
 
+function defaultName(role: MemberRole): string {
+  if (role === "EARNER") return "Earner";
+  if (role === "NON_EARNING_ADULT") return "Spouse";
+  return "Dependent";
+}
+
 function addPerson(role: MemberRole) {
   const id = crypto.randomUUID().slice(0, 8);
+  const adult = isAdultRole(role);
   members.value.push({
     id,
-    name: role === "EARNER" ? "Earner" : "Dependent",
-    dateOfBirth: dobFromAge(role === "EARNER" ? 30 : 5),
+    name: defaultName(role),
+    dateOfBirth: dobFromAge(adult ? 30 : 5),
     role,
     targetRetirementAge: role === "EARNER" ? 50 : null,
-    planToAge: role === "EARNER" ? 90 : null,
-    relation: role === "EARNER" ? "" : "Child",
+    // gh #34: a non-earning adult has a plan-to age (longevity to fund); a child does not.
+    planToAge: adult ? 90 : null,
+    relation: role === "EARNER" ? "" : role === "NON_EARNING_ADULT" ? "Spouse" : "Child",
     ...defaultsForRole(role),
   });
   expandedIds.value = new Set(expandedIds.value).add(id);
@@ -79,8 +98,10 @@ function removeAt(idx: number) {
 }
 
 const earners = computed(() => members.value.filter((m) => m.role === "EARNER"));
+const nonEarningAdults = computed(() => members.value.filter((m) => m.role === "NON_EARNING_ADULT"));
 const dependents = computed(() => members.value.filter((m) => m.role === "DEPENDENT"));
 const earnerCount = computed(() => earners.value.length);
+const nonEarningAdultCount = computed(() => nonEarningAdults.value.length);
 const dependentCount = computed(() => dependents.value.length);
 
 // Initials for the identity avatar — up to two letters, derived from the name field.
@@ -110,6 +131,14 @@ function dependentSummary(m: MemberDraft): SummaryItem[] {
     { icon: "mdi-school-outline", label: m.educationStage ?? "—" },
     { icon: "mdi-map-marker-outline", label: m.city },
     { icon: "mdi-heart-pulse", label: m.health },
+  ];
+}
+function nonEarningAdultSummary(m: MemberDraft): SummaryItem[] {
+  return [
+    { icon: "mdi-timeline-clock-outline", label: m.planToAge ? `Plan to ${m.planToAge}` : "Plan-to —" },
+    { icon: "mdi-map-marker-outline", label: m.city },
+    { icon: "mdi-heart-pulse", label: m.health },
+    { icon: "mdi-ring", label: m.marital },
   ];
 }
 
@@ -282,6 +311,101 @@ const employmentItems = [
       cta-icon="mdi-account-plus"
       @cta="addPerson('EARNER')"
     />
+
+    <!-- ───── Non-earning adults (gh #34 — homemaker / non-earning spouse) ───── -->
+    <div class="section-head mt-6">
+      <span class="section-eyebrow">Non-earning adults</span>
+      <span class="section-count">{{ nonEarningAdultCount }}</span>
+      <v-spacer />
+      <v-btn size="small" color="secondary" variant="tonal" rounded="lg" @click="addPerson('NON_EARNING_ADULT')">
+        <v-icon icon="mdi-plus" class="mr-1" /> Add non-earning adult
+      </v-btn>
+    </div>
+
+    <div v-if="nonEarningAdultCount" class="person-grid">
+      <div
+        v-for="(m, idx) in nonEarningAdults"
+        :key="m.id"
+        class="person-card"
+        :class="{ 'person-card--open': isExpanded(m.id) }"
+        :style="{ ...colorVars(m.id), '--enter-delay': `${idx * 45}ms` }"
+      >
+        <div class="person-card__head" @click="toggleExpand(m.id)">
+          <div class="person-card__avatar-wrap">
+            <v-avatar size="46" class="person-card__avatar">
+              <span class="person-card__initials">{{ initials(m.name) }}</span>
+            </v-avatar>
+            <span class="person-card__badge"><v-icon icon="mdi-account-heart-outline" size="12" /></span>
+          </div>
+          <div class="person-card__id" @click.stop>
+            <v-text-field
+              v-model="m.name"
+              variant="plain"
+              density="compact"
+              hide-details
+              aria-label="Name"
+              placeholder="Name"
+              class="person-card__name-input"
+            />
+            <div class="person-card__role">{{ m.relation || "Non-earning adult" }}</div>
+          </div>
+          <v-chip size="small" variant="tonal" :color="memberColor(m.id)" class="person-card__age">
+            Age {{ ageFromDOB(m.dateOfBirth) }}
+          </v-chip>
+          <v-btn
+            icon
+            variant="text"
+            size="small"
+            class="person-card__chevron"
+            :aria-label="isExpanded(m.id) ? 'Collapse details' : 'Edit details'"
+            @click.stop="toggleExpand(m.id)"
+          >
+            <v-icon :icon="isExpanded(m.id) ? 'mdi-chevron-up' : 'mdi-pencil-outline'" />
+          </v-btn>
+          <v-btn
+            icon
+            variant="text"
+            size="small"
+            :aria-label="`Remove ${m.name || 'non-earning adult'}`"
+            @click.stop="removeAt(members.indexOf(m))"
+          >
+            <v-icon icon="mdi-delete-outline" />
+          </v-btn>
+        </div>
+
+        <div v-if="!isExpanded(m.id)" class="person-card__summary">
+          <span v-for="(s, i) in nonEarningAdultSummary(m)" :key="i" class="summary-chip">
+            <v-icon :icon="s.icon" size="13" />{{ s.label }}
+          </span>
+        </div>
+
+        <v-expand-transition>
+          <v-row v-if="isExpanded(m.id)" dense class="person-card__fields">
+            <v-col cols="6" md="3">
+              <v-text-field v-model="m.dateOfBirth" type="date" label="Date of birth" prepend-inner-icon="mdi-cake-variant-outline" variant="outlined" density="comfortable" hide-details />
+            </v-col>
+            <v-col cols="6" md="3">
+              <v-text-field v-model.number="m.planToAge" type="number" label="Plan-to age" prepend-inner-icon="mdi-timeline-clock-outline" variant="outlined" density="comfortable" hide-details min="50" max="110" data-testid="non-earning-plan-to-age" />
+            </v-col>
+            <v-col cols="6" md="3">
+              <v-text-field v-model="m.relation" label="Relation" prepend-inner-icon="mdi-account-heart-outline" variant="outlined" density="comfortable" hide-details placeholder="Spouse / Parent / …" />
+            </v-col>
+            <v-col cols="6" md="3">
+              <v-select v-model="m.city" :items="cityItems" label="City tier" variant="outlined" density="comfortable" hide-details />
+            </v-col>
+            <v-col cols="12" sm="4">
+              <v-select v-model="m.riskAppetite" :items="riskItems" label="Risk appetite" variant="outlined" density="comfortable" hide-details />
+            </v-col>
+            <v-col cols="12" sm="4">
+              <v-select v-model="m.health" :items="healthItems" label="Health" variant="outlined" density="comfortable" hide-details />
+            </v-col>
+            <v-col cols="12" sm="4">
+              <v-select v-model="m.marital" :items="maritalItems" label="Marital status" variant="outlined" density="comfortable" hide-details />
+            </v-col>
+          </v-row>
+        </v-expand-transition>
+      </div>
+    </div>
 
     <!-- ───── Dependents ───── -->
     <div class="section-head mt-6">

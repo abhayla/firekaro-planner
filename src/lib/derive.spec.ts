@@ -45,6 +45,89 @@ describe("derive() — pure kernel", () => {
     expect(kernel.projection.length).toBe(wrapper.projection.value.length);
   });
 
+  // gh #34: a non-earning (homemaker) spouse is an ADULT with longevity. The household plan
+  // horizon MUST extend to the LONGEST-LIVED adult so the corpus covers a surviving spouse —
+  // not stop at the earner's planToAge (which would under-provision her later years).
+  it("gh #34: a non-earning adult's longevity extends the household plan-to horizon", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    // Earner plans to 88; homemaker spouse plans to 95. Household horizon must be 95.
+    h.data.members = [
+      {
+        id: "you", name: "You", dateOfBirth: "1986-01-01", role: "EARNER",
+        targetRetirementAge: 55, planToAge: 88, relation: "",
+        city: "Metro", health: "Healthy", riskAppetite: "Moderate", marital: "Married",
+        employmentStatus: "Employed",
+        salary: { annualCTC: 3_000_000, hikePercent: 8 },
+      },
+      {
+        id: "spouse", name: "Spouse", dateOfBirth: "1988-01-01", role: "NON_EARNING_ADULT",
+        planToAge: 95, relation: "Spouse",
+        city: "Metro", health: "Healthy", riskAppetite: "Conservative", marital: "Married",
+      },
+    ] as typeof h.data.members;
+    h.data.expenses.avgMonthly = 80_000;
+
+    const k = derive(h.data, a.values, { isFamilyView: false, viewingMemberId: null, currentFY: "2025-26" });
+    expect(k.planToAge).toBe(95);
+  });
+
+  // gh #34 substance lock: extending the horizon to the longer-lived non-earning spouse must
+  // RAISE the FIRE number (longer horizon → lower SWR → bigger corpus), not merely survive as a
+  // field. Demoting her to a child DEPENDENT (no planToAge) drops the horizon back to the earner.
+  it("gh #34: a non-earning spouse who outlives the earner RAISES the FIRE number vs. ignoring her longevity", () => {
+    const a = useAssumptionsStore();
+    const build = (spouseRole: "NON_EARNING_ADULT" | "DEPENDENT") => {
+      const h = useHouseholdStore();
+      h.data.members = [
+        {
+          id: "you", name: "You", dateOfBirth: "1986-01-01", role: "EARNER",
+          targetRetirementAge: 55, planToAge: 85, relation: "",
+          city: "Metro", health: "Healthy", riskAppetite: "Moderate", marital: "Married",
+          employmentStatus: "Employed", salary: { annualCTC: 3_000_000, hikePercent: 8 },
+        },
+        {
+          id: "spouse", name: "Spouse", dateOfBirth: "1988-01-01", role: spouseRole,
+          planToAge: spouseRole === "NON_EARNING_ADULT" ? 98 : null, relation: "Spouse",
+          city: "Metro", health: "Healthy", riskAppetite: "Conservative", marital: "Married",
+        },
+      ] as typeof h.data.members;
+      h.data.expenses.avgMonthly = 80_000;
+      return derive(h.data, a.values, { isFamilyView: false, viewingMemberId: null, currentFY: "2025-26" });
+    };
+    setActivePinia(createPinia());
+    const withSpouse = build("NON_EARNING_ADULT");
+    setActivePinia(createPinia());
+    const ignoringSpouse = build("DEPENDENT");
+
+    expect(withSpouse.planToAge).toBe(98);
+    expect(ignoringSpouse.planToAge).toBe(85);
+    // The honest plan funds the surviving spouse to 98 → a strictly larger FIRE number.
+    expect(withSpouse.fireNumber).toBeGreaterThan(ignoringSpouse.fireNumber);
+  });
+
+  it("gh #34: when the earner is the longest-lived adult, the horizon stays the earner's planToAge", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    h.data.members = [
+      {
+        id: "you", name: "You", dateOfBirth: "1986-01-01", role: "EARNER",
+        targetRetirementAge: 55, planToAge: 92, relation: "",
+        city: "Metro", health: "Healthy", riskAppetite: "Moderate", marital: "Married",
+        employmentStatus: "Employed", salary: { annualCTC: 3_000_000, hikePercent: 8 },
+      },
+      {
+        id: "spouse", name: "Spouse", dateOfBirth: "1988-01-01", role: "NON_EARNING_ADULT",
+        planToAge: 85, relation: "Spouse",
+        city: "Metro", health: "Healthy", riskAppetite: "Conservative", marital: "Married",
+      },
+    ] as typeof h.data.members;
+    h.data.expenses.avgMonthly = 80_000;
+
+    const k = derive(h.data, a.values, { isFamilyView: false, viewingMemberId: null, currentFY: "2025-26" });
+    expect(k.planToAge).toBe(92);
+  });
+
   it("does NOT double-count SIP contributions — monthlyContribution = annualSavings/12 (gh-issue #11)", () => {
     const h = useHouseholdStore();
     const a = useAssumptionsStore();
