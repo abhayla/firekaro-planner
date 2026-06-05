@@ -15,7 +15,7 @@ import { useFireDerive } from "@/lib/useFireDerive";
 import { derive, bridgeRentalPostTaxAnnual, SEC_24A_DEDUCTION_RATE, SEC_71_HP_LOSS_SETOFF_CAP } from "@/lib/derive";
 import type { OtherIncomeLine } from "@/types/household";
 import { calculateNpsWithdrawal, postTaxAnnuityIncome } from "@/lib/nps-withdrawal";
-import { calculateYearsToTarget } from "@/lib/fire-math";
+import { calculateYearsToTarget, calculateFIRENumber } from "@/lib/fire-math";
 
 describe("derive() — pure kernel", () => {
   beforeEach(() => setActivePinia(createPinia()));
@@ -335,7 +335,7 @@ describe("derive() — pure kernel", () => {
     loadSeedPersona(h, a);
     const lens = { isFamilyView: false, viewingMemberId: null, currentFY: "2025-26" };
 
-    const withoutNps = derive(h.data, a.values, lens).fireNumber;
+    const withoutNps = derive(h.data, a.values, lens);
 
     // Add a large NPS holding (> ₹5L) so the mandatory 40% annuity kicks in.
     h.addInvestment({ type: "NPS", label: "NPS top-up", value: 5_000_000, monthlyContribution: 0, ownerId: "rohit" });
@@ -344,9 +344,37 @@ describe("derive() — pure kernel", () => {
     // Annuity income is positive (40% × 50L × 6% = ₹1.2L/yr).
     expect(withNps.npsAnnuityIncome).toBeGreaterThan(0);
     // The FIRE number drops by ~ annuityIncome / SWR (the annuity's present value).
-    expect(withNps.fireNumber).toBeLessThan(withoutNps);
+    expect(withNps.fireNumber).toBeLessThan(withoutNps.fireNumber);
     // The withdrawable corpus excludes the annuitised 40% (no double-count).
     expect(withNps.fireWithdrawableCorpus).toBeLessThan(withNps.totalCorpus);
+
+    // #17 cross-leg "annuity-once" SUBSTANCE lock (no double-offset): the adequacy leg
+    // must reduce the FIRE number by EXACTLY ONE annuity's present value. The base FIRE
+    // number (pre healthcare-reservation multiplier) is calculateFIRENumber(netAnnualExpenses)
+    // where net = annualExpensesToday − npsAnnuityIncome — the annuity subtracted ONCE.
+    // If a refactor double-offset it (gross − 2·annuity, the optimistic bug), this exact
+    // reconstruction from the engine's own exposed inputs would fail. (NB: assert against
+    // baseFireNumber, not fireNumber — the latter applies the healthcare-reservation
+    // multiplier on top. The bridge leg separately receives GROSS expenses — annuity
+    // credited once there via the NPS holding's own income stream — guarded by the
+    // contract at derive.ts ~line 605.)
+    const expectedBase = calculateFIRENumber(
+      withNps.annualExpensesToday - withNps.npsAnnuityIncome,
+      withNps.effectiveSWR,
+      withNps.anchorAge,
+    );
+    expect(withNps.baseFireNumber).toBe(expectedBase);
+    // The drop vs no-NPS is one annuity PV, never two (a second offset would drop further).
+    const oneAnnuityDrop = withoutNps.baseFireNumber - withNps.baseFireNumber;
+    const twoAnnuityDrop =
+      withoutNps.baseFireNumber -
+      calculateFIRENumber(
+        withNps.annualExpensesToday - 2 * withNps.npsAnnuityIncome,
+        withNps.effectiveSWR,
+        withNps.anchorAge,
+      );
+    expect(oneAnnuityDrop).toBeGreaterThan(0);
+    expect(oneAnnuityDrop).toBeLessThan(twoAnnuityDrop);
   });
 
   it("M1 (#9): an enabled glide path de-risks late years → LOWER terminal corpus than the flat path", () => {

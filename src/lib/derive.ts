@@ -602,6 +602,13 @@ export function derive(household: Household, assumptions: Assumptions, lens: Der
       retirementAge: adequacyAge,
       anchorAge,
       planToAge,
+      // #17 cross-leg "annuity-once" CONTRACT: this MUST be GROSS annualExpensesToday,
+      // NOT netAnnualExpenses. The NPS annuity is credited to the bridge exactly once —
+      // via the NPS holding's own income stream inside computeBridgeCoverage. Feeding net
+      // (gross − annuity) here would subtract the annuity a SECOND time → optimistic
+      // over-coverage (the bridge looks more covered than it is → retire-too-early, a
+      // Tier-0 honesty error). The adequacy leg separately uses netAnnualExpenses for the
+      // FIRE number — locked by derive.spec's "annuity-once" magnitude test.
       annualExpenses: annualExpensesToday,
       income: {
         rentalAnnualPostTax: Math.round(rentalAnnualPostTax),
