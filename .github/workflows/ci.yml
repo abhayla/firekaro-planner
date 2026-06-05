@@ -65,3 +65,14 @@ jobs:
       - run: npm run test:unit
         env:
           NODE_ENV: test
+          # index.ts runs validateEnv() as an import side-effect (fail-fast boot
+          # guard), and planner.integration.spec.ts imports index — so CI must
+          # supply these or the spec crashes on load. The "placeholder" in
+          # DATABASE_URL satisfies validateEnv WHILE keeping the spec's RUN_LIVE
+          # gate false (it excludes /placeholder/), so the live-DB specs self-skip.
+          # BETTER_AUTH_SECRET is a short dummy — validateEnv only checks presence
+          # (not length), and the placeholder-secret guard only fires under
+          # NODE_ENV=production. Kept under 16 chars so the repo secret-scan
+          # pre-commit hook doesn't flag it as a real credential.
+          DATABASE_URL: "postgresql://placeholder:placeholder@localhost:5432/placeholder"
+          BETTER_AUTH_SECRET: "ci-test-dummy"
