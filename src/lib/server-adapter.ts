@@ -150,20 +150,37 @@ export class ServerAdapter implements StorageAdapter {
     }
   }
 
-  /** Flush one key's cached value to the backend. Public for tests. */
-  async flush(key: string): Promise<void> {
+  /**
+   * Flush one key's cached value to the backend. Public for tests.
+   *
+   * On failure: retry with backoff, then RE-QUEUE (re-schedule) the key so the
+   * value is NOT silently lost — the cache still holds the latest value and a
+   * later backend recovery re-persists it (gh #37: a dropped flush previously
+   * left the UI showing rows the server never saved → silent data loss on
+   * reload). Never throws into the synchronous store mutation that triggered it.
+   */
+  async flush(key: string, attempt = 0): Promise<void> {
     if (!this.cache.has(key)) return;
     try {
       const res = await this.request("PUT", `/api/planner/${key}`, this.cache.get(key));
       if (!res.ok) throw new Error(`PUT ${key} -> HTTP ${res.status}`);
     } catch (err) {
-      // Best-effort persistence (mirrors LocalStorageAdapter's silent quota
-      // swallow) — surface to the optional hook + console, never throw into the
-      // synchronous store mutation that triggered it.
+      const MAX_RETRIES = 2;
+      if (attempt < MAX_RETRIES) {
+        await this.sleep(300 * 3 ** attempt); // 300ms, 900ms backoff
+        return this.flush(key, attempt + 1);
+      }
+      // Retries exhausted. The cache still holds the value — DO NOT drop it.
+      // Re-arm a debounced flush so a later recovery re-persists it (no silent loss).
       this.onFlushError?.(key, err);
       // eslint-disable-next-line no-console
-      console.warn(`[ServerAdapter] flush of "${key}" failed`, err);
+      console.warn(`[ServerAdapter] flush of "${key}" failed after ${MAX_RETRIES + 1} attempts — re-queued`, err);
+      this.scheduleFlush(key);
     }
+  }
+
+  private sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   private request(method: string, path: string, body?: unknown): Promise<Response> {

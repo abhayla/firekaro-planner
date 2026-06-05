@@ -147,7 +147,40 @@ describe("ServerAdapter — write-behind cache (mocked fetch, no DB/network)", (
     const fetchImpl = vi.fn(async (_url?: string | URL | Request, _init?: RequestInit) => httpError(500));
     const a = new ServerAdapter("u1", { fetchImpl, debounceMs: 500, onFlushError });
     expect(() => a.set("household", { v: 1 })).not.toThrow();
-    await vi.advanceTimersByTimeAsync(500);
+    // debounce (500) + 2 backoff retries (300 + 900) before the failure surfaces.
+    await vi.advanceTimersByTimeAsync(1800);
     expect(onFlushError).toHaveBeenCalledWith("household", expect.anything());
+  });
+
+  it("retries a failed flush with backoff and succeeds — no silent loss (gh #37)", async () => {
+    let puts = 0;
+    const onFlushError = vi.fn();
+    const fetchImpl = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
+      if ((init as RequestInit)?.method === "PUT") {
+        puts++;
+        return puts < 3 ? httpError(500) : okJson(null); // fail twice, then succeed
+      }
+      return okJson(null);
+    });
+    const a = new ServerAdapter("u1", { fetchImpl, debounceMs: 500, onFlushError });
+    a.set("household", { v: 1 });
+    await vi.advanceTimersByTimeAsync(1800); // debounce + 2 backoffs
+    expect(puts).toBe(3); // original + 2 retries, succeeding on the 3rd
+    expect(onFlushError).not.toHaveBeenCalled(); // recovered → never surfaced as a failure
+  });
+
+  it("re-queues after retries exhaust so the write is not silently dropped (gh #37)", async () => {
+    const onFlushError = vi.fn();
+    const fetchImpl = vi.fn(async (_url?: string | URL | Request, _init?: RequestInit) => httpError(500));
+    const a = new ServerAdapter("u1", { fetchImpl, debounceMs: 500, onFlushError });
+    a.set("household", { v: 1 });
+    await vi.advanceTimersByTimeAsync(1800); // first cycle: 3 attempts all fail
+    const puts1 = fetchImpl.mock.calls.filter((c) => (c[1] as RequestInit).method === "PUT").length;
+    expect(puts1).toBe(3);
+    expect(onFlushError).toHaveBeenCalledTimes(1);
+    // The key was RE-QUEUED (not dropped): a later window re-attempts the PUT.
+    await vi.advanceTimersByTimeAsync(1800);
+    const puts2 = fetchImpl.mock.calls.filter((c) => (c[1] as RequestInit).method === "PUT").length;
+    expect(puts2).toBeGreaterThan(puts1); // still pending → re-persisted on recovery, no silent loss
   });
 });
