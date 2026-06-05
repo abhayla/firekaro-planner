@@ -35,6 +35,10 @@ verify-*/
 # run artifacts
 docs/goals/.run/
 
+# ephemeral hook counter + throwaway debug specs (regenerable, never commit)
+.claude/.keepgoing-count
+e2e/_*.spec.ts
+
 # prisma generated client (regenerated via prisma generate)
 server/node_modules/.prisma/
 
