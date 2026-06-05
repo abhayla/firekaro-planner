@@ -42,6 +42,17 @@ A plan is not a restatement of the ask. It MUST show:
 - **Finalized scope ready to build** → offer a goal contract via `goal-creator` first (rule 28) — the contract IS the plan for autonomous `/goal` runs.
 - **Smaller-but-non-trivial work** that does not warrant plan mode → write a short **inline plan block** (Approach / Files / Steps / Verification) in the response BEFORE the first `Edit`/`Write`.
 
+## Root-cause map is part of the plan (not a separate step)
+
+The plan MUST trace the **root cause to its single source** and **enumerate EVERY consumer/surface** the fix touches BEFORE the first edit — so the fix is the root-cause fix, never a patch of one visible symptom that leaves siblings live (rule 17: root cause, not band-aid). Patching the first symptom you see, then discovering more mid-verify, is the failure this prevents (2026-06-05: an empty-state fix patched the FIRE headline but left the crossover labels + Coast/Barista chips false because the consumer map wasn't drawn first). If you cannot list every surface a change affects, you are not ready to edit — finish the map.
+
+## Propagation to dispatched workers (ALL invoked roles)
+
+Plan-before-coding AND root-cause-not-patch (rule 17) are NOT just T0's discipline — they bind **every role/agent T0 dispatches to change code**. So:
+- T0's dispatch prompt to any code-changing worker MUST require: "produce a plan (approach + full file/consumer map + verification) before editing; fix the ROOT cause across ALL affected surfaces, never a one-symptom patch."
+- T0 (supervisor, `orchestrator-output-validation.md`) MUST verify the returned work was root-cause + complete (no un-touched siblings), not accept a worker's patch.
+- Independent reviewers (rule 29) MUST be asked to check specifically for "is this the root cause or a patch?" and "are all sibling surfaces covered?".
+
 ## Relationship to the other gates (no duplication)
 
 - **Confidence gate** (`decision-authority.md`) decides WHAT to build by converging on intent. Planning comes AFTER intent is locked and decides HOW.
@@ -53,5 +64,7 @@ A plan is not a restatement of the ask. It MUST show:
 - MUST produce a visible plan (plan mode, goal contract, or inline plan block) before the FIRST code edit on any non-trivial change.
 - MUST include the concrete file list + WHY-this-approach + verification steps — a plan missing these is a restatement, not a plan.
 - MUST re-plan immediately if the approach goes sideways mid-implementation (rule 1) instead of pushing forward.
+- MUST draw the root-cause + full consumer/surface map BEFORE the first edit — fix the root across ALL surfaces, never a one-symptom patch (rule 17).
+- MUST propagate both mandates (plan-first + root-cause) to EVERY dispatched code-changing worker via the dispatch prompt, and verify the returned work honored them (no patches, no un-touched siblings).
 - MUST NOT force a plan onto trivial/mechanical work (KISS) — the trigger list above is the gate.
 - MUST NOT duplicate the confidence-gate / TDD / goal-contract content — cross-reference, never copy (`configuration-ssot.md`).
