@@ -3,7 +3,7 @@ import { useHouseholdStore } from "@/stores/household";
 import { useAssumptionsStore } from "@/stores/assumptions";
 import { useUiStore } from "@/stores/ui";
 import { derive } from "@/lib/derive";
-import { runMonteCarloFire } from "@/lib/monte-carlo";
+import { runMonteCarloFire, INDIA_EQUITY_ANNUAL_RETURNS } from "@/lib/monte-carlo";
 
 /**
  * Single source of truth for all FIRE dashboard math — now a thin Pinia-aware
@@ -62,10 +62,15 @@ export function useFireDerive() {
     portfolioVolatility: computed(() => d.value.portfolioVolatility),
     // #18 Monte Carlo headline confidence band — LAZY (Vue computed only runs the
     // simulation when a consumer reads it, e.g. FireHero). Same real frame as the
-    // corrected headline so p50 ≈ the deterministic years-to-FIRE. The MC now tapers its
+    // corrected headline so p50 ≈ the deterministic years-to-FIRE. The MC tapers its
     // per-year MEAN along the GLIDE schedule (#24 Part 1) so p50 converges to the headline
-    // for glide-ON households instead of running fast off a scalar pre-glide return.
-    // meanReturn stays as the scalar fallback (glide-OFF households resolve it identically).
+    // for glide-ON households; meanReturn stays as the scalar fallback (glide-OFF resolves
+    // identically). #24 Part 2: HISTORY-FED block-bootstrap — passing the real Indian-equity
+    // series swaps the IID draw for circular-block sampling of standardized historical
+    // deviations (location-scaled to this household's mean+vol), so the band now carries the
+    // REAL return shape + serial structure (mean-reversion) of Indian equity since 1991 —
+    // measured tighter-or-equal to IID, not heavier (the lognormal's fat tail was an
+    // artifact); surfaced as the "history-informed" disclosure.
     monteCarlo: computed(() =>
       runMonteCarloFire({
         currentCorpus: d.value.fireWithdrawableCorpus,
@@ -74,6 +79,7 @@ export function useFireDerive() {
         meanReturn: d.value.realBlendedReturn,
         meanReturnSchedule: d.value.realReturnSchedule,
         volatility: d.value.portfolioVolatility,
+        historicalReturns: INDIA_EQUITY_ANNUAL_RETURNS,
       }),
     ),
     annualEpfVpfContribution: computed(() => d.value.annualEpfVpfContribution),

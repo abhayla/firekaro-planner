@@ -25,7 +25,7 @@ import { loadSeedPersona } from "@/lib/seed-persona";
 import { loadMehtasSeed } from "@/seeds/mehtas";
 import { loadIyersSeed } from "@/seeds/iyers";
 import { derive } from "@/lib/derive";
-import { runMonteCarloFire, MAX_PROJECTION_YEARS } from "@/lib/monte-carlo";
+import { runMonteCarloFire, MAX_PROJECTION_YEARS, INDIA_EQUITY_ANNUAL_RETURNS } from "@/lib/monte-carlo";
 import { evaluateNudges } from "@/lib/nudge-engine";
 import { derivedFamilyLayer } from "@/lib/derived-records";
 
@@ -156,13 +156,17 @@ describe("captureSnapshot — pure builder (Stage A)", () => {
     expect(snap.activeNudgeIds).toEqual(["marginal-relief"]);
 
     // SUBSTANCE (not shape): monteCarloP50Age must use the SAME real-return frame +
-    // inputs useFireDerive feeds the headline band — never an independent recompute.
+    // inputs useFireDerive feeds the headline band — incl. the #24-Part-1 glide schedule
+    // AND the #24-Part-2 history-fed series — never an independent recompute. Mirroring
+    // the production call EXACTLY guards the cross-consumer divergence (digest vs band).
     const mc = runMonteCarloFire({
       currentCorpus: k.fireWithdrawableCorpus,
       targetCorpus: k.fireNumber,
       monthlySavings: k.monthlyContribution,
       meanReturn: k.realBlendedReturn,
+      meanReturnSchedule: k.realReturnSchedule,
       volatility: k.portfolioVolatility,
+      historicalReturns: INDIA_EQUITY_ANNUAL_RETURNS,
     });
     const expectedP50Age =
       mc.p50Years < MAX_PROJECTION_YEARS ? Math.round(k.anchorAge + mc.p50Years) : null;

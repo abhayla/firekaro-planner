@@ -13,16 +13,46 @@
  * many times with a stochastic return schedule, and collects the spread. Pure —
  * no store/DOM access. Seeded PRNG ⇒ reproducible (tests + caching).
  *
- * RETURN MODEL (v1): per-YEAR returns drawn IID **lognormal**, moment-matched so
- * E[r]=meanReturn and SD[r]=volatility exactly, reused across that year's 12
+ * RETURN MODEL (v1, IID): per-YEAR returns drawn IID **lognormal**, moment-matched
+ * so E[r]=meanReturn and SD[r]=volatility exactly, reused across that year's 12
  * months. Lognormal is naturally bounded at −1 (no impossible worse-than-total
  * loss) — it replaced a Normal+floor whose left-only clamp lifted the mean
  * upward at high vol (optimistic; gh-issue #18 H1, FinTech review 2026-06-03).
+ * Still the FALLBACK path (and zero-vol point estimate) when no `historicalReturns`
+ * series is passed. NOTE: the lognormal's right-skew is a BOUNDING ARTIFACT (forced by
+ * the −1 floor to keep E[r]/SD[r]) — NOT a real market property; do not reason from it
+ * that "lognormal is conservative" (the v2 history-fed band is milder-skewed and tighter).
  *
- * ⚠ NOT YET HEADLINE-READY (tracked in #18 — required BEFORE any UI wiring):
- *   1. IID omits sequence-of-returns AUTOCORRELATION (real bad years cluster),
- *      so IID can UNDER-state the bad tail vs a historical block-bootstrap (the
- *      v2 upgrade). Do NOT call this "conservative" until v2 lands.
+ * RETURN MODEL (v2, HISTORY-FED block-bootstrap — #24 Part 2): when a
+ * `historicalReturns` series is passed, each path samples contiguous
+ * ~`BOOTSTRAP_BLOCK_YEARS`-year BLOCKS (wrapping/circular) from that series,
+ * standardizes each historical year to z=(r−μ_h)/σ_h, and maps it to the user's
+ * frame via LOCATION-SCALE: r_user(y) = meanForYear(y) + z·volatility (floored at
+ * −0.95). This borrows ONLY the historical SHAPE (real skew) + the real year-to-year
+ * SERIAL STRUCTURE while ANCHORING the mean to the customizable forward schedule and
+ * the spread to the blended portfolio σ. The historical MEAN and single-asset vol are
+ * NOT imposed (they'd be optimistic / wrong-portfolio). Standardization makes the
+ * embedded series AFFINE-INVARIANT — only its shape survives, which is why a
+ * representative (not audited-exact) series is sufficient. Borrowing an EQUITY shape
+ * for a blended portfolio is a documented simplification (a full multi-asset
+ * aligned-history bootstrap is deferred — YAGNI); at the small blended σ the absolute
+ * effect is minor. FinTech-validated 2026-06-05 (#24 Part 2).
+ *
+ * ⚠ HEADLINE-HONESTY NOTES (tracked in #18/#24):
+ *   1. v2 is MORE-REAL, not "more conservative" (measured + FinTech-adjudicated
+ *      2026-06-05). The original prior — "bad years cluster ⇒ heavier bad tail than
+ *      IID" — DID NOT survive the data: at ANNUAL frequency Indian equity is only
+ *      mildly right-skewed (Sensex std skew ≈ +0.21) and MEAN-REVERTS (lag-1 autocorr
+ *      ≈ −0.20, big years reverse — 2008 −52% → 2009 +76%), which is STABILIZING, not
+ *      clustering. The IID lognormal's heavier right-skew (≈ +0.59) is a moment-matching
+ *      ARTIFACT (forced by the −1 bound) that manufactured a fat slow-tail real equity
+ *      does NOT have. Net: the history-fed band is UNIFORMLY TIGHTER than the
+ *      IID-lognormal (both tails pull in), p50 anchored & a hair later. Tighter here ≠
+ *      optimistic — the thing it is tighter-than was distorted. The ONE residual
+ *      optimism vector is REGIME risk (future markets mean-reverting LESS than
+ *      1991–2024); that is disclosed in copy (fire-confidence-band.ts), never hidden.
+ *      Substance is CI-locked by the skew + autocorr + p50-anchor + boot.p90≤iid.p90
+ *      tests, not by a (now-deleted) false "heavier tail" assertion.
  *   2. INFLATION FRAME: `meanReturn` and `targetCorpus` MUST be in the SAME
  *      frame. For FIRE, pass a REAL return (≈ nominal − inflation) with today's
  *      (un-inflated) target, OR inflate the target each year. Passing a NOMINAL
@@ -91,6 +121,47 @@ export const RETURN_BUCKET_VOLATILITY = {
   other: 0.05,
 } as const;
 
+/**
+ * Representative Indian-equity (BSE Sensex) CALENDAR-year price returns, 1991→2024 (%).
+ *
+ * REPRESENTATIVE, NOT audited-exact (rule 20 honesty): whole-percent figures from the
+ * widely-published year-wise Sensex calendar-return record (year-end close-to-close).
+ * The block-bootstrap consumes ONLY the STANDARDIZED deviation (r−μ_h)/σ_h, so any
+ * affine error (uniform level shift OR uniform scale) cancels mathematically — only
+ * the SHAPE survives: skew, fat-tailed crash years (2008 −52%, 2011 −25%), and the
+ * real crash→rebound SERIAL STRUCTURE (2008 −52% → 2009 +76% — annual MEAN-REVERSION)
+ * that IID misses. Dividends (~1.3%/yr, price-index→TRI) are deliberately OMITTED: a flat
+ * per-year add is inert under standardization, and the forward MEAN is supplied by the
+ * user's REAL total-return schedule, not by this array. Calendar-year (Jan–Dec), not the
+ * Apr–Mar FY — irrelevant to vol/skew/serial-structure shape. μ_h≈18.6%, σ_h≈30.5% (computed in code
+ * from the array, never hardcoded). FinTech-sourced + validated 2026-06-05 (#24 Part 2).
+ */
+export const INDIA_EQUITY_ANNUAL_RETURNS: readonly number[] = [
+  0.82, 0.37, 0.28, 0.17, -0.21, // 1991-1995
+  -0.01, 0.19, -0.17, 0.64, -0.21, // 1996-2000
+  -0.18, 0.04, 0.73, 0.13, 0.42, // 2001-2005
+  0.47, 0.47, -0.52, 0.76, 0.17, // 2006-2010
+  -0.25, 0.26, 0.09, 0.3, -0.05, // 2011-2015
+  0.02, 0.28, 0.06, 0.14, 0.16, // 2016-2020
+  0.22, 0.04, 0.19, 0.08, // 2021-2024
+] as const;
+
+/**
+ * Block length (years) for the circular block-bootstrap (#24 Part 2). 5yr spans the
+ * canonical Indian crash→rebound→recovery arcs (2008→2009→2010; 2000→2001→2002) and
+ * sits at the Künsch (1989) n^(1/3)-toward-dependence-horizon sweet spot for a ~34yr
+ * series: 3 splits the crash→rebound arcs, 7–10 leaves too few distinct wrapping blocks
+ * (the tail under-disperses). Wrapping/circular (Politis–Romano) avoids the end-effect bias
+ * where late-series years get under-sampled. FinTech-validated 2026-06-05.
+ */
+export const BOOTSTRAP_BLOCK_YEARS = 5;
+
+/** Hard floor on a single year's mapped return — no impossible worse-than-near-total
+ *  loss. At blended σ ≤ 0.20 it almost never binds (the worst standardized Sensex year,
+ *  2008 ≈ −2.3σ, maps to ≈ −0.40 at σ=0.20), so its mean-lift on the band is negligible
+ *  — but it MUST exist as a safety, and the moment-recovery test asserts it stays inert. */
+const RETURN_FLOOR = -0.95;
+
 export interface MonteCarloFireInput {
   currentCorpus: number;
   targetCorpus: number;
@@ -110,6 +181,18 @@ export interface MonteCarloFireInput {
   meanReturnSchedule?: ReturnSchedule;
   /** Annual return stdev (e.g. blended from INDIA_RETURN_VOLATILITY). 0 ⇒ deterministic. */
   volatility: number;
+  /**
+   * Optional historical annual-return series for the v2 HISTORY-FED block-bootstrap
+   * (#24 Part 2, e.g. INDIA_EQUITY_ANNUAL_RETURNS). When present (and volatility > 0),
+   * each path draws contiguous ~`blockYears`-year blocks (wrapping) from this series,
+   * standardizes them, and location-scales to (meanForYear, volatility) — borrowing the
+   * historical SHAPE + serial structure (annual mean-reversion) while anchoring mean+spread
+   * to the user's frame. ABSENT (or empty, or vol ≤ 0) ⇒ the IID lognormal v1 path, byte-identical &
+   * backward-compatible (the rng draw sequence is untouched on the IID path).
+   */
+  historicalReturns?: readonly number[];
+  /** Bootstrap block length in years (default BOOTSTRAP_BLOCK_YEARS). Ignored on the IID path. */
+  blockYears?: number;
   /** Years over which to report the success-probability curve (default 50). */
   horizonYears?: number;
   /** Simulated paths (default 1000). More ⇒ smoother tails, slower. */
@@ -177,6 +260,63 @@ export function sampleAnnualReturns(mean: number, vol: number, count: number, se
   return out;
 }
 
+/**
+ * Standardize a return series to mean 0, population stdev 1 — preserving skew/kurtosis
+ * (scale-invariant) so the block-bootstrap borrows shape, not the historical mean/vol.
+ * A degenerate (constant) series ⇒ all zeros (no deviations to borrow).
+ */
+export function standardizeSeries(series: readonly number[]): number[] {
+  const n = series.length;
+  if (n === 0) return [];
+  const mean = series.reduce((s, r) => s + r, 0) / n;
+  const variance = series.reduce((s, r) => s + (r - mean) * (r - mean), 0) / n;
+  const sd = Math.sqrt(variance);
+  if (sd <= 0) return series.map(() => 0);
+  return series.map((r) => (r - mean) / sd);
+}
+
+/**
+ * Fill a `years`-long sequence of STANDARDIZED deviations by sampling contiguous
+ * circular blocks of length `blockLen` from `stdSeries` — preserving within-block
+ * autocorrelation (the real serial structure / annual mean-reversion). Wrapping (`% n`)
+ * makes every start index equally likely ⇒ E[z]=0 exactly ⇒ the mapped return's mean stays anchored.
+ */
+function fillBlockBootstrapZ(stdSeries: number[], blockLen: number, years: number, rng: () => number): number[] {
+  const n = stdSeries.length;
+  const z = new Array<number>(years);
+  let filled = 0;
+  while (filled < years) {
+    const start = Math.floor(rng() * n) % n;
+    for (let k = 0; k < blockLen && filled < years; k++) {
+      z[filled++] = stdSeries[(start + k) % n];
+    }
+  }
+  return z;
+}
+
+/**
+ * Sample `count` history-fed annual returns via the circular block-bootstrap (the v2
+ * companion to `sampleAnnualReturns`, for distribution previews + moment-recovery tests).
+ * Maps each block-drawn standardized deviation `z` to the user frame:
+ * r = max(RETURN_FLOOR, mean + z·vol). vol ≤ 0 ⇒ the deterministic mean (point estimate).
+ */
+export function sampleBlockBootstrapReturns(
+  historical: readonly number[],
+  mean: number,
+  vol: number,
+  count: number,
+  blockYears: number = BOOTSTRAP_BLOCK_YEARS,
+  seed = 1,
+): number[] {
+  const n = Math.max(0, Math.floor(count));
+  if (vol <= 0 || historical.length === 0) return new Array<number>(n).fill(mean);
+  const std = standardizeSeries(historical);
+  const blockLen = Math.max(1, Math.floor(blockYears));
+  const rng = mulberry32(seed >>> 0);
+  const z = fillBlockBootstrapZ(std, blockLen, n, rng);
+  return z.map((zi) => Math.max(RETURN_FLOOR, mean + zi * vol));
+}
+
 function percentile(sortedAsc: number[], q: number): number {
   if (sortedAsc.length === 0) return 0;
   const idx = Math.round(q * (sortedAsc.length - 1));
@@ -206,13 +346,30 @@ export function runMonteCarloFire(input: MonteCarloFireInput): MonteCarloFireRes
         ? (_y: number): number => meanSchedule
         : (_y: number): number => input.meanReturn;
 
+  // #24 Part 2: HISTORY-FED block-bootstrap when a series is passed (and vol > 0). The
+  // standardized series is precomputed ONCE; each path draws fresh circular blocks. The
+  // IID lognormal path is the fallback (and the byte-identical backward-compat path when
+  // no series is passed — its rng draw sequence is untouched).
+  const useBootstrap = !!input.historicalReturns && input.historicalReturns.length > 0 && input.volatility > 0;
+  const stdSeries = useBootstrap ? standardizeSeries(input.historicalReturns!) : null;
+  const blockLen = Math.max(1, Math.floor(input.blockYears ?? BOOTSTRAP_BLOCK_YEARS));
+
   for (let p = 0; p < paths; p++) {
     // Pre-draw ONE return per year and reuse it across that year's 12 months.
     // calculateYearsToTarget calls the schedule per-month; drawing inside it
     // would average 12 sub-draws and silently understate annual volatility.
     const yearly: number[] = new Array(MAX_PROJECTION_YEARS);
-    for (let y = 0; y < MAX_PROJECTION_YEARS; y++) {
-      yearly[y] = annualReturnFromStdNormal(meanForYear(y), input.volatility, nextNormal(rng));
+    if (stdSeries) {
+      // Location-scale: r(y) = meanForYear(y) + z·vol, z a circular-block-drawn
+      // standardized historical deviation (preserves the real serial structure), floored.
+      const z = fillBlockBootstrapZ(stdSeries, blockLen, MAX_PROJECTION_YEARS, rng);
+      for (let y = 0; y < MAX_PROJECTION_YEARS; y++) {
+        yearly[y] = Math.max(RETURN_FLOOR, meanForYear(y) + z[y] * input.volatility);
+      }
+    } else {
+      for (let y = 0; y < MAX_PROJECTION_YEARS; y++) {
+        yearly[y] = annualReturnFromStdNormal(meanForYear(y), input.volatility, nextNormal(rng));
+      }
     }
     const schedule = (yearIndex: number): number => yearly[Math.min(yearIndex, MAX_PROJECTION_YEARS - 1)];
 

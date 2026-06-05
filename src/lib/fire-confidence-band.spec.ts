@@ -13,12 +13,15 @@ const mk = (p10: number, p90: number, pNever = 0): MonteCarloFireResult => ({
 });
 
 describe("describeFireConfidenceBand (#18)", () => {
-  it("a reachable band shows the p10–p90 range + age range + illustrative disclosure", () => {
+  it("a reachable band shows the p10–p90 range + age range + history-informed disclosure", () => {
     const s = describeFireConfidenceBand(mk(12, 20), 16, 35)!;
     expect(s).toContain("12–20 years out");
     expect(s).toContain("age 47–55");
-    expect(s).toContain("Illustrative model");
-    expect(s).not.toMatch(/conservative/i); // engine-header constraint
+    expect(s).toContain("History-informed model");
+    expect(s).toContain("since 1991"); // #24 Part 2 — built on the real historical return series
+    expect(s).toContain("could play out worse"); // the REQUIRED regime caveat (residual optimism vector)
+    expect(s).not.toMatch(/conservative/i); // makes NO conservatism claim — it is more-real, not more-conservative
+    expect(s).not.toMatch(/cluster/i); // dominant annual signal is mean-REVERSION, not clustering
   });
 
   it("returns null for an already-FIRE / non-positive headline", () => {
@@ -37,7 +40,7 @@ describe("describeFireConfidenceBand (#18)", () => {
     expect(s).toContain("~10 years");
     expect(s).not.toMatch(/age \d{3}/); // no 3-digit age leaks
     expect(s).not.toContain(String(MAX_PROJECTION_YEARS + 1)); // sentinel never printed
-    expect(s).toContain("Illustrative model");
+    expect(s).toContain("History-informed model");
   });
 
   it("describes a mostly-unreachable plan in words when even the optimistic tail is off-chart", () => {

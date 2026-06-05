@@ -18,7 +18,7 @@
  * `ui` storage blob unchanged.
  */
 import type { DerivedFinancials } from "@/lib/derive";
-import { runMonteCarloFire, MAX_PROJECTION_YEARS } from "@/lib/monte-carlo";
+import { runMonteCarloFire, MAX_PROJECTION_YEARS, INDIA_EQUITY_ANNUAL_RETURNS } from "@/lib/monte-carlo";
 
 /**
  * Milestone bands, ascending. Mirrors `lifecycle-evaluator.ts` MILESTONE_BANDS
@@ -180,6 +180,10 @@ function computeMonteCarloP50Age(derived: SnapshotInputs, skip: boolean): number
     // p50 age converges to the headline for glide-ON households (same as useFireDerive).
     meanReturnSchedule: derived.realReturnSchedule,
     volatility: derived.portfolioVolatility,
+    // #24 Part 2: MUST pass the SAME history-fed series the dashboard band uses
+    // (useFireDerive) — else the digest's MC FIRE age (IID) would diverge from the
+    // FireHero band's p50 (bootstrap) for the same household. One model, both surfaces.
+    historicalReturns: INDIA_EQUITY_ANNUAL_RETURNS,
   });
   return Number.isFinite(mc.p50Years) && mc.p50Years < MAX_PROJECTION_YEARS
     ? Math.round(derived.anchorAge + mc.p50Years)

@@ -7,13 +7,23 @@
  * the exact false precision this feature exists to kill. When the slow tail runs
  * off the projection horizon, say so in words instead.
  *
- * The band is labelled "Illustrative", NOT "conservative": the v1 IID model can
- * UNDER-state the bad tail (clustering/sequence-of-returns), so the disclosure must
- * own the direction of the error (`monte-carlo.ts` header, FinTech 2026-06-03).
+ * The band is labelled "History-informed", NOT "conservative" (#24 Part 2): the v2
+ * block-bootstrap is built on the REAL shape + serial structure of Indian-equity returns
+ * since 1991 (instead of an idealized lognormal whose tail skew was a moment-matching
+ * artifact). It is MORE-REAL, not "more conservative" — measured, the band is actually
+ * a touch TIGHTER than the old IID model (real annual returns mean-revert, which is
+ * stabilizing). So the copy makes NO conservatism claim; it discloses the real basis,
+ * carries the REGIME caveat (a future downturn unlike the past could be worse — the only
+ * residual optimism vector), and always keeps the P(never reach) clause (`monte-carlo.ts`
+ * header; FinTech-adjudicated 2026-06-05). "Crash clustering" was REMOVED — the dominant
+ * annual signal is mean-REVERSION, so that phrasing described a mechanism the model does
+ * not exhibit. The earlier "Illustrative (assumes independent years)" copy described the
+ * superseded IID model and is no longer accurate.
  */
 import { MAX_PROJECTION_YEARS, type MonteCarloFireResult } from "@/lib/monte-carlo";
 
-const DISCLOSURE = "Illustrative model (assumes independent yearly returns; real downside may be larger).";
+const DISCLOSURE =
+  "History-informed model — built on the real pattern of Indian-equity returns since 1991 (deep crashes and the rebounds that have historically followed), not an idealized bell curve; a projection, not a guarantee — a downturn unlike the past could play out worse.";
 
 export function describeFireConfidenceBand(
   mc: MonteCarloFireResult | null | undefined,
