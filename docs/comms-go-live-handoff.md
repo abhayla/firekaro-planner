@@ -83,6 +83,14 @@ carries ONLY the `whatsappMessageId`; fixed to correlate by that id (commit `996
   non-vacuous: covers >100 files + a positive-fixture regex check). **A full frontend ESLint setup for
   a single invariant is YAGNI** — the targeted guard is the proportionate machine-enforcement. No
   1-word direction needed; resolved.
+- **B6. #32 rental-tax migration — 🚦 deploy-gate (Abhay).** The migration
+  `server/prisma/migrations/20260605120000_rental_24b_fields/` adds two nullable columns
+  (`homeLoanInterest`, `municipalTaxes`) to `OtherIncomeLine`. It MUST be applied to Supabase via
+  `cd server && npm run prisma:migrate:deploy` **BEFORE** the #32 code deploys to prod — otherwise the
+  regenerated Prisma client SELECTs columns the live DB lacks → `P2022` on every household read/write.
+  Deploy-gated (part of the standard migrate-before-deploy step in `docs/DEPLOY.md`). Until applied,
+  the backend live-DB integration spec (`server/src/routes/planner.integration.spec.ts`) fails locally
+  with P2022 against a not-yet-migrated DB; it auto-skips on CI (no `DATABASE_URL`), so CI stays green.
 
 ---
 

@@ -128,6 +128,11 @@ export const otherIncomeLineSchema = z.object({
   frequency: periodSchema,
   ownerId: z.string(),
   isTaxExempt: z.boolean(),
+  // §24(b) home-loan interest + municipal taxes — let-out rental only (type === "Rental").
+  // Both are ANNUAL amounts; undefined ⇒ 0. They reduce TAXABLE house-property income only,
+  // never the cash the landlord receives. gh-issue #32.
+  homeLoanInterest: z.number().min(0).optional(),
+  municipalTaxes: z.number().min(0).optional(),
 });
 export type OtherIncomeLine = z.infer<typeof otherIncomeLineSchema>;
 

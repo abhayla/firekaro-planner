@@ -47,6 +47,8 @@ const otherDraft = ref<Partial<OtherIncomeLine>>({
   frequency: "M",
   ownerId: household.earners[0]?.id ?? household.members[0]?.id ?? "you",
   isTaxExempt: false,
+  homeLoanInterest: undefined,
+  municipalTaxes: undefined,
 });
 
 const positiveRules = [(v: number | null | undefined) => (v !== null && v !== undefined && v > 0) || "Amount must be > 0"];
@@ -63,6 +65,21 @@ const isEditValid = computed(() =>
 // Track which row was most recently added — used to highlight + scroll-into-view.
 const recentlyAddedId = ref<string | null>(null);
 
+// §24(b) interest + municipal taxes are relevant ONLY for let-out (Rental) lines; for any other
+// type they stay undefined (⇒ 0 in the tax engine). Coerce a blank/0 input to undefined so the
+// persisted shape stays clean. gh-issue #32.
+function rentalTaxFields(
+  draft: Partial<OtherIncomeLine>,
+): Pick<OtherIncomeLine, "homeLoanInterest" | "municipalTaxes"> {
+  if (draft.type !== "Rental") return { homeLoanInterest: undefined, municipalTaxes: undefined };
+  const hli = Number(draft.homeLoanInterest);
+  const mt = Number(draft.municipalTaxes);
+  return {
+    homeLoanInterest: Number.isFinite(hli) && hli > 0 ? hli : undefined,
+    municipalTaxes: Number.isFinite(mt) && mt > 0 ? mt : undefined,
+  };
+}
+
 function addOtherIncome() {
   if (!isAddValid.value) return;
   const isEntity = otherDraft.value.source !== "Direct";
@@ -75,6 +92,7 @@ function addOtherIncome() {
     frequency: otherDraft.value.frequency as Period,
     ownerId: otherDraft.value.ownerId as string,
     isTaxExempt: !!otherDraft.value.isTaxExempt,
+    ...rentalTaxFields(otherDraft.value),
   });
   if (added && typeof added === "object" && "id" in added) {
     recentlyAddedId.value = (added as { id: string }).id;
@@ -92,6 +110,8 @@ function addOtherIncome() {
     frequency: "M",
     ownerId: otherDraft.value.ownerId,
     isTaxExempt: false,
+    homeLoanInterest: undefined,
+    municipalTaxes: undefined,
   };
 }
 
@@ -249,6 +269,7 @@ function saveEdit() {
     frequency: editing.value.frequency,
     ownerId: editing.value.ownerId,
     isTaxExempt: !!editing.value.isTaxExempt,
+    ...rentalTaxFields(editing.value),
   });
   editing.value = null;
 }
@@ -363,6 +384,41 @@ function saveEdit() {
           </v-btn>
         </v-col>
       </v-row>
+
+      <!-- §24(b) home-loan interest + municipal taxes — let-out rental only. Both ANNUAL.
+           They reduce taxable house-property income only, never the cash you receive. #32 -->
+      <v-expand-transition>
+        <v-row v-if="otherDraft.type === 'Rental'" dense class="mt-1">
+          <v-col cols="12" md="6">
+            <v-text-field
+              v-model.number="otherDraft.homeLoanInterest"
+              type="number"
+              label="Home-loan interest (optional)"
+              prefix="₹"
+              variant="outlined"
+              density="comfortable"
+              prepend-inner-icon="mdi-percent-outline"
+              hint="Annual §24(b) interest on a loan for this let-out property — fully deductible"
+              persistent-hint
+              suffix="/yr"
+            />
+          </v-col>
+          <v-col cols="12" md="6">
+            <v-text-field
+              v-model.number="otherDraft.municipalTaxes"
+              type="number"
+              label="Municipal taxes paid (optional)"
+              prefix="₹"
+              variant="outlined"
+              density="comfortable"
+              prepend-inner-icon="mdi-city-variant-outline"
+              hint="Annual municipal / property tax you paid — lowers the taxable rental value"
+              persistent-hint
+              suffix="/yr"
+            />
+          </v-col>
+        </v-row>
+      </v-expand-transition>
 
       <v-expand-transition>
         <v-alert
@@ -624,6 +680,37 @@ function saveEdit() {
             <v-col cols="6" md="3">
               <v-checkbox v-model="editing.isTaxExempt" label="Tax exempt" density="comfortable" hide-details />
             </v-col>
+            <!-- §24(b) interest + municipal taxes — let-out rental only (annual). #32 -->
+            <template v-if="editing.type === 'Rental'">
+              <v-col cols="12" md="6">
+                <v-text-field
+                  v-model.number="editing.homeLoanInterest"
+                  type="number"
+                  label="Home-loan interest (optional)"
+                  prefix="₹"
+                  variant="outlined"
+                  density="comfortable"
+                  prepend-inner-icon="mdi-percent-outline"
+                  hint="Annual §24(b) interest — fully deductible for a let-out property"
+                  persistent-hint
+                  suffix="/yr"
+                />
+              </v-col>
+              <v-col cols="12" md="6">
+                <v-text-field
+                  v-model.number="editing.municipalTaxes"
+                  type="number"
+                  label="Municipal taxes paid (optional)"
+                  prefix="₹"
+                  variant="outlined"
+                  density="comfortable"
+                  prepend-inner-icon="mdi-city-variant-outline"
+                  hint="Annual municipal / property tax you paid"
+                  persistent-hint
+                  suffix="/yr"
+                />
+              </v-col>
+            </template>
           </v-row>
         </v-card-text>
         <v-divider />

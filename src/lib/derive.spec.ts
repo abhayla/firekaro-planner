@@ -12,7 +12,7 @@ import { useAssumptionsStore } from "@/stores/assumptions";
 import { useUiStore } from "@/stores/ui";
 import { loadSeedPersona } from "@/lib/seed-persona";
 import { useFireDerive } from "@/lib/useFireDerive";
-import { derive, bridgeRentalPostTaxAnnual, SEC_24A_DEDUCTION_RATE } from "@/lib/derive";
+import { derive, bridgeRentalPostTaxAnnual, SEC_24A_DEDUCTION_RATE, SEC_71_HP_LOSS_SETOFF_CAP } from "@/lib/derive";
 import type { OtherIncomeLine } from "@/types/household";
 import { calculateNpsWithdrawal, postTaxAnnuityIncome } from "@/lib/nps-withdrawal";
 import { calculateYearsToTarget } from "@/lib/fire-math";
@@ -149,6 +149,143 @@ describe("derive() — pure kernel", () => {
     const deduction = 0.3 * R;
     expect(taxSaving).toBeGreaterThan(0.28 * deduction); // ~30% slab floor
     expect(taxSaving).toBeLessThanOrEqual(deduction); // ≤ deducted income (no over-correction)
+  });
+
+  // ── gh-issue #32: §24(b) home-loan interest + municipal taxes + §71 loss cap ──
+  // Differential pattern, mirroring #29: hold EVERYTHING constant except the one rental field under
+  // test, in a clean 30%-slab band (₹30L salary, ≪ ₹50L surcharge, ≫ ₹12L rebate).
+  describe("gh-issue #32: let-out rental §24(b)/municipal/§71", () => {
+    function thirtyPctSlabHousehold() {
+      const h = useHouseholdStore();
+      const a = useAssumptionsStore();
+      loadSeedPersona(h, a);
+      const rohit = h.data.members.find((m) => m.id === "rohit")!;
+      const priya = h.data.members.find((m) => m.id === "priya")!;
+      rohit.salary!.annualCTC = 3_000_000;
+      priya.salary!.annualCTC = 0;
+      const lens = { isFamilyView: false, viewingMemberId: null, currentFY: "2025-26" };
+      const baseLine = {
+        id: "test-32-line",
+        source: "Direct",
+        amount: 240_000, // ₹2.4L/yr let-out rent
+        frequency: "A" as const,
+        ownerId: rohit.id,
+        isTaxExempt: false,
+        type: "Rental" as const,
+      };
+      return { h, a, lens, baseLine };
+    }
+
+    it("(a) home-loan interest lowers tax by ≈ marginalRate×interest; CASH unchanged", () => {
+      const { h, a, lens, baseLine } = thirtyPctSlabHousehold();
+      const INTEREST = 100_000;
+
+      h.data.otherIncome = [{ ...baseLine }]; // no interest
+      const noInterest = derive(h.data, a.values, lens);
+
+      h.data.otherIncome = [{ ...baseLine, homeLoanInterest: INTEREST }];
+      const withInterest = derive(h.data, a.values, lens);
+
+      // CASH basis UNCHANGED — §24(b) is a TAX-ONLY deduction; the landlord still receives full rent
+      // and the EMI is already a separate household expense. (Same trap #29's review caught.)
+      expect(withInterest.annualIncome.total).toBe(noInterest.annualIncome.total);
+
+      // Taxed strictly LESS, and by ≈ marginalRate × interest (30% slab + 4% cess ⇒ ~31.2%).
+      const taxSaving = noInterest.annualTax - withInterest.annualTax;
+      const mr = withInterest.householdMarginalRate; // slab rate (excl. cess)
+      expect(taxSaving).toBeGreaterThan(0); // FAILS pre-#32 (interest ignored ⇒ equal tax)
+      expect(taxSaving).toBeGreaterThan(mr * INTEREST * 0.95); // ~marginal, with cess headroom
+      expect(taxSaving).toBeLessThanOrEqual(INTEREST); // deduction of D can't save more than D
+    });
+
+    it("(b) municipal taxes reduce taxable income further (GAV→NAV); CASH unchanged", () => {
+      const { h, a, lens, baseLine } = thirtyPctSlabHousehold();
+      const MUNI = 30_000;
+
+      h.data.otherIncome = [{ ...baseLine }];
+      const noMuni = derive(h.data, a.values, lens);
+
+      h.data.otherIncome = [{ ...baseLine, municipalTaxes: MUNI }];
+      const withMuni = derive(h.data, a.values, lens);
+
+      expect(withMuni.annualIncome.total).toBe(noMuni.annualIncome.total); // cash unchanged
+      // NAV drops by MUNI, and only 70% of NAV is taxable ⇒ taxable falls by 0.7×MUNI.
+      const taxSaving = noMuni.annualTax - withMuni.annualTax;
+      const taxableDrop = 0.7 * MUNI;
+      const mr = withMuni.householdMarginalRate;
+      expect(taxSaving).toBeGreaterThan(0);
+      expect(taxSaving).toBeGreaterThan(mr * taxableDrop * 0.95);
+      expect(taxSaving).toBeLessThanOrEqual(taxableDrop); // ≤ the income actually removed
+    });
+
+    it("(c) §71: a house-property LOSS sets off against other income only up to ₹2L", () => {
+      const { h, a, lens, baseLine } = thirtyPctSlabHousehold();
+      // NAV = 0.7 × 240k = ₹168k. Interest ₹2,500,000 ⇒ netHP = 168k − 2,500,000 = −₹2,332,000.
+      // §71 caps the loss set-off at ₹2L: taxableHP = −₹200,000. So vs a zero-interest rental
+      // (taxable = +₹168k), interest can reduce taxable income by AT MOST (168k + 200k) = ₹368k —
+      // NOT the full ₹2.33M loss. The uncapped remainder would carry forward 8 yrs (out of scope).
+      const HUGE_INTEREST = 2_500_000;
+
+      h.data.otherIncome = [{ ...baseLine }]; // taxable HP = +0.7·240k
+      const noInterest = derive(h.data, a.values, lens);
+
+      h.data.otherIncome = [{ ...baseLine, homeLoanInterest: HUGE_INTEREST }];
+      const cappedLoss = derive(h.data, a.values, lens);
+
+      expect(cappedLoss.annualIncome.total).toBe(noInterest.annualIncome.total); // cash unchanged
+
+      const taxSaving = noInterest.annualTax - cappedLoss.annualTax;
+      const mr = cappedLoss.householdMarginalRate;
+      // Max taxable income removed = NAV (0.7·240k = 168k, no longer taxed) + the ₹2L §71 loss set-off.
+      const maxTaxableRemoved = 0.7 * 240_000 + 200_000;
+      // The saving must NOT exceed marginalRate(+cess ~1.04) × that capped amount. If §71 were missing,
+      // the engine would deduct the full ₹2.33M loss and the saving would blow past this bound.
+      expect(taxSaving).toBeLessThanOrEqual(maxTaxableRemoved * (mr + 0.05));
+    });
+
+    it("(d) CASH basis identical across no-tax-fields / interest / municipal / capped-loss", () => {
+      const { h, a, lens, baseLine } = thirtyPctSlabHousehold();
+      h.data.otherIncome = [{ ...baseLine }];
+      const plain = derive(h.data, a.values, lens).annualIncome.total;
+
+      h.data.otherIncome = [{ ...baseLine, homeLoanInterest: 100_000 }];
+      const withInterest = derive(h.data, a.values, lens).annualIncome.total;
+
+      h.data.otherIncome = [{ ...baseLine, municipalTaxes: 30_000 }];
+      const withMuni = derive(h.data, a.values, lens).annualIncome.total;
+
+      h.data.otherIncome = [{ ...baseLine, homeLoanInterest: 2_500_000 }];
+      const cappedLoss = derive(h.data, a.values, lens).annualIncome.total;
+
+      // The cash a landlord receives is the full rent in EVERY case — tax fields never touch it.
+      expect(withInterest).toBe(plain);
+      expect(withMuni).toBe(plain);
+      expect(cappedLoss).toBe(plain);
+    });
+
+    it("(e) §71 cap is AGGREGATE: one loss + one profitable rental net BEFORE the ₹2L cap bites", () => {
+      const { h, a, lens, baseLine } = thirtyPctSlabHousehold();
+      h.data.otherIncome = [];
+      const noRental = derive(h.data, a.values, lens);
+
+      // A: rent ₹2L, interest ₹15L → houseProperty = 2L·0.7 − 15L = −13.6L (loss)
+      // B: rent ₹5L, no interest    → houseProperty = 5L·0.7 = +3.5L (profit)
+      // AGGREGATE netHP = −10.1L → §71 caps the SET-OFF at −₹2L → tax LOWER than salary-only by ≈mr·2L.
+      // PER-PROPERTY capping (the regression this guards) would cap A at −2L, leaving net +1.5L taxable
+      // → tax HIGHER. The sign of the tax change distinguishes the two mechanics.
+      h.data.otherIncome = [
+        { ...baseLine, id: "rA", amount: 200_000, homeLoanInterest: 1_500_000 },
+        { ...baseLine, id: "rB", amount: 500_000 },
+      ];
+      const twoRentals = derive(h.data, a.values, lens);
+
+      expect(twoRentals.annualTax).toBeLessThan(noRental.annualTax); // a capped LOSS, not net profit
+      const saving = noRental.annualTax - twoRentals.annualTax;
+      expect(saving).toBeGreaterThan(0.28 * SEC_71_HP_LOSS_SETOFF_CAP); // ≈30%+cess on the ₹2L set-off
+      expect(saving).toBeLessThanOrEqual(SEC_71_HP_LOSS_SETOFF_CAP); // can't save more than the capped loss
+      // Cash unchanged: BOTH full rents (₹2L + ₹5L) flow to income regardless of the tax treatment.
+      expect(twoRentals.annualIncome.total).toBe(noRental.annualIncome.total + 700_000);
+    });
   });
 
   it("gh-issue #9: projected expenses grow at a constant NOMINAL inflation (real/nominal coherence)", () => {

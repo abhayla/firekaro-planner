@@ -204,6 +204,8 @@ export async function readHousehold(
         frequency: o.frequency as OtherIncomeLine["frequency"],
         ownerId: o.ownerId,
         isTaxExempt: o.isTaxExempt,
+        homeLoanInterest: o.homeLoanInterest ?? undefined,
+        municipalTaxes: o.municipalTaxes ?? undefined,
       }),
     ),
     investments: investments.map(rowToInvestment),
@@ -372,6 +374,8 @@ export async function applyHouseholdPlan(
           frequency: o.frequency,
           ownerId: o.ownerId,
           isTaxExempt: o.isTaxExempt,
+          homeLoanInterest: o.homeLoanInterest ?? 0,
+          municipalTaxes: o.municipalTaxes ?? 0,
         },
       });
     }
@@ -387,6 +391,8 @@ export async function applyHouseholdPlan(
           frequency: o.frequency,
           ownerId: o.ownerId,
           isTaxExempt: o.isTaxExempt,
+          homeLoanInterest: o.homeLoanInterest ?? 0,
+          municipalTaxes: o.municipalTaxes ?? 0,
         },
       });
     }

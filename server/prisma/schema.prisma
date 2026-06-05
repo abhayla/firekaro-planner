@@ -210,6 +210,10 @@ model OtherIncomeLine {
   ownerId       String // member id OR "Joint" — plain TEXT, NO FK
   isTaxExempt   Boolean
 
+  // §24(b) home-loan interest + municipal taxes — let-out rental only (annual amounts). gh-issue #32.
+  homeLoanInterest Float? @default(0)
+  municipalTaxes   Float? @default(0)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
