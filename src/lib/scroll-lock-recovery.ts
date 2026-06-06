@@ -40,25 +40,39 @@ export function shouldReleaseScrollLock(
  * Release a stuck Vuetify scroll-lock when one is present without any open
  * overlay. Returns `true` if a stuck lock was actually released. Safe to call
  * anywhere — it is a no-op when there is nothing stuck to release.
+ *
+ * Scope: this heals the **document-level** lock on `<html>` (the cause of
+ * "no scrollbar at all, across every screen" — gh #42). Vuetify can also block
+ * scroll on a nested scroll-parent for a `contained` overlay; that narrower case
+ * is intentionally out of scope here (no evidence it occurs in this app — YAGNI).
+ *
+ * Wrapped in try/catch: this is a best-effort post-navigation safety net and must
+ * never throw into the router's afterEach chain.
  */
 export function releaseStuckScrollLock(doc: Document = document): boolean {
-  const html = doc.documentElement;
-  const hasBlockedClass = html.classList.contains(SCROLL_BLOCK_CLASS);
-  const hasActiveOverlay = doc.querySelector(ACTIVE_OVERLAY_SELECTOR) !== null;
-  if (!shouldReleaseScrollLock(hasBlockedClass, hasActiveOverlay)) return false;
+  try {
+    const html = doc.documentElement;
+    const hasBlockedClass = html.classList.contains(SCROLL_BLOCK_CLASS);
+    const hasActiveOverlay = doc.querySelector(ACTIVE_OVERLAY_SELECTOR) !== null;
+    if (!shouldReleaseScrollLock(hasBlockedClass, hasActiveOverlay)) return false;
 
-  // Vuetify parks the pre-lock scroll offset in CSS vars (the `top`/`left` above),
-  // stored as negative px strings. Capture before clearing so the page does not
-  // jump to the top when we restore normal flow.
-  const restoreY = Math.abs(parseFloat(html.style.getPropertyValue("--v-body-scroll-y")) || 0);
-  const restoreX = Math.abs(parseFloat(html.style.getPropertyValue("--v-body-scroll-x")) || 0);
+    // Vuetify parks the pre-lock scroll offset in CSS vars (the `top`/`left`
+    // above), stored as negative px strings. Capture before clearing so the page
+    // does not jump to the top when we restore normal flow.
+    const restoreY = Math.abs(parseFloat(html.style.getPropertyValue("--v-body-scroll-y")) || 0);
+    const restoreX = Math.abs(parseFloat(html.style.getPropertyValue("--v-body-scroll-x")) || 0);
 
-  // Removing the class drops `position: fixed`; clearing the vars removes the
-  // residual offset. Together this fully restores normal document scrolling.
-  html.classList.remove(SCROLL_BLOCK_CLASS);
-  html.style.removeProperty("--v-body-scroll-y");
-  html.style.removeProperty("--v-body-scroll-x");
+    // Removing the class drops `position: fixed`; clearing the vars removes the
+    // residual offset. Together this fully restores normal document scrolling.
+    html.classList.remove(SCROLL_BLOCK_CLASS);
+    html.style.removeProperty("--v-body-scroll-y");
+    html.style.removeProperty("--v-body-scroll-x");
 
-  doc.defaultView?.scrollTo?.(restoreX, restoreY);
-  return true;
+    doc.defaultView?.scrollTo?.(restoreX, restoreY);
+    return true;
+  } catch (err) {
+    // Best-effort recovery — surface but never propagate.
+    console.warn("[scroll-lock-recovery] failed to release stuck scroll-lock", err);
+    return false;
+  }
 }
