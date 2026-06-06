@@ -100,6 +100,13 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 ## §3 — Decision log (append-only, newest first)
 
 ### 2026-06-06
+- **D-2026-06-06-10 — Set up a proper feature-tiering PROCESS (was missing).** Audit found the tier
+  decisions were captured in PROJECT-LOG but there was NO queryable registry and the issues weren't
+  tiered. Fix: GitHub issue LABELS `must-have`/`good-to-have`/`nice-to-have` are the registry
+  (`gh issue list --label …`); the process is codified in `documentation-management.md` § "Feature
+  tiering registry"; the WHY stays here. Applied tiers to all open issues (#48 must; #44/#45/#41/#46
+  good; #43/#47 nice). *Why:* Abhay's standing requirement to keep must/good/nice features properly
+  documented — decisions alone weren't enough without a maintained, queryable home + a process.
 - **D-2026-06-06-09 — Re-scoped #48's remaining increments: only ~half are must-have.** Must-have =
   composable + ranked card + **regime arbitrage** (highest-ROI, cleanest-to-model India lever) +
   confidence ranges on variance-bearing levers (honesty). Should-have = 80CCD(1B), prepay-vs-invest
@@ -152,7 +159,11 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 ## §4 — Pointers (the formal artifacts this log indexes)
 
 - Product design SSOT + objectives §9: `docs/v6-fire-planner-product-plan.md`
-- Open work items: GitHub Issues (`gh issue list`) — current: #41, #42, #43, #44, #45, #46
+- Open work items: GitHub Issues (`gh issue list`) — current: #41, #43, #44, #45, #46, #47, #48
+- **Feature priority tiers (registry = issue labels):** `gh issue list --label must-have` /
+  `--label good-to-have` / `--label nice-to-have`. The categorization process is governed by
+  `.claude/rules/documentation-management.md` § "Feature tiering registry"; the WHY of each call is in
+  the decision log below. Current: must-have #48 · good-to-have #44/#45/#41/#46 · nice-to-have #43/#47.
 - Architecture decisions: `docs/adr/` (0001–0003; 0004 temporal model pending the #46 run)
 - Autonomous build specs: `docs/goals/`
 - Retention backlog: `docs/retention-engagement-features.md`
