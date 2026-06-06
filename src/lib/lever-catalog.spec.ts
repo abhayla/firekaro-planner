@@ -11,7 +11,6 @@ const BASE: FireBaseline = {
 
 const CTX: AccelerationContext = {
   baseline: BASE,
-  monthlySurplus: 30_000, // ₹30k/mo investable headroom
   monthlyExpenses: 100_000,
   realisticExpenseTrimPct: 0.1,
   swr: 0.035,
@@ -21,23 +20,20 @@ const CTX: AccelerationContext = {
 };
 
 describe("buildAccelerationLevers — realistic max-effort catalog", () => {
-  it("emits the surplus, expense-trim, and allocation levers when each has headroom", () => {
+  it("emits the expense-trim and allocation levers when each has headroom", () => {
     const keys = buildAccelerationLevers(CTX).map((l) => l.key);
-    expect(keys).toContain("invest-surplus");
     expect(keys).toContain("trim-expenses");
     expect(keys).toContain("risk-notch");
+  });
+
+  it("never emits an invest-surplus lever (moot — surplus is already invested per derive, D-11)", () => {
+    expect(buildAccelerationLevers(CTX).map((l) => l.key)).not.toContain("invest-surplus");
   });
 
   it("every lever carries a transparent bound note (honesty requirement)", () => {
     for (const lever of buildAccelerationLevers(CTX)) {
       expect(lever.note, `${lever.key} must show its realistic bound`).toBeTruthy();
     }
-  });
-
-  it("invest-surplus raises monthly savings by exactly the surplus", () => {
-    const lever = buildAccelerationLevers(CTX).find((l) => l.key === "invest-surplus")!;
-    const perturbed = lever.apply(BASE);
-    expect(perturbed.monthlySavings).toBe(BASE.monthlySavings + CTX.monthlySurplus);
   });
 
   it("trim-expenses BOTH lowers the FIRE target and raises savings (modeled via SWR)", () => {
@@ -77,11 +73,6 @@ describe("buildAccelerationLevers — realistic max-effort catalog", () => {
 });
 
 describe("buildAccelerationLevers — no-headroom levers are LOCKED, not faked", () => {
-  it("omits invest-surplus when there is no investable surplus", () => {
-    const keys = buildAccelerationLevers({ ...CTX, monthlySurplus: 0 }).map((l) => l.key);
-    expect(keys).not.toContain("invest-surplus");
-  });
-
   it("omits risk-notch when already at the equity ceiling", () => {
     const keys = buildAccelerationLevers({ ...CTX, currentEquityPct: 75, maxEquityPct: 75 }).map((l) => l.key);
     expect(keys).not.toContain("risk-notch");

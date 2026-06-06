@@ -18,14 +18,6 @@ import { formatINRCompact } from "@/lib/formatters";
 /** Household-resolved inputs needed to bound each lever to a realistic max effort. */
 export interface AccelerationContext {
   baseline: FireBaseline;
-  /**
-   * Investable monthly surplus today, real ₹/mo. ≤0 ⇒ the surplus lever is locked.
-   * CALLER CONTRACT (double-count guard, FinTech review): MUST be net of money already invested —
-   * `income − expenses − existing monthly contributions`. Passing a non-net `income − expenses`
-   * double-counts the existing SIP (it's already inside `baseline.monthlySavings`), over-ranking
-   * this lever. The caller's spec MUST assert this; no in-module test can catch it.
-   */
-  monthlySurplus: number;
   /** Current monthly expenses (real ₹/mo) — basis for the expense-trim lever. */
   monthlyExpenses: number;
   /** Realistic achievable expense trim as a fraction (e.g. 0.10 = a 10% cut). Transparent + adjustable. */
@@ -49,18 +41,12 @@ const EQUITY_NOTCH_POINTS = 10; // one realistic re-allocation step = +10pp equi
 export function buildAccelerationLevers(ctx: AccelerationContext): Lever[] {
   const levers: Lever[] = [];
 
-  // 1) Invest the actual monthly surplus.
-  if (ctx.monthlySurplus > 0) {
-    const surplus = ctx.monthlySurplus;
-    levers.push({
-      key: "invest-surplus",
-      label: "Invest your monthly surplus",
-      note: `Invest your spare ${formatINRCompact(surplus)}/mo`,
-      apply: (b) => ({ ...b, monthlySavings: b.monthlySavings + surplus }),
-    });
-  }
+  // NOTE: there is deliberately NO "invest your surplus" lever — `derive()` already computes
+  // `annualSavings = income − tax − expenses` AS the monthly contribution, so the surplus is
+  // already invested; an invest-surplus lever would double-count (D-2026-06-06-11). The genuine
+  // "save more" path is a user-set sensitivity in the UI, not a fixed-bound catalog lever.
 
-  // 2) Trim a realistic slice of recurring expenses — lowers the FIRE target (via SWR) AND adds the
+  // 1) Trim a realistic slice of recurring expenses — lowers the FIRE target (via SWR) AND adds the
   //    saved amount to monthly savings; both pull FIRE earlier.
   if (ctx.monthlyExpenses > 0 && ctx.realisticExpenseTrimPct > 0 && ctx.swr > 0) {
     const monthlyCut = Math.round(ctx.realisticExpenseTrimPct * ctx.monthlyExpenses);
@@ -81,7 +67,7 @@ export function buildAccelerationLevers(ctx: AccelerationContext): Lever[] {
     });
   }
 
-  // 3) Shift one realistic risk notch toward equity (bounded by the household's ceiling).
+  // 2) Shift one realistic risk notch toward equity (bounded by the household's ceiling).
   const equityNotch = Math.min(EQUITY_NOTCH_POINTS, ctx.maxEquityPct - ctx.currentEquityPct);
   if (equityNotch > 0) {
     const returnDelta = equityNotch * ctx.realReturnPerEquityPoint;
