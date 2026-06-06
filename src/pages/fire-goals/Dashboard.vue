@@ -12,6 +12,7 @@ import { isEmergencyFundEligible } from "@/lib/investment-traits";
 import FireHero from "@/components/dashboard/FireHero.vue";
 import LifecycleDigestCard from "@/components/dashboard/LifecycleDigestCard.vue";
 import BridgeBreakdownCard from "@/components/dashboard/BridgeBreakdownCard.vue";
+import AccelerationCard from "@/components/dashboard/AccelerationCard.vue";
 import FireProjectionChart from "@/components/dashboard/FireProjectionChart.vue";
 import AssetAllocationDonut from "@/components/dashboard/AssetAllocationDonut.vue";
 import SectionCard from "@/components/dashboard/SectionCard.vue";
@@ -266,6 +267,11 @@ onMounted(() => {
            liquidity shortfall + every assumption with a one-tap fix. Self-hides
            for a fully-liquid household. -->
       <BridgeBreakdownCard />
+
+      <!-- #48 obj-2 — "your biggest achievable wins": ranked accelerators (years sooner) for THIS
+           household, the risk-notch with a confidence range, + a live save-more what-if. The
+           get-there-faster surface, placed number → honesty(bridge) → how-to-accelerate → nudges. -->
+      <AccelerationCard />
 
       <!-- Phase 4 Stage I — audit-mandated dashboard additions -->
       <NudgeStack />
