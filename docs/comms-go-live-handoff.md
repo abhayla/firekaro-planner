@@ -92,6 +92,20 @@ carries ONLY the `whatsappMessageId`; fixed to correlate by that id (commit `996
   the backend live-DB integration spec (`server/src/routes/planner.integration.spec.ts`) fails locally
   with P2022 against a not-yet-migrated DB; it auto-skips on CI (no `DATABASE_URL`), so CI stays green.
 
+- **B7. #46 temporal-contributions migration — 🚦 deploy-gate (Abhay).** The migration
+  `server/prisma/migrations/20260606120000_add_investment_contribution_schedule/` adds ONE nullable
+  `contributionSchedule JSONB` column to `Investment` (the time-varying contribution plan; merged to
+  `main` @ `c7c70a5`, authored-not-applied per the goal contract). It is applied **automatically** by
+  the standard `cd server && npm run prisma:migrate:deploy` step already in `docs/DEPLOY.md` §3 +
+  Redeploy — **no special action needed**; it ships with the next redeploy. **The one thing not to
+  miss:** it is **schema-changing**, so honour the runbook's own rule (`DEPLOY.md` §Rollback: *take a
+  Supabase PITR backup before a schema-changing deploy*), and after deploy confirm the column exists
+  (the §8 smoke + an `Investment` read round-trip). Until applied, the live-DB integration spec
+  (`planner.integration.spec.ts`) fails locally with *"column contributionSchedule does not exist"*
+  against a not-yet-migrated DB; it auto-skips on CI (no `DATABASE_URL`), so CI stays green. The
+  feature is inert without the column **only on the ServerAdapter path** — the localStorage demo path
+  works regardless (verified).
+
 ---
 
 ## C. Optional / nice-to-have

@@ -67,6 +67,12 @@ cd /var/www/firekaro/server && npm run prisma:migrate:deploy
 > Standalone Prisma commands against the Supabase session pooler should append
 > `?connection_limit=1` to `DATABASE_URL` if other clients hold connections
 > (the pooler caps at 15 → `EMAXCONNSESSION`).
+>
+> **Pending schema-changing migration (check the needs-Abhay register before deploying):**
+> any `ADD COLUMN`/schema-changing migration listed under `docs/comms-go-live-handoff.md` §B
+> (currently **B7** — gh-46 `Investment.contributionSchedule`) is applied by the command above,
+> but is schema-changing → **take a Supabase PITR backup first** (per §Rollback) and confirm the
+> column post-deploy (§8 smoke + an `Investment` read).
 
 ## 4. Build the SPA
 
