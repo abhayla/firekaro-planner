@@ -43,6 +43,8 @@ const INVESTMENT_TYPED_KEYS = new Set([
   "value",
   "monthlyContribution",
   "ownerId",
+  // #46 — its own Json column, so it must NOT be swept into subtypeData.
+  "contributionSchedule",
 ]);
 
 function investmentSubtypeData(inv: Investment): Prisma.InputJsonValue {
@@ -53,6 +55,13 @@ function investmentSubtypeData(inv: Investment): Prisma.InputJsonValue {
   return sub as Prisma.InputJsonValue;
 }
 
+// #46 — the dedicated contributionSchedule column. Absent ⇒ SQL NULL (the scalar/default path).
+function investmentContributionSchedule(inv: Investment): Prisma.InputJsonValue | typeof Prisma.DbNull {
+  return inv.contributionSchedule != null
+    ? (inv.contributionSchedule as unknown as Prisma.InputJsonValue)
+    : Prisma.DbNull;
+}
+
 function rowToInvestment(row: {
   entityId: string;
   type: string;
@@ -61,6 +70,7 @@ function rowToInvestment(row: {
   monthlyContribution: number | null;
   ownerId: string;
   subtypeData: Prisma.JsonValue;
+  contributionSchedule: Prisma.JsonValue;
 }): Investment {
   const sub = (row.subtypeData ?? {}) as Record<string, unknown>;
   return {
@@ -70,6 +80,10 @@ function rowToInvestment(row: {
     value: row.value,
     monthlyContribution: row.monthlyContribution ?? undefined,
     ownerId: row.ownerId,
+    // #46 — round-trip the dedicated column; absent stays undefined (scalar/default path).
+    ...(row.contributionSchedule != null
+      ? { contributionSchedule: row.contributionSchedule as Investment["contributionSchedule"] }
+      : {}),
     ...sub,
   } as unknown as Investment;
 }
@@ -412,6 +426,7 @@ export async function applyHouseholdPlan(
           monthlyContribution: inv.monthlyContribution ?? null,
           ownerId: inv.ownerId,
           subtypeData: investmentSubtypeData(inv),
+          contributionSchedule: investmentContributionSchedule(inv),
         },
       });
     }
@@ -425,6 +440,7 @@ export async function applyHouseholdPlan(
           monthlyContribution: inv.monthlyContribution ?? null,
           ownerId: inv.ownerId,
           subtypeData: investmentSubtypeData(inv),
+          contributionSchedule: investmentContributionSchedule(inv),
         },
       });
     }

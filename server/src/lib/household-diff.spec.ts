@@ -135,6 +135,32 @@ describe("diffHousehold — classification", () => {
     expect(plan.investments.deletes).toHaveLength(0);
   });
 
+  it("classifies a contributionSchedule change as an update; an identical one as unchanged (#46)", () => {
+    const schedule = [{ amount: 25000, startAtAge: 30, stepUpPercentPerYear: 10 }];
+    const current = emptyHousehold({
+      investments: [makeInvestment("inv1", { contributionSchedule: schedule })],
+    });
+    // Identical (canonical) schedule → unchanged → zero writes (idempotent PUT).
+    const same = emptyHousehold({
+      investments: [makeInvestment("inv1", { contributionSchedule: [{ ...schedule[0] }] })],
+    });
+    const noChange = diffHousehold(current, same);
+    expect(noChange.investments.updates).toHaveLength(0);
+    expect(noChange.investments.unchanged.map((i) => i.id)).toEqual(["inv1"]);
+
+    // A changed schedule → update.
+    const changed = emptyHousehold({
+      investments: [
+        makeInvestment("inv1", {
+          contributionSchedule: [{ amount: 25000, startAtAge: 30, stepUpPercentPerYear: 12 }],
+        }),
+      ],
+    });
+    const plan = diffHousehold(current, changed);
+    expect(plan.investments.updates.map((i) => i.id)).toEqual(["inv1"]);
+    expect(plan.investments.inserts).toHaveLength(0);
+  });
+
   it("does NOT duplicate an auto-flow row that already exists (match by sourceRefId)", () => {
     // The store may regenerate the auto-loan recurring line with a NEW row id
     // but the SAME sourceRefId (pointing at the liability). Matching by
