@@ -60,6 +60,13 @@ build contract (still the source of truth for the planner's screens/math) is
 > `.claude/tasks/needs-abhay.md`). It is a disposable worklist that *consumes* the SSOTs, not a
 > design SSOT itself.
 
+> **📒 Project log (read at session start): `docs/PROJECT-LOG.md`.** The canonical, auto-referred
+> home for **strategic/product/roadmap/prioritization decisions + the running goal status** — the
+> narrative index that POINTS to the formal artifacts (issues / ADRs / goal contracts), so no decision
+> is lost across sessions. Governed by **`.claude/rules/documentation-management.md`** (the doc
+> taxonomy + document-on-decision trigger + auto-reference protocol). Significant decisions MUST be
+> logged there before the turn ends; do NOT create a parallel decision log.
+
 ## Repository layout
 
 | Path | What | Port |
