@@ -207,6 +207,15 @@ Pinia-aware wrapper (reads the stores, calls `derive()` once, re-exposes each fi
 through the real stores. The lifecycle/nudge loop in `server/` shares this SAME `derive()` (no math
 duplication). Touching FIRE math almost always means touching `derive.ts`.
 
+**Temporal contributions (ADR-0004):** the kernel is **time-varying**, not scalar — `derive.ts`
+builds a `ContributionSchedule` + `ReturnSchedule` (`fire-math.ts`) and `calculateYearsToTarget`
+grows the corpus segment-by-segment in the REAL frame. The live lever is the household real
+savings step-up (`assumptions.householdSavingsStepUpPercent`, **default 0 ⇒ byte-identical scalar
+headline**). Per-investment `investments[].contributionSchedule` (age-relative segments, real
+₹/month `amount`, `stepUpPercentPerYear` ≤15 — `src/types/household.ts`) is **DISPLAY/PLAN only**
+today (persisted via `household-diff`/`household-repo`, NOT yet feeding the headline). Design SSOT:
+`docs/adr/0004-temporal-contribution-model.md` + gh-issue #46.
+
 Pure modules in `src/lib/` with colocated `*.spec.ts`: `fire-math.ts`, `tax.ts` + `tax-deductions.ts`
 + `tax-cliff.ts`, `amortization.ts`, `withdrawal-strategy.ts`, `glide-path.ts`, `coast-fire.ts`,
 `cashflow.ts`, `epf-vpf.ts`, `nps-withdrawal.ts`, `esop-tax.ts`, `freedom-score.ts`, `adequacy.ts`,
