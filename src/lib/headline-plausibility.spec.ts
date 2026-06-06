@@ -27,6 +27,7 @@ import { loadMehtasSeed } from "@/seeds/mehtas";
 import { loadIyersSeed } from "@/seeds/iyers";
 import { loadMauryasSeed } from "@/seeds/mauryas";
 import { derive } from "@/lib/derive";
+import { useFireDerive } from "@/lib/useFireDerive";
 import { calculateYearsToTarget } from "@/lib/fire-math";
 import { buildContributionResolver } from "@/lib/contribution-schedule";
 import { runMonteCarloFire } from "@/lib/monte-carlo";
@@ -341,4 +342,31 @@ describe("headline plausibility — EMPTY state (gh #39: no 'achieved' on zero d
     expect(Number.isFinite(k.yearsToLean), "Lean: must be non-finite, not 0").toBe(false);
     expect(Number.isFinite(k.yearsToFat), "Fat: must be non-finite, not 0").toBe(false);
   });
+});
+
+// gh-48 — the AccelerationCard ("biggest achievable wins") is a flagship default-lens output, so it
+// gets a plausibility bound here too (rule 31). The bug it locks (caught in independent review
+// 2026-06-06): the card showed the SCALAR corpus-only years, which on a bridge-limited household
+// (Iyers) is 1–2yr MORE OPTIMISTIC than the honest bridge-adjusted FireHero headline. The action
+// surface must NEVER show a FIRE date sooner than the truth.
+describe("acceleration card plausibility — never more optimistic than the headline (gh-48, rule 31)", () => {
+  beforeEach(() => setActivePinia(createPinia()));
+
+  for (const persona of PERSONAS) {
+    it(`${persona.name}: the card baseline == the bridge-adjusted headline, never the rosier scalar`, async () => {
+      const { useAcceleration } = await import("@/composables/useAcceleration");
+      const h = useHouseholdStore();
+      const a = useAssumptionsStore();
+      persona.load(h, a);
+      const fire = useFireDerive();
+      const accel = useAcceleration();
+      // The card renders headlineYears: it must equal the FireHero headline AND never be earlier
+      // (more optimistic) than the scalar corpus model — i.e. headline = max(scalar, bridge runway).
+      expect(accel.headlineYears.value).toBeCloseTo(fire.yearsToRegular.value, 5);
+      expect(
+        accel.headlineYears.value,
+        `${persona.name}: card baseline must not be more optimistic than the headline`,
+      ).toBeGreaterThanOrEqual(accel.baselineYears.value - 0.01);
+    });
+  }
 });

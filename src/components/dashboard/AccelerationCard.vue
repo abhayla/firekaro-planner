@@ -14,13 +14,19 @@ import { formatINRCompact } from "@/lib/formatters";
 
 const accel = useAcceleration();
 
+// The card ALWAYS shows the honest, bridge-adjusted headline (never the rosier scalar corpus model) —
+// a user must never see a FIRE date more optimistic than the truth (rule 31 / bug-#22, fixed 2026-06-06).
+const headlineYears = computed(() => accel.headlineYears.value);
+// When the accessible-money bridge (early-years liquidity) sets the date, the scalar per-lever
+// "N years sooner" deltas overstate the real, liquidity-gated saving — so we drop them and caveat.
+const bridgeBinding = computed(() => accel.bridgeBinding.value);
 const baselineYears = computed(() => accel.baselineYears.value);
 const ranked = computed(() => accel.rankedLevers.value);
 const reachableLevers = computed(() => ranked.value.filter((l) => l.reachable && l.deltaYears > 0));
 
 // Baseline must itself be reachable for any "sooner" to mean anything; otherwise the honest message
 // is "build the plan first", not a fake accelerator (gh #39 empty-state class).
-const baselineReachable = computed(() => Number.isFinite(baselineYears.value) && baselineYears.value > 0);
+const baselineReachable = computed(() => Number.isFinite(headlineYears.value) && headlineYears.value > 0);
 
 // Self-hide only when there is genuinely nothing to offer: no reachable lever AND no plannable
 // baseline to save against. Otherwise always render (this is the obj-2 flagship surface).
@@ -60,13 +66,29 @@ const saveMoreImpact = computed(() => accel.saveMoreImpact(extraMonthly.value));
       <v-icon icon="mdi-rocket-launch-outline" color="fire-orange" size="24" class="mr-2" />
       <h3 class="accel-card__title flex-grow-1">Your biggest achievable wins</h3>
       <v-chip size="small" variant="tonal" color="fire-orange" prepend-icon="mdi-flag-checkered">
-        FIRE in ~{{ yearsLabel(baselineYears) }}
+        FIRE in ~{{ yearsLabel(headlineYears) }}
       </v-chip>
     </div>
     <p class="text-body-2 text-medium-emphasis mb-4">
       Realistic moves that pull your FIRE date closer — ranked by impact for your household. These show
       what <em>you</em> could choose; we never recommend products.
     </p>
+
+    <!-- Bridge-limited honesty caveat: when early-years liquidity (the accessible-money bridge), not
+         corpus size, sets the FIRE date, the corpus-model "N years sooner" figures overstate the real
+         liquidity-gated saving — so we drop them and point the user at the binding constraint. -->
+    <v-alert
+      v-if="bridgeBinding"
+      type="warning"
+      variant="tonal"
+      density="comfortable"
+      class="mb-4"
+      data-testid="accel-bridge-caveat"
+    >
+      Your FIRE date is currently set by <strong>early-years liquidity</strong> — your accessible-money
+      bridge, not your corpus size. The moves below build your corpus faster, but closing the bridge gap
+      (see the bridge breakdown above) is what actually moves your date.
+    </v-alert>
 
     <!-- Ranked levers -->
     <template v-if="reachableLevers.length">
@@ -81,9 +103,10 @@ const saveMoreImpact = computed(() => accel.saveMoreImpact(extraMonthly.value));
           <div class="text-body-1 font-weight-medium">{{ lever.label }}</div>
           <div class="text-caption text-medium-emphasis">{{ lever.note }}</div>
 
-          <!-- Variance-bearing lever: show the honest confidence RANGE, never a bare point. -->
+          <!-- Variance-bearing lever: show the honest confidence RANGE, never a bare point. Suppressed
+               when the bridge binds — the scalar range would overstate the liquidity-gated date. -->
           <div
-            v-if="lever.band"
+            v-if="lever.band && !bridgeBinding"
             class="text-caption accel-row__range"
             :data-testid="`accel-band-${lever.key}`"
           >
@@ -94,7 +117,9 @@ const saveMoreImpact = computed(() => accel.saveMoreImpact(extraMonthly.value));
             across good and bad markets
           </div>
         </div>
-        <div class="accel-row__impact" :data-testid="`accel-impact-${lever.key}`">
+        <!-- The "N years sooner" figure is a corpus-model estimate; hidden when the bridge is the binding
+             constraint (it would overstate the real, liquidity-gated saving — rule 31). -->
+        <div v-if="!bridgeBinding" class="accel-row__impact" :data-testid="`accel-impact-${lever.key}`">
           <div class="accel-row__impact-value">{{ soonerLabel(lever.deltaYears) }}</div>
           <div v-if="lever.band" class="text-caption text-medium-emphasis">expected</div>
         </div>
@@ -132,7 +157,11 @@ const saveMoreImpact = computed(() => accel.saveMoreImpact(extraMonthly.value));
       <div class="accel-savemore__amount text-currency">+{{ formatINRCompact(extraMonthly) }}/mo</div>
     </div>
     <div class="accel-savemore__result mt-1" data-testid="accel-savemore-result">
-      <template v-if="saveMoreImpact && saveMoreImpact.reachable && saveMoreImpact.deltaYears > 0">
+      <template v-if="bridgeBinding && extraMonthly > 0">
+        Investing {{ formatINRCompact(extraMonthly) }} more every month grows your corpus and your liquid
+        runway faster — easing the bridge gap that currently sets your date.
+      </template>
+      <template v-else-if="saveMoreImpact && saveMoreImpact.reachable && saveMoreImpact.deltaYears > 0">
         Investing {{ formatINRCompact(extraMonthly) }} more every month →
         <strong>{{ soonerLabel(saveMoreImpact.deltaYears) }}</strong>
       </template>

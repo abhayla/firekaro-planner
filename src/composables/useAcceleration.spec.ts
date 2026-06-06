@@ -12,6 +12,7 @@ import { setActivePinia, createPinia } from "pinia";
 import { useHouseholdStore } from "@/stores/household";
 import { useAssumptionsStore } from "@/stores/assumptions";
 import { loadSeedPersona } from "@/lib/seed-persona";
+import { loadIyersSeed } from "@/seeds/iyers";
 import { useFireDerive } from "@/lib/useFireDerive";
 import { useAcceleration } from "@/composables/useAcceleration";
 
@@ -25,6 +26,11 @@ describe("useAcceleration — Sharmas seed (derive→engine wiring proof)", () =
     const accel = useAcceleration();
     const fire = useFireDerive();
     expect(accel.baselineYears.value).toBeCloseTo(fire.yearsToRegular.value, 0); // ±1 year
+  });
+
+  it("bridge NOT binding for Sharmas (corpus-limited) ⇒ card renders normal lever deltas", () => {
+    const accel = useAcceleration();
+    expect(accel.bridgeBinding.value).toBe(false);
   });
 
   it("DOUBLE-COUNT GUARD: save-more of ₹0 yields no phantom acceleration (~0 years, bug-#11 lock)", () => {
@@ -76,5 +82,39 @@ describe("useAcceleration — Sharmas seed (derive→engine wiring proof)", () =
     // the cashflow levers (trim / save-more) never carry a band
     const trim = ranked.find((l) => l.key === "trim-expenses");
     if (trim) expect(trim.band ?? null).toBeNull();
+  });
+});
+
+describe("useAcceleration — Iyers seed (bridge-binding honesty, gh-48 HIGH 2026-06-06)", () => {
+  // Code-review/FinTech caught a live optimistic-skew defect (rule 31 / bug-#22 class): on Iyers the
+  // card chip showed the SCALAR corpus-only years (~17.5) while the FireHero headline is the
+  // bridge-adjusted ~18.9 — the action surface was 1.4yr ROSIER than the honest headline. These locks
+  // assert the card never shows an absolute more optimistic than the headline, and that the bridge-
+  // binding state is detectable so the card can drop the (overstated) scalar lever deltas + caveat.
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    loadIyersSeed(useHouseholdStore(), useAssumptionsStore());
+  });
+
+  it("headlineYears equals the FireHero headline (the honest, bridge-adjusted number the card shows)", () => {
+    const accel = useAcceleration();
+    const fire = useFireDerive();
+    expect(accel.headlineYears.value).toBeCloseTo(fire.yearsToRegular.value, 5);
+  });
+
+  it("OPTIMISM LOCK (rule 31): the card baseline is NEVER earlier/sooner than the honest headline", () => {
+    const accel = useAcceleration();
+    // headlineYears = max(corpusOnlyYears, bridge runway) ≥ the scalar baseline, ALWAYS. The card must
+    // render headlineYears, so a user can never see a FIRE date more optimistic than the truth.
+    expect(accel.headlineYears.value).toBeGreaterThanOrEqual(accel.baselineYears.value - 0.01);
+  });
+
+  it("flags bridgeBinding when liquidity (the accessible-money bridge) gates FIRE later than corpus", () => {
+    const accel = useAcceleration();
+    // Iyers has an active bridge shortfall (corpus-rich but early-years-liquidity-limited), so the honest
+    // headline is materially later than the scalar corpus model ⇒ bridgeBinding ⇒ the card drops the
+    // scalar "N years sooner" deltas (they overstate the liquidity-gated date) and shows the bridge caveat.
+    expect(accel.bridgeBinding.value).toBe(true);
+    expect(accel.headlineYears.value).toBeGreaterThan(accel.baselineYears.value + 0.25);
   });
 });

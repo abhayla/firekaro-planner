@@ -28,10 +28,17 @@ import { getTaxConfigForFY } from "@/lib/tax";
  * stays in the pure libs; this layer only maps stores → pure inputs → pure outputs
  * (`.claude/rules/pinia-store-conventions.md` + `calculation-modules.md`).
  *
- * BASELINE COHERENCE (#20/#47, Rule 26): the engine baseline uses the SAME bridge-adjusted withdrawable
- * corpus, real FIRE number, contribution, and REAL blended return the headline uses — so
- * `yearsToFire(baseline)` equals `fire.yearsToRegular` (the FireHero number), and every lever's
- * "N years sooner" is measured off the number the user already sees.
+ * BASELINE COHERENCE (#20/#47, Rule 26) — and its ONE honest exception: the engine baseline uses the
+ * same withdrawable corpus, real FIRE number, contribution, and REAL blended return the headline uses,
+ * so the scalar `yearsToFire(baseline)` equals `fire.yearsToRegular` WHENEVER FIRE is corpus-limited.
+ * It does NOT when the accessible-money BRIDGE is the binding constraint: the headline is
+ * `max(corpusOnlyYears, bridge runway)` (derive.ts), so a liquidity-short household's honest headline is
+ * LATER than the scalar model. Showing the scalar number there would be 1–2yr more OPTIMISTIC than the
+ * truth (the rule-31 / bug-#22 class — caught in independent review 2026-06-06). Therefore the card
+ * ALWAYS displays `headlineYears` (never the scalar baseline), and when `bridgeBinding` is true it drops
+ * the scalar per-lever "N years sooner" deltas (which overstate the liquidity-gated date) in favour of an
+ * honest "your date is bridge-limited — close the bridge gap first" caveat. (Making the per-lever deltas
+ * themselves bridge-aware needs a full derive() re-run per lever — tracked as a follow-up, not done here.)
  *
  * DOUBLE-COUNT GUARD (bug-#11 / D-2026-06-06-11): derive() already invests the household savings
  * residual, so there is no invest-surplus lever and the save-more sensitivity only ever ADDS money the
@@ -140,12 +147,32 @@ export function useAcceleration() {
     return computeLeverImpact(baseline.value, makeSaveMoreLever(extraMonthly));
   }
 
+  // The scalar corpus-model years-to-FIRE (the engine's internal frame) vs the honest bridge-adjusted
+  // headline the user sees. They are equal when FIRE is corpus-limited; the headline is LATER when the
+  // bridge runway gates it. The card renders headlineYears and uses bridgeBinding to decide whether the
+  // scalar per-lever deltas are safe to show (rule 31 optimism guard — see the module doc).
+  const baselineYears = computed(() => yearsToFire(baseline.value));
+  const headlineYears = computed(() => fire.yearsToRegular.value);
+  const BRIDGE_BINDING_TOLERANCE_YEARS = 0.25;
+  const bridgeBinding = computed(
+    () =>
+      Number.isFinite(headlineYears.value) &&
+      Number.isFinite(baselineYears.value) &&
+      headlineYears.value - baselineYears.value > BRIDGE_BINDING_TOLERANCE_YEARS,
+  );
+
   return {
     baseline,
-    /** The engine baseline's years-to-FIRE — equals the FireHero headline by construction (Rule 26). */
-    baselineYears: computed(() => yearsToFire(baseline.value)),
-    /** The FireHero headline years (the number the card shows as the baseline). */
-    headlineYears: computed(() => fire.yearsToRegular.value),
+    /** The scalar corpus-model years-to-FIRE (engine frame). Equals the headline ONLY when corpus-limited. */
+    baselineYears,
+    /** The honest, bridge-adjusted FireHero headline — the number the card ALWAYS shows as the baseline. */
+    headlineYears,
+    /**
+     * True when the accessible-money bridge (early-years liquidity), not corpus size, sets the FIRE date —
+     * i.e. the honest headline is materially later than the scalar model. The card then drops the scalar
+     * per-lever "N years sooner" deltas (they overstate the liquidity-gated date) and shows a bridge caveat.
+     */
+    bridgeBinding,
     /** Ranked accelerators, biggest years-saved first; the risk-notch carries a confidence band. */
     rankedLevers,
     /** Current monthly contribution — a sane ceiling for the save-more stepper. */
