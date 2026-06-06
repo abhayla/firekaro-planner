@@ -103,6 +103,22 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 ## §3 — Decision log (append-only, newest first)
 
 ### 2026-06-06
+- **D-2026-06-06-13 — Authored the 3 remaining must-have goal contracts (the obj-1/3/4 queue) for
+  parallel `/goal` runs.** With #48 done (D-12), the remaining must-have set is contracted, sequenced,
+  and parallel-safe — Abhay runs them in separate sessions: (1) **tax current-FY staleness guard**
+  (obj-1, small — the last accumulation-core honesty hole; prod-visible banner when the live FY is
+  unconfigured) → `docs/goals/2026-06-06-tax-current-fy-staleness-guard.md`; (2) **readiness-to-stop
+  verdict** (obj-3 — a "can I pull the trigger?" verdict on the existing bridge math) →
+  `docs/goals/2026-06-06-readiness-to-stop-verdict.md`; (3) **decumulation guardrails** (obj-4 —
+  withdrawal bands reuse + NEW post-FIRE sequence-of-returns warning + light annual review) →
+  `docs/goals/2026-06-06-decumulation-guardrails.md`. Each contract self-isolates into its own worktree
+  off `main` (§0.1) + an idempotency preflight (§0.2), commits-but-does-not-push (Abhay merges), and bakes
+  the 526e100 real-frame/never-more-optimistic-than-headline lesson. **Parallel-safe by design:** disjoint
+  file sets, except #2/#3 both add a route+nav line (`router/index.ts` + `SidebarNav.vue`) — a trivial
+  adjacent-line merge, noted in both. *Why logged:* the must-have roadmap after #48 is now durably
+  tracked as runnable contracts, not chat. obj-1 first (small, closes the core); obj-3/4 are the wedge's
+  later lifecycle (math built, UI missing). Contracts left UNCOMMITTED per the goal-contract convention
+  (edit-then-run). Good-to-have follow-ups remain: #44/#45/#41/#49 + the untracked ones from the audit.
 - **D-2026-06-06-12 — #48 SHIPPED then the supervisor edge caught a HIGH honesty defect; fixed. #48
   must-have core now genuinely complete.** The `/goal` run built + merged the #48 remainder (80CCD
   lever, MC band, composable, AccelerationCard) onto `feat/lever-impact-engine` (merge 84fde1e). The
