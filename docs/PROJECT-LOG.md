@@ -103,6 +103,24 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 ## §3 — Decision log (append-only, newest first)
 
 ### 2026-06-06
+- **D-2026-06-06-14 — SHIPPED obj-3 readiness-to-stop verdict (the "can I pull the trigger?" surface);
+  merged to `main` (cd78485).** The `/goal` run on `docs/goals/2026-06-06-readiness-to-stop-verdict.md`
+  built it in 2 commits on `feat/readiness-verdict`: (a) **`src/lib/readiness.ts`** — a PURE
+  `computeReadiness()` classifier over the EXISTING accessible-money bridge (no new FIRE math), 5 honest
+  states `ready-now / ready-at-age / bridge-limited / corpus-short / unplannable`, `readyAtAge ==
+  bridge.effectiveFireAge` verbatim (never more optimistic than the FireHero headline — bakes the
+  526e100 lesson); (b) **`/fire-goals/readiness`** page + `ReadinessVerdictCard` (decision-support, never
+  advice) above the REUSED `BridgeBreakdownCard` + a "Can I retire?" nav entry. **Verification:** FinTech
+  Domain Analyst PASS (zero optimistic-honesty defects), code-reviewer APPROVE ×2, type-check 0, 921 unit
+  (post-merge), build green; Rule 24 screenshot/ARIA/console on Sharmas (age 56) + Mauryas (age 67); Rule
+  26 readyAtAge == round(anchorAge+yearsToRegular) on both; Rule 25 N/A (read-only). Merged cleanly with
+  the already-merged tax-staleness sibling (no conflict). *Why logged:* obj-3 (the wedge persona's
+  readiness-to-stop lifecycle stage) now has its decision-support UI — math was already built, only the
+  verdict surface was missing. **Run DEFERRED note** (non-blocking): `bridge-limited`/`ready-now`/
+  `ready-at-age` are not seed-reachable (all 5 seeds covered+accumulating → corpus-short) so they are
+  unit-locked, not screenshot-verified — a near-FIRE-with-locked-money seed would let `bridge-limited`
+  get a real on-screen fixture (good-to-have follow-up). Branch `feat/readiness-verdict` + worktree
+  `firekaro-goal-readiness` retained (cleanup later).
 - **D-2026-06-06-13 — Authored the 3 remaining must-have goal contracts (the obj-1/3/4 queue) for
   parallel `/goal` runs.** With #48 done (D-12), the remaining must-have set is contracted, sequenced,
   and parallel-safe — Abhay runs them in separate sessions: (1) **tax current-FY staleness guard**
