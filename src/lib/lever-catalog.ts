@@ -14,6 +14,7 @@
  */
 import type { FireBaseline, Lever } from "./lever-impact";
 import { formatINRCompact } from "@/lib/formatters";
+import { LIMIT_80CCD_1B } from "./tax-deductions";
 
 /** Household-resolved inputs needed to bound each lever to a realistic max effort. */
 export interface AccelerationContext {
@@ -30,9 +31,37 @@ export interface AccelerationContext {
   maxEquityPct: number;
   /** Expected REAL-return delta per +1 percentage-point of equity (the equity−debt real-return spread ÷ 100). */
   realReturnPerEquityPoint: number;
+  /** ₹/yr already claimed under the ₹50k 80CCD(1B) NPS sub-limit. Headroom = cap − this. */
+  currentNps80ccd1bUsed: number;
+  /** Household top marginal tax rate (0..1, incl. cess in the real wiring) — the rate the 80CCD headroom saves. */
+  marginalTaxRate: number;
+  /**
+   * The household's effective tax regime (`derive()`'s auto-optimized `householdTaxRecommendation.recommended`).
+   * 80CCD(1B) is an OLD-regime-only Chapter VI-A deduction — under the NEW regime it saves ₹0, so the
+   * lever MUST be locked for new-regime filers (the persona majority post-Budget-2025) to avoid showing
+   * a phantom "years sooner" for a tax benefit they legally cannot claim (FinTech HIGH, 2026-06-06; rule 31).
+   */
+  regime: "OLD" | "NEW";
 }
 
 const EQUITY_NOTCH_POINTS = 10; // one realistic re-allocation step = +10pp equity
+
+/**
+ * The save-more sensitivity is a USER-PARAMETERISED lever, not a fixed-bound catalog entry — its
+ * magnitude is set live in the UI ("invest ₹X more/month"), so it is exported as a pure factory the
+ * card calls on demand. It adds `extraMonthly` to monthly savings; the target is unchanged. This is
+ * the GENUINE "save more" path that replaces the moot invest-surplus lever (D-2026-06-06-11): the
+ * existing surplus is already invested by derive(), so only money the user does not yet invest counts.
+ * Callers MUST omit it for `extraMonthly <= 0` (a non-positive amount is a no-op, not an accelerator).
+ */
+export function makeSaveMoreLever(extraMonthly: number): Lever {
+  return {
+    key: "save-more",
+    label: `Invest ${formatINRCompact(extraMonthly)} more/month`,
+    note: `Invest ${formatINRCompact(extraMonthly)} more every month`,
+    apply: (b) => ({ ...b, monthlySavings: b.monthlySavings + extraMonthly }),
+  };
+}
 
 /**
  * Build the realistic-max-effort acceleration levers that have headroom for this household.
@@ -81,6 +110,30 @@ export function buildAccelerationLevers(ctx: AccelerationContext): Lever[] {
       // disclosed in the note until per-lever confidence bands land (gh-48 follow-on).
       note: `Raise equity ${ctx.currentEquityPct}% → ${ctx.currentEquityPct + equityNotch}% (+${(returnDelta * 100).toFixed(1)}% expected real return) — adds market risk: a wider range of outcomes, not a guaranteed gain`,
       apply: (b) => ({ ...b, expectedReturn: b.expectedReturn + returnDelta }),
+    });
+  }
+
+  // 3) Fill the 80CCD(1B) NPS headroom — a near-deterministic cashflow lever. HONEST MODEL
+  //    (D-2026-06-06-11): the ₹50k sub-limit contribution itself comes from the surplus that
+  //    derive() ALREADY invests, so adding it to savings would double-count. The genuinely NEW
+  //    investable cashflow is only the marginal TAX SAVED on filling the headroom, redirected to
+  //    investing. (Conservative assumption: the ₹50k is funded FROM the already-invested surplus —
+  //    if instead funded from consumption the full ₹50k would be new money, so this UNDER-states,
+  //    the honest direction for the accumulator.) `marginalTaxRate` is the single top-slab rate incl.
+  //    cess (a single-slab approximation — the accumulator's marginal ₹50k sits within one slab).
+  //    Locked (omitted) when: no headroom, no tax to save, OR the household files the NEW regime
+  //    (80CCD(1B) is OLD-regime-only → ₹0 saving under new; FinTech HIGH 2026-06-06, rule 31).
+  const npsHeadroom = Math.max(0, LIMIT_80CCD_1B - ctx.currentNps80ccd1bUsed);
+  if (ctx.regime === "OLD" && npsHeadroom > 0 && ctx.marginalTaxRate > 0) {
+    const annualTaxSaved = Math.round(npsHeadroom * ctx.marginalTaxRate);
+    // Round the MONTHLY contribution to whole rupees (integer-money rule, `calculation-modules.md`),
+    // matching the trim lever's monthly rounding — avoids a fractional-rupee monthlySavings.
+    const monthlyTaxSaved = Math.round(annualTaxSaved / 12);
+    levers.push({
+      key: "nps-80ccd1b",
+      label: "Fill your 80CCD(1B) NPS headroom",
+      note: `Invest ${formatINRCompact(npsHeadroom)}/yr in NPS under 80CCD(1B) → save ${formatINRCompact(annualTaxSaved)}/yr tax, redirected to investing`,
+      apply: (b) => ({ ...b, monthlySavings: b.monthlySavings + monthlyTaxSaved }),
     });
   }
 
