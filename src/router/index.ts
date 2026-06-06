@@ -5,6 +5,7 @@ import { useAssumptionsStore } from "@/stores/assumptions";
 import { useUiStore } from "@/stores/ui";
 import { featuresGuardingRoute } from "@/lib/features";
 import { getAuthProvider } from "@/lib/auth-provider";
+import { releaseStuckScrollLock } from "@/lib/scroll-lock-recovery";
 
 function realRoute(
   path: string,
@@ -187,6 +188,17 @@ router.beforeEach((to) => {
   }
 
   return true;
+});
+
+// Self-heal a stuck Vuetify scroll-lock (see lib/scroll-lock-recovery.ts). If an
+// overlay (menu/select/dialog) was still open when this navigation swapped the
+// page, Vuetify's scroll-block teardown can be skipped, freezing <html> at
+// position:fixed with NO scrollbar across every screen until a reload. After each
+// navigation, release the lock IFF no overlay is actually open. Deferred to the
+// next frame so the outgoing route's overlays have finished unmounting.
+router.afterEach(() => {
+  if (typeof window === "undefined") return;
+  requestAnimationFrame(() => releaseStuckScrollLock());
 });
 
 export default router;
