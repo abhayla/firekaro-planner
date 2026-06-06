@@ -13,6 +13,25 @@ set -uo pipefail
 
 fail=0
 
+# 0) Worktree / background-run collision guard (added 2026-06-06 after a /goal run switched the
+#    interactive worktree's branch mid-session and a docs commit landed on the run's feature
+#    branch). ALWAYS surface branch+worktree so it is never invisible again; HARD-BLOCK committing
+#    into a worktree an active /goal run has claimed via .goal-active.lock (see goal-creator §0.1).
+_branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "?")
+_wt=$(git rev-parse --show-toplevel 2>/dev/null || echo "?")
+echo "[pre-commit] committing on branch '$_branch'  (worktree: $_wt)"
+_lock="$_wt/.goal-active.lock"
+if [ -f "$_lock" ]; then
+  _owner=$(head -n1 "$_lock" 2>/dev/null || echo "")
+  if [ -z "${GOAL_RUN_TOKEN:-}" ] || [ "${GOAL_RUN_TOKEN:-}" != "$_owner" ]; then
+    echo "BLOCKED: an active /goal run owns this worktree (.goal-active.lock present)."
+    echo "  A background /goal run is building here — do NOT commit into its worktree. Commit from"
+    echo "  main or a dedicated worktree, or wait for the run to finish. (If you ARE that run,"
+    echo "  export GOAL_RUN_TOKEN matching the lock's first line.)"
+    fail=1
+  fi
+fi
+
 # 1) Block staging real env files (allow templates: .env.example/.sample/.template)
 staged=$(git diff --cached --name-only --diff-filter=ACM)
 while IFS= read -r f; do

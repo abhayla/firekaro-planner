@@ -11,6 +11,33 @@ they load transitively.
 
 ---
 
+## §0.1 Worktree isolation — run in a DEDICATED worktree, claim it with a lock (paste FIRST, before §0.2)
+
+Paste this as the contract's **very first** action, ABOVE §0.2 (paste §0.1 AND §0.2 together as the
+contract's opening two sections). It prevents a background `/goal` run from colliding with the user's
+interactive session — the root cause of the 2026-06-06 incident, where a run switched the user's
+primary worktree onto its feature branch mid-session and a stray docs commit landed on that branch.
+
+> **First action of the run, before §0.2 and any stage. Non-negotiable.** This run MUST execute in a
+> **dedicated git worktree**, never the user's primary interactive checkout (which shares its branch +
+> working tree with the user's live session).
+>
+> 1. **Isolate:** `root=$(git rev-parse --show-toplevel)`. If `root` is the user's **primary
+>    interactive checkout** (the repo the user works in, e.g. `…/firekaro-planner`) rather than an
+>    already-dedicated `…/firekaro-goal-*` worktree, then **create and switch to a dedicated worktree
+>    before any stage**: `git worktree add ../firekaro-goal-<slug> -b <feature-branch>` and run every
+>    stage from there. NEVER run a multi-commit build in the user's primary worktree.
+> 2. **Claim it:** export a unique `GOAL_RUN_TOKEN` for this run (e.g. `<branch>-<nonce>`) and write
+>    the lock: `printf '%s\n' "$GOAL_RUN_TOKEN" > "$(git rev-parse --show-toplevel)/.goal-active.lock"`.
+>    The repo's `.githooks/pre-commit` hook HARD-BLOCKS any commit whose `GOAL_RUN_TOKEN` does not match
+>    this lock — so a concurrent interactive session physically cannot commit into this run's worktree.
+> 3. **Release on exit:** the run's FINAL action (after merge/push, OR on any halt/defer) MUST remove
+>    the lock: `rm -f "$(git rev-parse --show-toplevel)/.goal-active.lock"`. `.goal-active.lock` is
+>    gitignored. If `git worktree` is genuinely unavailable, note it and proceed — but still NEVER run
+>    in the user's primary interactive checkout.
+
+---
+
 ## §0.2 Preflight — read the coverage ledger FIRST (idempotency · NO duplication)
 
 Paste this as the contract's first numbered section (before any stage). It makes the

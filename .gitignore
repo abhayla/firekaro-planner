@@ -34,6 +34,8 @@ verify-*/
 
 # run artifacts
 docs/goals/.run/
+# /goal run worktree-claim lock (goal-creator §0.1; read by .githooks/pre-commit)
+.goal-active.lock
 
 # ephemeral hook counter + throwaway debug specs (regenerable, never commit)
 .claude/.keepgoing-count
