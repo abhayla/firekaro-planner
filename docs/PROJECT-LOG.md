@@ -62,11 +62,14 @@ missing — sequenced to a later phase.**
    annotations + the celebrate phase.
    **Re-scoped 2026-06-06 (D-2026-06-06-09) — NOT all remaining increments are must-have (anti
    feature-completeness, rule 30):**
-   - **MUST-HAVE (makes obj 2 genuinely work):** the composable (ii); the ranked card (iii-core);
-     **regime arbitrage** (the highest-ROI India lever AND the cleanest to model — no NPS/prepay fork);
+   - **MUST-HAVE (makes obj 2 genuinely work) — CORRECTED by D-2026-06-06-11 (regime is moot):**
+     the composable (ii); the ranked card (iii-core); the GENUINE behaviour-change levers —
+     **trim-expenses ✓ + risk-notch ✓** (built), **80CCD(1B) headroom** (the real India tax lever —
+     replaces regime), and a **save-more sensitivity** (replaces the moot invest-surplus); plus
      **confidence ranges on the variance-bearing levers** (risk/return — honesty, closes the free-lunch
-     gap). Pure-cashflow levers (surplus/trim/regime) stay point estimates (near-deterministic; banding
-     them is gold-plating).
+     gap). Pure-cashflow levers (trim, 80CCD, save-more) stay point estimates (near-deterministic).
+     **Reverted/moot:** regime arbitrage (→ good-to-have, blocked on `preferredTaxRegime`),
+     invest-surplus (needs rework to a sensitivity).
    - **SHOULD-HAVE (next, non-blocking):** 80CCD(1B) top-up; prepay-vs-invest (high salience but hardest
      to model honestly → its OWN careful increment); per-lever sensitivity drill-down.
    - **NICE/DEFER:** employer-NPS ask (weakest: small, not user-controllable, lock-in fork); tax-page
@@ -100,6 +103,17 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 ## §3 — Decision log (append-only, newest first)
 
 ### 2026-06-06
+- **D-2026-06-06-11 — FinTech gate caught 2 moot levers; corrected the must-have obj-2 lever set.**
+  A lever only has value if it changes something `derive()` doesn't already assume optimal.
+  **Regime arbitrage = MOOT** (`derive()` auto-`recommendRegime()`s + taxes at the optimal regime;
+  no persisted "regime the user files under") → reverted the inert `lever-tax.ts`; regime becomes
+  **good-to-have, blocked on a `household.preferredTaxRegime` + `derive()` change** (a Tier-0 honesty
+  surface). **invest-surplus = MOOT/double-count** (`annualSavings = income−tax−expenses` IS already
+  `monthlyContribution`) → rework to a "save ₹X more/mo" sensitivity. **80CCD(1B) headroom = GENUINE**
+  (`derive()` uses *actual* `deriveDeductions()`, not assumed-max) → it REPLACES regime as the must-have
+  India tax lever. *Why logged:* my earlier "regime = cleanest must-have" call (D-09) was wrong; the
+  verification edge corrected the lever set before it shipped. Corrected must-have levers: trim ✓ +
+  risk-notch ✓ (built) + 80CCD(1B) headroom + save-more sensitivity; invest-surplus needs rework.
 - **D-2026-06-06-10 — Set up a proper feature-tiering PROCESS (was missing).** Audit found the tier
   decisions were captured in PROJECT-LOG but there was NO queryable registry and the issues weren't
   tiered. Fix: GitHub issue LABELS `must-have`/`good-to-have`/`nice-to-have` are the registry
