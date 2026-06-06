@@ -27,6 +27,8 @@ import { loadMehtasSeed } from "@/seeds/mehtas";
 import { loadIyersSeed } from "@/seeds/iyers";
 import { loadMauryasSeed } from "@/seeds/mauryas";
 import { derive } from "@/lib/derive";
+import { calculateYearsToTarget } from "@/lib/fire-math";
+import { buildContributionResolver } from "@/lib/contribution-schedule";
 import { runMonteCarloFire } from "@/lib/monte-carlo";
 import { captureSnapshot, milestoneBandFor } from "@/lib/lifecycle-digest";
 
@@ -223,6 +225,95 @@ describe("headline plausibility — DEFAULT product lens (#22 foolproof gate)", 
       expect(JSON.parse(JSON.stringify(snap))).toEqual(snap);
     });
   }
+});
+
+// Temporal contributions Phase 1 (gh-issue #46) — the headline-honesty CI locks, asserted on the
+// DEFAULT product lens for EVERY seed persona. These keep the #11 corpus-inflow lock + the REAL
+// step-up monotonicity impossible to silently regress (a future edit that re-routes per-investment
+// SIPs into corpus, or flips the step-up direction, trips a RED test here).
+describe("headline plausibility — temporal contributions (#46 locks, DEFAULT lens)", () => {
+  beforeEach(() => setActivePinia(createPinia()));
+
+  for (const persona of PERSONAS) {
+    it(`${persona.name}: 0% household step-up is a NO-OP (default-path byte-identity)`, () => {
+      const h = useHouseholdStore();
+      const a = useAssumptionsStore();
+      persona.load(h, a);
+      const base = derive(h.data, a.values, DEFAULT_PRODUCT_LENS);
+      const zero = derive(h.data, { ...a.values, householdSavingsStepUpPercent: 0 }, DEFAULT_PRODUCT_LENS);
+      expect(zero.yearsToRegular, `${persona.name}: 0% step-up must not move yearsToRegular`).toBe(
+        base.yearsToRegular,
+      );
+      expect(zero.corpusOnlyYearsToRegular).toBe(base.corpusOnlyYearsToRegular);
+      expect(zero.fireNumber).toBe(base.fireNumber);
+    });
+
+    it(`${persona.name}: per-investment contributionSchedule does NOT leak into corpus (#11 coherence)`, () => {
+      const h = useHouseholdStore();
+      const a = useAssumptionsStore();
+      persona.load(h, a);
+      const base = derive(h.data, a.values, DEFAULT_PRODUCT_LENS);
+      const planted = JSON.parse(JSON.stringify(h.data)) as typeof h.data;
+      // An aggressive per-investment schedule that, IF summed into corpus, would slash the FIRE
+      // date — the exact ~10× double-count gh #11 fixed. The headline MUST be unmoved.
+      if (planted.investments[0]) {
+        planted.investments[0].contributionSchedule = [
+          { amount: 1000000, startAtAge: 30, stepUpPercentPerYear: 15 },
+        ];
+      }
+      const withSchedule = derive(planted, a.values, DEFAULT_PRODUCT_LENS);
+      expect(
+        withSchedule.yearsToRegular,
+        `${persona.name}: #11 lock — per-investment schedule must not move corpus headline`,
+      ).toBe(base.yearsToRegular);
+      expect(withSchedule.monthlyContribution).toBe(base.monthlyContribution);
+    });
+
+    it(`${persona.name}: a positive household step-up is earlier-or-equal (step-up monotonicity)`, () => {
+      const h = useHouseholdStore();
+      const a = useAssumptionsStore();
+      persona.load(h, a);
+      const base = derive(h.data, a.values, DEFAULT_PRODUCT_LENS);
+      const stepped = derive(h.data, { ...a.values, householdSavingsStepUpPercent: 8 }, DEFAULT_PRODUCT_LENS);
+      // Only meaningful when the base headline is reachable (every seed persona qualifies).
+      if (Number.isFinite(base.corpusOnlyYearsToRegular)) {
+        expect(
+          stepped.corpusOnlyYearsToRegular,
+          `${persona.name}: +8% step-up must be earlier-or-equal, never later`,
+        ).toBeLessThanOrEqual(base.corpusOnlyYearsToRegular);
+      }
+    });
+
+    it(`${persona.name}: the default-lens FIRE age sits in [anchorAge, planToAge] or is non-finite`, () => {
+      const h = useHouseholdStore();
+      const a = useAssumptionsStore();
+      persona.load(h, a);
+      const k = derive(h.data, a.values, DEFAULT_PRODUCT_LENS);
+      if (Number.isFinite(k.yearsToRegular)) {
+        const fireAge = k.anchorAge + k.yearsToRegular;
+        expect(fireAge, `${persona.name}: FIRE age never before the anchor age`).toBeGreaterThanOrEqual(
+          k.anchorAge,
+        );
+        expect(fireAge, `${persona.name}: FIRE age within the plan horizon`).toBeLessThanOrEqual(
+          k.planToAge,
+        );
+      }
+      // A non-finite result is the honest "not within horizon" signal — never an absurd age.
+    });
+  }
+
+  it("stop/reduction monotonicity: a savings schedule that STOPS reaches the target later-or-equal", () => {
+    // The household step-up can't go negative, so the stop/pause direction is locked at the
+    // calculateYearsToTarget level: a contribution schedule that stops contributing at age 50
+    // can never reach a target SOONER than the equivalent always-on contribution.
+    const anchor = 30;
+    const target = 30_000_000;
+    const monthly = 60_000;
+    const constant = calculateYearsToTarget(0, target, monthly, 0.05);
+    const stops = buildContributionResolver([{ amount: monthly, startAtAge: anchor, endAtAge: 50 }], anchor);
+    const stopped = calculateYearsToTarget(0, target, stops, 0.05);
+    expect(stopped).toBeGreaterThanOrEqual(constant);
+  });
 });
 
 // gh #39 — the EMPTY / zero-data boundary the populated personas above never covered

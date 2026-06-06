@@ -37,7 +37,8 @@ import { equityPercentAtYear } from "@/lib/glide-path";
 import { computeBridgeCoverage, type BridgeHolding } from "@/lib/bridge";
 import { deriveEpsPensionForMember, EPS_NORMAL_START_AGE } from "@/lib/eps-pension";
 import { deriveGratuityForMember } from "@/lib/gratuity";
-import type { ReturnSchedule } from "@/lib/fire-math";
+import type { ReturnSchedule, ContributionSchedule } from "@/lib/fire-math";
+import { buildContributionResolver } from "@/lib/contribution-schedule";
 import {
   resolveHouseholdInflation,
   resolveEffectiveSWRByHorizon,
@@ -536,6 +537,32 @@ export function derive(household: Household, assumptions: Assumptions, lens: Der
   const realBlendedReturn = toRealReturn(blendedReturn);
   const portfolioVolatility = blendPortfolioVolatility(returnWeights);
 
+  // ----- #46 the SINGLE corpus inflow: the household savings residual, now time-varying -----
+  // gh-issue #11 LOCK (non-negotiable): corpus inflow is the household savings RESIDUAL alone
+  // (monthlyContribution = annualSavings/12). It becomes time-varying ONLY via a REAL
+  // household-level step-up (assumptions.householdSavingsStepUpPercent, default 0 ⇒ scalar ⇒
+  // byte-identical headline). Per-investment `investments[].contributionSchedule` is DISPLAY/PLAN
+  // metadata ONLY and is DELIBERATELY NOT read here — summing per-investment SIPs into corpus is
+  // exactly the ~10× double-count gh #11 fixed (SIPs are already a subset of the surplus residual).
+  // The step-up is REAL (no inflation added — derive.ts grows the corpus in the real frame, so a
+  // real step-up is net-of-inflation growth on top of the constant-real baseline). The flattening
+  // lives in lib/contribution-schedule.ts (single-kernel rule), not inline here.
+  const householdSavingsStepUpPct = assumptions.householdSavingsStepUpPercent ?? 0;
+  const householdContributionSchedule: ContributionSchedule =
+    householdSavingsStepUpPct > 0 && monthlyContribution > 0
+      ? buildContributionResolver(
+          [
+            {
+              amount: monthlyContribution,
+              startAtAge: anchorAge,
+              stepUpPercentPerYear: householdSavingsStepUpPct,
+            },
+          ],
+          anchorAge,
+        )
+      : monthlyContribution; // scalar ⇒ byte-identical (default path; also preserves the
+  // `monthlyContribution <= 0 → Infinity` empty-state guard in calculateYearsToTarget).
+
   // Headline FIRE dates (FireHero) — the ADEQUACY leg (corpus grows to the FIRE
   // number) in the REAL frame. The bridge layer below can push the HEADLINE later
   // when the adequate corpus is not yet liquid (#15). Lean/Fat stay corpus-only.
@@ -547,13 +574,13 @@ export function derive(household: Household, assumptions: Assumptions, lens: Der
   // fireNumber > 0 (real expenses) and is unaffected.
   const hasFireTarget = fireNumber > 0;
   const corpusOnlyYearsToRegular = hasFireTarget
-    ? calculateYearsToTarget(fireWithdrawableCorpus, fireNumber, monthlyContribution, realReturnSchedule)
+    ? calculateYearsToTarget(fireWithdrawableCorpus, fireNumber, householdContributionSchedule, realReturnSchedule)
     : Number.POSITIVE_INFINITY;
   const yearsToLean = hasFireTarget
-    ? calculateYearsToTarget(fireWithdrawableCorpus, variants.leanFIRE, monthlyContribution, realReturnSchedule)
+    ? calculateYearsToTarget(fireWithdrawableCorpus, variants.leanFIRE, householdContributionSchedule, realReturnSchedule)
     : Number.POSITIVE_INFINITY;
   const yearsToFat = hasFireTarget
-    ? calculateYearsToTarget(fireWithdrawableCorpus, variants.fatFIRE, monthlyContribution, realReturnSchedule)
+    ? calculateYearsToTarget(fireWithdrawableCorpus, variants.fatFIRE, householdContributionSchedule, realReturnSchedule)
     : Number.POSITIVE_INFINITY;
 
   // ----- #15 accumulation bridge: corpus-adequate ≠ FIRE-ready -----
@@ -657,7 +684,7 @@ export function derive(household: Household, assumptions: Assumptions, lens: Der
 
   const projection = projectCorpus({
     currentCorpus: fireWithdrawableCorpus,
-    monthlyContribution,
+    monthlyContribution: householdContributionSchedule,
     expectedReturns: expectedReturnSchedule,
     // #20: grow the FIRE target at GENERAL CPI (not the healthcare-weighted blend)
     // so the chart crossover and the real-frame headline agree and FIRE is reachable.

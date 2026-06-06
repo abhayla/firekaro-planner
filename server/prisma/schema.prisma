@@ -240,6 +240,12 @@ model Investment {
   // grant details, NPS tier, RealEstate role, bucket, etc.) — JSONB.
   subtypeData Json?
 
+  // Temporal Phase 1 (gh-issue #46) — optional time-varying contribution plan
+  // (age-relative segments with a REAL step-up). Its own column (not folded into
+  // subtypeData) so the diff engine treats it as a first-class field. DISPLAY/PLAN
+  // metadata only — never an input to corpus inflow (the gh-issue #11 lock).
+  contributionSchedule Json?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

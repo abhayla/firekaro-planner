@@ -43,6 +43,13 @@ export const assumptionsSchema = z.object({
   // accumulation projection. FloorCeiling = overlays a post-retirement
   // decumulation phase using the research-grounded floor/ceiling band.
   withdrawalRule: z.enum(["Constant", "FloorCeiling"]).default("Constant"),
+  // Temporal Phase 1 (gh-issue #46) — a REAL household-savings step-up: the rate (%/yr,
+  // above inflation) at which the household's monthly savings residual (the SINGLE corpus
+  // inflow, gh #11) is planned to grow. Default 0 ⇒ the residual stays flat ⇒ today's
+  // headline is byte-identical. Opt-in; clamped ≤15%/yr (an implausibly high real step-up
+  // would optimistically pull the FIRE date in). REAL terms — the corpus compounds in the
+  // real frame (derive.ts), so a step-up here is growth NET of general inflation.
+  householdSavingsStepUpPercent: z.number().min(0).max(15).default(0),
 });
 
 export type Assumptions = z.infer<typeof assumptionsSchema>;
@@ -70,4 +77,5 @@ export const DEFAULT_ASSUMPTIONS: Assumptions = {
   leanMultiplier: 0.6,
   fatMultiplier: 1.5,
   withdrawalRule: "Constant",
+  householdSavingsStepUpPercent: 0,
 };

@@ -209,19 +209,28 @@ export function calculateFIREVariants(
 export function calculateYearsToTarget(
   currentCorpus: number,
   targetCorpus: number,
-  monthlySavings: number,
+  monthlySavings: ContributionSchedule,
   expectedReturns: ReturnSchedule = DEFAULT_RETURNS,
 ): number {
   if (currentCorpus >= targetCorpus) return 0;
-  if (monthlySavings <= 0) return Infinity;
+  // Preserve the prior scalar guard EXACTLY: a constant non-positive contribution can never
+  // reach the target (keeps the constant path byte-identical, incl. the Infinity sentinel the
+  // empty-state headline relies on). A function schedule is not eagerly rejected — it may start
+  // at 0 and ramp up — so it falls through to the loop.
+  if (typeof monthlySavings === "number" && monthlySavings <= 0) return Infinity;
   let months = 0;
   let corpus = currentCorpus;
   while (corpus < targetCorpus && months < 1200) {
     // M1 (#9): resolve the return for the current year so a glide-path schedule
     // de-risks the headline "years to FIRE" the same way it de-risks the
     // projection. A constant rate is byte-identical to the prior flat loop.
-    const r = resolveReturn(expectedReturns, Math.floor(months / 12)) / 12;
-    corpus = corpus * (1 + r) + monthlySavings;
+    const yearIndex = Math.floor(months / 12);
+    const r = resolveReturn(expectedReturns, yearIndex) / 12;
+    // #46: resolve the contribution for the current year (constant ⇒ identical to the prior
+    // `+ monthlySavings`; a step-up/stop schedule varies it year-by-year, same year-index origin
+    // as projectCorpus so the headline and the chart curve agree).
+    const contribution = resolveContribution(monthlySavings, yearIndex);
+    corpus = corpus * (1 + r) + contribution;
     months++;
   }
   return months / 12;
@@ -284,9 +293,27 @@ function resolveReturn(schedule: ReturnSchedule, yearIndex: number): number {
   return Number.isFinite(r) ? r : 0;
 }
 
+/**
+ * A per-year contribution schedule (Temporal Phase 1, gh-issue #46) — mirrors
+ * {@link ReturnSchedule}: either one constant monthly amount for the whole horizon, or a
+ * function of the year index (0 = first projected year) returning that year's monthly
+ * contribution. A constant scalar is byte-identical to the prior single-amount loop; a
+ * function lets a step-up / start-stop plan move the FIRE date. The flattening of segments
+ * into this function lives in lib/contribution-schedule.ts (the single-kernel rule keeps
+ * the math out of derive.ts).
+ */
+export type ContributionSchedule = number | ((yearIndex: number) => number);
+
+function resolveContribution(schedule: ContributionSchedule, yearIndex: number): number {
+  const c = typeof schedule === "function" ? schedule(yearIndex) : schedule;
+  // Defensive (defensive-coding.md): a non-finite contribution would poison the corpus
+  // path — fall back to 0 for that year, never NaN.
+  return Number.isFinite(c) ? c : 0;
+}
+
 export function projectCorpus(args: {
   currentCorpus: number;
-  monthlyContribution: number;
+  monthlyContribution: ContributionSchedule;
   expectedReturns: ReturnSchedule;
   inflation: number;
   annualExpensesToday: number;
@@ -352,9 +379,13 @@ export function projectCorpus(args: {
       prevWithdrawal = wd.withdrawal;
       retYear++;
     } else {
-      // Accumulation phase (unchanged): grow corpus over next 12 months + contribute.
+      // Accumulation phase: grow corpus over next 12 months + contribute. #46: the monthly
+      // contribution is resolved ONCE for this year `y` (constant schedule ⇒ identical to the
+      // prior `+ monthlyContribution`; a step-up/stop schedule varies it per year). Same
+      // year-index origin as calculateYearsToTarget so headline and chart can't diverge.
+      const contributionThisYear = resolveContribution(monthlyContribution, y);
       for (let m = 0; m < 12; m++) {
-        corpus = corpus * (1 + er / 12) + monthlyContribution;
+        corpus = corpus * (1 + er / 12) + contributionThisYear;
       }
     }
   }

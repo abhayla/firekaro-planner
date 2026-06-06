@@ -29,6 +29,10 @@ export function mapAssumptionsRow(row: UserAssumptions): Assumptions {
     leanMultiplier: row.leanMultiplier,
     fatMultiplier: row.fatMultiplier,
     withdrawalRule: row.withdrawalRule as Assumptions["withdrawalRule"],
+    // #46 — the household savings step-up is NOT persisted to UserAssumptions in Phase 1 (the
+    // What-If lever is non-persisting; default 0). Map to the research default so the server
+    // derive()/lifecycle path stays byte-identical to today.
+    householdSavingsStepUpPercent: DEFAULT_ASSUMPTIONS.householdSavingsStepUpPercent,
   };
 }
 

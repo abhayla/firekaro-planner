@@ -14,7 +14,8 @@ import { useFireDerive } from "@/lib/useFireDerive";
 import { useAssumptionsStore } from "@/stores/assumptions";
 import { useHouseholdStore } from "@/stores/household";
 import { useScenariosStore, type LeverValues } from "@/stores/scenarios";
-import { calculateFIRENumber, calculateYearsToTarget, projectCorpus } from "@/lib/fire-math";
+import { calculateFIRENumber, calculateYearsToTarget, projectCorpus, type ContributionSchedule } from "@/lib/fire-math";
+import { buildContributionResolver } from "@/lib/contribution-schedule";
 import { retireByAgeRequiredSIP } from "@/lib/adequacy";
 import { formatINRCompact, formatYearsMonths } from "@/lib/formatters";
 import InfoTip from "@/components/shared/InfoTip.vue";
@@ -52,6 +53,8 @@ const levers = ref<{
   healthcareInflation: number;
   equityAllocationPct: number;
   marriageYear: number;
+  // #46 — REAL household-savings step-up (%/yr). 0 = today's flat baseline.
+  householdStepUpPercentPerYear: number;
 }>({
   annualExpenses: baselineExpenses.value,
   monthlyContribution: baselineMonthly.value,
@@ -63,6 +66,7 @@ const levers = ref<{
   healthcareInflation: baselineHealthcareInflation.value,
   equityAllocationPct: baselineEquityPct.value,
   marriageYear: new Date().getFullYear() + 5,
+  householdStepUpPercentPerYear: 0,
 });
 
 // Re-seed levers if the baseline changes (e.g. user toggles family view in another tab).
@@ -93,6 +97,7 @@ function resetLevers() {
   levers.value.healthcareInflation = baselineHealthcareInflation.value;
   levers.value.equityAllocationPct = baselineEquityPct.value;
   levers.value.marriageYear = new Date().getFullYear() + 5;
+  levers.value.householdStepUpPercentPerYear = 0;
 }
 
 // Baseline FIRE projection (read from useFireDerive).
@@ -104,6 +109,24 @@ const baselineFireYear = computed(() =>
     : null,
 );
 
+// #46 — the What-If contribution as a (possibly time-varying) schedule. A positive household
+// step-up turns the flat monthly contribution into a REAL year-on-year ramp via the shared
+// resolver (no math duplicated here) → the FIRE date recomputes live below. 0% ⇒ the plain
+// scalar (byte-identical to the prior What-If). The household savings residual is the only
+// truthful corpus inflow (gh #11), so the step-up rides on monthlyContribution, not per-SIP.
+const whatIfContribution = computed<ContributionSchedule>(() => {
+  const stepUp = levers.value.householdStepUpPercentPerYear;
+  const monthly = levers.value.monthlyContribution;
+  if (stepUp > 0 && monthly > 0) {
+    const anchor = fire.anchorAge.value ?? 30;
+    return buildContributionResolver(
+      [{ amount: monthly, startAtAge: anchor, stepUpPercentPerYear: stepUp }],
+      anchor,
+    );
+  }
+  return monthly;
+});
+
 // What-If projection — recomputed from the levers.
 const whatIfFireNumber = computed(() => calculateFIRENumber(levers.value.annualExpenses, levers.value.swr));
 const whatIfYears = computed(() => {
@@ -111,7 +134,7 @@ const whatIfYears = computed(() => {
   return calculateYearsToTarget(
     currentCorpus,
     whatIfFireNumber.value,
-    levers.value.monthlyContribution,
+    whatIfContribution.value,
     levers.value.expectedReturn,
   );
 });
@@ -148,7 +171,7 @@ const baselineProjection = computed(() =>
 const whatIfProjection = computed(() =>
   projectCorpus({
     currentCorpus: fire.totalCorpus.value + (levers.value.lumpSumWindfall || 0),
-    monthlyContribution: levers.value.monthlyContribution,
+    monthlyContribution: whatIfContribution.value,
     expectedReturns: levers.value.expectedReturn,
     inflation: levers.value.inflation,
     annualExpensesToday: levers.value.annualExpenses,
@@ -188,6 +211,7 @@ function saveCurrentAsScenario() {
   if (levers.value.lumpSumWindfall) diff.lumpSumWindfall = levers.value.lumpSumWindfall;
   if (Math.abs(levers.value.healthcareInflation - baselineHealthcareInflation.value) > 1e-4) diff.healthcareInflation = levers.value.healthcareInflation;
   if (levers.value.equityAllocationPct !== baselineEquityPct.value) diff.equityAllocationPct = levers.value.equityAllocationPct;
+  if (levers.value.householdStepUpPercentPerYear > 0) diff.householdStepUpPercentPerYear = levers.value.householdStepUpPercentPerYear;
   scenarios.addScenario(newScenarioName.value.trim(), diff);
   newScenarioName.value = "";
 }
@@ -206,6 +230,7 @@ function loadScenario(id: string) {
   if (v.lumpSumWindfall !== undefined) levers.value.lumpSumWindfall = v.lumpSumWindfall;
   if (v.healthcareInflation !== undefined) levers.value.healthcareInflation = v.healthcareInflation;
   if (v.equityAllocationPct !== undefined) levers.value.equityAllocationPct = v.equityAllocationPct;
+  if (v.householdStepUpPercentPerYear !== undefined) levers.value.householdStepUpPercentPerYear = v.householdStepUpPercentPerYear;
 }
 
 // ---- Retire-by-age reverse solver (gh-issue #30) ----
@@ -372,6 +397,30 @@ function resetTargetAge() {
                 hint="What you save + invest each month"
                 persistent-hint
               />
+            </v-col>
+            <v-col cols="12">
+              <div class="d-flex align-center justify-space-between mb-1">
+                <span class="text-caption">
+                  Annual savings step-up:
+                  <strong data-testid="whatif-stepup-value">{{ levers.householdStepUpPercentPerYear }}%</strong>
+                  <span class="text-medium-emphasis"> / yr (real, above inflation)</span>
+                </span>
+              </div>
+              <v-slider
+                v-model="levers.householdStepUpPercentPerYear"
+                :min="0"
+                :max="15"
+                :step="1"
+                thumb-label="always"
+                density="compact"
+                color="primary"
+                hide-details
+                aria-label="Annual household savings step-up percent"
+                data-testid="whatif-stepup-slider"
+              />
+              <div class="text-caption text-medium-emphasis">
+                Grow what you save each year — watch the FIRE date move.
+              </div>
             </v-col>
           </v-row>
         </v-card>

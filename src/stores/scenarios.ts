@@ -37,6 +37,13 @@ export interface LeverValues {
   kidsCollegeYears?: Record<string, number>;
   /** Marriage goal year. */
   marriageYear?: number;
+  /**
+   * #46 — REAL household-savings step-up (%/yr, above inflation). The live What-If lever that
+   * actually moves the FIRE date: only the household savings residual is the truthful corpus
+   * inflow, so a household-level step-up is what compresses the years-to-FIRE (a per-investment
+   * SIP step-up would double-count — gh #11). Non-persisting like every What-If lever.
+   */
+  householdStepUpPercentPerYear?: number;
 }
 
 export interface Scenario {
