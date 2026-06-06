@@ -46,8 +46,14 @@ retention you cannot measure.
    `docs/retention-engagement-features.md`.
 
 **Parallel/queued (not the active focus):**
-- **#46 temporal-contributions Phase 1** — design FINAL, autonomous goal contract ready
-  (`docs/goals/2026-06-06-temporal-contributions-phase1.md`); Abhay runs `/goal` when ready.
+- **#46 temporal-contributions Phase 1 — ✅ DONE** (merged to `main` @ `c7c70a5`, autonomous `/goal`
+  run complete, no deferrals). Time-varying household savings schedule + REAL opt-in step-up lever;
+  per-investment schedules persisted but **barred from the corpus headline** (bug-#11 lock) — plan/
+  display only. ADR-0004 written. **Two open follow-ups, both non-blocking:** **#47** chart-vs-headline
+  nominal/real frame divergence (only bites once a persisted dashboard step-up UI lands; conservative
+  direction, never optimistic) + a missing step-up-ceiling persona-sanity spec. **Deploy-gate B7**
+  (`docs/comms-go-live-handoff.md`): the authored-not-applied `contributionSchedule` JSONB migration
+  ships automatically on the next redeploy (Abhay's gate) — take a Supabase PITR backup first.
 - **#43 Form16/CAS import** (obj 0, effortless setup — the buildable activation-gate friction-killer).
 - **#42 scroll-lock prod bug**; **#41 business-income tax modelling.**
 
@@ -56,6 +62,12 @@ retention you cannot measure.
 ## §3 — Decision log (append-only, newest first)
 
 ### 2026-06-06
+- **D-2026-06-06-06 — Temporal-contributions Phase 1 SHIPPED to `main`.** Autonomous `/goal` run of the
+  #46 contract completed with no deferrals; merged @ `c7c70a5` (+ ADR-0004, the persisted
+  `contributionSchedule` column, the What-If step-up lever, plausibility locks). Migration is
+  authored-not-applied → tracked as deploy-gate **B7**. Two non-blocking follow-ups filed: **#47**
+  (chart/headline frame divergence + step-up-ceiling spec gap). *Why logged:* closes the §2
+  "Abhay runs /goal when ready" status; the honesty-objective foundation is now stronger.
 - **D-2026-06-06-05 — Created the documentation-management system.** New rule
   `.claude/rules/documentation-management.md` (doc taxonomy + document-on-decision trigger +
   auto-reference protocol) + this `docs/PROJECT-LOG.md` + a `CLAUDE.md` pointer. *Why:* strategic
