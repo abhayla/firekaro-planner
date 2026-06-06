@@ -60,6 +60,9 @@ export function useFireDerive() {
     realBlendedReturn: computed(() => d.value.realBlendedReturn),
     realReturnSchedule: computed(() => d.value.realReturnSchedule),
     portfolioVolatility: computed(() => d.value.portfolioVolatility),
+    // Canonical per-bucket corpus weights (₹) backing blendedReturn/portfolioVolatility — the basis
+    // the obj-2 acceleration composable must use for risk-notch equity headroom + perturbed σ (gh-48).
+    returnWeights: computed(() => d.value.returnWeights),
     // #18 Monte Carlo headline confidence band — LAZY (Vue computed only runs the
     // simulation when a consumer reads it, e.g. FireHero). Same real frame as the
     // corrected headline so p50 ≈ the deterministic years-to-FIRE. The MC tapers its

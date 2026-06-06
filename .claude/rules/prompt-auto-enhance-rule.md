@@ -9,6 +9,20 @@ The hook (`prompt-enhance-reminder.sh`) gates triggering: prompts ≤15 chars
 and known continuation phrases skip injection at the deterministic layer,
 so the strengthening pipeline only runs on substantive prompts.
 
+> **The indicator is unconditional on substantive OUTPUT — even when the hook stayed
+> silent (B-layer rule, 2026-06-06).** The prompt hook gates on PROMPT shape, so it
+> intentionally injects nothing on short / slash-command / continuation prompts (the
+> `/init` class). But those prompts STILL spawn substantive work, and per
+> `operating-model.md` the governance discipline fires on the **output's blast radius,
+> not the prompt's shape**. So: whenever a turn produces substantive output (real
+> analysis, a multi-step answer, tool edits/commits) you MUST self-apply the
+> `*Enhanced:*` indicator + the `Role:` line + the governance tail **even if no
+> reminder was injected** — never let a hook-silent turn skip the discipline. The Stop
+> hook `no-overask-guard.sh` (class C) logs any substantive turn missing the banner to
+> `.claude/.enhance-misses.log` as a backstop (telemetry, non-blocking). Genuinely
+> trivial turns (a one-line confirmation, `yes`/`go ahead`) are exempt — the banner is
+> for substantive output, not chatter.
+
 ## The unified per-prompt pipeline (0 → 6)
 
 Every substantive prompt runs ONE process. Stages 0–4.6 strengthen the prompt;

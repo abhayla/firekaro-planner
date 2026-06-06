@@ -21,6 +21,7 @@ operating log for product/roadmap decisions that previously had no home), and de
 | **Strategic / product / roadmap / prioritization decision** (the "operating log") | **`docs/PROJECT-LOG.md`** (append-only, dated) | this rule |
 | Architecture decision (schema, engine, data-model fork) | `docs/adr/NNNN-*.md` (`/adr` skill) | ADR process |
 | Bug / feature / task work item | **GitHub Issues** (SSOT) | `bug-filing-and-sibling-audit.md` |
+| **Feature priority tier** (`must-have` / `good-to-have` / `nice-to-have`) | **GitHub issue LABEL** (queryable: `gh issue list --label must-have`) — the WHY of the call goes in PROJECT-LOG | this rule (§ below) |
 | Autonomous build spec | `docs/goals/YYYY-MM-DD-*.md` (`goal-creator`) | goal-creator skill |
 | Product design SSOT (objectives, persona, screens) | `docs/v6-fire-planner-product-plan.md` §9; `SCREEN-STANDARD.md` | rule 27 |
 | Stable convention / how-we-work | `CLAUDE.md` + `.claude/rules/*.md` | `configuration-ssot.md` |
@@ -34,6 +35,28 @@ operating log for product/roadmap decisions that previously had no home), and de
 why* and POINTS to the formal artifact (the issue #, ADR, goal contract). It is NOT a duplicate of
 them. It is specifically for the strategic/product/operating decisions that previously evaporated into
 chat (goal-status calls, prioritization, "what we're building next and why").
+
+## Feature tiering registry (must-have / good-to-have / nice-to-have — MUST)
+
+Every feature/work-item is categorized into exactly one priority tier, and that categorization is
+**documented, queryable, and maintained** — never left only in chat. The mechanism (chosen to leverage
+the work-item SSOT without a drifting parallel doc, per `configuration-ssot.md`):
+
+- **The registry = GitHub issue LABELS** `must-have`, `good-to-have`, `nice-to-have` (Abhay's exact
+  terms). The live registry is a query: `gh issue list --label must-have` (or `good-to-have` /
+  `nice-to-have`). There is **no separate feature-tier markdown doc** — that would drift from the
+  issues. Definitions: **must-have** = the app/objective doesn't genuinely work without it;
+  **good-to-have** = important to the goal but the product works without it, sequenced after must-haves;
+  **nice-to-have** = valuable polish/edge, lowest priority, often deferred.
+- **Every feature issue MUST carry exactly one tier label** (alongside `enhancement`/`bug`). When an
+  issue is filed or its priority is re-decided, set/replace the tier label **in the same turn**.
+- **Sub-features inside one issue** (e.g. the #48 lever increments) → a tier-tagged **checklist in the
+  issue body**, since they share one issue number.
+- **The WHY of each tiering call → `docs/PROJECT-LOG.md` decision log** (the tier label says *what*; the
+  decision entry says *why*, goal-anchored). Re-tiering is a `Document-on-decision` event (below).
+- **Tiering is goal-anchored** (`goal-anchored-decisions.md`, rule 30): tier by importance to the goal +
+  LOCKED persona, NOT by feature-completeness ("the catalog looks incomplete" is not a reason to
+  must-have something).
 
 ## Document-on-decision (the trigger — MUST, every turn that decides)
 

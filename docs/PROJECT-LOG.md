@@ -48,8 +48,33 @@ missing — sequenced to a later phase.**
   build, tracked as a new issue.
 
 **The must-have-now plan (sequenced):**
-1. **Obj-2 flagship — lever-impact ranking engine** (#48; financial math + UI; the hollow core of
-   "get there faster"). → IN PROGRESS.
+1. **Obj-2 flagship — lever-impact ranking engine** (#48; financial math + UI). → IN PROGRESS on
+   `feat/lever-impact-engine`. **Done so far (pure core, TDD + double independent FinTech review):**
+   (a) the policy-free engine (`src/lib/lever-impact.ts` — per-lever years-to-FIRE delta + ranking,
+   honest cap-out reachability); (b) comparability policy DECIDED (D-2026-06-06-08); (c) the
+   realistic-max-effort catalog (`src/lib/lever-catalog.ts` — surplus / trim / risk-notch with
+   transparent bounds + the risk-notch volatility caveat). **Remaining increments:** (i) India-specific
+   levers (regime arbitrage, 80CCD(1B), employer-NPS, prepay-vs-invest — need tax/interest
+   recomputation modelling); (ii) the impure composable wiring derive→AccelerationContext (MUST assert
+   the net-of-existing-contributions surplus contract — the double-count guard); (iii) the UI surface
+   (ranked "biggest achievable wins" card + per-lever sensitivity drill-down + obj-1 confidence bands;
+   the bands also close the risk-notch deterministic-yardstick honesty gap) + tax-planning FIRE-impact
+   annotations + the celebrate phase.
+   **Re-scoped 2026-06-06 (D-2026-06-06-09) — NOT all remaining increments are must-have (anti
+   feature-completeness, rule 30):**
+   - **MUST-HAVE (makes obj 2 genuinely work) — CORRECTED by D-2026-06-06-11 (regime is moot):**
+     the composable (ii); the ranked card (iii-core); the GENUINE behaviour-change levers —
+     **trim-expenses ✓ + risk-notch ✓** (built), **80CCD(1B) headroom** (the real India tax lever —
+     replaces regime), and a **save-more sensitivity** (replaces the moot invest-surplus); plus
+     **confidence ranges on the variance-bearing levers** (risk/return — honesty, closes the free-lunch
+     gap). Pure-cashflow levers (trim, 80CCD, save-more) stay point estimates (near-deterministic).
+     **Reverted/moot:** regime arbitrage (→ good-to-have, blocked on `preferredTaxRegime`),
+     invest-surplus (needs rework to a sensitivity).
+   - **SHOULD-HAVE (next, non-blocking):** 80CCD(1B) top-up; prepay-vs-invest (high salience but hardest
+     to model honestly → its OWN careful increment); per-lever sensitivity drill-down.
+   - **NICE/DEFER:** employer-NPS ask (weakest: small, not user-controllable, lock-in fork); tax-page
+     FIRE annotations (polish); **celebrate phase → the STICKINESS phase** (it's retention, which we
+     deferred behind the must-have core — folding it in now reopens D-2026-06-06-07).
 2. ~~#42 scroll-lock~~ **✅ RESOLVED** (2026-06-06) — fix already shipped (`scroll-lock-recovery.ts`
    router safety net @ 8467055/c2176a1), verified live on `main` (spec 4/4, wired at
    `router/index.ts:201`); was a stale-open issue. Closed.
@@ -78,6 +103,71 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 ## §3 — Decision log (append-only, newest first)
 
 ### 2026-06-06
+- **D-2026-06-06-13 — Authored the 3 remaining must-have goal contracts (the obj-1/3/4 queue) for
+  parallel `/goal` runs.** With #48 done (D-12), the remaining must-have set is contracted, sequenced,
+  and parallel-safe — Abhay runs them in separate sessions: (1) **tax current-FY staleness guard**
+  (obj-1, small — the last accumulation-core honesty hole; prod-visible banner when the live FY is
+  unconfigured) → `docs/goals/2026-06-06-tax-current-fy-staleness-guard.md`; (2) **readiness-to-stop
+  verdict** (obj-3 — a "can I pull the trigger?" verdict on the existing bridge math) →
+  `docs/goals/2026-06-06-readiness-to-stop-verdict.md`; (3) **decumulation guardrails** (obj-4 —
+  withdrawal bands reuse + NEW post-FIRE sequence-of-returns warning + light annual review) →
+  `docs/goals/2026-06-06-decumulation-guardrails.md`. Each contract self-isolates into its own worktree
+  off `main` (§0.1) + an idempotency preflight (§0.2), commits-but-does-not-push (Abhay merges), and bakes
+  the 526e100 real-frame/never-more-optimistic-than-headline lesson. **Parallel-safe by design:** disjoint
+  file sets, except #2/#3 both add a route+nav line (`router/index.ts` + `SidebarNav.vue`) — a trivial
+  adjacent-line merge, noted in both. *Why logged:* the must-have roadmap after #48 is now durably
+  tracked as runnable contracts, not chat. obj-1 first (small, closes the core); obj-3/4 are the wedge's
+  later lifecycle (math built, UI missing). Contracts left UNCOMMITTED per the goal-contract convention
+  (edit-then-run). Good-to-have follow-ups remain: #44/#45/#41/#49 + the untracked ones from the audit.
+- **D-2026-06-06-12 — #48 SHIPPED then the supervisor edge caught a HIGH honesty defect; fixed. #48
+  must-have core now genuinely complete.** The `/goal` run built + merged the #48 remainder (80CCD
+  lever, MC band, composable, AccelerationCard) onto `feat/lever-impact-engine` (merge 84fde1e). The
+  run self-verified green — but the operating-model verification edge (independent FinTech +
+  Code-Quality, rule 29/33) caught what the run's seed spec missed: on the **bridge-limited Iyers
+  persona the card showed the SCALAR corpus-only years (~17.5) — 1.4yr MORE OPTIMISTIC than the honest
+  bridge-adjusted headline (~18.9)** — the rule-31/bug-#22 optimistic-skew class on a flagship action
+  surface (the run's spec only tested Sharmas, where the bridge is inactive → diff 0). **Fixed**
+  (526e100): card always renders the honest `headlineYears`; when `bridgeBinding`, the scalar per-lever
+  deltas are dropped for an honest "your date is bridge-limited" caveat; +4-persona rule-31 plausibility
+  sweep + a dep-free template-binding lock. FinTech PASS, Code-Quality re-review APPROVE, 903/903 green,
+  type-check clean; committed (NOT pushed — Abhay merges). **Deferred → #49 (good-to-have):** make the
+  per-lever deltas themselves bridge-aware (re-run `derive()` per lever) to restore quantified figures
+  for liquidity-limited households; the caveat makes the current state honest now. *Why logged:* a
+  textbook win for the independent-verification mandate — self-verification shipped an optimistic-honesty
+  bug; the blind review pass caught it before it reached a user. **#48 = done** (modulo #49); the next
+  must-have is the obj-1 tax current-FY staleness guard (small) then the obj-3/4 surfaces (later phase).
+- **D-2026-06-06-11 — FinTech gate caught 2 moot levers; corrected the must-have obj-2 lever set.**
+  A lever only has value if it changes something `derive()` doesn't already assume optimal.
+  **Regime arbitrage = MOOT** (`derive()` auto-`recommendRegime()`s + taxes at the optimal regime;
+  no persisted "regime the user files under") → reverted the inert `lever-tax.ts`; regime becomes
+  **good-to-have, blocked on a `household.preferredTaxRegime` + `derive()` change** (a Tier-0 honesty
+  surface). **invest-surplus = MOOT/double-count** (`annualSavings = income−tax−expenses` IS already
+  `monthlyContribution`) → rework to a "save ₹X more/mo" sensitivity. **80CCD(1B) headroom = GENUINE**
+  (`derive()` uses *actual* `deriveDeductions()`, not assumed-max) → it REPLACES regime as the must-have
+  India tax lever. *Why logged:* my earlier "regime = cleanest must-have" call (D-09) was wrong; the
+  verification edge corrected the lever set before it shipped. Corrected must-have levers: trim ✓ +
+  risk-notch ✓ (built) + 80CCD(1B) headroom + save-more sensitivity; invest-surplus needs rework.
+- **D-2026-06-06-10 — Set up a proper feature-tiering PROCESS (was missing).** Audit found the tier
+  decisions were captured in PROJECT-LOG but there was NO queryable registry and the issues weren't
+  tiered. Fix: GitHub issue LABELS `must-have`/`good-to-have`/`nice-to-have` are the registry
+  (`gh issue list --label …`); the process is codified in `documentation-management.md` § "Feature
+  tiering registry"; the WHY stays here. Applied tiers to all open issues (#48 must; #44/#45/#41/#46
+  good; #43/#47 nice). *Why:* Abhay's standing requirement to keep must/good/nice features properly
+  documented — decisions alone weren't enough without a maintained, queryable home + a process.
+- **D-2026-06-06-09 — Re-scoped #48's remaining increments: only ~half are must-have.** Must-have =
+  composable + ranked card + **regime arbitrage** (highest-ROI, cleanest-to-model India lever) +
+  confidence ranges on variance-bearing levers (honesty). Should-have = 80CCD(1B), prepay-vs-invest
+  (own careful increment), sensitivity drill-down. Nice/defer = employer-NPS ask, tax-page annotations,
+  **celebrate phase → stickiness phase** (it's retention, deferred behind the core). *Why (goal):*
+  anti-feature-completeness (rule 30) — build the minimum that makes obj 2 genuinely answer the
+  accumulator's "biggest achievable win?", sequenced by value-per-modelling-risk, not "the catalog
+  looks incomplete". See §2.
+- **D-2026-06-06-08 — Lever comparability policy = realistic max-effort + transparent bounds + obj-1
+  confidence bands + per-lever sensitivity drill-down** (#48). Decided with the FinTech + PM role
+  (Abhay: "use proper role and take decision"), goal-anchored to the accumulator's "what's my biggest
+  *achievable* win?". Rejected per-₹ efficiency (crowns tiny-headroom levers) and pure user-set
+  sensitivity (abdicates the "rank them" mandate). *Why logged:* it's the load-bearing honesty
+  decision gating every lever definition. Engine + 3-lever catalog shipped on `feat/lever-impact-engine`.
 - **D-2026-06-06-07 — Reprioritized to COMPLETE THE MUST-HAVE CORE (obj 0+1+2) before stickiness;
   scope = accumulation core, defer obj 3+4 to a later phase.** Abhay's call: complete the app's
   must-have feature set before measuring retention (a working core is the precondition for
@@ -116,7 +206,11 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 ## §4 — Pointers (the formal artifacts this log indexes)
 
 - Product design SSOT + objectives §9: `docs/v6-fire-planner-product-plan.md`
-- Open work items: GitHub Issues (`gh issue list`) — current: #41, #42, #43, #44, #45, #46
+- Open work items: GitHub Issues (`gh issue list`) — current: #41, #43, #44, #45, #46, #47, #48
+- **Feature priority tiers (registry = issue labels):** `gh issue list --label must-have` /
+  `--label good-to-have` / `--label nice-to-have`. The categorization process is governed by
+  `.claude/rules/documentation-management.md` § "Feature tiering registry"; the WHY of each call is in
+  the decision log below. Current: must-have #48 · good-to-have #44/#45/#41/#46 · nice-to-have #43/#47.
 - Architecture decisions: `docs/adr/` (0001–0003; 0004 temporal model pending the #46 run)
 - Autonomous build specs: `docs/goals/`
 - Retention backlog: `docs/retention-engagement-features.md`

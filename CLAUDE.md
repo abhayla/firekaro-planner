@@ -79,6 +79,10 @@ build contract (still the source of truth for the planner's screens/math) is
 Frontend and backend each have their **own `package.json` / `node_modules`** — run `npm install` in
 both `.` (root) and `server/`.
 
+> **Cold-start for code tasks:** the load-bearing spine is `src/lib/derive.ts` (the ONE pure FIRE-math
+> kernel), `src/lib/storage-adapter.ts` (the persistence seam — localStorage demo ↔ ServerAdapter), and
+> `src/stores/household.ts` (the big store). Read those three before touching planner logic.
+
 > `README.md` is the human-facing overview (refreshed for the standalone repo). THIS file (`CLAUDE.md`)
 > remains the SSOT for layout, ports, architecture, and commands — if the two ever drift, trust this one.
 
