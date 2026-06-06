@@ -48,8 +48,18 @@ missing — sequenced to a later phase.**
   build, tracked as a new issue.
 
 **The must-have-now plan (sequenced):**
-1. **Obj-2 flagship — lever-impact ranking engine** (#48; financial math + UI; the hollow core of
-   "get there faster"). → IN PROGRESS.
+1. **Obj-2 flagship — lever-impact ranking engine** (#48; financial math + UI). → IN PROGRESS on
+   `feat/lever-impact-engine`. **Done so far (pure core, TDD + double independent FinTech review):**
+   (a) the policy-free engine (`src/lib/lever-impact.ts` — per-lever years-to-FIRE delta + ranking,
+   honest cap-out reachability); (b) comparability policy DECIDED (D-2026-06-06-08); (c) the
+   realistic-max-effort catalog (`src/lib/lever-catalog.ts` — surplus / trim / risk-notch with
+   transparent bounds + the risk-notch volatility caveat). **Remaining increments:** (i) India-specific
+   levers (regime arbitrage, 80CCD(1B), employer-NPS, prepay-vs-invest — need tax/interest
+   recomputation modelling); (ii) the impure composable wiring derive→AccelerationContext (MUST assert
+   the net-of-existing-contributions surplus contract — the double-count guard); (iii) the UI surface
+   (ranked "biggest achievable wins" card + per-lever sensitivity drill-down + obj-1 confidence bands;
+   the bands also close the risk-notch deterministic-yardstick honesty gap) + tax-planning FIRE-impact
+   annotations + the celebrate phase.
 2. ~~#42 scroll-lock~~ **✅ RESOLVED** (2026-06-06) — fix already shipped (`scroll-lock-recovery.ts`
    router safety net @ 8467055/c2176a1), verified live on `main` (spec 4/4, wired at
    `router/index.ts:201`); was a stale-open issue. Closed.
@@ -78,6 +88,12 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 ## §3 — Decision log (append-only, newest first)
 
 ### 2026-06-06
+- **D-2026-06-06-08 — Lever comparability policy = realistic max-effort + transparent bounds + obj-1
+  confidence bands + per-lever sensitivity drill-down** (#48). Decided with the FinTech + PM role
+  (Abhay: "use proper role and take decision"), goal-anchored to the accumulator's "what's my biggest
+  *achievable* win?". Rejected per-₹ efficiency (crowns tiny-headroom levers) and pure user-set
+  sensitivity (abdicates the "rank them" mandate). *Why logged:* it's the load-bearing honesty
+  decision gating every lever definition. Engine + 3-lever catalog shipped on `feat/lever-impact-engine`.
 - **D-2026-06-06-07 — Reprioritized to COMPLETE THE MUST-HAVE CORE (obj 0+1+2) before stickiness;
   scope = accumulation core, defer obj 3+4 to a later phase.** Abhay's call: complete the app's
   must-have feature set before measuring retention (a working core is the precondition for
