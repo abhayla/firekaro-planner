@@ -90,9 +90,13 @@ export function scalarToSegments(monthly: number | undefined): ContributionSegme
 }
 
 /**
- * Canonicalise a schedule into a stably-sorted, number-rounded array so a re-save with no real
- * change does not trip the household-diff `deepEqual` (idempotent PUT → zero writes, Stage E).
- * Amounts rounded to the rupee; step-up rounded to 4 dp; sorted by `startAtAge`.
+ * Canonicalise a schedule into a stably-sorted, number-rounded array. Call this at the WRITE
+ * boundary (the InvestmentForm save is the sole writer of a persisted schedule today) so a re-save
+ * with no real change does not trip the household-diff `deepEqual` (idempotent PUT → zero writes,
+ * Stage E). The diff engine itself does NOT canonicalize — it relies on the writer having done so;
+ * if a future non-form writer (a seed persona, a programmatic edit) ever persists a raw schedule,
+ * canonicalize it there too, or move this into the diff comparison. Amounts rounded to the rupee;
+ * step-up rounded to 4 dp; sorted by `startAtAge`.
  */
 export function canonicalizeSegments(segments: ContributionSegments): ContributionSegments {
   return [...segments]

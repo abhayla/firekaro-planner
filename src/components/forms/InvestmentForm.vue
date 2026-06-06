@@ -819,11 +819,17 @@ function saveEdit() {
             <span v-if="i.holdingsCount"> · {{ i.holdingsCount }} holdings</span>
             <span v-if="i.type === 'ESOP' && i.totalGrantValue"> · {{ i.vestedPercent }}% vested of {{ formatINRCompact(i.totalGrantValue) }}</span>
             <span
-              v-if="i.contributionSchedule?.[0]?.stepUpPercentPerYear"
+              v-if="i.contributionSchedule?.[0]"
               class="text-primary"
               data-testid="contribution-plan-indicator"
             >
-              · planned +{{ i.contributionSchedule[0].stepUpPercentPerYear }}%/yr
+              <template v-if="i.contributionSchedule[0].stepUpPercentPerYear">
+                · planned +{{ i.contributionSchedule[0].stepUpPercentPerYear }}%/yr
+              </template>
+              <template v-else-if="i.contributionSchedule[0].endAtAge">
+                · planned: stops at {{ i.contributionSchedule[0].endAtAge }}
+              </template>
+              <template v-else> · planned change</template>
             </span>
           </template>
           <template #trailing>
@@ -920,6 +926,8 @@ function saveEdit() {
                           label="Starts at age (optional)"
                           density="comfortable"
                           placeholder="now"
+                          min="0"
+                          max="120"
                           data-testid="plan-start-age-field"
                         />
                       </v-col>
@@ -930,6 +938,8 @@ function saveEdit() {
                           label="Stops at age (optional)"
                           density="comfortable"
                           placeholder="never"
+                          :min="(scheduleStartAge ?? 0) + 1"
+                          max="120"
                           data-testid="plan-stop-age-field"
                         />
                       </v-col>
