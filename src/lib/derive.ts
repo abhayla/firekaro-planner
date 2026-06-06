@@ -736,6 +736,12 @@ export function derive(household: Household, assumptions: Assumptions, lens: Der
     // and the MC p50 converges to the headline for glide-ON households (#24 Part 1).
     realReturnSchedule,
     portfolioVolatility,
+    // The canonical per-bucket corpus weights (₹, from fireCorpusInvestments — whole-household,
+    // primary-residence excluded) that back blendedReturn + portfolioVolatility. Exposed so the
+    // obj-2 acceleration composable computes the risk-notch's current-equity headroom + perturbed
+    // volatility off the SAME basis as the headline (gh-48 coherence; do not re-aggregate from a
+    // lensed/residence-inclusive set, which silently diverges).
+    returnWeights,
     householdInflation,
     annualEpfVpfContribution,
     householdMarginalRate,

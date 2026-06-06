@@ -1,7 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { computeLeverBand } from "./lever-bands";
+import { computeLeverBand, volatilityAfterEquityNotch } from "./lever-bands";
 import { MAX_PROJECTION_YEARS } from "./monte-carlo";
+import { blendPortfolioVolatility, type PortfolioReturnWeights } from "./assumption-math";
 import { yearsToFire, type FireBaseline } from "./lever-impact";
+
+const WEIGHTS: PortfolioReturnWeights = {
+  equity: 40, debt: 40, ppf: 10, epf: 0, gold: 0, realEstate: 0, nps: 0, international: 10, reit: 0, crypto: 0, other: 0,
+};
 
 // A reachable accumulator baseline already perturbed by the risk-notch (a raised expected real return).
 const PERTURBED: FireBaseline = {
@@ -59,6 +64,33 @@ describe("computeLeverBand — real-frame confidence band for the variance-beari
     const band = computeLeverBand({ baseline: PERTURBED, volatility: 0.2, seed: 1 })!;
     expect(band.expectedYears).toBeGreaterThan(band.p10Years);
     expect(band.expectedYears).toBeLessThan(band.p90Years);
+  });
+});
+
+describe("volatilityAfterEquityNotch — the perturbed σ always RISES (funded from the defensive sleeve)", () => {
+  it("raises blended σ when shifting into equity from the defensive sleeve", () => {
+    const baseSigma = blendPortfolioVolatility(WEIGHTS);
+    const perturbed = volatilityAfterEquityNotch(WEIGHTS, 10)!;
+    expect(perturbed).toBeGreaterThan(baseSigma);
+  });
+
+  it("returns null when there is no defensive sleeve to redeploy (all equity-like)", () => {
+    const allEquity: PortfolioReturnWeights = { ...WEIGHTS, debt: 0, ppf: 0, equity: 90, international: 10 };
+    expect(volatilityAfterEquityNotch(allEquity, 10)).toBeNull();
+  });
+
+  it("returns null for a non-positive notch or an empty portfolio", () => {
+    expect(volatilityAfterEquityNotch(WEIGHTS, 0)).toBeNull();
+    expect(volatilityAfterEquityNotch(WEIGHTS, -5)).toBeNull();
+    const empty: PortfolioReturnWeights = { ...WEIGHTS, equity: 0, debt: 0, ppf: 0, international: 0 };
+    expect(volatilityAfterEquityNotch(empty, 10)).toBeNull();
+  });
+
+  it("never raises σ by funding from higher-σ international/reit (caps the shift at the defensive sleeve)", () => {
+    // defensive = debt40 + ppf10 = 50; a 60pp shift caps at 50, leaving international untouched
+    const perturbed = volatilityAfterEquityNotch(WEIGHTS, 60)!;
+    expect(perturbed).toBeGreaterThan(blendPortfolioVolatility(WEIGHTS));
+    expect(Number.isFinite(perturbed)).toBe(true);
   });
 });
 

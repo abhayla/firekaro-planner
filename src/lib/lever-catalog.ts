@@ -44,7 +44,9 @@ export interface AccelerationContext {
   regime: "OLD" | "NEW";
 }
 
-const EQUITY_NOTCH_POINTS = 10; // one realistic re-allocation step = +10pp equity
+/** One realistic re-allocation step = +10pp equity. Exported so the band wiring can compute the
+ *  perturbed portfolio volatility for the SAME notch the lever applies (single source of the notch). */
+export const EQUITY_NOTCH_POINTS = 10;
 
 /**
  * The save-more sensitivity is a USER-PARAMETERISED lever, not a fixed-bound catalog entry — its

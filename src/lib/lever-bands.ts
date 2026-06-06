@@ -16,7 +16,42 @@
  * Keep pure (no store/DOM) per `.claude/rules/calculation-modules.md`.
  */
 import { runMonteCarloFire, INDIA_EQUITY_ANNUAL_RETURNS, MAX_PROJECTION_YEARS } from "./monte-carlo";
+import { blendPortfolioVolatility, type PortfolioReturnWeights } from "./assumption-math";
 import type { FireBaseline } from "./lever-impact";
+
+/**
+ * Perturbed portfolio volatility after shifting `notchPoints` percentage-points of the portfolio into
+ * equity, funded ONLY from the genuinely DEFENSIVE (low-σ) sleeve — debt, ppf, epf, gold, other —
+ * scaled down proportionally (total fixed). Funding from the defensive sleeve (never from already
+ * equity-like international/reit/crypto, whose σ ≥ equity's) GUARANTEES the blended σ rises — the added
+ * variance the risk-notch band exists to disclose. Pure (no store/DOM). Returns null when there is no
+ * shift to make or no defensive sleeve to redeploy (caller then renders no band).
+ */
+export function volatilityAfterEquityNotch(
+  weights: PortfolioReturnWeights,
+  notchPoints: number,
+): number | null {
+  const total = Object.values(weights).reduce((s, v) => s + v, 0);
+  if (total <= 0 || notchPoints <= 0) return null;
+  const defensiveTotal = weights.debt + weights.ppf + weights.epf + weights.gold + weights.other;
+  if (defensiveTotal <= 0) return null;
+  const shiftAmt = Math.min((notchPoints / 100) * total, defensiveTotal);
+  const factor = Math.max(0, (defensiveTotal - shiftAmt) / defensiveTotal);
+  return blendPortfolioVolatility({
+    equity: weights.equity + shiftAmt,
+    debt: weights.debt * factor,
+    ppf: weights.ppf * factor,
+    epf: weights.epf * factor,
+    gold: weights.gold * factor,
+    other: weights.other * factor,
+    // equity-like + crypto sleeves untouched (funding equity from them would not raise σ).
+    realEstate: weights.realEstate,
+    nps: weights.nps,
+    international: weights.international,
+    reit: weights.reit,
+    crypto: weights.crypto,
+  });
+}
 
 export interface LeverBand {
   /** 10th-percentile years-to-FIRE — the optimistic / fast outcome. */
