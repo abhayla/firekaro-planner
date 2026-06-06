@@ -51,6 +51,12 @@ export interface FireBaseline {
 export interface Lever {
   key: string;
   label: string;
+  /**
+   * The realistic-effort BOUND this lever represents, in plain words (e.g. "Invest your ₹40k/mo
+   * surplus"). Honesty requirement: the ranking is only fair if the bound behind each lever is
+   * shown, so the user reads "rank #1" as "biggest *achievable* win", not a hidden assumption.
+   */
+  note?: string;
   /** Return the perturbed baseline this lever produces. MUST be pure (no mutation of `b`). */
   apply: (b: FireBaseline) => FireBaseline;
 }
@@ -58,6 +64,8 @@ export interface Lever {
 export interface LeverImpact {
   key: string;
   label: string;
+  /** The realistic-effort bound behind this lever, carried through for the UI (see Lever.note). */
+  note?: string;
   baselineYears: number;
   perturbedYears: number;
   /** Years SAVED (positive = earlier FIRE). `NaN` when either path never reaches FIRE. */
@@ -81,7 +89,7 @@ export function computeLeverImpact(baseline: FireBaseline, lever: Lever): LeverI
   const reachable = reachesFire(baselineYears) && reachesFire(perturbedYears);
   // years SAVED = baseline − perturbed (positive ⇒ the lever brings FIRE earlier).
   const deltaYears = reachable ? baselineYears - perturbedYears : NaN;
-  return { key: lever.key, label: lever.label, baselineYears, perturbedYears, deltaYears, reachable };
+  return { key: lever.key, label: lever.label, note: lever.note, baselineYears, perturbedYears, deltaYears, reachable };
 }
 
 /**
