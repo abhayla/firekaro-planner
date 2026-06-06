@@ -206,12 +206,29 @@ export type RealEstateOwnership = z.infer<typeof realEstateOwnershipSchema>;
 export const npsTierSchema = z.enum(["I", "II"]);
 export type NpsTier = z.infer<typeof npsTierSchema>;
 
+// Temporal Phase 1 (gh-issue #46) — an optional time-varying contribution plan for one holding.
+// Mirrors lib/contribution-schedule.ts (kept FLAT, per this file's localStorage back-compat note).
+// Age-relative segments; `amount` REAL ₹/month; `stepUpPercentPerYear` REAL %, clamped ≤15.
+// DISPLAY/PLAN metadata only — NEVER summed into corpus inflow (the gh-issue #11 lock; corpus
+// inflow is the single household savings residual in derive.ts).
+// (The compute-side type lives in lib/contribution-schedule.ts and is structurally identical;
+// this is only the persisted Zod shape — no second exported type name to keep one canonical.)
+export const contributionSegmentSchema = z.object({
+  amount: z.number().min(0),
+  startAtAge: z.number().int().min(0).max(120),
+  endAtAge: z.number().int().min(0).max(120).optional(),
+  stepUpPercentPerYear: z.number().min(0).max(15).optional(),
+});
+
 export const investmentSchema = z.object({
   id: z.string(),
   type: investmentTypeSchema,
   label: z.string().max(80).optional(),
   value: z.number().min(0), // For tradables: derived. For PPF/NPS/FD: stored balance/principal.
   monthlyContribution: z.number().min(0).optional(),
+  // Opt-in time-varying contribution plan (#46). Absent ⇒ the scalar monthlyContribution is the
+  // simple/default path. When present it is authoritative for DISPLAY; the two are never summed.
+  contributionSchedule: z.array(contributionSegmentSchema).optional(),
   ownerId: z.string(), // member id or "Joint"
   holdingsCount: z.number().int().min(0).optional(),
   // ESOP (Q20B mid-fidelity, v2)
