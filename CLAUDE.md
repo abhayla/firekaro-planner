@@ -84,6 +84,17 @@ both `.` (root) and `server/`.
 
 ## Commands
 
+**Fresh clone (once):** `prisma generate` is required before the backend type-checks.
+```bash
+npm install && (cd server && npm install && npm run prisma:generate)
+```
+
+**Pre-commit gate (run in BOTH trees before committing):**
+```bash
+npm run type-check && npm run test:unit
+(cd server && npm run type-check && npm run lint && npm run test:unit)
+```
+
 **Frontend (repo root):**
 ```bash
 npm run dev               # Vite dev server on http://localhost:5175
