@@ -103,6 +103,23 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 ## §3 — Decision log (append-only, newest first)
 
 ### 2026-06-06
+- **D-2026-06-06-12 — #48 SHIPPED then the supervisor edge caught a HIGH honesty defect; fixed. #48
+  must-have core now genuinely complete.** The `/goal` run built + merged the #48 remainder (80CCD
+  lever, MC band, composable, AccelerationCard) onto `feat/lever-impact-engine` (merge 84fde1e). The
+  run self-verified green — but the operating-model verification edge (independent FinTech +
+  Code-Quality, rule 29/33) caught what the run's seed spec missed: on the **bridge-limited Iyers
+  persona the card showed the SCALAR corpus-only years (~17.5) — 1.4yr MORE OPTIMISTIC than the honest
+  bridge-adjusted headline (~18.9)** — the rule-31/bug-#22 optimistic-skew class on a flagship action
+  surface (the run's spec only tested Sharmas, where the bridge is inactive → diff 0). **Fixed**
+  (526e100): card always renders the honest `headlineYears`; when `bridgeBinding`, the scalar per-lever
+  deltas are dropped for an honest "your date is bridge-limited" caveat; +4-persona rule-31 plausibility
+  sweep + a dep-free template-binding lock. FinTech PASS, Code-Quality re-review APPROVE, 903/903 green,
+  type-check clean; committed (NOT pushed — Abhay merges). **Deferred → #49 (good-to-have):** make the
+  per-lever deltas themselves bridge-aware (re-run `derive()` per lever) to restore quantified figures
+  for liquidity-limited households; the caveat makes the current state honest now. *Why logged:* a
+  textbook win for the independent-verification mandate — self-verification shipped an optimistic-honesty
+  bug; the blind review pass caught it before it reached a user. **#48 = done** (modulo #49); the next
+  must-have is the obj-1 tax current-FY staleness guard (small) then the obj-3/4 surfaces (later phase).
 - **D-2026-06-06-11 — FinTech gate caught 2 moot levers; corrected the must-have obj-2 lever set.**
   A lever only has value if it changes something `derive()` doesn't already assume optimal.
   **Regime arbitrage = MOOT** (`derive()` auto-`recommendRegime()`s + taxes at the optimal regime;
