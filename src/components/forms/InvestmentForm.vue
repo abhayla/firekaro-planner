@@ -2,6 +2,7 @@
 import { computed, ref, watch } from "vue";
 import { useHouseholdStore } from "@/stores/household";
 import { formatINRCompact } from "@/lib/formatters";
+import { canonicalizeSegments } from "@/lib/contribution-schedule";
 import type { Investment, InvestmentType } from "@/types/household";
 import { typeColor } from "@/lib/investment-traits";
 import PanelCard from "@/components/shared/PanelCard.vue";
@@ -400,9 +401,22 @@ const showEdit = computed({
   get: () => !!editing.value,
   set: (v) => { if (!v) editing.value = null; },
 });
+// #46 — opt-in "Plan a future change" editor state (transient UI; collapsed by default).
+// On save it builds the per-investment contributionSchedule (DISPLAY/PLAN metadata only —
+// never corpus inflow, gh #11). Initialised from the first existing segment when editing.
+const planFutureChange = ref(false);
+const scheduleStepUp = ref<number>(0);
+const scheduleStartAge = ref<number | null>(null);
+const scheduleStopAge = ref<number | null>(null);
+
 function startEdit(row: Investment) {
   if (row.type === "EPF_VPF") return; // not directly editable; managed by autoflow
   editing.value = { ...row };
+  const seg = row.contributionSchedule?.[0];
+  planFutureChange.value = !!seg;
+  scheduleStepUp.value = seg?.stepUpPercentPerYear ?? 0;
+  scheduleStartAge.value = seg?.startAtAge ?? null;
+  scheduleStopAge.value = seg?.endAtAge ?? null;
 }
 const editingEsopVested = computed(() => {
   if (!editing.value || editing.value.type !== "ESOP") return 0;
@@ -423,13 +437,32 @@ function saveEdit() {
       bucket: editing.value.bucket ?? undefined,
     });
   } else {
+    const monthly =
+      editing.value.monthlyContribution !== undefined && editing.value.monthlyContribution !== null
+        ? Number(editing.value.monthlyContribution)
+        : undefined;
+    // #46 — build the opt-in plan when the user enabled it AND there's a base amount to ramp.
+    // Canonicalised so a no-op re-save doesn't trip the server diff. Off ⇒ clear any prior plan
+    // (scalar/default path). DISPLAY/PLAN metadata only — never corpus inflow (gh #11).
+    const hasPlan =
+      planFutureChange.value &&
+      !!monthly &&
+      monthly > 0 &&
+      (scheduleStepUp.value > 0 || scheduleStartAge.value !== null || scheduleStopAge.value !== null);
+    const contributionSchedule = hasPlan
+      ? canonicalizeSegments([
+          {
+            amount: monthly as number,
+            startAtAge: scheduleStartAge.value ?? 0,
+            ...(scheduleStopAge.value !== null ? { endAtAge: scheduleStopAge.value } : {}),
+            ...(scheduleStepUp.value > 0 ? { stepUpPercentPerYear: scheduleStepUp.value } : {}),
+          },
+        ])
+      : undefined;
     household.updateInvestment(editing.value.id, {
       label: editing.value.label || undefined,
       value: Number(editing.value.value),
-      monthlyContribution:
-        editing.value.monthlyContribution !== undefined && editing.value.monthlyContribution !== null
-          ? Number(editing.value.monthlyContribution)
-          : undefined,
+      monthlyContribution: monthly,
       ownerId: editing.value.ownerId,
       holdingsCount:
         editing.value.type === "Stocks" && editing.value.holdingsCount !== undefined
@@ -438,6 +471,7 @@ function saveEdit() {
       realEstateRole:
         editing.value.type === "RealEstate" ? editing.value.realEstateRole : undefined,
       bucket: editing.value.bucket ?? undefined,
+      contributionSchedule,
     });
   }
   editing.value = null;
@@ -784,6 +818,13 @@ function saveEdit() {
             <span v-if="i.monthlyContribution"> · +{{ formatINRCompact(i.monthlyContribution) }}/mo</span>
             <span v-if="i.holdingsCount"> · {{ i.holdingsCount }} holdings</span>
             <span v-if="i.type === 'ESOP' && i.totalGrantValue"> · {{ i.vestedPercent }}% vested of {{ formatINRCompact(i.totalGrantValue) }}</span>
+            <span
+              v-if="i.contributionSchedule?.[0]?.stepUpPercentPerYear"
+              class="text-primary"
+              data-testid="contribution-plan-indicator"
+            >
+              · planned +{{ i.contributionSchedule[0].stepUpPercentPerYear }}%/yr
+            </span>
           </template>
           <template #trailing>
             <v-btn v-if="i.type !== 'EPF_VPF'" icon size="x-small" variant="text" aria-label="Edit" @click="startEdit(i)">
@@ -843,6 +884,62 @@ function saveEdit() {
               </v-col>
               <v-col v-if="editing.type === 'RealEstate'" cols="12" md="6">
                 <v-select v-model="editing.realEstateRole" :items="RE_ROLE_OPTIONS" item-title="title" item-value="value" label="Role" density="comfortable" />
+              </v-col>
+              <!-- #46 — opt-in "Plan a future change": step-up % + optional start/stop age. -->
+              <v-col cols="12">
+                <v-switch
+                  v-model="planFutureChange"
+                  color="primary"
+                  density="compact"
+                  hide-details
+                  label="Plan a future change to this contribution"
+                  data-testid="plan-future-change-toggle"
+                />
+                <v-expand-transition>
+                  <div v-if="planFutureChange" class="mt-1">
+                    <v-row dense>
+                      <v-col cols="12" md="4">
+                        <v-text-field
+                          v-model.number="scheduleStepUp"
+                          type="number"
+                          label="Annual step-up"
+                          suffix="%"
+                          density="comfortable"
+                          min="0"
+                          max="15"
+                          step="1"
+                          hint="Real, above inflation (max 15)"
+                          persistent-hint
+                          data-testid="plan-stepup-field"
+                        />
+                      </v-col>
+                      <v-col cols="6" md="4">
+                        <v-text-field
+                          v-model.number="scheduleStartAge"
+                          type="number"
+                          label="Starts at age (optional)"
+                          density="comfortable"
+                          placeholder="now"
+                          data-testid="plan-start-age-field"
+                        />
+                      </v-col>
+                      <v-col cols="6" md="4">
+                        <v-text-field
+                          v-model.number="scheduleStopAge"
+                          type="number"
+                          label="Stops at age (optional)"
+                          density="comfortable"
+                          placeholder="never"
+                          data-testid="plan-stop-age-field"
+                        />
+                      </v-col>
+                    </v-row>
+                    <div class="text-caption text-medium-emphasis">
+                      A plan for this holding — shown on its card. It does not change your headline
+                      FIRE date (only your overall savings rate does).
+                    </div>
+                  </div>
+                </v-expand-transition>
               </v-col>
             </template>
             <v-col cols="12" md="6">
