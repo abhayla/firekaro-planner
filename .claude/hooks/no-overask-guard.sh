@@ -8,7 +8,7 @@
 # rule-writing-meta.md, zero-exception behaviour needs a HOOK, not prose. So this
 # hook now BLOCKS the stop and RE-INJECTS the rule so the model keeps going.
 #
-# Two stop-violation classes detected:
+# Two BLOCKING stop-violation classes detected:
 #   A. OVER-ASK — trailing offer / multiple-choice / recommendation+question.
 #   B. NARRATE-AND-STOP — ending by describing the NEXT reversible step
 #      ("next step is…", "next I'll…", "continuation…", "remaining … tracked",
@@ -16,6 +16,16 @@
 # On either (and NOT a genuine blocker), it emits {"decision":"block","reason":…}
 # to force continuation. A per-user-turn counter (.claude/.keepgoing-count, reset
 # by prompt-enhance-reminder.sh) caps auto-continues at 12 to prevent any loop.
+#
+# Plus one NON-BLOCKING telemetry class (the B-layer backstop, 2026-06-06):
+#   C. ENHANCE-BANNER MISS — a substantive assistant turn (>=300 chars) that does
+#      NOT open with the *Enhanced:* governance banner. WHY: prompt-enhance-reminder.sh
+#      gates on PROMPT shape, so it stays silent on short/command/continuation prompts
+#      that still spawn real work (the /init class). Per operating-model.md the banner
+#      should fire on OUTPUT blast-radius, not prompt shape — the prompt hook can't see
+#      output, this Stop hook can. We LOG the miss to .claude/.enhance-misses.log
+#      (telemetry first, rule 22 — escalate to block only if the log shows it's frequent).
+#      The behavioral fix is the rule wording in prompt-auto-enhance-rule.md.
 exec 2>/dev/null
 input=$(cat)
 command -v jq >/dev/null || exit 0
@@ -32,6 +42,15 @@ root="$(git rev-parse --show-toplevel 2>/dev/null)"
 # ── Exemption: a GENUINE blocker / escalation / user-input-needed stop is legitimate. ──
 if printf '%s' "$full" | grep -qE "push to prod|deploy|dns|cutover|force[- ]push|--force|spend|publish|destructive|drop (table|column)|delete (the )?(branch|remote)|escalat|blocked on|need (your|you to)|your (credential|password|gmail|approval|login|call)|waiting on (you|abhay)|log in yourself|run .* yourself|requires? your"; then
   exit 0
+fi
+
+# ── C. Enhance-banner miss (B-layer telemetry, NON-BLOCKING) ──
+# Substantive proxy: assistant text >= 300 chars. Banner = first line opens with
+# "*enhanced" (case-insensitive). Log-only; never blocks, never sets $flag.
+# Limitation (v1, KISS): a short message that nonetheless made tool edits is not
+# caught by the length proxy — revisit with a tool_use scan if the log warrants.
+if [ "${#last_text}" -ge 300 ] && ! printf '%s' "$full" | head -1 | grep -qE '^\*enhanced'; then
+  printf '%s\tenhance-banner-miss (len=%s)\n' "$(jq -rn 'now|todate' 2>/dev/null || echo now)" "${#last_text}" >> "$root/.claude/.enhance-misses.log" 2>/dev/null
 fi
 
 # ── A. Over-ask detection ──
