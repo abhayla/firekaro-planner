@@ -48,10 +48,13 @@ missing — sequenced to a later phase.**
   build, tracked as a new issue.
 
 **The must-have-now plan (sequenced):**
-1. **Obj-2 flagship — lever-impact ranking engine** (financial math + UI; the hollow core of "get
-   there faster"). → goal contract (rule 28) before building.
-2. **#42 scroll-lock root-cause fix** (cheap, high-trust hygiene; mitigation already in place).
-3. **Obj-2 — connect tax/deduction surfaces to FIRE-impact + prepay-vs-invest + celebrate phase.**
+1. **Obj-2 flagship — lever-impact ranking engine** (#48; financial math + UI; the hollow core of
+   "get there faster"). → IN PROGRESS.
+2. ~~#42 scroll-lock~~ **✅ RESOLVED** (2026-06-06) — fix already shipped (`scroll-lock-recovery.ts`
+   router safety net @ 8467055/c2176a1), verified live on `main` (spec 4/4, wired at
+   `router/index.ts:201`); was a stale-open issue. Closed.
+3. **Obj-2 — connect tax/deduction surfaces to FIRE-impact + prepay-vs-invest + celebrate phase**
+   (folded into #48's surfacing).
 4. **Obj-0 polish — named scenario persistence.**
 
 **Deferred (was the prior focus — resumes after the must-have core):** stickiness/measurement (#44),
