@@ -1,6 +1,8 @@
 // Ported from server/lib/tax-config.ts (multi-FY tax engine, slabs + surcharge + cess + marginal relief)
 // Demo subset: FY 2024-25 through 2026-27 (current FY by default).
 
+import { getCurrentFinancialYear } from "./expense-history";
+
 export interface TaxSlabEntry {
   min: number;
   max: number;
@@ -133,6 +135,12 @@ export const AVAILABLE_FYS = Object.keys(TAX_CONFIGS);
 export const DEFAULT_FY = "2026-27";
 
 /**
+ * The date `TAX_CONFIGS` was last checked against the latest Indian Budget. Bump this whenever
+ * `TAX_CONFIGS` is updated for a new Budget; the current-FY staleness guard reads it.
+ */
+export const TAX_CONFIG_LAST_VERIFIED = "2026-06-06";
+
+/**
  * Whether a requested FY actually has configured tax slabs, and what is applied if not.
  * gh-issue #19 (Tier-0 honesty): a multi-decade FIRE projection runs far past the newest
  * configured FY, and those years silently use the newest slabs held FLAT. `isFutureUnconfigured`
@@ -210,6 +218,33 @@ export function getTaxConfigForFY(fy: string): FYTaxConfig {
     );
   }
   return TAX_CONFIGS[coverage.appliedFy];
+}
+
+/**
+ * Current-FY tax-staleness signal (obj-1 honesty must-have). Unlike `isProjectedTaxStale`
+ * (which covers a FIRE projection running PAST the newest configured FY), this covers the case
+ * where the **live current FY itself** has no configured slabs — e.g. from ~April 2027, once
+ * `TAX_CONFIGS` ends at FY 2026-27, every user's headline take-home / savings / FIRE-date would
+ * silently compute on stale 2026-27 slabs with no prod-visible signal. This is the detectable
+ * signal a prod-visible banner surfaces. PURE — `now` injectable; never reads the real clock in tests.
+ *
+ * `stale = true` ⇔ the current FY is NOT configured (the nearest, held-flat, is being silently used).
+ * The fallback direction itself (least-wrong, ADR-0003/gh-#6) is intentionally unchanged.
+ */
+export function getCurrentFYTaxStaleness(now: Date = new Date()): {
+  stale: boolean;
+  currentFy: string;
+  newestConfiguredFy: string;
+  reason: "ok" | "current-fy-unconfigured";
+} {
+  const currentFy = getCurrentFinancialYear(now);
+  const cov = getTaxConfigCoverage(currentFy);
+  return {
+    stale: !cov.isConfigured,
+    currentFy,
+    newestConfiguredFy: cov.newestConfiguredFy,
+    reason: cov.isConfigured ? "ok" : "current-fy-unconfigured",
+  };
 }
 
 /**

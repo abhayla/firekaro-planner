@@ -7,6 +7,8 @@ import {
   getTaxConfigCoverage,
   isProjectedTaxStale,
   fireProjectionTaxNote,
+  getCurrentFYTaxStaleness,
+  TAX_CONFIG_LAST_VERIFIED,
   oldRegimeSlabsForAge,
   type TaxSlabEntry,
 } from "./tax";
@@ -419,5 +421,41 @@ describe("tax config coverage / staleness (gh-issue #19 — long-horizon honesty
 
   it("regression: getTaxConfigForFY still falls back to the newest config for a future FY (behaviour preserved)", () => {
     expect(getTaxConfigForFY("2035-36")).toBe(getTaxConfigForFY("2026-27"));
+  });
+});
+
+describe("getCurrentFYTaxStaleness (current-FY honesty guard — obj-1 must-have)", () => {
+  it("today (FY 2026-27 configured) is NOT stale", () => {
+    const s = getCurrentFYTaxStaleness(new Date("2026-06-06"));
+    expect(s.stale).toBe(false);
+    expect(s.currentFy).toBe("2026-27");
+    expect(s.reason).toBe("ok");
+    expect(s.newestConfiguredFy).toBe("2026-27");
+  });
+
+  it("the April-2027 footgun: once the live current FY (2027-28) is unconfigured, it IS stale", () => {
+    const s = getCurrentFYTaxStaleness(new Date("2027-05-01"));
+    expect(s.stale).toBe(true);
+    expect(s.reason).toBe("current-fy-unconfigured");
+    expect(s.currentFy).toBe("2027-28");
+    expect(s.newestConfiguredFy).toBe("2026-27");
+  });
+
+  it("a date still inside the newest configured FY (Mar 2027) is NOT stale", () => {
+    // FY 2026-27 runs Apr 2026 → Mar 2027; a Mar-2027 date is still the configured current FY.
+    const s = getCurrentFYTaxStaleness(new Date("2027-03-15"));
+    expect(s.stale).toBe(false);
+    expect(s.currentFy).toBe("2026-27");
+    expect(s.reason).toBe("ok");
+  });
+
+  it("is bound on the injected `now`, never the real wall clock (purity)", () => {
+    const a = getCurrentFYTaxStaleness(new Date("2027-05-01"));
+    const b = getCurrentFYTaxStaleness(new Date("2027-05-01"));
+    expect(a).toEqual(b);
+  });
+
+  it("TAX_CONFIG_LAST_VERIFIED is an ISO date string the guard can read", () => {
+    expect(TAX_CONFIG_LAST_VERIFIED).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 });

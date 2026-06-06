@@ -3,6 +3,7 @@ import { ref, watch } from "vue";
 import { useDisplay } from "vuetify";
 import SidebarNav from "@/layouts/SidebarNav.vue";
 import AppBar from "@/layouts/AppBar.vue";
+import TaxStalenessBanner from "@/components/shared/TaxStalenessBanner.vue";
 
 // Below the md breakpoint (<960px) the 260px sidebar collapses to a temporary
 // overlay drawer toggled by the app-bar hamburger; on desktop it stays a
@@ -35,6 +36,7 @@ watch(smAndDown, (narrow) => {
     </v-app-bar>
     <v-main>
       <main aria-label="Main content">
+        <TaxStalenessBanner />
         <slot />
       </main>
     </v-main>
