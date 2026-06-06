@@ -28,22 +28,35 @@
 
 ## §2 — Active priority / roadmap (the "Now" order: correctness → stickiness → friction)
 
-**Current focus chosen 2026-06-06: STICKINESS — the measurement backbone first (issue #44).**
-Rationale (goal-anchored): correctness was just served by the temporal-model plan (#46); "does the
-accumulator come back?" is the single biggest *unproven* risk to the goal; you cannot improve
-retention you cannot measure.
+**Current focus chosen 2026-06-06 (REPRIORITIZED by Abhay): COMPLETE THE MUST-HAVE CORE before
+stickiness.** Rationale (goal-anchored): there is no point measuring/improving retention on an
+incomplete product — a working must-have core is the *precondition* for stickiness. **Scope locked
+(D-2026-06-06-07): must-have-now = the accumulation core, objectives 0+1+2; objectives 3+4
+(readiness-to-stop, post-FIRE) are the wedge persona's LATER lifecycle — math already built, only UI
+missing — sequenced to a later phase.**
 
-**How we proceed on stickiness (the plan):**
-1. **Define "activated"** — working definition: *the persona reached their first honest FIRE number
-   with real (not seed) data*. Everything downstream (funnel, return cohorts, nudge triggers) hangs
-   off this. → first fork to settle.
-2. **Decide the DPDP/privacy posture** — what a finance app holding PAN/salary may collect. This is a
-   `TODO(5W)` portfolio call, not a silent default — settle it before instrumenting (#44).
-3. **Design the event schema** — activation, onboarding-complete, return visits, section engagement →
-   funnel + 7/30-day cohort retention + drop-off (#44).
-4. **Then** wire the retention delivery loop (#45) — gated on comms go-live (Abhay; see needs-Abhay
-   register). Build leans on `src/lib/nudge-engine.ts` (generation exists) + the retention backlog
-   `docs/retention-engagement-features.md`.
+**Completeness audit (4 parallel assessors, 2026-06-06; evidence in commit thread):**
+- **Obj 1 "honest number" — ~95% ✅** (FIRE date, Monte-Carlo bands, accessible-money bridge wired
+  into the headline, stress test, plan-is-alive). No blocking gap. (#47 dormant.)
+- **Obj 0 "effortless setup" (manual) — ~90% ✅** (wizard, 8-section CRUD+persist, smart defaults,
+  auto-flow, completeness nudges, estate+glossary real). Gaps: **#42 scroll-lock** (self-heals but
+  trust-killer) + named-scenario persistence (polish).
+- **Obj 2 "get there faster" — ~35% ⚠️ THE must-have gap.** Missing the **lever-impact ranking
+  engine** (the core of the objective): no ranking of India-specific levers (regime arbitrage,
+  80CCD(1B)/employer-NPS, prepay-vs-invest, savings-rate/step-up, allocation) by years-to-FIRE
+  impact with confidence bands; tax levers isolated from FIRE-impact; no celebrate phase. → flagship
+  build, tracked as a new issue.
+
+**The must-have-now plan (sequenced):**
+1. **Obj-2 flagship — lever-impact ranking engine** (financial math + UI; the hollow core of "get
+   there faster"). → goal contract (rule 28) before building.
+2. **#42 scroll-lock root-cause fix** (cheap, high-trust hygiene; mitigation already in place).
+3. **Obj-2 — connect tax/deduction surfaces to FIRE-impact + prepay-vs-invest + celebrate phase.**
+4. **Obj-0 polish — named scenario persistence.**
+
+**Deferred (was the prior focus — resumes after the must-have core):** stickiness/measurement (#44),
+retention loop (#45, also gated on comms go-live), Form16/CAS import (#43, nice-to-have).
+DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting.
 
 **Parallel/queued (not the active focus):**
 - **#46 temporal-contributions Phase 1 — ✅ DONE** (merged to `main` @ `c7c70a5`, autonomous `/goal`
@@ -62,6 +75,14 @@ retention you cannot measure.
 ## §3 — Decision log (append-only, newest first)
 
 ### 2026-06-06
+- **D-2026-06-06-07 — Reprioritized to COMPLETE THE MUST-HAVE CORE (obj 0+1+2) before stickiness;
+  scope = accumulation core, defer obj 3+4 to a later phase.** Abhay's call: complete the app's
+  must-have feature set before measuring retention (a working core is the precondition for
+  stickiness). A 4-assessor completeness audit found obj 1 ~95% / obj 0 ~90% / **obj 2 ~35% — the
+  lever-impact ranking engine is the hollow core**. Obj 3+4 are the wedge persona's later lifecycle
+  (math built, UI missing) → sequenced later, NOT must-have-now. Stickiness (#44/#45) + Form16/CAS
+  (#43) deferred behind the core. *Why (goal):* serves the LOCKED accumulator persona's "get there
+  faster" objective, the biggest must-have gap. → flagship issue (lever engine) + §2 plan.
 - **D-2026-06-06-06 — Temporal-contributions Phase 1 SHIPPED to `main`.** Autonomous `/goal` run of the
   #46 contract completed with no deferrals; merged @ `c7c70a5` (+ ADR-0004, the persisted
   `contributionSchedule` column, the What-If step-up lever, plausibility locks). Migration is
