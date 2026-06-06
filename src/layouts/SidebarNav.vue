@@ -91,6 +91,7 @@ const sections: NavSection[] = [
     children: [
       { title: "Dashboard", path: "/fire-goals/dashboard" },
       { title: "Goals", path: "/fire-goals/goals" },
+      { title: "Can I retire?", path: "/fire-goals/readiness" },
       { title: "What-If", path: "/fire-goals/what-if" },
     ],
   },

@@ -80,6 +80,8 @@ const routes: RouteRecordRaw[] = [
   realRoute("/fire-goals/dashboard", "fire-dashboard", () => import("@/pages/fire-goals/Dashboard.vue")),
   realRoute("/fire-goals/goals", "fire-goals-roadmap", () => import("@/pages/fire-goals/Goals.vue")),
   realRoute("/fire-goals/what-if", "fire-what-if", () => import("@/pages/fire-goals/WhatIf.vue")),
+  // obj-3 — readiness verdict: "can I pull the trigger and stop working?" (decision-support).
+  realRoute("/fire-goals/readiness", "fire-readiness", () => import("@/pages/fire-goals/Readiness.vue")),
   // Phase 5 Stage O — stress test (audit Entry #27). Feature-gated on
   // fire.stressTest via the router guard (Stage A4).
   realRoute("/fire-goals/stress-test", "fire-goals-stress-test", () => import("@/pages/fire-goals/StressTest.vue")),
