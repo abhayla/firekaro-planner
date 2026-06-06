@@ -60,6 +60,18 @@ missing — sequenced to a later phase.**
    (ranked "biggest achievable wins" card + per-lever sensitivity drill-down + obj-1 confidence bands;
    the bands also close the risk-notch deterministic-yardstick honesty gap) + tax-planning FIRE-impact
    annotations + the celebrate phase.
+   **Re-scoped 2026-06-06 (D-2026-06-06-09) — NOT all remaining increments are must-have (anti
+   feature-completeness, rule 30):**
+   - **MUST-HAVE (makes obj 2 genuinely work):** the composable (ii); the ranked card (iii-core);
+     **regime arbitrage** (the highest-ROI India lever AND the cleanest to model — no NPS/prepay fork);
+     **confidence ranges on the variance-bearing levers** (risk/return — honesty, closes the free-lunch
+     gap). Pure-cashflow levers (surplus/trim/regime) stay point estimates (near-deterministic; banding
+     them is gold-plating).
+   - **SHOULD-HAVE (next, non-blocking):** 80CCD(1B) top-up; prepay-vs-invest (high salience but hardest
+     to model honestly → its OWN careful increment); per-lever sensitivity drill-down.
+   - **NICE/DEFER:** employer-NPS ask (weakest: small, not user-controllable, lock-in fork); tax-page
+     FIRE annotations (polish); **celebrate phase → the STICKINESS phase** (it's retention, which we
+     deferred behind the must-have core — folding it in now reopens D-2026-06-06-07).
 2. ~~#42 scroll-lock~~ **✅ RESOLVED** (2026-06-06) — fix already shipped (`scroll-lock-recovery.ts`
    router safety net @ 8467055/c2176a1), verified live on `main` (spec 4/4, wired at
    `router/index.ts:201`); was a stale-open issue. Closed.
@@ -88,6 +100,14 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 ## §3 — Decision log (append-only, newest first)
 
 ### 2026-06-06
+- **D-2026-06-06-09 — Re-scoped #48's remaining increments: only ~half are must-have.** Must-have =
+  composable + ranked card + **regime arbitrage** (highest-ROI, cleanest-to-model India lever) +
+  confidence ranges on variance-bearing levers (honesty). Should-have = 80CCD(1B), prepay-vs-invest
+  (own careful increment), sensitivity drill-down. Nice/defer = employer-NPS ask, tax-page annotations,
+  **celebrate phase → stickiness phase** (it's retention, deferred behind the core). *Why (goal):*
+  anti-feature-completeness (rule 30) — build the minimum that makes obj 2 genuinely answer the
+  accumulator's "biggest achievable win?", sequenced by value-per-modelling-risk, not "the catalog
+  looks incomplete". See §2.
 - **D-2026-06-06-08 — Lever comparability policy = realistic max-effort + transparent bounds + obj-1
   confidence bands + per-lever sensitivity drill-down** (#48). Decided with the FinTech + PM role
   (Abhay: "use proper role and take decision"), goal-anchored to the accumulator's "what's my biggest
