@@ -60,3 +60,7 @@ Thumbs.db
 
 # Local session checkpoints (working state)
 .claude/sessions/
+
+# Stryker mutation-testing scratch + reports (ephemeral)
+.stryker-tmp/
+reports/
