@@ -19,11 +19,11 @@
   SaaS — correct, honest, sticky, friction-free — serving the **urban salaried accumulator** across
   the whole FIRE lifecycle (5 objectives: effortless setup · honest number · get-there-faster ·
   readiness-to-stop · stay-free-post-FIRE).
-- **Realization: ~55–60%.** Production-live (https://firekaro.com); the must-have **accumulation
-  core — objectives 0, 1, 2, 3 — is now built AND deployed to prod** (deploy 2026-06-07, SHA
-  `d04571c`; #48/#51/#52 closed). **Remaining: objective 4** (post-FIRE decumulation guardrails,
-  **#50** — the last unbuilt must-have) **plus stickiness is still unproven** (zero retained users,
-  retention unmeasured).
+- **Realization: ~65%.** Production-live (https://firekaro.com); the **full-lifecycle must-have core
+  — objectives 0, 1, 2, 3 AND 4 — is now built, deployed to prod, AND functionally verified live**
+  (deploys 2026-06-07, SHAs `d04571c` → `45201dc`; **#48/#50/#51/#52 all closed — must-have registry
+  empty**). **Remaining: stickiness is still unproven** (zero retained users, retention unmeasured) +
+  good-to-have (#41/#44/#45/#46/#49) + nice-to-have (#43/#47/#53) + adjacent personas (NRI/HUF).
 - Calling the goal "achieved" would be the optimism-error the honesty mandate exists to prevent.
 
 ---
@@ -105,6 +105,21 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 ## §3 — Decision log (append-only, newest first)
 
 ### 2026-06-07
+- **D-2026-06-07-06 — DEPLOYED obj-4 #50 to production + functionally verified live; the full
+  must-have core (obj 0→4) is now COMPLETE in prod.** Abhay authorized ("do it"). Shipped pinned
+  `main` `45201dc` (obj-1/2/3 + obj-4 #50 + the SequenceRiskCard HIGH fix) to the VPS
+  (`git archive | ssh tar`), rebuilt SPA, `pm2 reload` zero-downtime; migrate = "no pending" (#50
+  added no migration). Pre-deploy backup `firekaro-backup-predeploy-45201dc-*.tgz`. **Smoke green**
+  (/api/internal/smoke ok, db connected, user.count 3, 114ms; /fire-goals/drawdown 200; code in live
+  bundle). **Authenticated functional sweep PASS** (test account abhayfaircent): `/fire-goals/drawdown`
+  renders all 3 sections — safe-withdrawal range (preview ₹27.43–41.14L on the ₹10.55 Cr FIRE number,
+  suggested ₹34.28L ≈3.3%), sequence-risk **real "Watch early years" verdict** ("under normal markets
+  your corpus lasts; a bad early sequence could deplete by ~age 79", plan-to 90) — **the HIGH fix
+  confirmed live (no false alarm)** — and the annual check-in; zero console/page errors, numbers
+  coherent. **Independently blind-verified** (separate context-blind agent: accept, conf 0.9, no
+  dissents/plausibility flags). **#50 closed → must-have registry empty (#48/#50/#51/#52 all closed).**
+  *Milestone:* the urban-salaried accumulator's WHOLE FIRE lifecycle (obj 0→4) is now built, deployed,
+  and verified in production. Next frontier = stickiness (unproven) + good-to-have. → §1.
 - **D-2026-06-07-05 — Supervisor verification of #50 (obj-4) caught + fixed a deploy-blocking HIGH;
   #50 now verified-ready (NOT yet deployed).** Abhay asked to verify "is #50 fully implemented?"
   before deploying. Independent supervisor pass (rule 29/33, operating-model): reproduced the gates
