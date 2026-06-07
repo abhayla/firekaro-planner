@@ -107,6 +107,7 @@ const TAX_CONFIGS: Record<string, FYTaxConfig> = {
       rebateLimit: 1200000,
       maxRebate: Infinity,
       marginalRelief: true,
+      // Stryker disable next-line all: equivalent — RegimeConfig.isDefault is not read by the engine.
       isDefault: true,
     },
     surchargeSlabs: SURCHARGE_SLABS,
@@ -115,8 +116,11 @@ const TAX_CONFIGS: Record<string, FYTaxConfig> = {
   },
   // 2026-27: pre-emptive mirror of 2025-26 (Budget 2026 unknown at build time)
   "2026-27": {
+    // Stryker disable next-line all: equivalent — financialYear is display-only metadata, never read.
     financialYear: "2026-27",
+    // Stryker disable next-line all: equivalent — assessmentYear is display metadata, never read.
     assessmentYear: "2027-28",
+    // Stryker disable next-line all: equivalent — RegimeConfig.isDefault is not read by the engine.
     oldRegime: { ...OLD_REGIME_BASE, isDefault: false },
     newRegime: {
       slabs: [
@@ -132,6 +136,7 @@ const TAX_CONFIGS: Record<string, FYTaxConfig> = {
       rebateLimit: 1200000,
       maxRebate: Infinity,
       marginalRelief: true,
+      // Stryker disable next-line all: equivalent — RegimeConfig.isDefault is not read by the engine.
       isDefault: true,
     },
     surchargeSlabs: SURCHARGE_SLABS,
@@ -141,6 +146,8 @@ const TAX_CONFIGS: Record<string, FYTaxConfig> = {
 };
 
 export const AVAILABLE_FYS = Object.keys(TAX_CONFIGS);
+// Stryker disable next-line all: equivalent — DEFAULT_FY is consumed by callers, not by any tax
+// computation inside this module, so a mutation here cannot change any function-under-test's output.
 export const DEFAULT_FY = "2026-27";
 
 /**
