@@ -105,6 +105,25 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 ## §3 — Decision log (append-only, newest first)
 
 ### 2026-06-07
+- **D-2026-06-07-04 — SHIPPED obj-4 post-FIRE decumulation guardrails (must-have) + merged to `main`.**
+  Ran `docs/goals/2026-06-06-decumulation-guardrails.md` via `/goal` in an isolated worktree
+  (`feat/decumulation-guardrails` off `main`); Abhay merged it (`d891875`, `--no-ff`). Adds the
+  `/fire-goals/drawdown` "After you retire" surface: (A) `safeWithdrawalBands()` — this-year safe
+  range, REUSING the existing Floor/Ceiling rule (no duplicated withdrawal math); (B) NEW
+  `sequenceRiskWarning()` — an honest deterministic bad-early-sequence depletion stress (the #1
+  retiree-ruin risk; never a smooth average that can't fail, rule 31); (C) two cards + page + a
+  lightweight annual check-in. Pure real-frame lib (`src/lib/decumulation.ts` + 14 specs).
+  **Verification:** type-check 0, 935 unit tests, build green (pre- AND post-merge on `main`);
+  **FinTech Domain Analyst** first BLOCKED on a band-coherence HIGH (`floor≤suggested≤ceiling` broke
+  when a guardrail fired) → fixed at root (band anchored to `suggested`, one frame) + catch-tests →
+  re-gate PASS; **code-reviewer** APPROVE (lib + UI); **Rule 24** across 3 personas (Sharmas
+  accumulating/at-risk, Iyers resilient, Mehtas near-FIRE/depletes — all three sequence-risk branches,
+  zero console errors, PNGs read); **Rule 26** coherence confirmed live (every card input is the
+  headline's own derive value; Mehtas' realReturn-1.6% < SWR-3.25% depletion is an honest longevity
+  signal, not a frame bug). Pointer: goal contract + `docs/goals/.run/2026-06-06-decumulation-guardrails-DEFERRED.md`
+  (DEFERRED: MC depletion probability, full post-FIRE annual-review engine, pre-existing shared-chrome
+  a11y debt). *Why logged:* obj-4 ("stay free post-FIRE") must-have is now in `main` — the
+  full-lifecycle wedge (obj 0→4) for the urban-salaried accumulator is feature-complete on the core.
 - **D-2026-06-07-03 — Prod AUTHENTICATED functional verification of obj-1/2/3 PASSED (rule 32),
   independently re-verified (rule 33).** Drove the live site logged-in (valid saved session, test
   account `abhayfaircent@gmail.com`) headless + non-destructive via `scripts/prod-functional-sweep.mjs`
