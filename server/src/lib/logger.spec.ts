@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Writable } from "node:stream";
 import pino from "pino";
-import { redactUrlSecrets, reqSerializer } from "./logger";
+import { redactUrlSecrets, reqSerializer, REDACT_PATHS } from "./logger";
 
 // gh-issue #26: pino's stdSerializers.req logs req.url with the full query string, so a webhook
 // authenticated via ?token=<WATI_WEBHOOK_SECRET> leaked the secret in plaintext prod logs. The
@@ -57,5 +57,64 @@ describe("redactUrlSecrets — mask secrets in logged request URLs (gh-issue #26
     const out = lines.join("");
     expect(out).not.toContain("LIVESECRET999");
     expect(out).toContain("[REDACTED]");
+  });
+});
+
+// A4.3 (DPDP / structured-logging.md): prove the FIELD-PATH redaction (the pino `redact.paths`
+// the live logger uses, via the shared REDACT_PATHS const) actually masks secret + PII fields in
+// emitted output — NOT a vacuous "looks clean". Under-masking PAN/salary/recipient-number PII is a
+// DPDP violation; this asserts each sensitive value is gone and replaced by [REDACTED].
+describe("field-path redaction — DPDP PII + secrets masked in emitted logs (A4.3)", () => {
+  function captureLog(obj: Record<string, unknown>): string {
+    const lines: string[] = [];
+    const sink = new Writable({
+      write(chunk, _enc, cb) {
+        lines.push(chunk.toString());
+        cb();
+      },
+    });
+    // Same redact config the live logger uses (shared REDACT_PATHS — no drift), JSON output.
+    const testLogger = pino({ redact: { paths: REDACT_PATHS, censor: "[REDACTED]" } }, sink);
+    testLogger.info(obj, "sensitive payload");
+    return lines.join("");
+  }
+
+  it("masks top-level secret fields (token, password, secret, authorization)", () => {
+    const out = captureLog({
+      token: "TKN-LIVE-1",
+      password: "PW-LIVE-2",
+      secret: "SEC-LIVE-3",
+      authorization: "Bearer LIVE-4",
+    });
+    for (const leak of ["TKN-LIVE-1", "PW-LIVE-2", "SEC-LIVE-3", "LIVE-4"]) {
+      expect(out, `${leak} must be masked`).not.toContain(leak);
+    }
+    expect(out).toContain("[REDACTED]");
+  });
+
+  it("masks PII recipient fields (whatsappNumber, toNumber, failedDetail) — DPDP", () => {
+    const out = captureLog({
+      whatsappNumber: "917000000001",
+      toNumber: "917000000002",
+      failedDetail: "delivery failed for 917000000003",
+    });
+    for (const pii of ["917000000001", "917000000002", "917000000003"]) {
+      expect(out, `recipient PII ${pii} must never reach logs`).not.toContain(pii);
+    }
+  });
+
+  it("masks nested (wildcard *.token / *.whatsappNumber) one level deep", () => {
+    const out = captureLog({
+      send: { token: "NESTED-TKN-9", whatsappNumber: "917999999999" },
+    });
+    expect(out).not.toContain("NESTED-TKN-9");
+    expect(out).not.toContain("917999999999");
+  });
+
+  it("leaves non-sensitive fields intact (no over-masking of benign data)", () => {
+    const out = captureLog({ userId: "user-123", fy: "2025-26", count: 42 });
+    expect(out).toContain("user-123");
+    expect(out).toContain("2025-26");
+    expect(out).toContain("42");
   });
 });
