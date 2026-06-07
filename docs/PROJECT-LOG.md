@@ -113,6 +113,22 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 ## §3 — Decision log (append-only, newest first)
 
 ### 2026-06-07
+- **D-2026-06-07-08 — Built the goal-run self-improvement loop into `goal-creator` + remediated its own
+  independent-review findings.** Added (a) a §0.3 **live cross-session progress log**
+  (`docs/goals/.run/<slug>-PROGRESS.md`, discover via `git worktree list`); (b) a **run-end learnings
+  fold-back** + **Mode B** (post-run apply on approval); (c) a **two-type learning taxonomy** —
+  **GENERIC** → skill/process-rule vs **PRODUCT-SPECIFIC** → a product rule if a recurring class else
+  the goal contract; prefer a deterministic gate over prose; one canonical home + dedup — *grilled with
+  Abhay via `/grill-me`* (the routing fork). Commits `a273bc8`/`1be51f5`/`f63a48a` + the remediation
+  `<this commit>`. **An adversarial independent review (rule 29) then found this session's own
+  governance slips** — no `lessons.md` entries, no PROJECT-LOG entry (this one), a missed SemVer bump, a
+  triplicated taxonomy that drifted once, stale `mvp/`/`demo/` tree refs in the skill, and the core
+  irony that the loop is **advisory prose** in a repo whose lesson is "prose doesn't prevent recurrence;
+  gates do." **All remediated:** 3 lessons added; this entry; SemVer→1.3.0; taxonomy de-duplicated to
+  one canonical home (`baked-in-rules §0.3`) + pointers; tree refs retargeted to the single-app reality
+  (closes #57); volatile snapshot removed from `must-have-only-focus.md`; an honest advisory-pending-a-gate
+  note added + the gate candidate filed (#58). *Why logged:* document-on-decision was the gap the review
+  caught — this closes it. → §2.
 - **D-2026-06-07-07 — Locked focus to MUST-HAVE ONLY (new standing rule) + authored a full-LIFECYCLE
   QA verification goal (pre-prod gate + post-prod verification).** Abhay's directive: "focus only on
   must-have features; make this a rule; do not touch good-to-have/nice-to-have until I explicitly

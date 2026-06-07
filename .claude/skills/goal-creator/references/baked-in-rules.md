@@ -72,6 +72,14 @@ other session — there is no way to see how far it got, what broke, or what it 
 This makes the run's progress + major events readable LIVE from another session, and captures the
 events/lessons so future runs (and Abhay) can learn from this one.
 
+> **Honest standard note (don't pretend otherwise):** this log + fold-back discipline is currently
+> **advisory prose** the run is asked to follow — there is **no deterministic enforcement yet**. By
+> this repo's own gate-gap lesson (*prose doesn't prevent recurrence; a hook/CI gate does*), the real
+> backstop is a deterministic run-completion check (e.g. a `/goal` run cannot be marked done without a
+> `<slug>-PROGRESS.md` carrying a `DONE` line + a final-report "LEARNINGS TO FOLD BACK" section). That
+> gate is tracked as a candidate (see the goal-creator gate-candidate issue) — until it exists, treat
+> §0.3 as best-effort, not guaranteed.
+
 > **Maintain an append-only progress log for the entire run. Update it BEFORE moving on from each
 > stage/event — so a crash or context-out leaves it current (it survives where in-context memory does not).**
 >
@@ -240,14 +248,17 @@ expected to skip.
 
 ---
 
-## Tree-specific mechanics (adapt these, keep the mandate)
+## Persistence-mode mechanics (adapt the Rule-25 signal to the mode the run exercises)
 
-| Concern | Root app (`src/`+`server/`, port 5173) | `mvp/` (active, port 5175/5173) |
+> Single-app repo (extraction 2026-05-31 — no `mvp/`/`demo/` trees). Two trees: `src/` (Vue planner
+> SPA, :5175) + `server/` (Hono/Prisma → Supabase, :3100). Run static gates in BOTH where a change is
+> `@planner`-shared (root `npm run type-check && npm run test:unit`; `cd server && npm run type-check &&
+> npm run lint && npm run test:unit`). The Rule-25 persistence signal depends on the adapter mode:
+
+| Mode | Rule 25 persistence signal | Rule 26 cross-page consumers |
 |---|---|---|
-| Static gates (CWD) | repo root: `npm run type-check && npm run lint && npm run test:unit && npm run build` | **`cd mvp/`**: `npm run type-check` (banner must say `firekaro-mvp`), `npm run test:unit`, `npm run build` (watch bundle budget) |
-| Rule 25 persistence signal | independent API GET: `curl -H "x-dev-bypass: true" <url>` (per `rules/dev-bypass-auth.md`) confirms the row | localStorage round-trip via `mcp__playwright__browser_evaluate` reading `firekaro-mvp:<userId>:<entityKey>` (per `mvp/src/lib/storage-adapter.ts`) |
-| Rule 26 cross-page consumers | the API consumer map in `docs/NEW-USER-JOURNEY-TEST-PLAN.md` §3 + the cross-page e2e specs | `useFireDerive()` aggregates + the dashboard/overview screens that read them |
-| CWD trap | n/a | **every** npm/playwright command MUST run from `mvp/` — wrong CWD silently runs the parent `firekaro-vue` project |
-| Boundary | root app may not touch `mvp/`, `demo/`, or `5Wealths\` | `mvp/` only; never `src/`, `server/`, `demo/`, `.claude/`, or `5Wealths\` |
+| **localStorage demo adapter** (default — `VITE_USE_SERVER_ADAPTER` off) | localStorage round-trip via `mcp__playwright__browser_evaluate` reading `firekaro-mvp:<userId>:<entityKey>` (per `src/lib/storage-adapter.ts`) | `useFireDerive()` aggregates + the dashboard/overview screens that read them |
+| **ServerAdapter** (`VITE_USE_SERVER_ADAPTER=on` → Supabase) | independent API GET `curl -H "x-dev-bypass: true" http://localhost:3100/api/planner/<key>` (per `rules/dev-bypass-auth.md`); wait out the 1.5s write debounce first | same derived consumers + the `/api/planner/*` round-trip |
 
-The `demo/` tree is **frozen** — contracts should not target it unless Abhay explicitly says so.
+Boundary for every contract: this repo's `src/`/`server/`/`e2e/` only — never `.claude/` rules from a
+build run, never `D:\Abhay\VibeCoding\5Wealths\`.

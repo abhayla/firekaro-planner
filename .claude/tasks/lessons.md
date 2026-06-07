@@ -80,3 +80,26 @@ Per the process-improvement item 5 (measure the process). The pattern is decisiv
 | moot-lever / didn't check derive's assumptions (06-06) | pre-build design check — **didn't exist**; FinTech caught it POST-build | "no-inert-lever" CI substance test — **NOT yet built** (needs the wired catalog) | n/a (reverted before wiring) | **OPEN** — prose design-rule only until the CI test exists |
 
 **Conclusion:** 3 CLOSED = all hook/CI-test. 2 AT-RISK + 1 OPEN = all advisory prose. 1 PARTIAL = hook (extended). The data says prose-rules do not prevent recurrence; hooks and CI gates do — which is exactly why improvement items 1 (prune prose) and 2 (promote MUSTs to hooks) are the highest-leverage process changes. **Standing addition: every future lesson MUST carry a gate-gap line (which gate should have caught it + closed-by-hook-or-prose) so this signal keeps accruing.**
+
+---
+
+## 2026-06-07 — Ask-vs-decide-vs-grill: I did the first two ad-hoc and skipped grilling
+**Mistake:** On consequential design forks I either asked multiple-choice-with-my-own-recommendation or just decided, until Abhay: "why aren't you using the grill skill — utilize it when you have questions."
+**What it missed:** decision-authority's confidence gate already names three paths: reversible/best-practice-clear → DECIDE; consequential fork + <95% + no clear winner → `/grill-me`; small gap → one clarification. I was collapsing it to a binary and skipping grill.
+**Root cause:** adherence gap — forgot grill is the designated tool for genuine no-clear-winner forks; "ask-with-a-recommendation" is the over-ask costume.
+**Fix/Pattern:** consequential + no clear winner → `/grill-me` (or `/grill-with-docs`); reversible/clear → decide; never ad-hoc multiple-choice-with-recommendation. (Applied same turn: grilled the learnings-routing fork.)
+**Gate-gap:** the no-overask Stop hook catches trailing-question PHRASES, not "should have grilled but didn't" — judgment call, hard to gate. Status: OPEN (prose).
+
+## 2026-06-07 — Over-executed on a "just hand me the prompt to review" turn → forced a revert
+**Mistake:** Asked to ENHANCE a prompt for review, I enhanced AND executed it (created a rule + goal contract, committed + pushed `8a56315`). Abhay wanted only the polished prompt; reverted (`dd874c7`).
+**What it missed:** "enhance/review/show me X" is produce-an-artifact, NOT execute. I let the prompt-auto-enhance pipeline's default-execute override the user's explicit "for review".
+**Root cause:** intent miss on a reversible-but-consequential action; didn't confirm enhance-vs-execute when the verb was "enhance/review".
+**Fix/Pattern:** when the ask is "enhance / review / show me X (for review)," STOP at producing X; execute only on an explicit go-ahead. The confidence gate governs WHAT to do, not only what to build.
+**Gate-gap:** no gate distinguishes "produce for review" from "execute"; advisory. Status: OPEN (prose).
+
+## 2026-06-07 — Shipped a half-propagated taxonomy refactor; the rule-29 edge caught it
+**Mistake:** Refactored goal-creator's learning routing to a two-type taxonomy but updated only SKILL.md + part of baked-in-rules, leaving stale "3-way / (a)(b)(c)" wording in contract-template + a "3-way" label in §0.3 (`1be51f5`/`f63a48a`) before an independent review caught it. Also: did not update lessons.md or PROJECT-LOG for the session's corrections, and built a prose-only fold-back loop in a repo whose own lesson is "prose doesn't prevent recurrence."
+**What it missed:** (a) a multi-file consistency sweep — the routing logic was DUPLICATED across 3+ files, so editing one and missing the others is the predicted drift (`configuration-ssot`); (b) the every-correction→lessons.md + document-on-decision→PROJECT-LOG discipline; (c) the gate-over-prose preference for the loop itself.
+**Root cause:** concept duplicated across files (no single canonical home); and treating doc-discipline (lessons/PROJECT-LOG) as optional under task focus.
+**Fix/Pattern:** de-duplicated the taxonomy to ONE canonical home (`baked-in-rules.md` §0.3) with the others pointing to it; added these lessons + PROJECT-LOG `D-2026-06-07-08`; added an honest "advisory-pending-a-gate" note to the loop + filed the gate candidate. When a concept lives in N files → consolidate to one + pointers, or grep-sweep ALL copies per edit.
+**Gate-gap:** the rule-29 independent-review edge caught the drift (process gate works); the deterministic fix is de-duplication (one home) — but the doc-discipline (lessons/PROJECT-LOG) + the loop's own enforcement remain advisory PROSE → tracked as a gate candidate. Status: PARTIAL (de-dup CLOSED; doc-discipline + loop-enforcement OPEN/prose).

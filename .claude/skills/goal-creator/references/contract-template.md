@@ -146,15 +146,12 @@ per screen + PNG paths; Rule 25 verdict per write path; Rule 26 cross-page resul
 Lighthouse summary; DoD green/amber/red tally; any DEFERRED entries with rule status + reason.
 
 Plus a **LEARNINGS TO FOLD BACK** section (derived from the §0.3 progress log) — the
-self-improvement loop. Classify each learning by **TYPE**, place it in its **ONE canonical home**
-(dedup first), as PROPOSALS for Abhay (never auto-applied — governance edits need approval):
-**GENERIC** (how goals/tests/process run) → `goal-creator` baked-in-rules/skill and/or a process
-rule (`.claude/rules/*`); **PRODUCT-SPECIFIC** (about FireKaro) → a product rule (`.claude/rules/*`)
-if a recurring class, else THIS goal contract. For BOTH, prefer a **deterministic gate**
-(hook/CI/run-profile) over prose where one fits (gate → rule/skill prose → contract note).
-Auto-append only the one-line error→fix→lesson (with a gate-gap line, after a dedup check) to
-`.claude/tasks/lessons.md`. The next interactive turn offers to apply the fold-back via
-`goal-creator` Mode B.
+self-improvement loop. Route each learning **per the canonical taxonomy in
+`references/baked-in-rules.md` §0.3 step 5** (GENERIC → skill/process-rule; PRODUCT-SPECIFIC →
+product rule if a recurring class, else THIS contract; gate over prose; one canonical home, dedup),
+as PROPOSALS for Abhay (governance edits need approval). Auto-append only the one-line
+error→fix→lesson (with a gate-gap line) to `.claude/tasks/lessons.md`. The next interactive turn
+offers to apply the fold-back via `goal-creator` Mode B.
 
 ---
 

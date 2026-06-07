@@ -33,8 +33,9 @@ good-to-have or nice-to-have, it is **blocked pending approval** by this rule.
 
 ## BLOCKED pending explicit approval
 
-- **Starting or building any `good-to-have` or `nice-to-have` feature/issue** (today: #41 / #43 /
-  #44 / #45 / #46 / #47 / #49 / #53 and any future lower-tier ask).
+- **Starting or building any `good-to-have` or `nice-to-have` feature/issue** — the live blocked set is
+  the query `gh issue list --label good-to-have` / `--label nice-to-have` (this rule does NOT snapshot
+  issue numbers — they go stale).
 - Promoting a good-to-have/nice-to-have into active build because "the catalog looks incomplete"
   (feature-completeness bias — forbidden by `goal-anchored-decisions.md` rule 30).
 
@@ -45,12 +46,12 @@ retention loop"). Absent that, surface the lower-tier item in **one line** as bl
 and keep working the allowed set — do NOT silently start it, and do NOT stop the whole turn for it
 (`decision-authority.md`: escalate in one line, keep going on non-gated work).
 
-## Current state (2026-06-07)
+## Seeing the live state (query, never a snapshot)
 
-The **must-have registry is empty** (#48/#50/#51/#52 all closed — the full obj 0→4 core is built +
-deployed). So the live effect of this rule **today** is: hardening/testing the built app is in-scope;
-**no new good-to-have/nice-to-have work begins until approved.** When the next must-have surfaces,
-label it `must-have` and it is unblocked automatically.
+`gh issue list --label must-have` = what's buildable now; `--label good-to-have` / `--label
+nice-to-have` = blocked pending approval. The query IS the live registry — this rule deliberately holds
+no dated snapshot. When the must-have set is empty, the rule's effect is simply: hardening/testing the
+built app is in-scope (the carve-out above); no new lower-tier build begins until approved.
 
 ## CRITICAL RULES
 

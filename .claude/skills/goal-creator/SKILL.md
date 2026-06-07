@@ -21,7 +21,7 @@ description: >
 type: workflow
 allowed-tools: "Read Write Edit Grep Glob Bash"
 argument-hint: "[one-line description of the goal, optional]"
-version: "1.2.0"
+version: "1.3.0"
 ---
 
 # Goal Creator
@@ -82,12 +82,12 @@ Before interviewing, ground yourself so your recommended answers are real, not g
 3. **Recall the relevant project memory** — especially `feedback_goal_is_user_invoked.md`
    (you author, Abhay runs), `feedback_rule24_25_pre_commit.md`, `feedback_take_judgment_call.md`,
    `feedback_dont_defer_on_context_judgment.md`, and `feedback_enumerate_before_greenfield.md`.
-4. **Identify the target app tree early.** This repo has three independent apps
-   (`src/`+`server/` root, `demo/` frozen, `mvp/` active). Architecture, commands, ports,
-   and persistence differ per tree — the contract's verification gates must match the
-   target tree (e.g. `mvp/` persists to localStorage, not a DB, so Rule 25 is
-   localStorage round-trip; the root app uses `curl -H "x-dev-bypass: true"` API checks).
-   When in doubt the active tree is `mvp/`; confirm in the interview.
+4. **Identify the target layer + persistence mode early.** This is a single-app repo
+   (extracted standalone 2026-05-31 — the old `mvp/`/`demo/` monorepo split no longer exists):
+   `src/` (Vue planner SPA, :5175) + `server/` (Hono/Prisma → Supabase, :3100). The contract's
+   Rule-25 verification must match the mode the run exercises: **localStorage round-trip** (demo
+   adapter, default) OR **`curl -H "x-dev-bypass: true"` API check** (ServerAdapter when
+   `VITE_USE_SERVER_ADAPTER=on`). Confirm which mode in the interview. See CLAUDE.md "Cold-start".
 
 If Abhay gave a one-line goal as an argument, use it to seed the interview — don't re-ask
 what he already told you.
@@ -236,16 +236,10 @@ loaded its contract).
 1. **Read the run's learnings** — its `docs/goals/.run/<slug>-PROGRESS.md` (the §0.3 log: defects,
    "X not working + what I did" events, decisions, recoveries) **and** the committed final report's
    **"LEARNINGS TO FOLD BACK"** section.
-2. **Classify each learning by TYPE, then place it in its ONE canonical home by blast radius
-   (`configuration-ssot`):**
-   - **GENERIC** — about how goals / tests / the process run (e.g. headed-run launcher, demo-vs-server
-     E2E, an IDOR false-proof pattern) → improve the **skill** (`references/baked-in-rules.md` /
-     `references/contract-template.md`) and/or a **process rule** (`.claude/rules/*`). Benefits every goal.
-   - **PRODUCT-SPECIFIC** — about FireKaro itself → route by reach: a recurring product **class** (any
-     product work would hit it) → a **product rule** (`.claude/rules/*`); a **single-goal** quirk/scope
-     correction → **that goal contract**.
-   - **For BOTH, prefer a DETERMINISTIC GATE** (hook / CI test / run-profile) over prose where one fits
-     (the `lessons.md` gate-gap lesson). Target preference: **gate → rule/skill prose → contract note.**
+2. **Classify + route each learning per the canonical taxonomy in `references/baked-in-rules.md` §0.3
+   step 5** (the single source of truth — do NOT restate it here). In brief: GENERIC → skill/process-rule;
+   PRODUCT-SPECIFIC → a product rule if a recurring class, else the goal contract; prefer a deterministic
+   gate over prose for both; one canonical home.
 3. **Dedup** — grep the target home before adding; skip anything already covered. One learning = one home.
 4. **PROPOSE, then apply on approval.** These are skill/rule/contract = governance edits (rule 5) →
    show Abhay the concrete diffs and apply ONLY on his go-ahead. The one-line `lessons.md` entry the
@@ -273,19 +267,20 @@ loaded its contract).
   other session can track the run live (`git worktree list` → read the log), and the major
   events/lessons roll into the committed final report + `.claude/tasks/lessons.md` at run-end.
 - **Mode B (fold-back) only PROPOSES skill/rule/contract edits for Abhay's approval** (governance,
-  rule 5); the only auto-write is the one-line `lessons.md` entry. Classify each learning by TYPE
-  (**GENERIC** → skill/process-rule · **PRODUCT-SPECIFIC** → a product rule if a class, the goal
-  contract if goal-only), prefer a **deterministic gate over prose** for both, land it in ONE
-  canonical home (dedup first), and end with the offer to fold them in. NEVER fold back into a contract
-  that may be running (cardinal rule 5) — generalize or write a delta instead.
+  rule 5); the only auto-write is the one-line `lessons.md` entry. Route learnings per the canonical
+  taxonomy in `references/baked-in-rules.md` §0.3 step 5 (GENERIC → skill/process-rule;
+  PRODUCT-SPECIFIC → product rule if a class, else the contract; gate over prose; one home, dedup),
+  and end with the offer. NEVER fold back into a contract that may be running (cardinal rule 5) —
+  generalize or write a delta instead.
 - **Interview-first, one question at a time, each with a recommended answer**, until every
   fork is resolved. The contract must be zero-user-input.
 - **Every contract bakes in rules 24, 25, 26, 15, 17, 20, 23 + the failure-recovery budget
   block** (`references/baked-in-rules.md`), with mechanics adapted to the target app tree.
 - **Match the house format** in `docs/goals/` and the skeleton in
   `references/contract-template.md`. Concrete paths/components/commands, never abstractions.
-- **Resolve the target app tree first** — `mvp/` (active, localStorage) vs root
-  `src/`+`server/` (DB, `x-dev-bypass`) vs frozen `demo/` — and match the gates to it.
+- **Resolve the persistence mode first** — localStorage demo adapter (default) vs ServerAdapter
+  (`VITE_USE_SERVER_ADAPTER=on` → `x-dev-bypass` API) — and match the Rule-25 gate to it. Single-app
+  repo: `src/` (:5175) + `server/` (:3100); no `mvp/`/`demo/` trees (extraction 2026-05-31).
 - **No open questions in the output.** "Decide whether to…" in a finished contract is a bug.
 - **Honor the boundary contracts** the contract operates under (e.g. `mvp/` only; never
   write `5Wealths\`; surface strategic items as `TODO(5W):`).
