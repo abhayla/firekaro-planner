@@ -34,12 +34,22 @@ release-readiness sign-off, and a post-deploy verification report.
 
 ---
 
+## 0.0 PREREQUISITE before a re-run (read FIRST)
+
+> **The first Phase-A run (branch `chore/full-lifecycle-qa`) is COMPLETE but UNMERGED** (22 commits
+> ahead of `main`, 12 behind). Before re-running this hardened contract, **merge `chore/full-lifecycle-qa`
+> into `main`** (Abhay's gate) so `main` carries BOTH the prior ~63 green locks AND this latest contract —
+> otherwise §0.2's idempotency preflight (which reads `main` + `git log`) cannot see the prior work and
+> will redo it. After merging, the old `chore/full-lifecycle-qa` branch + `../firekaro-goal-qa` worktree
+> may be removed; this re-run uses a FRESH worktree/branch (§0.1) off the updated `main`.
+
 ## 0.1 WORKTREE ISOLATION (paste FIRST)
 
 > **First action, before §0.2 and any stage. Non-negotiable.** Dedicated worktree, NEW branch off `main`:
 > 1. If `root=$(git rev-parse --show-toplevel)` is the primary checkout, run:
->    `git worktree add ../firekaro-goal-qa -b chore/full-lifecycle-qa main` and run EVERY stage from
->    `../firekaro-goal-qa`. Reuse it if it exists (§0.2 makes re-runs idempotent).
+>    `git worktree add ../firekaro-goal-qa2 -b chore/full-lifecycle-qa-2 main` (a FRESH worktree/branch —
+>    the prior `chore/full-lifecycle-qa` is the completed-run branch; see §0.0) and run EVERY stage from
+>    `../firekaro-goal-qa2`. Reuse it if it exists (§0.2 makes re-runs idempotent).
 > 2. Claim: `export GOAL_RUN_TOKEN=qa-<short-nonce>` → write `.goal-active.lock` with it.
 > 3. Release on exit (after last commit OR any halt): `rm -f "$(git rev-parse --show-toplevel)/.goal-active.lock"`.
 > If `git worktree` is unavailable, note it and proceed — never run in the primary checkout.
