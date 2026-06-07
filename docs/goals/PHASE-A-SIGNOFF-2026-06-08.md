@@ -40,7 +40,7 @@ Engine generalized to a `PERSONAS` registry; each persona hand-entered from scra
 
 ## Open items (non-blocking)
 - gh #62 (demo→server migration seam, LOW), gh #63 (demo seed-switcher label, nice-to-have).
-- #59 literal-85% cosmetic gap (substance met; equivalent-gated).
+- One residual OLD-regime `marginalRelief` killable-only-at-an-untested-edge mutant (low-value; tax.ts already ≥85%).
 
 ## Verdict
-The re-run's delta (§A2.6 + #60 + the #59 substance) is **complete and verified**; baseline + prior-run-covered stages are green. **Deploy is Abhay-gated** — this contract does not deploy/merge. Phase B runs after deploy.
+All three deltas (§A2.6 ✅ all-4-personas + blind-verified · #60 ✅ auth gate locked · #59 ✅ tax.ts **85.27% ≥ 85% gate met**) are **complete and verified**; baseline + prior-run-covered stages are green. **Deploy is Abhay-gated** — this contract does not deploy/merge. Phase B runs after deploy.
