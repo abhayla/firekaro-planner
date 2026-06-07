@@ -1,0 +1,85 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`A7.2 golden-master — per-persona headline (DEFAULT lens) > iyers: derive() headline is locked 1`] = `
+{
+  "anchorAge": 38,
+  "annualSavings": 1475608,
+  "corpusOnlyYearsToRegular": 18.9167,
+  "effectiveSWR": 0.035,
+  "fireAge": 56.92,
+  "fireNumber": 80319726,
+  "fireWithdrawableCorpus": 17080000,
+  "lensedEarners": 2,
+  "monthlyContribution": 122967,
+  "progressPercent": 21,
+  "savingsRate": 43.2,
+  "targetRetirementAge": 55,
+  "totalCorpus": 17400000,
+  "yearsToFat": 19.6667,
+  "yearsToLean": 6.0833,
+  "yearsToRegular": 18.9167,
+}
+`;
+
+exports[`A7.2 golden-master — per-persona headline (DEFAULT lens) > mauryas: derive() headline is locked 1`] = `
+{
+  "anchorAge": 44,
+  "annualSavings": 1510982,
+  "corpusOnlyYearsToRegular": 23.0833,
+  "effectiveSWR": 0.0325,
+  "fireAge": 67.08,
+  "fireNumber": 111410486,
+  "fireWithdrawableCorpus": 35520000,
+  "lensedEarners": 1,
+  "monthlyContribution": 125915,
+  "progressPercent": 32,
+  "savingsRate": 38.1,
+  "targetRetirementAge": 50,
+  "totalCorpus": 36000000,
+  "yearsToFat": 23.5,
+  "yearsToLean": 3.8333,
+  "yearsToRegular": 23.0833,
+}
+`;
+
+exports[`A7.2 golden-master — per-persona headline (DEFAULT lens) > mehtas: derive() headline is locked 1`] = `
+{
+  "anchorAge": 45,
+  "annualSavings": 2765864,
+  "corpusOnlyYearsToRegular": 4.4167,
+  "effectiveSWR": 0.0325,
+  "fireAge": 49.42,
+  "fireNumber": 98333391,
+  "fireWithdrawableCorpus": 79880000,
+  "lensedEarners": 2,
+  "monthlyContribution": 230489,
+  "progressPercent": 81,
+  "savingsRate": 52.2,
+  "targetRetirementAge": 47,
+  "totalCorpus": 80600000,
+  "yearsToFat": 8.5833,
+  "yearsToLean": 0,
+  "yearsToRegular": 4.4167,
+}
+`;
+
+exports[`A7.2 golden-master — per-persona headline (DEFAULT lens) > sharmas: derive() headline is locked 1`] = `
+{
+  "anchorAge": 30,
+  "annualSavings": 1927164,
+  "corpusOnlyYearsToRegular": 25.5833,
+  "effectiveSWR": 0.0325,
+  "fireAge": 55.58,
+  "fireNumber": 105482068,
+  "fireWithdrawableCorpus": 11000000,
+  "lensedEarners": 2,
+  "monthlyContribution": 160597,
+  "progressPercent": 10,
+  "savingsRate": 48.1,
+  "targetRetirementAge": 47,
+  "totalCorpus": 11000000,
+  "yearsToFat": 23.75,
+  "yearsToLean": 10,
+  "yearsToRegular": 25.5833,
+}
+`;

@@ -26,7 +26,10 @@ const BASE = "http://localhost:5175";
 const argv = process.argv.slice(2);
 const headless = argv.includes("--headless");
 const routesFlagIdx = argv.indexOf("--routes");
-const persona = argv.find((a) => !a.startsWith("--") && a !== argv[routesFlagIdx + 1]) || "mauryas";
+// Guard: when there's no --routes flag, routesFlagIdx is -1 and argv[routesFlagIdx+1] resolves to
+// argv[0] (the persona itself) — which would wrongly exclude it and always default to mauryas.
+const persona =
+  argv.find((a) => !a.startsWith("--") && (routesFlagIdx === -1 || a !== argv[routesFlagIdx + 1])) || "mauryas";
 
 // SEED_META labels (keep in sync with src/seeds/index.ts).
 const LABELS = {
@@ -127,7 +130,10 @@ try {
 
   // 2) Switch to the target persona (Sharmas is already loaded by the sample CTA).
   if (persona !== "sharmas") {
-    await page.locator(".seed-switcher-btn").click();
+    // The DemoTour auto-launches ~300ms deferred (rAF + 300ms), so the dismissTour() at entry can
+    // miss it and the re-appeared overlay intercepts this click. Clear it RIGHT before, then force.
+    await dismissTour();
+    await page.locator(".seed-switcher-btn").click({ force: true });
     await page.waitForTimeout(400);
     await page.getByText(personaLabel, { exact: true }).click();
     await page.waitForTimeout(1200); // loadSeed + reactivity / possible reload
