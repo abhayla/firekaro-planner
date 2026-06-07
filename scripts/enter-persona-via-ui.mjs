@@ -7,7 +7,9 @@
 import { chromium } from "@playwright/test";
 import { mkdirSync } from "node:fs";
 
-const BASE = "http://localhost:5175";
+// Port-configurable (ENTRY_BASE) so the engine runs against any dev-server port — 5175 is often
+// occupied by another worktree's server, and a demo-mode run may use a side port (§A2.6 continuation).
+const BASE = process.env.ENTRY_BASE || "http://localhost:5175";
 const headless = process.argv.includes("--headless");
 const ts = new Date().toISOString().replace(/[:.]/g, "-");
 const OUT = `verification-screenshots/mauryas-ENTRY-${ts}`;
@@ -141,6 +143,9 @@ try {
   await page.getByRole("button", { name: /begin wizard/i }).click();
   await page.waitForURL(/\/wizard/, { timeout: 15000 });
   await dismissTour();
+  // Settle: the URL flips to /wizard before the profile step's lazy component finishes mounting;
+  // wait for the first control to be present so the gated run is not flaky (observed 2026-06-07).
+  await page.getByLabel("Setup mode").waitFor({ state: "visible", timeout: 15000 });
   await page.getByLabel("Setup mode").click({ force: true });
   await page.getByRole("option", { name: "Solo" }).click();
   await page.getByLabel(/household name/i).fill("The Maurya Family");
