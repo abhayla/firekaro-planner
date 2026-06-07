@@ -158,6 +158,32 @@ describe("A7.1 kernel invariants — per-persona metamorphic (fast-check)", () =
         { numRuns: 25 },
       );
     });
+
+    // (5) ANTI-OPTIMISM (the Tier-0 honesty contract the bridge exists for): the bridge-adjusted
+    // headline yearsToRegular may only push FIRE LATER than the pure corpus-accumulation leg, NEVER
+    // earlier. An earlier headline would be optimistic — the exact under-save failure mode. (FinTech
+    // independent review, 2026-06-07: this directly locks the anti-optimism promise.)
+    it(`${persona.name}: headline FIRE is never more optimistic than the corpus-only leg`, () => {
+      const h = useHouseholdStore();
+      const a = useAssumptionsStore();
+      persona.load(h, a);
+      const base = a.values;
+      fc.assert(
+        fc.property(
+          fc.double({ min: 0, max: 15, noNaN: true }),
+          fc.double({ min: 1, max: 1.4, noNaN: true }),
+          (stepUp, f) => {
+            const perturbed = { ...base, householdSavingsStepUpPercent: stepUp };
+            for (const key of RETURN_KEYS) perturbed[key] = Math.min(0.5, base[key] * f);
+            const k = derive(h.data, perturbed, LENS);
+            if (Number.isFinite(k.yearsToRegular) && Number.isFinite(k.corpusOnlyYearsToRegular)) {
+              expect(k.yearsToRegular).toBeGreaterThanOrEqual(k.corpusOnlyYearsToRegular - EPS);
+            }
+          },
+        ),
+        { numRuns: 50 },
+      );
+    });
   }
 });
 
@@ -209,6 +235,67 @@ describe("A7.1 tax-engine invariants — free-form (fast-check)", () => {
       { numRuns: 120 },
     );
   });
+
+  // MARGINAL RELIEF (FinTech independent review, 2026-06-07 — the highest-rupee-risk area of
+  // Indian tax): post-tax income must be MONOTONIC NON-DECREASING in gross income. Earning ₹1
+  // more must never leave you with less after tax. This is exactly what surcharge marginal relief
+  // (₹50L/₹1Cr/₹2Cr/₹5Cr cliffs) + the ₹12L rebate marginal relief guarantee — a regression that
+  // dropped either would create a take-home CLIFF, caught here for free across the whole range.
+  it("computeTax: post-tax income is monotonic non-decreasing in gross (marginal relief holds)", () => {
+    fc.assert(
+      fc.property(
+        fc.double({ min: 0, max: 60_000_000, noNaN: true }),
+        fc.double({ min: 0, max: 60_000_000, noNaN: true }),
+        fc.constantFrom("OLD" as const, "NEW" as const),
+        fc.constantFrom(...AVAILABLE_FYS),
+        (g1, g2, regime, fy) => {
+          const lo = Math.min(g1, g2);
+          const hi = Math.max(g1, g2);
+          const netLo = lo - computeTax({ grossIncome: lo, regime, fy }).totalTax;
+          const netHi = hi - computeTax({ grossIncome: hi, regime, fy }).totalTax;
+          // A higher gross must yield a higher-or-equal take-home (±₹1 rounding slack).
+          expect(netHi).toBeGreaterThanOrEqual(netLo - 1);
+        },
+      ),
+      { numRuns: 250 },
+    );
+  });
+
+  // Targeted surcharge-cliff witnesses (₹50L, ₹1Cr) — a ₹1 raise across the cliff must not cost
+  // more than ₹1 of take-home (the explicit marginal-relief contract at the boundary).
+  it("computeTax: surcharge cliffs do not destroy take-home (₹50L, ₹1Cr witnesses)", () => {
+    const fy = AVAILABLE_FYS[AVAILABLE_FYS.length - 1];
+    for (const cliff of [5_000_000, 10_000_000]) {
+      for (const regime of ["OLD", "NEW"] as const) {
+        const below = cliff - 1000;
+        const above = cliff + 1000;
+        const netBelow = below - computeTax({ grossIncome: below, regime, fy }).totalTax;
+        const netAbove = above - computeTax({ grossIncome: above, regime, fy }).totalTax;
+        expect(netAbove, `${regime} ₹${cliff} cliff: +₹2000 gross must not reduce take-home`).toBeGreaterThanOrEqual(
+          netBelow - 1,
+        );
+      }
+    }
+  });
+
+  // NEW regime IGNORES chapter-VI-A deductions (tax.ts: ded = regime==='OLD' ? ... : 0). A bug that
+  // started applying them under NEW would UNDERSTATE tax → overstate take-home → optimistically
+  // earlier FIRE → under-save (a Tier-0 honesty error). Lock: NEW tax is invariant to `deductions`.
+  it("computeTax: NEW-regime tax is invariant to the deductions arg", () => {
+    fc.assert(
+      fc.property(
+        fc.double({ min: 0, max: 60_000_000, noNaN: true }),
+        fc.double({ min: 0, max: 1_500_000, noNaN: true }),
+        fc.constantFrom(...AVAILABLE_FYS),
+        (grossIncome, deductions, fy) => {
+          const withDed = computeTax({ grossIncome, regime: "NEW", fy, deductions }).totalTax;
+          const without = computeTax({ grossIncome, regime: "NEW", fy, deductions: 0 }).totalTax;
+          expect(withDed).toBe(without);
+        },
+      ),
+      { numRuns: 120 },
+    );
+  });
 });
 
 describe("A7.1 withdrawal-rule invariants — free-form (fast-check)", () => {
@@ -248,6 +335,22 @@ describe("A7.1 withdrawal-rule invariants — free-form (fast-check)", () => {
       ),
       { numRuns: 200 },
     );
+
+    // Deterministic branch witnesses (code-review 2026-06-07: the random property does not
+    // GUARANTEE each branch fires + does not lock the floor magnitude). These force every branch
+    // and pin the exact magnitude — non-flaky, no reliance on random coverage.
+    const start = 10_000_000;
+    const prev = 350_000;
+    const base = prev * (1 + config.inflation);
+    const floorR = floorCeilingWithdrawal(config, start, start * 0.5, 3, prev); // ratio 0.5 < floor 0.8
+    expect(floorR.rule).toBe("floor-triggered");
+    expect(floorR.withdrawal, "floor cut is exactly baseline*floorAdjustment").toBeCloseTo(base * config.floorAdjustment, 6);
+    const ceilR = floorCeilingWithdrawal(config, start, start * 2, 3, prev); // ratio 2 > ceiling 1.2
+    expect(ceilR.rule).toBe("ceiling-capped");
+    expect(ceilR.withdrawal).toBeCloseTo(base * config.ceilingAdjustment, 6);
+    const baseR = floorCeilingWithdrawal(config, start, start * 1.0, 3, prev); // ratio 1.0 in band
+    expect(baseR.rule).toBe("baseline");
+    expect(baseR.withdrawal).toBeCloseTo(base, 6);
   });
 
   // Year 0 is always exactly the starting SWR draw — a fixed, auditable anchor.

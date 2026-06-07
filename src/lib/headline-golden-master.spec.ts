@@ -44,6 +44,9 @@ describe("A7.2 golden-master — per-persona headline (DEFAULT lens)", () => {
       persona.load(h, a);
       const k = derive(h.data, a.values, LENS);
       const headline = {
+        // Lock the lens scope too — a #22-class regression that silently scoped the household to
+        // one earner would move this count and trip the golden master (code-review 2026-06-07).
+        lensedEarners: k.lensedEarners.length,
         anchorAge: k.anchorAge,
         targetRetirementAge: k.targetRetirementAge,
         fireAge: r(k.anchorAge + k.yearsToRegular, 2),

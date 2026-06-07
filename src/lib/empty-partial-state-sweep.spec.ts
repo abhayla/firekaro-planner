@@ -88,12 +88,13 @@ describe("A2.5b EMPTY/PARTIAL honesty sweep (gh #39 sibling sweep)", () => {
     // Crossover labels — no predicted "you'll reach FIRE in year X".
     expectNoCrossoverClaimed(k, ctx);
 
-    // Freedom score — the gh #40 zero-income guard means an empty user scores LOW, not "free".
+    // Freedom score — the gh #40 zero-income guard means an empty user scores essentially 0
+    // (no savings, no income, no corpus, no cover). A falsely-awarded score is the regression.
     const fs = freedomFromDerive(k, 0);
-    expect(fs.score, `${ctx} — freedom score must be low, not falsely high`).toBeLessThan(50);
-    expect(fs.status.toLowerCase(), `${ctx} — status not an 'excellent/free' headline`).not.toMatch(
-      /excellent|financially free|achieved/,
-    );
+    expect(fs.score, `${ctx} — freedom score must be ~0, never falsely high`).toBeLessThan(10);
+    // The only "free/achieved" headline computeFreedomScore can emit is "Excellent" (others:
+    // Good/Fair/Developing/Starting) — an empty user must NOT land there.
+    expect(fs.status.toLowerCase(), `${ctx} — status not 'Excellent'`).not.toMatch(/excellent/);
   });
 
   it("PARTIAL-A (real expenses, NO income/corpus): real target but zero progress, nothing achieved", () => {
