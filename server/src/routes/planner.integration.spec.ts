@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { app } from "../index";
-import { readHousehold } from "../lib/household-repo";
+import { readHousehold, applyHouseholdPlan } from "../lib/household-repo";
+import { diffHousehold } from "../lib/household-diff";
+import { householdSchema } from "@planner/types/household";
 import { prisma } from "../lib/prisma";
 
 /**
@@ -18,6 +20,11 @@ import { prisma } from "../lib/prisma";
  */
 
 const H = { "x-dev-bypass": "true", "content-type": "application/json" };
+
+// A7.3 multi-tenant isolation fixtures.
+const SPOOF_ID = "attacker-other-tenant-id";
+const TENANT_B_EMAIL = "tenant-b-isolation@firekaro-test.local";
+const TENANT_B_MARKER = "TenantB-Only-Member";
 
 const sampleHousehold = {
   name: "Integration",
@@ -115,28 +122,61 @@ dlive("/api/planner integration (live DB — Supabase firekaro-planner)", () => 
   // The #1 security property for a multi-tenant finance app holding PAN/salary/family data:
   // userId comes from the session ONLY (hono-route-conventions.md). A tenant leak is catastrophic.
 
-  it("IDOR: a spoofed body userId is IGNORED — the write is scoped to the session user only", async () => {
-    // Attacker-style payload: a userId pointing at another tenant, smuggled in the body.
-    const spoofed = { ...sampleHousehold, userId: "attacker-other-tenant-id" };
-    const put = await app.request("/api/planner/household", {
-      method: "PUT",
-      headers: H,
-      body: JSON.stringify(spoofed),
-    });
+  it("IDOR regression-lock: a spoofed body userId never writes under the spoofed id (write lands on the session user)", async () => {
+    // Resolve the REAL session userId so we assert the write landed where it should (not against a
+    // known-empty literal — that earlier form was a tautology, caught in independent review 2026-06-07).
+    const me: any = await (await app.request("/api/planner/me", { headers: H })).json();
+    const meId = me.data.id as string;
+    const spoofed = { ...sampleHousehold, userId: SPOOF_ID };
+    const put = await app.request("/api/planner/household", { method: "PUT", headers: H, body: JSON.stringify(spoofed) });
     expect(put.status).toBe(200);
-    // The SESSION (dev-bypass) user has the data...
-    const mine: any = await (await app.request("/api/planner/household", { headers: H })).json();
-    expect(mine.data.members.length).toBeGreaterThan(0);
-    // ...and the spoofed tenant id received ZERO rows — the body userId had no effect.
-    const leaked = await readHousehold(prisma, "attacker-other-tenant-id");
-    expect(leaked, "a spoofed body userId must not write a household for another tenant").toBeNull();
+    // The write landed under the SESSION user, with the payload's members.
+    const mine = await readHousehold(prisma, meId);
+    expect(mine, "the write must land under the session user").not.toBeNull();
+    expect(mine!.members.length).toBe(sampleHousehold.members.length);
+    // The spoofed id received NOTHING — householdSchema strips the body userId today, and if a future
+    // edit ever wired body.userId into the repo, this PUT would have created a config under SPOOF_ID
+    // and this read would be non-null. This locks the strip/ignore behaviour against regression.
+    expect(await readHousehold(prisma, SPOOF_ID), "no household for the spoofed id").toBeNull();
   });
 
-  it("isolation: readHousehold for a different userId never returns this user's data", async () => {
-    // Guarantee the session user has a household, then confirm a DIFFERENT tenant reads back null.
-    await app.request("/api/planner/household", { method: "PUT", headers: H, body: JSON.stringify(sampleHousehold) });
-    const other = await readHousehold(prisma, "some-unrelated-tenant-id");
-    expect(other, "cross-tenant read must never leak another user's household").toBeNull();
+  it("isolation: a real second tenant's household is invisible to the session user, and vice-versa", async () => {
+    // A GENUINE cross-tenant test needs a real second user with its OWN data (the prior version queried
+    // a never-written id — a tautology). Create tenant B + write a DISTINCT household for them directly.
+    await prisma.user.deleteMany({ where: { email: TENANT_B_EMAIL } }); // clean any leftover from a failed run
+    const tenantB = await prisma.user.create({ data: { email: TENANT_B_EMAIL, name: "Tenant B" } });
+    try {
+      // Base on the proven-valid sampleHousehold (same top-level shape) but with a DISTINCT marker
+      // member and no owner-ref'd investments/liabilities, so it parses + diffs cleanly for tenant B.
+      const householdB = householdSchema.parse({
+        ...sampleHousehold,
+        name: "TenantB",
+        members: [
+          { id: "tb-you", name: TENANT_B_MARKER, dateOfBirth: "1980-01-01", role: "EARNER", city: "Metro", health: "Healthy", riskAppetite: "Moderate", marital: "Single" },
+        ],
+        investments: [],
+        liabilities: [],
+        expenses: { avgMonthly: 30000, recurring: [], plannedFuture: [] },
+      });
+      await applyHouseholdPlan(prisma, tenantB.id, diffHousehold(null, householdB));
+
+      // The dev/session user writes their OWN (distinct) household.
+      const me: any = await (await app.request("/api/planner/me", { headers: H })).json();
+      const meId = me.data.id as string;
+      await app.request("/api/planner/household", { method: "PUT", headers: H, body: JSON.stringify(sampleHousehold) });
+
+      // Tenant B's marker member must NEVER appear in the session user's household (read or API)...
+      const mineRepo = await readHousehold(prisma, meId);
+      expect(mineRepo!.members.some((m) => m.name === TENANT_B_MARKER), "session user must not see tenant B's member").toBe(false);
+      const mineApi: any = await (await app.request("/api/planner/household", { headers: H })).json();
+      expect(mineApi.data.members.some((m: any) => m.name === TENANT_B_MARKER)).toBe(false);
+      // ...and tenant B's own read returns THEIR data, never the session user's members.
+      const bRepo = await readHousehold(prisma, tenantB.id);
+      expect(bRepo!.members.map((m) => m.name)).toEqual([TENANT_B_MARKER]);
+      expect(bRepo!.members.some((m) => sampleHousehold.members.some((s) => s.name === m.name)), "tenant B must not see the session user's members").toBe(false);
+    } finally {
+      await prisma.user.delete({ where: { id: tenantB.id } }).catch(() => {}); // cascade-deletes tenant B's rows
+    }
   });
 
   it("validation: a malformed household payload is rejected 422 (not 500, not silently accepted)", async () => {
@@ -178,22 +218,26 @@ dlive("/api/planner integration (live DB — Supabase firekaro-planner)", () => 
     expect(put.status).toBe(200);
 
     const body: any = await (await app.request("/api/planner/household", { headers: H })).json();
+    // Guard against a silently-dropped ROW (not just a field) — independent review 2026-06-07.
+    expect(body.data.investments, "all 5 investments must round-trip").toHaveLength(5);
     const byId: Record<string, any> = Object.fromEntries(body.data.investments.map((i: any) => [i.id, i]));
 
-    expect(byId.stk1, "Stocks qty/price/bucket/holdingsCount round-trip").toMatchObject({
-      type: "Stocks", ownerId: "you", qty: 100, pricePerShare: 500, bucket: 4, holdingsCount: 3,
+    // `value` is asserted on every type — it is the field every downstream consumer reads, so a
+    // silent value corruption must fail here (the omission was flagged in independent review).
+    expect(byId.stk1, "Stocks qty/price/bucket/holdingsCount/value round-trip").toMatchObject({
+      type: "Stocks", ownerId: "you", value: 50000, qty: 100, pricePerShare: 500, bucket: 4, holdingsCount: 3,
     });
-    expect(byId.fd1, "FD principal/rate/maturity/bank round-trip").toMatchObject({
-      type: "FD", principal: 200000, interestRate: 7.1, maturityYear: 2030, bank: "HDFC",
+    expect(byId.fd1, "FD principal/rate/maturity/bank/value round-trip").toMatchObject({
+      type: "FD", value: 200000, principal: 200000, interestRate: 7.1, maturityYear: 2030, bank: "HDFC",
     });
-    expect(byId.gold1, "Gold subtype/grams/pricePerGram + Joint owner round-trip").toMatchObject({
-      type: "Gold", ownerId: "Joint", subtype: "SGB", grams: 20, pricePerGram: 5000,
+    expect(byId.gold1, "Gold subtype/grams/pricePerGram + Joint owner + value round-trip").toMatchObject({
+      type: "Gold", ownerId: "Joint", value: 100000, subtype: "SGB", grams: 20, pricePerGram: 5000,
     });
-    expect(byId.re1, "RealEstate ownership/role/city/purchaseYear round-trip").toMatchObject({
-      type: "RealEstate", ownership: "Self", realEstateRole: "PrimaryResidence", city: "Metro", purchaseYear: 2018,
+    expect(byId.re1, "RealEstate ownership/role/city/purchaseYear/value round-trip").toMatchObject({
+      type: "RealEstate", value: 8000000, ownership: "Self", realEstateRole: "PrimaryResidence", city: "Metro", purchaseYear: 2018,
     });
-    expect(byId.esop1, "ESOP grant/vested round-trip").toMatchObject({
-      type: "ESOP", totalGrantValue: 500000, vestedPercent: 60,
+    expect(byId.esop1, "ESOP grant/vested/value round-trip").toMatchObject({
+      type: "ESOP", value: 300000, totalGrantValue: 500000, vestedPercent: 60,
     });
   });
 
