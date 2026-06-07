@@ -23,6 +23,7 @@ operating log for product/roadmap decisions that previously had no home), and de
 | Bug / feature / task work item | **GitHub Issues** (SSOT) | `bug-filing-and-sibling-audit.md` |
 | **Feature priority tier** (`must-have` / `good-to-have` / `nice-to-have`) | **GitHub issue LABEL** (queryable: `gh issue list --label must-have`) — the WHY of the call goes in PROJECT-LOG | this rule (§ below) |
 | Autonomous build spec | `docs/goals/YYYY-MM-DD-*.md` (`goal-creator`) | goal-creator skill |
+| **Live goal-run progress + major events** (cross-session, while a `/goal` runs) | `docs/goals/.run/<slug>-PROGRESS.md` (append-only, gitignored; **discover active runs via `git worktree list`** → read each worktree's `docs/goals/.run/*-PROGRESS.md`). Durable lessons roll into the committed final report + `.claude/tasks/lessons.md` at run-end. | goal-creator skill (§0.3) |
 | Product design SSOT (objectives, persona, screens) | `docs/v6-fire-planner-product-plan.md` §9; `SCREEN-STANDARD.md` | rule 27 |
 | Stable convention / how-we-work | `CLAUDE.md` + `.claude/rules/*.md` | `configuration-ssot.md` |
 | Multi-step procedure | `.claude/skills/*/SKILL.md` | `configuration-ssot.md` |

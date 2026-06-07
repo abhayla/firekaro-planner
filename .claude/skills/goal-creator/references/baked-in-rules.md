@@ -65,6 +65,43 @@ contract safe to run at any time, even while a parallel session implements part 
 
 ---
 
+## §0.3 Progress Log — live, cross-session-trackable + a learning trail (paste THIRD, after §0.1 + §0.2)
+
+Paste as the contract's third opening section. A long autonomous run is otherwise a black box to every
+other session — there is no way to see how far it got, what broke, or what it decided until it ends.
+This makes the run's progress + major events readable LIVE from another session, and captures the
+events/lessons so future runs (and Abhay) can learn from this one.
+
+> **Maintain an append-only progress log for the entire run. Update it BEFORE moving on from each
+> stage/event — so a crash or context-out leaves it current (it survives where in-context memory does not).**
+>
+> 1. **Location:** `docs/goals/.run/<contract-slug>-PROGRESS.md` (in THIS run's worktree). `.run/` is
+>    gitignored → the log adds no commit churn and never conflicts across parallel runs. It is read
+>    **cross-session via the worktree path**: another session runs `git worktree list`, then reads each
+>    `<worktree>/docs/goals/.run/*-PROGRESS.md` to see every active run's live status.
+> 2. **First log line (right after §0.1/§0.2):** slug · branch · worktree · start time · contract path ·
+>    one-line mission.
+> 3. **Append a SHORT entry (≤2 lines) at each of:** stage start; stage done (with the gate result);
+>    every MAJOR DEFECT found; every "something not working" EVENT **+ what you did about it**
+>    (recovery / decision); each independent-review outcome (concur / dissent); each DEFER or skip; each
+>    blocker / halt; and the final result. **Terse summaries, not detail dumps** — a heartbeat + a
+>    learning trail, never a transcript.
+> 4. **Entry format:** `[YYYY-MM-DD HH:MM] <STAGE|PROGRESS|DEFECT|EVENT|DECISION|RECOVERY|BLOCKER|DONE> — <≤2-line summary>` (get the time with `date "+%Y-%m-%d %H:%M"`).
+> 5. **At run-end, roll the durable learning into COMMITTED homes** (the `.run/` log is ephemeral — it
+>    is cleaned with the worktree): summarize the major defects/events/lessons into the run's committed
+>    final report, and append any notable error→fix→lesson (with a gate-gap line) to
+>    `.claude/tasks/lessons.md` — so the lesson outlives this run.
+>
+> Example:
+> ```
+> [2026-06-07 14:02] STAGE   — A1 static/unit green both trees (root 972, server 150); 0 fixes
+> [2026-06-07 14:31] DEFECT  — A7.3 IDOR test was a false proof (schema strips spoofed userId); rebuilt as genuine 2-tenant isolation
+> [2026-06-07 15:10] EVENT   — A2 E2E blocked: demo specs vs server-mode frontend; did NOT restart shared :5175 → filed #54, deferred to a controlled demo-mode run
+> [2026-06-07 15:20] DONE    — Phase A interim sign-off committed; deploy gate NOT cleared
+> ```
+
+---
+
 ## Process bar (carry forward verbatim)
 
 > **All 26 rules in `.claude/rules/claude-behavior.md` are operative for this run.** The

@@ -41,6 +41,15 @@ and report skips. (Omit only for a true greenfield goal with no prior/parallel w
 
 ---
 
+## 0.3 PROGRESS LOG — live, cross-session-trackable
+
+← PASTE the "§0.3 Progress Log" block from `references/baked-in-rules.md` HERE, naming this run's
+log path `docs/goals/.run/<slug>-PROGRESS.md`. The run appends a terse entry (≤2 lines) at every
+stage boundary + major defect/event/decision/recovery/blocker, so any other session can read the
+run's live status from the worktree, and the lessons roll into committed homes at run-end.
+
+---
+
 ## 1. Context you need (read first)
 
 <The exact files / components / stores / composables the run must study, with import
@@ -117,6 +126,7 @@ what untracked items to leave alone. Branch + push target. Co-author trailer.>
 **Ship:**
 - [ ] <N> conventional commits pushed to `<branch>`.
 - [ ] Any deferrals logged in `docs/goals/.run/<slug>-DEFERRED.md` with rule status + reason.
+- [ ] Progress log `docs/goals/.run/<slug>-PROGRESS.md` maintained throughout (§0.3); major events/lessons rolled into the final report + a notable lesson appended to `.claude/tasks/lessons.md` at end.
 
 ---
 

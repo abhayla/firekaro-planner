@@ -21,7 +21,7 @@ description: >
 type: workflow
 allowed-tools: "Read Write Edit Grep Glob Bash"
 argument-hint: "[one-line description of the goal, optional]"
-version: "1.0.0"
+version: "1.1.0"
 ---
 
 # Goal Creator
@@ -51,8 +51,11 @@ they are the spec for what you produce. The two best references are
 3. **Interview-first, always.** Resolve every fork via the Clarification Gate (STEP 2)
    before writing a single line of the contract. The output must be zero-user-input.
 4. **Bake in the standing rules.** Every contract folds in rules 24, 25, 26, 15, 17, 20,
-   23 plus the failure-recovery budget block — see `references/baked-in-rules.md`. These
-   are why these contracts produce *proven-working* results, not *claimed-working* ones.
+   23 plus the failure-recovery budget block AND the three opening blocks §0.1 (worktree
+   isolation), §0.2 (idempotency preflight), §0.3 (live progress log) — see
+   `references/baked-in-rules.md`. These are why these contracts produce *proven-working*
+   results, not *claimed-working* ones, and why a long run is trackable + learnable from
+   other sessions.
 5. **Default to a NEW contract file. NEVER edit a contract that may already be running.** A
    `/goal` run loads its contract at launch — editing a live contract is both useless (the
    in-flight run never sees the edit) and dangerous (a later re-run of the mutated file
@@ -175,11 +178,13 @@ confirmation, not a full question round.
 
 ## STEP 4: Write the contract
 
-Fill `references/contract-template.md` with the resolved decisions. Then **paste the
-standing-rules block** from `references/baked-in-rules.md`, adapting only the
-tree-specific mechanics (DB vs localStorage for Rule 25; the right static-gate commands;
-the right ports/paths). Do not water the rules down — adapt the *mechanics*, keep the
-*mandate*.
+Fill `references/contract-template.md` with the resolved decisions. **Paste the §0.1
+(worktree isolation) + §0.2 (idempotency preflight) + §0.3 (live progress log) blocks as
+the contract's opening three sections**, then **paste the standing-rules block** from
+`references/baked-in-rules.md`, adapting only the tree-specific mechanics (DB vs
+localStorage for Rule 25; the right static-gate commands; the right ports/paths). Do not
+water the rules down — adapt the *mechanics*, keep the *mandate*. The §0.3 progress log
+makes the run trackable from other sessions; name its path `docs/goals/.run/<slug>-PROGRESS.md`.
 
 Quality bar for the contract you write (this is what separates a good contract from a
 vague one):
@@ -230,6 +235,11 @@ The skill's deliverable is the contract file and the invocation line — nothing
 - **Every contract opens with the §0.2 ledger-aware idempotency preflight** (read ledger +
   code + `git log` → skip done → build only the delta → report skips). No run duplicates
   another parallel session's work.
+- **Every contract carries the §0.3 live progress log** — append-only
+  `docs/goals/.run/<slug>-PROGRESS.md`, ≤2-line entries at each stage boundary + every major
+  defect / "something not working + what you did" event / decision / recovery / blocker, so any
+  other session can track the run live (`git worktree list` → read the log), and the major
+  events/lessons roll into the committed final report + `.claude/tasks/lessons.md` at run-end.
 - **Interview-first, one question at a time, each with a recommended answer**, until every
   fork is resolved. The contract must be zero-user-input.
 - **Every contract bakes in rules 24, 25, 26, 15, 17, 20, 23 + the failure-recovery budget
