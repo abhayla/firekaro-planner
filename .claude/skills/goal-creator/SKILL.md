@@ -114,7 +114,14 @@ then march through it. A complete contract resolves at minimum:
 - **Failure-recovery budgets** — per-task fix budget, MCP-hang recovery, hard-halt list.
 - **Commit + push policy** — how many commits, message format, branch, push target,
   what NOT to stage (the working tree often has unrelated untracked items).
-- **Definition of Done** — the checkbox list that gates completion.
+- **Definition of Done** — the checkbox list that gates completion. **DoD verbs are load-bearing: an
+  autonomous run satisfies the LITERAL checkbox and stops.** State the ACTION + the COMPLETENESS BAR
+  explicitly — "**report** the score" yields a report, NOT closed gaps (say "**close** survived mutants
+  on X to threshold Y" if you want them closed); "every layer **represented**" yields representation,
+  NOT the exhaustive matrix (say "**all** N×M cells" for exhaustive, or "a **targeted** subset by
+  criteria Z" — and name which). Never write "each X" when you mean "a representative X" — the run will
+  pick the weaker reading. (Learned from the QA run: "report the mutation score" + an exhaustive-sounding
+  A3 both got satisfied at the weakest literal reading.)
 - **Final report** — what the closing report must contain.
 - **Guardrails** — the hard stops (no new deps, no design reinvention, honesty/no-fake-data,
   TODO(5W) boundary, etc.).
@@ -197,6 +204,13 @@ vague one):
 - **Verification is load-bearing, not decorative.** Rules 24/25/26 appear as MANDATORY
   per-task/per-stage gates with explicit pass criteria and the exact MCP/curl calls — not
   a hand-wave. This is the entire reason the contract format exists.
+- **Provision the env for every mandated check — don't mandate a check the run's own env can't
+  reach.** If the contract requires a check that needs a different environment than the main run
+  (e.g. an auth-gate test needs dev-bypass **OFF** while the main sweep runs dev-bypass **ON**, or a
+  server-mode path vs a demo-mode sweep), give that check its **own dedicated sub-run with its own env
+  setup** and mark it **non-deferrable** if it's a security/data-integrity gate. A check mandated in
+  prose while the preflight sets a conflicting env WILL be deferred — exactly what happened to the QA
+  run's dev-bypass-OFF + first-login checks (#60).
 - **Honest defaults.** No synthetic/fake data; remove fakery rather than carry it forward.
   Surface uncertainty as an explicit assumption in the contract, never as fiction.
 - **Self-contained.** The run should not need to consult this skill or any chat history —

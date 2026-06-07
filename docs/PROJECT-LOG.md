@@ -113,6 +113,20 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 ## §3 — Decision log (append-only, newest first)
 
 ### 2026-06-07
+- **D-2026-06-07-10 — Applied the Mode-B fold-back from the QA run's learnings (generic→skill,
+  specific→contract).** The QA run's misses (D-09) traced to two contract-AUTHORING defects, now fixed
+  at the source. **GENERIC → `goal-creator`:** (a) "DoD verbs are load-bearing — an autonomous run
+  satisfies the literal checkbox and stops" (state ACTION + COMPLETENESS bar; "report" ≠ "close to
+  threshold"; "represented" ≠ "all N×M") — SKILL.md STEP 1 + contract-template DoD note; (b) "provision
+  the env for every mandated check — a conflicting-env check gets a dedicated non-deferrable sub-run, or
+  it WILL be deferred" — SKILL.md STEP 4 quality bar; + a lessons.md entry. **SPECIFIC → the QA
+  contract** (`2026-06-07-full-lifecycle-qa-verification.md`, complete-not-running so editable): A7.6
+  now requires CLOSING `tax.ts` survived mutants to ≥85%/zero-on-slabs (#59) not just reporting; A2.5
+  gained a provisioned, **non-deferrable §A2.5d server-mode + dev-bypass-OFF sub-run** (auth-gate /login
+  bounce + 401 + first-login transition, #60); A3 now states the completeness bar (targeted high-risk
+  cross-product required, full 55-cell explicitly optional). A re-run's §0.2 preflight does only the
+  delta. *Why logged:* the self-improvement loop working as designed — the run's gaps became durable
+  skill+contract upgrades so they don't recur. Independently reviewed (rule 29). → §2.
 - **D-2026-06-07-09 — Supervisor completeness assessment of the full-lifecycle QA `/goal` run (Phase A
   "complete"); correctness strong, completeness ~85%, two gaps elevated + tracked.** The QA run (branch
   `chore/full-lifecycle-qa`, 21 commits, `RELEASE-READINESS-SIGNOFF-2026-06-07.md`) self-graded Phase A

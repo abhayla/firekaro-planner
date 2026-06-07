@@ -114,6 +114,12 @@ what untracked items to leave alone. Branch + push target. Co-author trailer.>
 
 ## <N+2>. Definition of Done (all MUST be true)
 
+> Each item needs an explicit ACTION VERB + COMPLETENESS BAR, and the env provisioned for every mandated
+> check — an autonomous run satisfies the literal checkbox and stops. Full guidance: `goal-creator`
+> SKILL.md STEP 1 (DoD verbs) + STEP 4 quality bar (env-provisioning). And keep the §13 DoD lines in
+> sync with their stage text — the run gates on the DoD checkbox, so a DoD that lags the stage reintroduces
+> the imprecision.
+
 **Build / change:**
 - [ ] <…>
 

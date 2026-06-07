@@ -154,16 +154,24 @@ the REAL v6 UI (honoring `e2e-vee-validate-forms.md` + `e2e-multi-row-verificati
 - `members.length===0`→splash; `!profileComplete`→wizard/profile; `wizardCompleted` returning-user skips
   splash→dashboard; auth-off→`/login`. Risk: redirect loop or onboarding bypass.
 
-**Auth / dev-bypass (MUST include a dev-bypass-OFF sub-run)**
-- The preflight runs `VITE_DEV_BYPASS=true`, so the `/login` bounce is NEVER exercised in the main pass —
-  "auth gate enforced" would be a **false PASS**. REQUIRE a separate **dev-bypass-OFF** sub-run (or an
-  explicit assertion `UnauthenticatedAuthProvider`→`/login`) so the gate protecting real PII is actually tested.
+**Auth / dev-bypass — a MANDATORY, ENV-PROVISIONED, NON-DEFERRABLE dev-bypass-OFF sub-run (gh #60)**
+- The main preflight runs `VITE_DEV_BYPASS=true`, so the `/login` bounce is NEVER exercised in the main
+  pass — "auth gate enforced" would be a **false PASS**. The first run *deferred* this exactly because
+  its env had dev-bypass ON — so this contract now **PROVISIONS the env, not just mandates the check**:
+- **Sub-run §A2.5d (dedicated, non-deferrable — may NOT be deferred for "env reasons"):** restart the
+  stack in **server mode with dev-bypass OFF** (`server/.env` `DEV_BYPASS_AUTH=false`; frontend
+  `VITE_USE_SERVER_ADAPTER=on`, `VITE_DEV_BYPASS` unset/false). Then assert: (1) an unauthenticated
+  request to a guarded route **bounces to `/login`** (`UnauthenticatedAuthProvider` → guard); (2) the
+  `/api/planner/*` endpoints reject unauthenticated calls (401). This is the gate protecting real PII —
+  it MUST run, not be marked "deferred to a server-mode run".
 
-**First-login persistence seam (owner-flagged)**
+**First-login persistence seam (owner-flagged) — part of the §A2.5d sub-run, NON-DEFERRABLE (gh #60)**
 - **localStorage→ServerAdapter transition:** there is currently **NO demo→server migration** (`main.ts`
   `hydrateAll()` warms the server cache; `storage-adapter.ts` has no backfill). A user who explored the demo
-  then signs in gets a fresh EMPTY server account — demo data orphaned. Test this transition; if migration is
-  intentionally absent, **file a Tier-0/HIGH issue + a regression lock** documenting the orphaned-demo-data behaviour.
+  then signs in gets a fresh EMPTY server account — demo data orphaned. In §A2.5d, **MUST test this
+  transition** (explore-as-demo → sign in → is the data migrated or orphaned?); if migration is
+  intentionally absent, **file a Tier-0/HIGH issue + a regression lock** documenting the orphaned-demo-data
+  behaviour. (The first run deferred this with the auth sub-run — now non-deferrable.)
 - **Migration-on-hydrate / older-shape backfill** (CLAUDE.md): a returning user with a pre-update serialized
   blob must hydrate without crash/field-drop. Risk: silent data loss on upgrade.
 - **First-write debounce race:** wizard auto-save firing before the cache warms / before the 1.5s flush. Risk: first profile save lost.
@@ -210,6 +218,14 @@ dev-bypass-off), verify the full stack:
    guards hold (`defensive-coding.md`).
 8. **Accessibility**: axe-core / WCAG via `/a11y-audit` per screen.
 9. **Responsive + dark mode**: mobile / tablet / desktop breakpoints + theme toggle.
+
+**Completeness bar (decided — do NOT rationalize it down):** the REQUIRED bar is **(a)** every one of
+the 9 layers is exercised at least once, AND **(b)** a **targeted cross-product on the highest-risk
+cells** — the money-bearing/most-complex sections (investments, tax-planning, fire-goals, income) ×
+all 5 personas × the layers that can break per-section (UI→DB, cross-page, interactive, three-state).
+The **full 55-cell exhaustive matrix** (all 8 sections × 5 personas × 9 layers) is **explicitly
+OPTIONAL** (diminishing returns once the high-risk cells + every layer are covered) — if skipped, say
+so in the SUMMARY; do NOT silently report "layers represented" as if the matrix were done.
 
 ## 5. STAGE A4 — Plausibility, performance, security
 
@@ -292,7 +308,17 @@ UI, no unhandled rejection). A crash or NaN on a money screen is a trust killer 
 
 **A7.6 — Mutation testing on the kernel** (Stryker on `src/lib/*` calc modules, periodic — NOT every gate):
 inject mutations and confirm the suite KILLS them. Coverage % lies; mutation score is the real proof the
-honesty-critical math is protected. Report the score; raise weak spots.
+honesty-critical math is protected. Report the score, **THEN CLOSE the survived mutants on the
+honesty-critical core — `tax.ts` FIRST** (slabs / surcharge / marginal relief / cess / rebate / regime
+selection) **and `fire-math.ts`** — by adding targeted differential/boundary tests until **the tax +
+FIRE modules clear a threshold (≥ 85% mutation score, and ZERO survived mutants on the tax-slab /
+surcharge / marginal-relief logic)**; re-run Stryker to confirm. **The threshold gate applies ONLY to
+the tax + FIRE modules** (the honesty-critical core); the remaining kernel modules
+(`epf-vpf` / `withdrawal-strategy` / `esop-tax`) are **report + raise-weak-spots only this pass** (not
+threshold-gated — a later follow-up). **Closing the gaps on tax + FIRE is REQUIRED here, not just
+reporting** — the first run reported 73% / 98 survived in `tax.ts` and that *was* its DoD, which left
+the correctness gaps open (gh #59). On a re-run, the §0.2 preflight skips the already-killed mutants and
+closes only the remaining survivors.
 
 **A7.7 — Performance budgets as GATES** (not just recorded scores) — fail if LCP/CLS/TBT or JS bundle size
 exceed budget on key screens; add a bundle-size regression check. Serves the friction-free objective.
@@ -368,13 +394,14 @@ recommendation (`DEPLOY.md` §Rollback). Rollback execution is Abhay-gated; afte
 **Phase A (pre-prod):**
 - [ ] Both trees: type-check 0, server lint 0, ALL unit + integration green.
 - [ ] Full E2E suite green on localhost + Supabase (headless gate + a headed maximized pass per §1.1); multi-row specs per-iteration + final-render verified.
-- [ ] **New-user journey spec authored + green** (A2.5): all entry surfaces (splash/demo/continue), the 6-step gating wizard (validation/skip/back/resume), every router-guard branch, the **dev-bypass-OFF auth path**, the **first-login localStorage→ServerAdapter transition** (tested or filed+locked), tour overlay; the stale `new-user-test-skill` filed as an issue.
+- [ ] **New-user journey spec authored + green** (A2.5): all entry surfaces (splash/demo/continue), the 6-step gating wizard (validation/skip/back/resume), every router-guard branch, tour overlay; the stale `new-user-test-skill` filed as an issue.
+- [ ] **§A2.5d server-mode + dev-bypass-OFF sub-run RAN (non-deferrable, #60):** unauthenticated → `/login` bounce + `/api/planner/*` 401 (auth gate actually enforced); first-login localStorage→ServerAdapter transition tested (or filed Tier-0 + regression-locked if migration is absent).
 - [ ] **EMPTY / PARTIAL / FULL state matrix green** with a regression lock closing gh #39's sibling sweep (no false achieved/100%/on-track/score on zero/partial data).
-- [ ] Every section × persona × process passes all 9 functional layers (incl. three-state, negative/boundary, a11y, responsive, dark mode); lifecycle/comms subsystem exercised.
+- [ ] A3 meets the §4 completeness bar: **every one of the 9 layers exercised ≥ once** AND the **targeted high-risk cross-product** (investments / tax-planning / fire-goals / income × all 5 personas × the per-section-breakable layers) covered (incl. three-state, negative/boundary, a11y, responsive, dark mode); the full 55-cell matrix is OPTIONAL — if skipped, said so in the SUMMARY; lifecycle/comms subsystem exercised.
 - [ ] Plausibility holds for all 5 personas on the default lens; FinTech end-to-end PASS; security pass clean.
 - [ ] Lighthouse/CWV + a11y recorded for key screens (budget met or a tracked issue).
 - [ ] Every screen + process screenshotted, archived (`test-evidence/{run_id}/`), multi-role-reviewed, blind-verified (rule 33), no dissent outstanding.
-- [ ] **Deep-correctness gates (A7) green:** kernel property-based + metamorphic invariants hold; per-persona golden-master headlines locked; multi-tenant IDOR isolation verified; full persistence round-trip integrity; resilience/error-injection graceful (no NaN/white-screen); mutation score reported; perf budgets enforced as gates; every fixed defect has a permanent regression-lock test.
+- [ ] **Deep-correctness gates (A7) green:** kernel property-based + metamorphic invariants hold; per-persona golden-master headlines locked; multi-tenant IDOR isolation verified; full persistence round-trip integrity; resilience/error-injection graceful (no NaN/white-screen); **tax + FIRE-module survived mutants CLOSED to ≥85% mutation / zero on slab-surcharge-relief logic (#59) — not just reported**; perf budgets enforced as gates; every fixed defect has a permanent regression-lock test.
 - [ ] Coverage + traceability matrix reported; all blockers fixed; non-blockers → tiered issues.
 - [ ] Zero assumptions; no silent skips ("X SKIPPED because <reason>" surfaced + blocks done).
 - [ ] Release-readiness sign-off report written (incl. the **verified build identity** — git SHA + bundle hash); commits on `chore/full-lifecycle-qa`, NOT pushed/merged.
