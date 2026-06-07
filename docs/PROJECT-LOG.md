@@ -30,7 +30,15 @@
 
 ## §2 — Active priority / roadmap (the "Now" order: correctness → stickiness → friction)
 
-**Current focus chosen 2026-06-06 (REPRIORITIZED by Abhay): COMPLETE THE MUST-HAVE CORE before
+**FOCUS LOCK (2026-06-07, D-2026-06-07-07): MUST-HAVE ONLY** — no new good-to-have/nice-to-have build
+without Abhay's explicit per-item approval (`.claude/rules/must-have-only-focus.md`). The must-have
+registry is empty (obj 0→4 shipped), so the **current active work = full-lifecycle QA verification &
+hardening** of what's built — contract `docs/goals/2026-06-07-full-lifecycle-qa-verification.md`
+(Phase A pre-prod gate → Abhay deploy gate → Phase B post-prod verification; run via `/goal`).
+Testing/hardening/bug-fixing existing features is the rule's allowed carve-out; good-to-have
+(#41/#44/#45/#46/#49) + nice-to-have (#43/#47/#53) stay BLOCKED pending approval.
+
+**Prior focus (2026-06-06, REPRIORITIZED by Abhay): COMPLETE THE MUST-HAVE CORE before
 stickiness.** Rationale (goal-anchored): there is no point measuring/improving retention on an
 incomplete product — a working must-have core is the *precondition* for stickiness. **Scope locked
 (D-2026-06-06-07): must-have-now = the accumulation core, objectives 0+1+2; objectives 3+4
@@ -105,6 +113,30 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 ## §3 — Decision log (append-only, newest first)
 
 ### 2026-06-07
+- **D-2026-06-07-07 — Locked focus to MUST-HAVE ONLY (new standing rule) + authored a full-LIFECYCLE
+  QA verification goal (pre-prod gate + post-prod verification).** Abhay's directive: "focus only on
+  must-have features; make this a rule; do not touch good-to-have/nice-to-have until I explicitly
+  approve" + (as QA process lead) "ensure everything is properly tested BEFORE prod deploy AND verify
+  everything AFTER prod deploy." **Acted (explicitly approved to execute):** (1) created
+  `.claude/rules/must-have-only-focus.md` (global) — no new good-to-have/nice-to-have build without
+  explicit per-item approval; explicit carve-out = testing/verification/hardening/bug-fixing of
+  already-implemented features (any tier) + Tier-0 fixes (resolves "only must-have" vs "test ALL
+  features"); reads tier from issue labels; cross-refs goal-anchored-decisions + documentation-management.
+  (2) Authored `docs/goals/2026-06-07-full-lifecycle-qa-verification.md` — an autonomous QA `/goal`
+  contract structured as **Phase A (pre-production gate)** → **hard DEPLOY GATE (Abhay)** → **Phase B
+  (post-production verification)**. Phase A (localhost:5175 + Supabase, never full-suite/load/pentest on
+  prod): both trees static+unit+integration, full E2E, 9-layer functional sweep (backend/API/render/
+  UI→DB/cross-page/interactive/three-state/negative-boundary/a11y/responsive/dark-mode) × 8 sections × 5
+  personas × each process, plausibility (31) + Lighthouse + security, screenshot-EVERY-screen/process
+  evidence archive + MULTI-ROLE visual review (UI/UX·QA·FinTech·a11y) + blind verify (33), coverage +
+  traceability matrix + severity triage, ending in a release-readiness sign-off. Phase B (after Abhay
+  deploys; NON-DESTRUCTIVE only): Tier-1 smoke, change-is-live, Tier-2 authenticated non-destructive
+  sweep, synthetic monitoring, blind re-verify, Abhay-gated rollback. Deploy + rollback are Abhay-gated
+  (the contract halts at the deploy gate). Contract left UNCOMMITTED per the goal-contract convention
+  (Abhay edits → runs `/goal`). *History note:* an earlier same-day attempt over-executed on a "just
+  hand me the polished prompt" turn and was reverted (`dd874c7`); after two review rounds (added
+  screenshot-per-screen + multi-role review, then the pre/post-prod lifecycle split) Abhay approved
+  execution. *Why logged:* a standing prioritization lock + the current active QA focus. → §1/§2.
 - **D-2026-06-07-06 — DEPLOYED obj-4 #50 to production + functionally verified live; the full
   must-have core (obj 0→4) is now COMPLETE in prod.** Abhay authorized ("do it"). Shipped pinned
   `main` `45201dc` (obj-1/2/3 + obj-4 #50 + the SequenceRiskCard HIGH fix) to the VPS
