@@ -113,6 +113,25 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 ## §3 — Decision log (append-only, newest first)
 
 ### 2026-06-07
+- **D-2026-06-07-09 — Supervisor completeness assessment of the full-lifecycle QA `/goal` run (Phase A
+  "complete"); correctness strong, completeness ~85%, two gaps elevated + tracked.** The QA run (branch
+  `chore/full-lifecycle-qa`, 21 commits, `RELEASE-READINESS-SIGNOFF-2026-06-07.md`) self-graded Phase A
+  complete. Applying the supervisor lens (a run is the worst judge of its own completeness): "complete"
+  = every stage **addressed/represented**, NOT exhaustively done. **Correctness — strong + blind-verified**
+  (kernel invariants, per-persona plausibility, empty/partial honesty closing #39 family, multi-tenant
+  isolation, persistence integrity, resilience; the edge caught + fixed a real IDOR false-proof; ~63 locks).
+  **Completeness — real named gaps**, ranked by product impact: (1) **A7.6 mutation 73%, 98 survived in
+  `tax.ts`** — REPORTED not closed; the top correctness hole for a tax/FIRE product → filed **#59**;
+  (2) **deferred dev-bypass-OFF auth gate + first-login localStorage→ServerAdapter transition** (A2.5a) —
+  the PII-protecting auth gate is still a false-PASS and the orphaned-demo-data risk is unconfirmed →
+  filed **#60**; (3) A3 exhaustive 5×11 matrix (layers represented, full cross-product not run — targeted
+  high-risk pass recommended over grinding all 55); (4) minor: A4 lifecycle/comms dry path, Mehtas what-if
+  baseline; (5) Phase B (post-prod) — correctly deferred to after deploy. E2E is demo-mode + headed-only,
+  not CI (→ #54). **Recommendation:** the branch is sound — **merging the locks is worthwhile (Abhay's
+  gate per the sign-off)**, but treat Phase A as "complete with documented non-blocking gaps," NOT a clean
+  deploy pass; run #59 + #60 (server-mode continuation) before deploy confidence; **production deploy stays
+  Abhay's gate** (decision-authority). *Why logged:* document-on-decision — captures the honest completeness
+  verdict so it isn't lost on an unmerged branch. → §2.
 - **D-2026-06-07-08 — Built the goal-run self-improvement loop into `goal-creator` + remediated its own
   independent-review findings.** Added (a) a §0.3 **live cross-session progress log**
   (`docs/goals/.run/<slug>-PROGRESS.md`, discover via `git worktree list`); (b) a **run-end learnings
