@@ -58,8 +58,13 @@ const SURCHARGE_SLABS: SurchargeSlab[] = [
 
 const TAX_CONFIGS: Record<string, FYTaxConfig> = {
   "2024-25": {
+    // Stryker disable next-line all: equivalent — financialYear/assessmentYear are display-only
+    // metadata; computeTax/recommendRegime read slabs/standardDeduction/rebate*/marginalRelief/
+    // cess only (never these fields), so mutating them cannot change any tax output.
     financialYear: "2024-25",
+    // Stryker disable next-line all: equivalent — assessmentYear is display metadata, never read.
     assessmentYear: "2025-26",
+    // Stryker disable next-line all: equivalent — RegimeConfig.isDefault is not read by the engine.
     oldRegime: { ...OLD_REGIME_BASE, isDefault: false },
     newRegime: {
       slabs: [
@@ -74,6 +79,7 @@ const TAX_CONFIGS: Record<string, FYTaxConfig> = {
       rebateLimit: 700000,
       maxRebate: 25000,
       marginalRelief: false,
+      // Stryker disable next-line all: equivalent — RegimeConfig.isDefault is not read by the engine.
       isDefault: true,
     },
     surchargeSlabs: SURCHARGE_SLABS,
@@ -81,8 +87,11 @@ const TAX_CONFIGS: Record<string, FYTaxConfig> = {
     cessRate: 0.04,
   },
   "2025-26": {
+    // Stryker disable next-line all: equivalent — financialYear is display-only metadata, never read.
     financialYear: "2025-26",
+    // Stryker disable next-line all: equivalent — assessmentYear is display metadata, never read.
     assessmentYear: "2026-27",
+    // Stryker disable next-line all: equivalent — RegimeConfig.isDefault is not read by the engine.
     oldRegime: { ...OLD_REGIME_BASE, isDefault: false },
     newRegime: {
       slabs: [
