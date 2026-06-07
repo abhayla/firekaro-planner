@@ -7,7 +7,7 @@
 > document** — it records an honest interim and recommends continuation before deploy.
 
 **Contract:** `docs/goals/2026-06-07-full-lifecycle-qa-verification.md` · **Branch:** `chore/full-lifecycle-qa`
-**Verified build identity:** `b1b506c` (this branch HEAD before sign-off) · worktree `../firekaro-goal-qa`
+**Verified build identity:** `30186fa` (this branch HEAD) · worktree `../firekaro-goal-qa`
 **Environment:** root `npm run dev` (5175) + Supabase `firekaro-planner` (live DB reachable — integration specs ran green).
 
 ---
@@ -15,10 +15,15 @@
 ## ✅ COMPLETED + INDEPENDENTLY VERIFIED
 
 All gates below are green AND were re-checked by **independent agents in a fresh context** (rule 29 /
-rule 33 / operating-model edge): `fintech-domain-analyst` (domain correctness vs Indian tax law + FIRE
-research) and `code-reviewer-agent` (test quality / vacuousness). Both returned **no correctness
-defects, no implausible values, no false-failing invariants**; their coverage findings were folded in
-(commit `ffab291`).
+rule 33 / operating-model edge): `fintech-domain-analyst` + `code-reviewer-agent` on A7.1/A7.2/A2.5b
+(both returned no correctness defects, no implausible values, no false-failing invariants; coverage
+findings folded in — `ffab291`), and a second `code-reviewer-agent` pass on A7.3/A7.4. **The edge
+proved its worth:** that reviewer caught that the first A7.3 IDOR tests were a *false proof* (the
+`householdSchema` strips the spoofed body `userId`, and `readHousehold(<empty-literal>)` is trivially
+null — green for the wrong reason). A7.3 was rebuilt into a **genuine two-tenant isolation test** (a
+real second `User` + distinct household, asserting neither tenant sees the other's data) and A7.4 got
+`value` + row-count guards — commit `30186fa`. A blind reviewer caught a shape-vs-substance gap the
+author's green run did not.
 
 | Stage | What | Result | Commit |
 |---|---|---|---|
@@ -26,7 +31,7 @@ defects, no implausible values, no false-failing invariants**; their coverage fi
 | **A7.1** | Kernel property-based + metamorphic invariants (fast-check) | **27 tests.** corpus-FIRE monotonic non-increasing in savings step-up + returns; no NaN/−∞/negative for any valid perturbation; default lens pools every earner (#22 class); tax 0≤t≤gross, eff-rate <45%; **marginal relief** (post-tax income monotonic in gross — confirms no take-home cliff at ₹50L/₹1Cr surcharge boundaries); NEW-regime invariant to deductions; **anti-optimism** (headline ≥ corpus-only leg — the bridge may only push FIRE later); floor/ceiling withdrawal bounded + protective | `b065807`, `ffab291` |
 | **A7.2** | Per-persona golden-master headlines | **4 snapshots** locking exact FIRE age/number/savings/years/corpus + `lensedEarners`. Values verified **domain-plausible** (rule 31): Sharmas 55.6, Mehtas 49.4, Iyers 56.9, Mauryas 67.1 (the honest "17yr past the wish", <70) | `f130d50`, `ffab291` |
 | **A2.5b** | EMPTY/PARTIAL honesty sweep (closes gh#39 sibling sweep) | **3 states** (EMPTY / expenses-only / income-only): no false achieved/100%/on-track/crossover-year/score; Coast/Barista not falsely reached; freedom score ~0 on empty (gh#40 guard); income-present path proven non-vacuous | `025677a`, `ffab291` |
-| **A7.3** | Multi-tenant IDOR / isolation (live DB) | **+4 tests, green vs Supabase.** Spoofed body `userId` IGNORED (no cross-tenant write); cross-tenant read returns null (no leak); malformed payload → 422; invalid JSON → 400 | `ef8c088` |
+| **A7.3** | Multi-tenant IDOR / isolation (live DB) | **+4 tests, green vs Supabase.** GENUINE two-tenant isolation (real 2nd `User` + distinct household — neither tenant sees the other's data, repo + API); IDOR regression-lock (spoofed body `userId` lands on the session user, nothing under the spoofed id); malformed → 422; invalid JSON → 400. *(Rebuilt from a false-proof after independent review — see header.)* | `ef8c088`, `30186fa` |
 | **A7.4** | Persistence round-trip integrity (live DB) | **+2 tests, green vs Supabase.** Per-type investment subtype fields survive PUT→GET with NO silent field drop (Stocks qty/price/bucket, FD principal/rate/bank, Gold subtype/grams+Joint owner, RealEstate ownership/role, ESOP grant); expense-history snapshot key round-trips deep-equal — directly clears the diff engine's "silent-data-loss" top risk | `b1b506c` |
 
 **Net new regression locks: 40 tests** (34 root + 6 server), all permanent catch-tests (A7.10 discipline). Final suite: **root 972 / 68 files · server 152 / 19 files — all green.**
