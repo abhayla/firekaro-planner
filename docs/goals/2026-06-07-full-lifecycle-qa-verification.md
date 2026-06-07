@@ -234,24 +234,36 @@ spot-review happens, fold it in.) The screenshot is the authoritative pass/fail 
 entry, an incoherent report value, an implausible FIRE number) → fix the ROOT cause (rule 17) → retest →
 loop until green (rule 15; `/fix-loop` → `/systematic-debugging`). Do NOT mark done with any step red.
 
-**A2.6f — across shapes ("multiple users") — NAMED personas.** Run the from-scratch entry for **two
-household shapes**:
-- **Single-earner, full-spread = the MAURYAS** (single-income mid-40s, every investment type) —
-  `scripts/enter-persona-via-ui.mjs` already drives every form for this dataset. This is the
-  maximum-field-coverage shape.
-- **Dual-income FAMILY = the SHARMAS** (the LOCKED target persona — urban salaried dual-income family;
-  the default product seed). **The entry engine currently holds ONLY the Maurya dataset → extend it with
-  a Sharmas entry dataset (a real sub-task, not hand-waved)** so the Sharmas household is hand-entered
-  from scratch through the same forms (do NOT just seed-load the Sharmas — that's the very thing A2.6
-  forbids).
+**A2.6f — SEQUENTIAL, GATED per-persona loop (no exceptions).** Enter the data-bearing personas FROM
+SCRATCH **one at a time, each to a CLEAN run before advancing** — never in parallel, never skipping the
+fix-loop. Order:
 
-**BOTH shapes get the FULL A2.6a–e depth** — every field incl. optional + per-section overview verify +
-post-entry per-screen screenshots + multi-role/blind review + the fix-loop. Shape #2 (Sharmas) is **NOT**
-a thinner pass; do not stop at the first shape's plausible FIRE number.
+1. **MAURYAS first** (single-income, full-spread — every investment type; `enter-persona-via-ui.mjs`
+   already drives every form for this dataset). Hand-enter the full household (A2.6a–e: every field incl.
+   optional + every accordion), verify everything (per-section overview, FIRE-from-entered, all report
+   screens, post-entry per-screen screenshots, multi-role + blind review). **Any issue → fix the ROOT
+   cause (rule 17) → re-run → fix-loop (rule 15) until THIS persona's run is clean (zero open issues).**
+2. **THEN the SHARMAS** (the LOCKED target persona — urban salaried dual-income family), same full
+   A2.6a–e + verify + fix-loop **to a clean run**.
+3. **THEN the IYERS, THEN the MEHTAS** (the other urban-salaried target-persona archetypes), each the
+   same — full entry + verify + fix-loop to clean.
 
-**A2.6 acceptance:** a full household hand-entered through the UI (every field), every section verified on
-its overview, FIRE + all reports coherent + plausible, post-entry screenshots multi-role + blind verified,
-all green via the fix-loop, across ≥2 household shapes. **Seed/demo-load explicitly does NOT count.**
+> **The GATE (no exceptions):** do NOT advance to persona N+1 until persona N has a **clean from-UI entry
+> run with zero open issues** — every problem found is fixed iteratively first. Loop through ALL the
+> data-bearing personas; the stage is DONE only when **every one** (Mauryas, Sharmas, Iyers, Mehtas) has
+> been fully hand-entered through the UI with no issues. Every persona runs the identical full process —
+> none is a thinner pass, none is exempt. (Empty = the zero-data new-user, covered by A2.5b.)
+
+**Engine:** `enter-persona-via-ui.mjs` holds the **Maurya** dataset today → **add a from-scratch entry
+dataset for each remaining persona (Sharmas / Iyers / Mehtas)** — a real per-persona sub-task; it is
+HAND-ENTRY through the forms, never a seed-load (a seed-load does NOT satisfy A2.6).
+
+**A2.6 acceptance:** for EVERY data-bearing persona (Mauryas → Sharmas → Iyers → Mehtas), entered
+**sequentially and gated** — a full household hand-entered through the UI (every field), every section
+verified on its overview, FIRE + all reports coherent + plausible, post-entry screenshots multi-role +
+blind verified, **all green via the fix-loop BEFORE the next persona starts**. The stage is done only
+when all four have a clean from-UI entry run; **no exceptions, no thinner passes. Seed/demo-load
+explicitly does NOT count.**
 
 ## 4. STAGE A3 — Multi-level functional sweep (every surface × persona × process)
 
@@ -453,7 +465,7 @@ recommendation (`DEPLOY.md` §Rollback). Rollback execution is Abhay-gated; afte
 - [ ] Full E2E suite green on localhost + Supabase (headless gate + a headed maximized pass per §1.1); multi-row specs per-iteration + final-render verified.
 - [ ] **New-user journey spec authored + green** (A2.5): all entry surfaces (splash/demo/continue), the 6-step gating wizard (validation/skip/back/resume), every router-guard branch, tour overlay; the stale `new-user-test-skill` filed as an issue.
 - [ ] **§A2.5d server-mode + dev-bypass-OFF sub-run RAN (non-deferrable, #60):** unauthenticated → `/login` bounce + `/api/planner/*` 401 (auth gate actually enforced); first-login localStorage→ServerAdapter transition tested (or filed Tier-0 + regression-locked if migration is absent).
-- [ ] **§A2.6 FROM-SCRATCH headed UI data-entry journey RAN (gh #61):** a full new household hand-entered through the real forms (every field incl. optional + every investment-type accordion), verified on each section's overview, FIRE number + all reports coherent + plausible (rule 31), POST-ENTRY per-screen screenshots multi-role + blind verified, green via the fix-loop, across both named shapes — the **Mauryas** (single, full-spread; engine ready) AND the **Sharmas** (dual-income family / target persona; engine extended to its dataset). A seed/demo-load does NOT satisfy this.
+- [ ] **§A2.6 FROM-SCRATCH headed UI data-entry journey RAN (gh #61):** a full new household hand-entered through the real forms (every field incl. optional + every investment-type accordion), verified on each section's overview, FIRE number + all reports coherent + plausible (rule 31), POST-ENTRY per-screen screenshots multi-role + blind verified, green via the fix-loop, run as a **SEQUENTIAL GATED loop over ALL data-bearing personas (Mauryas → Sharmas → Iyers → Mehtas)** — each hand-entered from scratch to a CLEAN run before the next starts, no exceptions; the engine extended with a per-persona entry dataset. A seed/demo-load does NOT satisfy this.
 - [ ] **EMPTY / PARTIAL / FULL state matrix green** with a regression lock closing gh #39's sibling sweep (no false achieved/100%/on-track/score on zero/partial data).
 - [ ] A3 meets the §4 completeness bar: **every one of the 9 layers exercised ≥ once** AND the **targeted high-risk cross-product** (investments / tax-planning / fire-goals / income × all 5 personas × the per-section-breakable layers) covered (incl. three-state, negative/boundary, a11y, responsive, dark mode); the full 55-cell matrix is OPTIONAL — if skipped, said so in the SUMMARY; lifecycle/comms subsystem exercised.
 - [ ] Plausibility holds for all 5 personas on the default lens; FinTech end-to-end PASS; security pass clean.

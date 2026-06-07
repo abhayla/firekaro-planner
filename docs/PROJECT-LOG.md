@@ -113,6 +113,16 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 ## §3 — Decision log (append-only, newest first)
 
 ### 2026-06-07
+- **D-2026-06-07-12 — §A2.6 refined to a SEQUENTIAL, GATED per-persona loop (Abhay's directive).** Per
+  Abhay: enter each persona FROM SCRATCH one at a time — **Mauryas first** (full entry → verify → fix
+  iteratively until a CLEAN run) → only THEN the next (Sharmas, then Iyers, then Mehtas) → loop through
+  **all 4 data-bearing personas**, each gated to zero-open-issues before advancing, **no exceptions, no
+  thinner passes**. Updated §A2.6f (the gated loop + order), the A2.6 acceptance, the §13 DoD line, and
+  noted the engine sub-task (`enter-persona-via-ui.mjs` holds only the Maurya dataset → add a from-scratch
+  entry dataset per persona; never a seed-load). Persona set decided goal-anchored: Mauryas (single,
+  full-field-coverage) + the 3 urban-salaried target-persona archetypes (Sharmas/Iyers/Mehtas); Empty =
+  zero-data new-user, covered by A2.5b. *Why logged:* materially changes how §A2.6 executes (gated
+  sequential, not parallel/either-order). Tracked under #61. → §2.
 - **D-2026-06-07-11 — CEO review: the QA run "verified the new-user journey" via SEED-LOAD, not
   from-scratch UI hand-entry → contract hardened (§A2.6) + skill generalized + #61.** Abhay's check: did
   the run create a new family + enter every field from the UI + compute the FIRE number + verify all
