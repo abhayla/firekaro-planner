@@ -189,6 +189,43 @@ describe("sequenceRiskWarning", () => {
     expect(r.note).toMatch(/reach FIRE|corpus|once you/i);
   });
 
+  // gh-#50 supervisor-review HIGH: SequenceRiskCard rendered a red "Your corpus runs short even
+  // under normal markets" alarm to a no-data user (fireNumber===0 → corpus 0). The lib now flags
+  // `unplannable` so the card branches to a neutral state. These lock that contract at the pure
+  // layer (this repo's vitest is node-env with no component-mount harness — gh-#39 class, rule 31).
+  it("flags unplannable=true when there is no corpus yet — card MUST NOT show a depletion alarm", () => {
+    const r = sequenceRiskWarning({
+      corpus: 0,
+      annualRealWithdrawal: 10_00_000,
+      expectedRealReturn: SMOOTH_RETURN,
+      yearsInRetirement: 30,
+      fireAge: 35,
+    });
+    expect(r.unplannable).toBe(true);
+  });
+
+  it("flags unplannable=true when withdrawal or horizon is missing", () => {
+    expect(
+      sequenceRiskWarning({ corpus: 3_00_00_000, annualRealWithdrawal: 0, expectedRealReturn: 0.04, yearsInRetirement: 30 })
+        .unplannable,
+    ).toBe(true);
+    expect(
+      sequenceRiskWarning({ corpus: 3_00_00_000, annualRealWithdrawal: 12_00_000, expectedRealReturn: 0.04, yearsInRetirement: 0 })
+        .unplannable,
+    ).toBe(true);
+  });
+
+  it("a real, stress-testable plan is NOT unplannable (card shows the verdict)", () => {
+    const r = sequenceRiskWarning({
+      corpus: 3_00_00_000,
+      annualRealWithdrawal: 12_00_000,
+      expectedRealReturn: 0.04,
+      yearsInRetirement: 30,
+      fireAge: 55,
+    });
+    expect(r.unplannable).toBe(false);
+  });
+
   it("sources its shock magnitude from the existing stress-test convention (30% / 3yr)", () => {
     expect(DECUMULATION_EARLY_SHOCK).toBeCloseTo(0.3, 5);
     expect(DECUMULATION_SHOCK_YEARS).toBe(3);

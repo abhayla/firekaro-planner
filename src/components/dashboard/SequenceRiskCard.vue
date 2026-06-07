@@ -41,7 +41,19 @@ const warning = computed(() =>
 );
 
 const survives = computed(() => warning.value.survivalUnderBadSequence);
+// No FIRE number / horizon yet → the lib flags `unplannable`; we render a neutral info state, NEVER
+// the red "runs short" alarm (the gh-#39 empty-data false-positive class, rule 31). Mirrors the
+// `plannable` guard in WithdrawalBandsCard.
+const unplannable = computed(() => warning.value.unplannable);
 const presentation = computed(() => {
+  if (unplannable.value) {
+    return {
+      icon: "mdi-information-outline",
+      color: "info",
+      alertType: "info" as const,
+      headline: "We can't stress-test your plan yet.",
+    };
+  }
   if (survives.value) {
     return {
       icon: "mdi-shield-check",
@@ -73,12 +85,13 @@ const presentation = computed(() => {
     class="seq-card pa-5 mb-4"
     :class="`seq-card--${presentation.color}`"
     data-testid="sequence-risk"
-    :data-state="survives ? 'survives' : warning.depletes ? 'depletes' : 'at-risk'"
+    :data-state="unplannable ? 'unplannable' : survives ? 'survives' : warning.depletes ? 'depletes' : 'at-risk'"
   >
     <div class="d-flex align-center mb-3">
       <v-icon :icon="presentation.icon" :color="presentation.color" size="26" class="mr-2" />
       <h3 class="seq-card__eyebrow flex-grow-1">Sequence-of-returns risk</h3>
       <v-chip
+        v-if="!unplannable"
         size="small"
         :color="presentation.color"
         variant="tonal"
@@ -88,29 +101,46 @@ const presentation = computed(() => {
       </v-chip>
     </div>
 
-    <div v-if="isPreview" class="seq-card__preview-label text-caption text-medium-emphasis mb-2">
-      Preview — tested at your FIRE number (the corpus you're building toward).
-    </div>
-
+    <!-- Unplannable: no FIRE number yet — neutral info, never the red "runs short" alarm. -->
     <v-alert
-      :type="presentation.alertType"
+      v-if="unplannable"
+      type="info"
       variant="tonal"
       density="comfortable"
-      class="mb-3"
-      data-testid="sequence-risk-verdict"
+      data-testid="sequence-risk-unplannable"
     >
-      <div class="seq-card__headline">{{ presentation.headline }}</div>
-      <div class="text-body-2 mt-1">{{ warning.note }}</div>
+      <div class="seq-card__headline">We can't stress-test your plan yet.</div>
+      <div class="text-body-2 mt-1">
+        Add your income, expenses and investments so we can compute your FIRE number — then we can
+        test it against a bad early-retirement market.
+      </div>
     </v-alert>
 
-    <div class="seq-card__explain d-flex align-start">
-      <v-icon icon="mdi-information-outline" size="18" class="mr-2 mt-1 flex-shrink-0" color="primary" />
-      <span class="text-body-2 text-medium-emphasis">
-        We stress your plan against a 30% market drop in your first three retirement years — the order
-        of returns, not just the average, decides whether an early crash plus withdrawals depletes the
-        corpus. We never assume a smooth average, which can't fail.
-      </span>
-    </div>
+    <template v-else>
+      <div v-if="isPreview" class="seq-card__preview-label text-caption text-medium-emphasis mb-2">
+        Preview — tested at your FIRE number (the corpus you're building toward).
+      </div>
+
+      <v-alert
+        :type="presentation.alertType"
+        variant="tonal"
+        density="comfortable"
+        class="mb-3"
+        data-testid="sequence-risk-verdict"
+      >
+        <div class="seq-card__headline">{{ presentation.headline }}</div>
+        <div class="text-body-2 mt-1">{{ warning.note }}</div>
+      </v-alert>
+
+      <div class="seq-card__explain d-flex align-start">
+        <v-icon icon="mdi-information-outline" size="18" class="mr-2 mt-1 flex-shrink-0" color="primary" />
+        <span class="text-body-2 text-medium-emphasis">
+          We stress your plan against a 30% market drop in your first three retirement years — the order
+          of returns, not just the average, decides whether an early crash plus withdrawals depletes the
+          corpus. We never assume a smooth average, which can't fail.
+        </span>
+      </div>
+    </template>
 
     <p class="seq-card__disclaimer text-caption text-medium-emphasis mt-4 mb-0">
       Decision support, not advice — an honest stress test of your plan, never a recommendation.

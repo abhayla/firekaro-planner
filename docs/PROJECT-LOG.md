@@ -105,6 +105,27 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 ## §3 — Decision log (append-only, newest first)
 
 ### 2026-06-07
+- **D-2026-06-07-05 — Supervisor verification of #50 (obj-4) caught + fixed a deploy-blocking HIGH;
+  #50 now verified-ready (NOT yet deployed).** Abhay asked to verify "is #50 fully implemented?"
+  before deploying. Independent supervisor pass (rule 29/33, operating-model): reproduced the gates
+  (type-check 0, **938** unit, build green); dispatched an independent **FinTech Domain Analyst**
+  (PASS-with-nits, **NO HIGH** optimistic-honesty defect — the sequence-of-returns math is a genuine
+  bad-early-sequence depletion stress, real-frame, well-guarded; nits = representative-not-worst
+  shock + a small documented `startingCorpus` tail-drift) AND an independent **code-reviewer** which
+  caught a **HIGH**: `SequenceRiskCard.vue` rendered a red "your corpus runs short even under normal
+  markets" alarm to a **no-data user** (`fireNumber===0`, the gh-#39 empty-data false-positive class,
+  rule-31 honesty) — the sibling `WithdrawalBandsCard` guards this; `SequenceRiskCard` didn't.
+  **Fixed at root:** `sequenceRiskWarning()` now returns `unplannable`; the card branches to a neutral
+  "we can't stress-test yet" state on that one lib-owned signal. Locked by 3 new lib specs (decumulation
+  14→17; full 938 green); type-check + build green. Backfilled the missing run DEFERRED file.
+  **Verdict: as-merged #50 was NOT fully implemented (1 HIGH); after the fix it is functionally
+  complete + deploy-ready. NOT yet deployed** (Abhay's gate; verification was the requested first step).
+  *Why logged:* textbook independent-verification win — the run self-verified green + claimed
+  code-review APPROVE, but the blind supervisor pass caught an optimistic-honesty bug before a user saw
+  it (mirrors D-12). **Separate finding (NOT #50) → filed:** the splash's "Try the sample" demo-entry
+  button is GONE (only "Begin wizard" remains), so `verify-persona.mjs` / `enter-persona-via-ui.mjs` /
+  the ui-verification rule's gotcha are stale → localhost persona-render is currently blocked; the
+  drawdown page's definitive rendered verification will be the post-deploy prod sweep.
 - **D-2026-06-07-04 — SHIPPED obj-4 post-FIRE decumulation guardrails (must-have) + merged to `main`.**
   Ran `docs/goals/2026-06-06-decumulation-guardrails.md` via `/goal` in an isolated worktree
   (`feat/decumulation-guardrails` off `main`); Abhay merged it (`d891875`, `--no-ff`). Adds the

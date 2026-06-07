@@ -180,6 +180,13 @@ export interface SequenceRiskResult {
   survivalUnderBadSequence: boolean;
   /** Honest, plain-language summary — decision-support, never advice. */
   note: string;
+  /**
+   * True when the plan can't meaningfully be stress-tested yet — no corpus / not at FIRE, or no
+   * withdrawal/horizon. The UI MUST render a neutral "we can't stress-test yet" state on this —
+   * NEVER the red depletion alarm (the gh-#39 empty-data false-positive class, rule 31). Lets the
+   * card branch on one lib-owned signal instead of re-deriving "plannable" (which can drift).
+   */
+  unplannable: boolean;
 }
 
 /**
@@ -206,6 +213,7 @@ export function sequenceRiskWarning(input: SequenceRiskInput): SequenceRiskResul
       depletionAge: fireAge,
       survivalUnderBadSequence: false,
       note: "You're not at FIRE yet — this matters once you reach your FIRE number. Here's the preview.",
+      unplannable: true,
     };
   }
   if (!(annualRealWithdrawal > 0) || !(yearsInRetirement > 0)) {
@@ -213,6 +221,7 @@ export function sequenceRiskWarning(input: SequenceRiskInput): SequenceRiskResul
       depletes: false,
       survivalUnderBadSequence: true,
       note: "Add your expenses and plan-to age so we can test your plan against a bad early-retirement market.",
+      unplannable: true,
     };
   }
 
@@ -252,5 +261,5 @@ export function sequenceRiskWarning(input: SequenceRiskInput): SequenceRiskResul
     note = `Under normal markets your corpus lasts — but a bad market in your first ${shockYears} retirement years could deplete it${byAge}. A cash buffer for the early years or lower initial withdrawals protects against this, the #1 risk for a new retiree.`;
   }
 
-  return { depletes, depletionAge, survivalUnderBadSequence, note };
+  return { depletes, depletionAge, survivalUnderBadSequence, note, unplannable: false };
 }
