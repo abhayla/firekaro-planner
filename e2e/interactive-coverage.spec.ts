@@ -294,14 +294,20 @@ test.describe("app bar controls", () => {
     await loadSampleSeed(page);
     await gotoSeeded(page, "/tax-planning");
 
-    const fySelect = page.locator(".v-select").filter({ hasText: /FY/ }).first();
+    // The global app-bar FY selector was REMOVED in the FY-selector refactor (the current FY is
+    // auto-derived from the wall clock). Manual FY selection now lives ONLY on /tax-planning as a
+    // page-local picker labelled "Tax year" (financial-year-handling.md). Match THAT picker.
+    const fySelect = page.locator(".v-select").filter({ hasText: /Tax year/ }).first();
     const beforeSel = ((await fySelect.textContent()) ?? "").replace(/\s+/g, "");
     await fySelect.click();
     await page.waitForTimeout(300);
     const options = page.getByRole("option");
     const optCount = await options.count();
-    expect(optCount, "FY dropdown opened with multiple year options").toBeGreaterThan(1);
-    // Find the first option whose year differs from the currently-selected one.
+    // The tax-year picker shows "current + next configured FY" (financial-year-handling.md). When
+    // the current FY IS the newest configured year (e.g. FY 2026-27 today), it is correctly a
+    // SINGLE-option picker — so we assert ≥1 option and only exercise the change when ≥2 exist.
+    expect(optCount, "FY dropdown opened with at least the current year").toBeGreaterThanOrEqual(1);
+    // Find the first option whose year differs from the currently-selected one (if any).
     let pickedYear = "";
     for (let i = 0; i < optCount; i++) {
       const txt = ((await options.nth(i).textContent()) ?? "").trim();
@@ -312,10 +318,16 @@ test.describe("app bar controls", () => {
         break;
       }
     }
-    expect(pickedYear, "a different FY than the current one was selectable").not.toBe("");
-    await page.waitForTimeout(400);
-    // SUBSTANCE: the select now reflects the newly-picked financial year.
-    await expect(fySelect, "FY select reflects the newly-picked year").toContainText(pickedYear);
+    if (pickedYear) {
+      await page.waitForTimeout(400);
+      // SUBSTANCE: the select now reflects the newly-picked financial year.
+      await expect(fySelect, "FY select reflects the newly-picked year").toContainText(pickedYear);
+    } else {
+      // Single-option (current == newest configured FY): close the menu and assert the picker
+      // still shows the current year — the control opened + responded, which is the substance here.
+      await page.keyboard.press("Escape");
+      await expect(fySelect, "single-option FY picker shows the current year").toContainText(/\d{4}/);
+    }
 
     guard.assertClean("appbar-fy-select");
   });
