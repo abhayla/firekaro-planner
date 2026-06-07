@@ -105,6 +105,22 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 ## §3 — Decision log (append-only, newest first)
 
 ### 2026-06-07
+- **D-2026-06-07-03 — Prod AUTHENTICATED functional verification of obj-1/2/3 PASSED (rule 32),
+  independently re-verified (rule 33).** Drove the live site logged-in (valid saved session, test
+  account `abhayfaircent@gmail.com`) headless + non-destructive via `scripts/prod-functional-sweep.mjs`
+  (session validity pre-checked by `scripts/prod-session-check.mjs` → `/api/planner/me` 200). Results:
+  **obj-2 AccelerationCard** renders "biggest achievable wins" with real per-lever deltas (≈2.6 yr /
+  1.5 yr / 10 mo sooner; the "invest more" slider is interactive); **obj-3 `/fire-goals/readiness`**
+  shows verdict "Not yet" + the accessible-money bridge breakdown, **age 56 == the dashboard headline**
+  (rule-26 coherence), nav entry "Can I retire?" present+active; **obj-1 tax-staleness** banner
+  correctly ABSENT for the configured FY. Zero console/page errors, no `/login` bounces, no implausible
+  numbers. A **separate context-blind agent** re-checked the screenshots + report and concurred
+  (accept, conf 0.88). **Honest caveats:** (a) obj-1's POSITIVE firing path (banner shows when the live
+  FY is unconfigured) is NOT exercisable non-destructively on prod — covered only by unit tests at
+  merge; (b) trim/risk levers verified as *computed* (not placeholder) but only the save-more slider
+  was toggled. Evidence: `verification-screenshots/PROD-functional-2026-06-07T03-07-18-915Z/`
+  (gitignored). *Why logged:* completes the "test it on prod" step Abhay asked for; the deployed
+  must-have core is now functionally verified live, not just smoke-checked.
 - **D-2026-06-07-02 — DEPLOYED the must-have accumulation core (obj-1/2/3) to production.** Abhay
   authorized + sequenced the deploy (run obj-4 #50 in a parallel `/goal` session; deploy obj-1/2/3
   here). Shipped pinned `main` SHA `d04571c` to the VPS (`git archive | ssh tar` — private repo, the
