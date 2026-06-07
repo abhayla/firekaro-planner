@@ -4,8 +4,8 @@ Fill every `<…>` placeholder with a resolved decision. Delete sections that ge
 don't apply (e.g. a pure process/loop contract has no "design decisions" stage), but
 never leave an open question. The two live references this skeleton is distilled from:
 
-- `docs/goals/complete-income-screens-salary-overview.md` — a build/propagation contract
-- `docs/goals/2026-05-22-autonomous-issue-loop.md` — a loop/process contract
+- `docs/goals/2026-06-06-temporal-contributions-phase1.md` — a build contract
+- `docs/goals/2026-06-07-full-lifecycle-qa-verification.md` — a verify/process contract
 
 Match their density. Long is correct — length buys an unattended run that does the right thing.
 

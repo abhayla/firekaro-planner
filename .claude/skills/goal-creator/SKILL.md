@@ -40,9 +40,9 @@ front-load the questions, resolve every branch, and only then write a contract i
 literally every decision is pre-made.
 
 The canonical examples of the house format already live in `docs/goals/` — study them,
-they are the spec for what you produce. The two best references are
-`docs/goals/complete-income-screens-salary-overview.md` (a build contract) and
-`docs/goals/2026-05-22-autonomous-issue-loop.md` (a loop/process contract).
+they are the spec for what you produce. The two best references (both committed) are
+`docs/goals/2026-06-06-temporal-contributions-phase1.md` (a build contract) and
+`docs/goals/2026-06-07-full-lifecycle-qa-verification.md` (a verify/process contract).
 
 ## The cardinal rules (read before anything)
 
@@ -76,7 +76,7 @@ Before interviewing, ground yourself so your recommended answers are real, not g
 
 1. **Read the two reference contracts** named above to refresh the exact house format,
    tone, and section set. Skim a third if the new goal resembles one (e.g. a tax/screen
-   build → read `docs/goals/conform-v1x-screens.md`).
+   build → read `docs/goals/2026-06-03-accessible-money-bridge.md`).
 2. **Read `references/contract-template.md`** (the skeleton you will fill) and
    **`references/baked-in-rules.md`** (the standing-rules block you will paste).
 3. **Recall the relevant project memory** — especially `feedback_goal_is_user_invoked.md`
@@ -203,7 +203,7 @@ vague one):
   everything it needs is in the contract (plus the rule files it names, which load
   transitively). List those references explicitly (see the template's References section).
 
-Match the density and structure of `complete-income-screens-salary-overview.md`. It is
+Match the density and structure of `docs/goals/2026-06-06-temporal-contributions-phase1.md`. It is
 long on purpose: length here buys an unattended run that builds the right thing.
 
 ---
