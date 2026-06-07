@@ -113,6 +113,21 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 ## §3 — Decision log (append-only, newest first)
 
 ### 2026-06-07
+- **D-2026-06-07-11 — CEO review: the QA run "verified the new-user journey" via SEED-LOAD, not
+  from-scratch UI hand-entry → contract hardened (§A2.6) + skill generalized + #61.** Abhay's check: did
+  the run create a new family + enter every field from the UI + compute the FIRE number + verify all
+  reports + screenshots verified by multiple roles, iteratively fixed? **Verified answer: NO.** The run's
+  A2.5a tested entry *surfaces* + guards + **"Try the sample" (loads the Sharma SEED)** + read-only
+  `verify-persona.mjs` screenshots; A5's 68 screens were seed-loaded (read-only), blind-verified by one
+  agent; it never drove the headed `enter-persona-via-ui.mjs` for a from-scratch new-user + family build.
+  That proves *render*, not *entry* (`ui-verification.md` "data ENTRY is not verification"). **Fixed:**
+  (GENERIC → goal-creator SKILL.md STEP 4) "'tested via UI'/'new-user journey' = HAND-ENTRY, not
+  seed/demo-load"; (SPECIFIC → the QA contract) new mandatory **§A2.6** — from-scratch headed every-field
+  UI data-entry journey → FIRE-from-entered → all-reports coherent+plausible → post-entry per-screen
+  screenshots multi-role + blind verified → iterative fix-loop → across ≥2 household shapes (single +
+  dual-income family); seed/demo-load explicitly does NOT count. Tracked **#61**; lessons.md entry added.
+  Independently reviewed (rule 29). *Why logged:* a genuine coverage gap the run's self-grade hid, caught
+  by the owner/CEO check — now durable in skill + contract so the re-run actually does it. → §2.
 - **D-2026-06-07-10 — Applied the Mode-B fold-back from the QA run's learnings (generic→skill,
   specific→contract).** The QA run's misses (D-09) traced to two contract-AUTHORING defects, now fixed
   at the source. **GENERIC → `goal-creator`:** (a) "DoD verbs are load-bearing — an autonomous run

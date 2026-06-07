@@ -98,7 +98,7 @@ scripts (`scripts/verify-persona.mjs` / `scripts/enter-persona-via-ui.mjs`), NOT
 |---|---|---|
 | A1 static/unit/integration | headless (no browser) | Bash or PowerShell |
 | A2 `npm run test:e2e` (regression gate) | **headless** for the gate verdict (CI-parity) **+ one headed+maximized pass** of the critical flows for human-watch | headed pass via the **PowerShell tool only** |
-| A2.5 / A3 / A4 / A5 — new-user journey, functional sweep, interactive, evidence | **headed + maximized**, screenshots preserved | headed scripts via the **PowerShell tool**; NOT the headless MCP |
+| A2.5 / A2.6 / A3 / A4 / A5 — new-user journey, FROM-SCRATCH UI data entry, functional sweep, interactive, evidence | **headed + maximized**, screenshots preserved | headed scripts (`enter-persona-via-ui.mjs` for A2.6) via the **PowerShell tool**; NOT the headless MCP |
 | B1 prod smoke | headless | Bash or PowerShell |
 | B2 Tier-2 prod sweep | headless verdict; MAY spot-watch headed | PowerShell tool |
 
@@ -195,6 +195,54 @@ each wizard step + the tour overlay (first a11y contact).
 **A2.5 acceptance:** the journey spec is green; the EMPTY/PARTIAL state matrix passes with regression locks;
 the dev-bypass-OFF auth path is verified; the first-login transition is tested or filed+locked; headed
 evidence archived; FinTech confirms no false-positive headline on zero/partial data.
+
+## 3.6 STAGE A2.6 — FROM-SCRATCH new-user + new-family HEADED UI data-entry journey (gh #61)
+
+> **Mandatory + distinct from A2.5. A seed-load / demo "Try the sample" / `verify-persona.mjs` read-only
+> screenshot DOES NOT satisfy this** — `.claude/rules/ui-verification.md`: "**data ENTRY is not
+> verification**; a fixture exercises zero forms." This stage proves a real user can build a whole
+> household FROM SCRATCH through the actual UI and get a correct, fully-reported plan. HEADED + maximized,
+> launched via the **PowerShell tool** (§1.1), NOT the headless MCP. Engine: `scripts/enter-persona-via-ui.mjs`.
+
+**A2.6a — Hand-enter a full new household via the real forms (every field).** From an empty/new-user
+state: create the household + **family members** via the wizard/forms, then enter the **salary grid +
+every one of the 8 sections** (income, tax-planning, expenses, investments, liabilities, insurance,
+financial-health, fire-goals), filling **EVERY field — including OPTIONAL ones + every investment-type
+detail accordion** (`ui-verification.md` 2 critical rules + `feedback_fill_all_fields_verify_overview`).
+Per-entity persistence verified (rules 24/25 + `e2e-multi-row-verification.md` per-iteration, not
+end-of-loop).
+
+**A2.6b — Verify-on-overview after EACH section (inline, not deferred).** After each section's save,
+navigate to that section's overview/list and assert the entered data renders (counts + sample substance)
+— rule 26 applied inline, per section, during entry.
+
+**A2.6c — FIRE number + ALL reports from the HAND-ENTERED data.** After full entry, the headline **FIRE
+number computes from the entered data** and is domain-plausible (rule 31 — sane, not absurd); then sweep
+**every report/dashboard screen — the named set: the dashboard + all 8 section overviews + the
+fire-goals views (FIRE hero / readiness / drawdown) + financial-health + estate-planning + glossary**
+(use A3's surface list as the canonical bound) — and confirm each value is coherent with the entered
+inputs + the headline (rule 26 cross-page). "Every screen" means this whole set, not just the dashboard.
+
+**A2.6d — POST-ENTRY per-screen screenshots → multi-role + blind review.** Screenshot **every screen
+AFTER data entry** (not seed-loaded screens) → archive to `test-evidence/{run_id}/` → review from MULTIPLE
+role lenses (UI/UX · QA · FinTech-numbers · a11y) AND a context-blind agent (rule 33). (The owner's
+"verified by multiple roles **+ users**" is operationalized as these multiple role-lenses + the
+context-blind rule-33 agent — a single autonomous `/goal` run has no second human user; if a human
+spot-review happens, fold it in.) The screenshot is the authoritative pass/fail (rules 24/26).
+
+**A2.6e — ITERATIVE fix-loop.** Any failure (a field that won't save, an overview that doesn't reflect
+entry, an incoherent report value, an implausible FIRE number) → fix the ROOT cause (rule 17) → retest →
+loop until green (rule 15; `/fix-loop` → `/systematic-debugging`). Do NOT mark done with any step red.
+
+**A2.6f — across shapes ("multiple users").** Run the from-scratch entry for at least **two household
+shapes**: a single-earner new user AND a dual-income **family** (the "new family" case). **BOTH shapes
+get the FULL A2.6a–e depth** — every field incl. optional + per-section overview verify + post-entry
+per-screen screenshots + multi-role/blind review + the fix-loop. Shape #2 is **NOT** a thinner pass; do
+not stop at the first shape's plausible FIRE number.
+
+**A2.6 acceptance:** a full household hand-entered through the UI (every field), every section verified on
+its overview, FIRE + all reports coherent + plausible, post-entry screenshots multi-role + blind verified,
+all green via the fix-loop, across ≥2 household shapes. **Seed/demo-load explicitly does NOT count.**
 
 ## 4. STAGE A3 — Multi-level functional sweep (every surface × persona × process)
 
@@ -396,6 +444,7 @@ recommendation (`DEPLOY.md` §Rollback). Rollback execution is Abhay-gated; afte
 - [ ] Full E2E suite green on localhost + Supabase (headless gate + a headed maximized pass per §1.1); multi-row specs per-iteration + final-render verified.
 - [ ] **New-user journey spec authored + green** (A2.5): all entry surfaces (splash/demo/continue), the 6-step gating wizard (validation/skip/back/resume), every router-guard branch, tour overlay; the stale `new-user-test-skill` filed as an issue.
 - [ ] **§A2.5d server-mode + dev-bypass-OFF sub-run RAN (non-deferrable, #60):** unauthenticated → `/login` bounce + `/api/planner/*` 401 (auth gate actually enforced); first-login localStorage→ServerAdapter transition tested (or filed Tier-0 + regression-locked if migration is absent).
+- [ ] **§A2.6 FROM-SCRATCH headed UI data-entry journey RAN (gh #61):** a full new household hand-entered through the real forms (every field incl. optional + every investment-type accordion), verified on each section's overview, FIRE number + all reports coherent + plausible (rule 31), POST-ENTRY per-screen screenshots multi-role + blind verified, green via the fix-loop, across ≥2 household shapes (single + dual-income family). A seed/demo-load does NOT satisfy this.
 - [ ] **EMPTY / PARTIAL / FULL state matrix green** with a regression lock closing gh #39's sibling sweep (no false achieved/100%/on-track/score on zero/partial data).
 - [ ] A3 meets the §4 completeness bar: **every one of the 9 layers exercised ≥ once** AND the **targeted high-risk cross-product** (investments / tax-planning / fire-goals / income × all 5 personas × the per-section-breakable layers) covered (incl. three-state, negative/boundary, a11y, responsive, dark mode); the full 55-cell matrix is OPTIONAL — if skipped, said so in the SUMMARY; lifecycle/comms subsystem exercised.
 - [ ] Plausibility holds for all 5 personas on the default lens; FinTech end-to-end PASS; security pass clean.

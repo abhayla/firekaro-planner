@@ -211,6 +211,13 @@ vague one):
   setup** and mark it **non-deferrable** if it's a security/data-integrity gate. A check mandated in
   prose while the preflight sets a conflicting env WILL be deferred — exactly what happened to the QA
   run's dev-bypass-OFF + first-login checks (#60).
+- **"Tested via the UI" / "the new-user journey" = HAND-ENTRY through the real forms, NOT a seed/demo
+  load.** If a contract must prove a user can *build* data (create a household, enter salary + sections
+  from scratch → get a correct, fully-reported plan), mandate a **headed, from-scratch, every-field UI
+  data-entry pass** (`enter-persona-via-ui.mjs` + per-section overview verify + fix-loop, per
+  `ui-verification.md` "**data ENTRY is not verification**"). A seed fixture / "Try the sample" demo-load
+  / read-only `verify-persona.mjs` screenshot proves *render*, not *entry* — never let it satisfy an
+  entry/journey requirement (the QA run's gap, #61).
 - **Honest defaults.** No synthetic/fake data; remove fakery rather than carry it forward.
   Surface uncertainty as an explicit assumption in the contract, never as fiction.
 - **Self-contained.** The run should not need to consult this skill or any chat history —
