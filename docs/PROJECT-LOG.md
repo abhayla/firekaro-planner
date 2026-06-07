@@ -30,7 +30,14 @@
 
 ## §2 — Active priority / roadmap (the "Now" order: correctness → stickiness → friction)
 
-**Current focus chosen 2026-06-06 (REPRIORITIZED by Abhay): COMPLETE THE MUST-HAVE CORE before
+**FOCUS LOCK (2026-06-07, D-2026-06-07-07): MUST-HAVE ONLY** — no new good-to-have/nice-to-have build
+without Abhay's explicit per-item approval (`.claude/rules/must-have-only-focus.md`). The must-have
+registry is empty (obj 0→4 shipped), so the **current active work = full-app verification & hardening**
+of what's built — contract `docs/goals/2026-06-07-full-app-verification-hardening.md` (run via `/goal`).
+Testing/hardening/bug-fixing existing features is the rule's allowed carve-out; good-to-have
+(#41/#44/#45/#46/#49) + nice-to-have (#43/#47/#53) stay BLOCKED pending approval.
+
+**Prior focus (2026-06-06, REPRIORITIZED by Abhay): COMPLETE THE MUST-HAVE CORE before
 stickiness.** Rationale (goal-anchored): there is no point measuring/improving retention on an
 incomplete product — a working must-have core is the *precondition* for stickiness. **Scope locked
 (D-2026-06-06-07): must-have-now = the accumulation core, objectives 0+1+2; objectives 3+4
@@ -105,6 +112,27 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 ## §3 — Decision log (append-only, newest first)
 
 ### 2026-06-07
+- **D-2026-06-07-07 — Locked focus to MUST-HAVE ONLY (new standing rule) + authored a full-app
+  verification/hardening goal.** Abhay's directive: "focus only on must-have features; make this a
+  rule; do not touch good-to-have / nice-to-have until I explicitly approve" + "fully test all
+  implemented features (all roles / use cases / performance) as a goal and iteratively fix until
+  everything passes, with multi-level verification (frontend/UI/API/backend) and no assumptions."
+  **Acted:** (1) created `.claude/rules/must-have-only-focus.md` (global) — the prioritization gate:
+  no new good-to-have/nice-to-have build without explicit per-item approval; **explicit carve-out** =
+  testing/verification/hardening/bug-fixing of already-implemented features (any tier) + Tier-0
+  correctness/honesty fixes are ALLOWED (resolves the apparent "only must-have" vs "test ALL features"
+  conflict — verifying what exists ≠ building good-to-have); reads tier from issue labels; cross-refs
+  goal-anchored-decisions + documentation-management (no dup). (2) Authored
+  `docs/goals/2026-06-07-full-app-verification-hardening.md` — an autonomous verify-and-fix `/goal`
+  contract (worktree-isolated, idempotent preflight, runs on localhost:5175 + Supabase per
+  testing-strategy.md — NEVER the full suite/load/pentest on prod) covering both trees' static+unit+
+  integration, full E2E, the 5-layer functional sweep (backend/API/render/UI→DB/cross-page/
+  interactive rules 24/25/26/32) × 8 sections × 5 personas, plausibility (rule 31) + Lighthouse, and
+  blind verification (rule 33), with fix-loops to green + issues for anything deferred. Contract left
+  UNCOMMITTED per the goal-contract convention (Abhay edits → runs `/goal`). *Why logged:* a standing
+  prioritization lock + the current active focus. *Tiering note:* the must-have registry is empty, so
+  the live effect is "harden the built app; build nothing new-tier until approved" — coherent with
+  the lock. → §1/§2.
 - **D-2026-06-07-06 — DEPLOYED obj-4 #50 to production + functionally verified live; the full
   must-have core (obj 0→4) is now COMPLETE in prod.** Abhay authorized ("do it"). Shipped pinned
   `main` `45201dc` (obj-1/2/3 + obj-4 #50 + the SequenceRiskCard HIGH fix) to the VPS
