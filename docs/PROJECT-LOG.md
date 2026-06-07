@@ -102,6 +102,25 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 
 ## §3 — Decision log (append-only, newest first)
 
+### 2026-06-07
+- **D-2026-06-07-01 — Completed the must-have GitHub-issue registry (filed #50/#51/#52); affirmed
+  obj-3/4 as must-have.** At Abhay's request ("find the goal's must-have features; if not logged as
+  issues, file them — do not implement yet"), audited the full-lifecycle goal (§9, all 5 objectives)
+  against the issue registry. Found the must-have set **~90% delivered to `main`** but with registry
+  gaps → filed: **#50** post-FIRE decumulation guardrails (obj-4 — the only fully-unbuilt must-have;
+  contract `docs/goals/2026-06-06-decumulation-guardrails.md` authored, not run); **#51** current-FY
+  tax-staleness guard (obj-1; built+merged @6ab9c8c/c08f91a, deploy-pending); **#52** readiness-to-stop
+  verdict (obj-3; built+merged @6b697f0/ec1eb5e, deploy-pending). All labelled `must-have`.
+  *Tiering call (goal-anchored, rule 30):* **obj-3 and obj-4 ARE must-have, not "later/good-to-have"** —
+  §9 lists them as part of THE goal ("in-scope for our own user who reaches FIRE"); D-2026-06-06-07's
+  "obj 3+4 = later phase" was a *sequencing* call, and the team has since shipped obj-3 + authored obj-4
+  as must-have contracts (D-13/D-14). They are the LAST must-haves in sequence. Supersedes the §2
+  implication that obj 3+4 sit outside the must-have set. **Registry now: `gh issue list --label
+  must-have` = #48 (obj-2, on main) · #50 (obj-4, unbuilt) · #51 (obj-1, deploy-pending) · #52 (obj-3,
+  deploy-pending).** *Per the user's instruction: do NOT implement yet.* **Cross-cutting blocker for
+  the "deployed in production" half of the goal:** obj-1/2/3 are merged to `main` but NOT live — the
+  production redeploy is Abhay's gate (B7, `docs/comms-go-live-handoff.md`).
+
 ### 2026-06-06
 - **D-2026-06-06-14 — SHIPPED obj-3 readiness-to-stop verdict (the "can I pull the trigger?" surface);
   merged to `main` (cd78485).** The `/goal` run on `docs/goals/2026-06-06-readiness-to-stop-verdict.md`
@@ -224,11 +243,12 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 ## §4 — Pointers (the formal artifacts this log indexes)
 
 - Product design SSOT + objectives §9: `docs/v6-fire-planner-product-plan.md`
-- Open work items: GitHub Issues (`gh issue list`) — current: #41, #43, #44, #45, #46, #47, #48
+- Open work items: GitHub Issues (`gh issue list`) — current: #41, #43, #44, #45, #46, #47, #48, #49, #50, #51, #52
 - **Feature priority tiers (registry = issue labels):** `gh issue list --label must-have` /
   `--label good-to-have` / `--label nice-to-have`. The categorization process is governed by
   `.claude/rules/documentation-management.md` § "Feature tiering registry"; the WHY of each call is in
-  the decision log below. Current: must-have #48 · good-to-have #44/#45/#41/#46 · nice-to-have #43/#47.
+  the decision log below. Current: must-have #48/#50/#51/#52 · good-to-have #44/#45/#41/#46/#49 ·
+  nice-to-have #43/#47.
 - Architecture decisions: `docs/adr/` (0001–0003; 0004 temporal model pending the #46 run)
 - Autonomous build specs: `docs/goals/`
 - Retention backlog: `docs/retention-engagement-features.md`
