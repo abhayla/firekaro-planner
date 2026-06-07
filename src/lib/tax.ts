@@ -200,6 +200,9 @@ export function isProjectedTaxStale(fy: string): boolean {
  */
 export function fireProjectionTaxNote(lastProjectionYear: number): string | null {
   if (!Number.isFinite(lastProjectionYear)) return null;
+  // Stryker disable next-line all: equivalent — the note's only observable output is a boolean
+  // "is this year past the newest configured FY?"; a ±1-year (or %100 / padStart) perturbation of a
+  // far-future year never flips that boolean, so these mutants cannot change behaviour.
   const lastFy = `${lastProjectionYear}-${String((lastProjectionYear + 1) % 100).padStart(2, "0")}`;
   const cov = getTaxConfigCoverage(lastFy);
   if (!cov.isFutureUnconfigured) return null;
@@ -211,6 +214,9 @@ export function getTaxConfigForFY(fy: string): FYTaxConfig {
   // planner, not a tax-return tracker). An unconfigured FY falls back to the NEAREST configured FY
   // (least-wrong) — single source of that rule is getTaxConfigCoverage (gh-issue #19, no drift).
   const coverage = getTaxConfigCoverage(fy);
+  // Stryker disable next-line all: equivalent under test — this is a DEV-only console.warn guarded
+  // by `import.meta.env.DEV && MODE !== "test"`, which is false in the vitest run, so no mutation of
+  // this advisory-logging condition is observable. The return value (the applied config) is unaffected.
   if (!coverage.isConfigured && import.meta.env?.DEV && import.meta.env?.MODE !== "test") {
     console.warn(
       `[tax] No tax config for FY ${fy}; using nearest configured FY ${coverage.appliedFy}. ` +
@@ -325,6 +331,11 @@ export function calculateSurcharge(
       break;
     }
   }
+  // Stryker disable all: equivalent — DEFENSIVE DEAD branch. Every configured surcharge table ends
+  // with a band whose max is Infinity (SURCHARGE_SLABS), so the loop above ALWAYS matches a band for
+  // any income > ₹50L (income ≤ ₹50L returned 0 already). This `rate === 0` fallback is therefore
+  // unreachable with the real configs; it only guards a hypothetical finite-last-band misconfig.
+  // Mutating unreachable code cannot change behaviour → these mutants are equivalent. (Kept as a guard.)
   if (rate === 0) {
     const lastIdx = slabs.length - 1;
     const last = slabs[lastIdx];
@@ -334,6 +345,7 @@ export function calculateSurcharge(
       prevRate = lastIdx > 0 ? slabs[lastIdx - 1].rate : 0;
     }
   }
+  // Stryker restore all
   if (cap !== null && rate > cap) rate = cap;
   if (cap !== null && prevRate > cap) prevRate = cap;
   let surcharge = Math.round(tax * rate);
