@@ -36,12 +36,13 @@ release-readiness sign-off, and a post-deploy verification report.
 
 ## 0.0 PREREQUISITE before a re-run (read FIRST)
 
-> **The first Phase-A run (branch `chore/full-lifecycle-qa`) is COMPLETE but UNMERGED** (22 commits
-> ahead of `main`, 12 behind). Before re-running this hardened contract, **merge `chore/full-lifecycle-qa`
-> into `main`** (Abhay's gate) so `main` carries BOTH the prior ~63 green locks AND this latest contract —
-> otherwise §0.2's idempotency preflight (which reads `main` + `git log`) cannot see the prior work and
-> will redo it. After merging, the old `chore/full-lifecycle-qa` branch + `../firekaro-goal-qa` worktree
-> may be removed; this re-run uses a FRESH worktree/branch (§0.1) off the updated `main`.
+> **✅ DONE (2026-06-07).** The first Phase-A run's branch `chore/full-lifecycle-qa` (~63 green locks)
+> was **merged into `main` (merge commit `086bc67`) and pushed**; the post-merge gate is green (root
+> type-check 0 / 978 tests; server type-check 0 / lint 0 / 156 tests). The old branch + worktree are
+> removed. So `main` now carries BOTH the prior work AND this hardened contract — §0.2's idempotency
+> preflight (reads `main` + `git log`) WILL see the prior work and skip it, doing only the delta
+> (§A2.6 + #59 + #60). **Nothing to merge before the re-run.** This re-run uses a FRESH worktree/branch
+> off `main` (§0.1).
 
 ## 0.1 WORKTREE ISOLATION (paste FIRST)
 

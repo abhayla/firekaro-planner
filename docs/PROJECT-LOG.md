@@ -113,6 +113,19 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 ## §3 — Decision log (append-only, newest first)
 
 ### 2026-06-07
+- **D-2026-06-07-13 — Re-run PREP done: merged the completed Phase-A QA branch to main + verified main green.**
+  Abhay delegated the prep ("you do all the prep; I'll run /goal in another session"). Merged
+  `chore/full-lifecycle-qa` (~63 green locks — 22 commits) into `main` via `--no-ff` (merge `086bc67`);
+  the merge was **clean (fully disjoint** — branch = test/engine/signoff files, main = docs/skill/contract
+  files, zero conflict candidates). Installed the merged devDeps (fast-check/Stryker), ran the post-merge
+  gate **GREEN**: root type-check 0 / **978** unit (69 files), server type-check 0 / lint 0 / **156** unit
+  (incl. live-DB IDOR/isolation/round-trip). Pushed `main` (`647555f..086bc67`). Verified the golden-master
+  snapshot was unchanged (the git "M" was a Windows CRLF-only touch — content identical, no FIRE-headline
+  drift). Deleted the merged local branch + pruned its worktree; the re-run uses fresh names
+  (`firekaro-goal-qa2` / `chore/full-lifecycle-qa-2`, §0.1). Updated the contract §0.0 to mark the
+  prerequisite SATISFIED. **The goal is now ready to re-run** — `/goal docs/goals/2026-06-07-full-lifecycle-qa-verification.md`
+  will skip the done work (§0.2 preflight) and execute only the delta (§A2.6 4-persona gated loop, #59, #60).
+  *Why logged:* records that the merge/prep gate (D-09's "Abhay's gate") is cleared + main is green. → §2.
 - **D-2026-06-07-12 — §A2.6 refined to a SEQUENTIAL, GATED per-persona loop (Abhay's directive).** Per
   Abhay: enter each persona FROM SCRATCH one at a time — **Mauryas first** (full entry → verify → fix
   iteratively until a CLEAN run) → only THEN the next (Sharmas, then Iyers, then Mehtas) → loop through
