@@ -1,0 +1,15 @@
+{
+  "$schema": "./node_modules/@stryker-mutator/core/schema/stryker-schema.json",
+  "_comment": "A7.6 mutation testing — proves the honesty-critical kernel math is actually PROTECTED by its specs (coverage % is a lie; a killed mutant is the real proof). Scoped to the pure calc modules for a tractable run; derive.ts (huge, dependency-dense) is exercised indirectly via these + the property/golden-master locks.",
+  "testRunner": "vitest",
+  "mutate": [
+    "src/lib/fire-math.ts",
+    "src/lib/tax.ts",
+    "src/lib/withdrawal-strategy.ts",
+    "src/lib/epf-vpf.ts"
+  ],
+  "reporters": ["clear-text", "progress"],
+  "coverageAnalysis": "perTest",
+  "concurrency": 4,
+  "timeoutMS": 20000
+}
