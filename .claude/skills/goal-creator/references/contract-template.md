@@ -141,7 +141,9 @@ what untracked items to leave alone. Branch + push target. Co-author trailer.>
 
 ## <N+3>. Final report (required on completion)
 
-Produce a closing report containing: commit SHAs + per-stage gate results; Rule 24 verdict
+**Open with a concise SUMMARY block — DONE / PENDING / BLOCKED / NEXT** (per `baked-in-rules.md`
+§0.3 step 6), so the run is readable at a glance from any session; mirror it in the final PROGRESS.md
+entry. Then the closing report contains: commit SHAs + per-stage gate results; Rule 24 verdict
 per screen + PNG paths; Rule 25 verdict per write path; Rule 26 cross-page result; a11y +
 Lighthouse summary; DoD green/amber/red tally; any DEFERRED entries with rule status + reason.
 

@@ -76,9 +76,10 @@ events/lessons so future runs (and Abhay) can learn from this one.
 > **advisory prose** the run is asked to follow — there is **no deterministic enforcement yet**. By
 > this repo's own gate-gap lesson (*prose doesn't prevent recurrence; a hook/CI gate does*), the real
 > backstop is a deterministic run-completion check (e.g. a `/goal` run cannot be marked done without a
-> `<slug>-PROGRESS.md` carrying a `DONE` line + a final-report "LEARNINGS TO FOLD BACK" section). That
-> gate is tracked as a candidate (see the goal-creator gate-candidate issue) — until it exists, treat
-> §0.3 as best-effort, not guaranteed.
+> `<slug>-PROGRESS.md` carrying a `DONE` line + the DONE/PENDING/BLOCKED/NEXT SUMMARY (step 6) + a
+> final-report "LEARNINGS TO FOLD BACK" section). That gate is tracked as a candidate (see the
+> goal-creator gate-candidate issue) — until it exists, treat §0.3 (the log, the SUMMARY, and the
+> fold-back) as best-effort, not guaranteed.
 
 > **Maintain an append-only progress log for the entire run. Update it BEFORE moving on from each
 > stage/event — so a crash or context-out leaves it current (it survives where in-context memory does not).**
@@ -130,6 +131,15 @@ events/lessons so future runs (and Abhay) can learn from this one.
 > [2026-06-07 15:10] EVENT   — A2 E2E blocked: demo specs vs server-mode frontend; did NOT restart shared :5175 → filed #54, deferred to a controlled demo-mode run
 > [2026-06-07 15:20] DONE    — Phase A interim sign-off committed; deploy gate NOT cleared
 > ```
+>
+> 6. **Run-end SUMMARY (a readable status digest — advisory until #58 gates it, per the note above).**
+>    The run's FINAL PROGRESS.md entry AND the committed final report MUST each carry a concise
+>    **SUMMARY** — a ROLL-UP of facts already recorded elsewhere, NOT a new source of truth:
+>    **DONE** (the verified-green stages) · **PENDING** (= the DEFERRED entries + their one-line reason —
+>    no silent skips) · **BLOCKED** (the Abhay-gated subset + why) · **NEXT** (the continuation note —
+>    the single next action + who owns the gate). Scannable, not a transcript. The committed final report
+>    is the durable copy (survives the worktree); the PROGRESS.md final entry mirrors it for the live
+>    cross-session reader.
 
 ---
 
