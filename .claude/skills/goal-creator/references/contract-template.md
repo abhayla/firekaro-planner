@@ -31,6 +31,15 @@ fresh build vs a propagation/refactor vs a fix loop, and the one non-negotiable 
 
 ---
 
+## 0.1 WORKTREE ISOLATION (paste FIRST, above §0.2)
+
+← PASTE the "§0.1 Worktree isolation" block from `references/baked-in-rules.md` HERE — the run's
+very first action: a dedicated `../firekaro-goal-<slug>` worktree + new branch + the
+`.goal-active.lock` claim, never the user's primary checkout. (Omit only if `git worktree` is
+genuinely unavailable — but still never run in the primary interactive checkout.)
+
+---
+
 ## 0.2 PREFLIGHT — read the coverage ledger FIRST (idempotency · NO duplication)
 
 ← PASTE the "§0.2 Preflight" block from `references/baked-in-rules.md` HERE, naming this
@@ -137,13 +146,15 @@ per screen + PNG paths; Rule 25 verdict per write path; Rule 26 cross-page resul
 Lighthouse summary; DoD green/amber/red tally; any DEFERRED entries with rule status + reason.
 
 Plus a **LEARNINGS TO FOLD BACK** section (derived from the §0.3 progress log) — the
-self-improvement loop. Route each learning by scope, generalize-first, as PROPOSALS for Abhay
-(never auto-applied — governance edits need approval): **(a) reusable process** → propose into
-`goal-creator` baked-in-rules/skill, preferring a hook/CI/run-profile gate over prose; **(b)
-goal-type** → propose into `contract-template.md`; **(c) goal-specific** → propose into THIS
-contract. Auto-append only the one-line error→fix→lesson (with a gate-gap line, after a dedup
-check) to `.claude/tasks/lessons.md`. The next interactive turn offers to apply the fold-back
-via `goal-creator` Mode B.
+self-improvement loop. Classify each learning by **TYPE**, place it in its **ONE canonical home**
+(dedup first), as PROPOSALS for Abhay (never auto-applied — governance edits need approval):
+**GENERIC** (how goals/tests/process run) → `goal-creator` baked-in-rules/skill and/or a process
+rule (`.claude/rules/*`); **PRODUCT-SPECIFIC** (about FireKaro) → a product rule (`.claude/rules/*`)
+if a recurring class, else THIS goal contract. For BOTH, prefer a **deterministic gate**
+(hook/CI/run-profile) over prose where one fits (gate → rule/skill prose → contract note).
+Auto-append only the one-line error→fix→lesson (with a gate-gap line, after a dedup check) to
+`.claude/tasks/lessons.md`. The next interactive turn offers to apply the fold-back via
+`goal-creator` Mode B.
 
 ---
 

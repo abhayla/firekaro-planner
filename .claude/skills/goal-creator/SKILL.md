@@ -236,14 +236,17 @@ loaded its contract).
 1. **Read the run's learnings** — its `docs/goals/.run/<slug>-PROGRESS.md` (the §0.3 log: defects,
    "X not working + what I did" events, decisions, recoveries) **and** the committed final report's
    **"LEARNINGS TO FOLD BACK"** section.
-2. **Route each learning by scope (3-way, generalize-first):**
-   - **(a) reusable process** (any goal would hit it) → `references/baked-in-rules.md` / the skill,
-     and — per the `lessons.md` gate-gap lesson — prefer a **deterministic gate** (hook / CI test /
-     run-profile) over prose where one fits;
-   - **(b) goal-type** (this class of goal) → `references/contract-template.md`;
-   - **(c) goal-specific** (only this contract) → that contract.
-3. **Dedup** — grep the target home before adding; skip anything already covered. Split by the
-   "would another goal hit this?" test.
+2. **Classify each learning by TYPE, then place it in its ONE canonical home by blast radius
+   (`configuration-ssot`):**
+   - **GENERIC** — about how goals / tests / the process run (e.g. headed-run launcher, demo-vs-server
+     E2E, an IDOR false-proof pattern) → improve the **skill** (`references/baked-in-rules.md` /
+     `references/contract-template.md`) and/or a **process rule** (`.claude/rules/*`). Benefits every goal.
+   - **PRODUCT-SPECIFIC** — about FireKaro itself → route by reach: a recurring product **class** (any
+     product work would hit it) → a **product rule** (`.claude/rules/*`); a **single-goal** quirk/scope
+     correction → **that goal contract**.
+   - **For BOTH, prefer a DETERMINISTIC GATE** (hook / CI test / run-profile) over prose where one fits
+     (the `lessons.md` gate-gap lesson). Target preference: **gate → rule/skill prose → contract note.**
+3. **Dedup** — grep the target home before adding; skip anything already covered. One learning = one home.
 4. **PROPOSE, then apply on approval.** These are skill/rule/contract = governance edits (rule 5) →
    show Abhay the concrete diffs and apply ONLY on his go-ahead. The one-line `lessons.md` entry the
    run already auto-appended needs no re-approval.
@@ -270,10 +273,11 @@ loaded its contract).
   other session can track the run live (`git worktree list` → read the log), and the major
   events/lessons roll into the committed final report + `.claude/tasks/lessons.md` at run-end.
 - **Mode B (fold-back) only PROPOSES skill/rule/contract edits for Abhay's approval** (governance,
-  rule 5); the only auto-write is the one-line `lessons.md` entry. Route learnings 3-way
-  (reusable→skill/rules+gate · goal-type→template · goal-specific→contract), generalize-first, dedup
-  before adding, and end with the offer to fold them in. NEVER fold back into a contract that may be
-  running (cardinal rule 5) — generalize or write a delta instead.
+  rule 5); the only auto-write is the one-line `lessons.md` entry. Classify each learning by TYPE
+  (**GENERIC** → skill/process-rule · **PRODUCT-SPECIFIC** → a product rule if a class, the goal
+  contract if goal-only), prefer a **deterministic gate over prose** for both, land it in ONE
+  canonical home (dedup first), and end with the offer to fold them in. NEVER fold back into a contract
+  that may be running (cardinal rule 5) — generalize or write a delta instead.
 - **Interview-first, one question at a time, each with a recommended answer**, until every
   fork is resolved. The contract must be zero-user-input.
 - **Every contract bakes in rules 24, 25, 26, 15, 17, 20, 23 + the failure-recovery budget

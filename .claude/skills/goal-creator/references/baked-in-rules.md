@@ -78,7 +78,9 @@ events/lessons so future runs (and Abhay) can learn from this one.
 > 1. **Location:** `docs/goals/.run/<contract-slug>-PROGRESS.md` (in THIS run's worktree). `.run/` is
 >    gitignored → the log adds no commit churn and never conflicts across parallel runs. It is read
 >    **cross-session via the worktree path**: another session runs `git worktree list`, then reads each
->    `<worktree>/docs/goals/.run/*-PROGRESS.md` to see every active run's live status.
+>    `<worktree>/docs/goals/.run/*-PROGRESS.md` to see every active run's live status. (Its sibling
+>    `<slug>-DEFERRED.md` — the deferrals log named in the DoD — lives in the same `.run/` dir with the
+>    same gitignored + cross-session-readable treatment.)
 > 2. **First log line (right after §0.1/§0.2):** slug · branch · worktree · start time · contract path ·
 >    one-line mission.
 > 3. **Append a SHORT entry (≤2 lines) at each of:** stage start; stage done (with the gate result);
@@ -89,18 +91,25 @@ events/lessons so future runs (and Abhay) can learn from this one.
 > 4. **Entry format:** `[YYYY-MM-DD HH:MM] <STAGE|PROGRESS|DEFECT|EVENT|DECISION|RECOVERY|BLOCKER|DONE> — <≤2-line summary>` (get the time with `date "+%Y-%m-%d %H:%M"`).
 > 5. **At run-end, DERIVE learnings from the log and route them by scope — the self-improvement
 >    fold-back, so the same mistake is not repeated next run.** The `.run/` log is ephemeral (cleaned
->    with the worktree), so the durable output goes to committed homes, routed 3-way (generalize-first):
+>    with the worktree), so the durable output goes to committed homes, routed by TYPE (GENERIC vs
+>    PRODUCT-SPECIFIC), one canonical home each:
 >    - **AUTO (only this — low-risk):** append each notable error→fix→lesson to `.claude/tasks/lessons.md`
 >      with a **gate-gap line** (which gate should have caught it + closed-by-hook-or-prose), after a
 >      **dedup check** (grep first — never re-add an existing lesson). `lessons.md` is the designated ledger.
 >    - **PROPOSE (never auto — needs Abhay's approval):** in the run's COMMITTED final report, write a
->      **"LEARNINGS TO FOLD BACK"** section routing every remaining learning by scope:
->      (a) **reusable process** (any goal would hit it) → propose lifting it into
->      `.claude/skills/goal-creator/references/baked-in-rules.md` / the skill, and — per the gate-gap
->      lesson (prose doesn't prevent recurrence; a hook/CI test does) — prefer a **deterministic gate**
->      (hook / CI test / run-profile) over prose where one fits;
->      (b) **goal-type** (this class of goal) → propose a `contract-template.md` edit;
->      (c) **goal-specific** (only this contract) → propose the edit to THIS contract.
+>      **"LEARNINGS TO FOLD BACK"** section. Classify each learning by **TYPE first**, then place it in
+>      its **ONE canonical home** (`configuration-ssot` — never duplicate; grep before adding), chosen
+>      by **blast radius** ("who else would hit this?"):
+>      - **GENERIC — about how goals / tests / the process run** (e.g. "headed runs need the PowerShell
+>        launcher", "demo vs server-mode E2E", "IDOR test false-proof pattern"). → improve the **skill**
+>        (`baked-in-rules.md` / `contract-template.md`) and/or the relevant **process rule**
+>        (`.claude/rules/*`). Benefits every future goal.
+>      - **PRODUCT-SPECIFIC — about FireKaro itself.** Route by reach: a recurring product **class**
+>        (would bite any product work, e.g. the empty-state false-positive family) → a **product rule**
+>        (`.claude/rules/*`); a **single-goal** quirk/scope correction → **this goal contract**.
+>      - **For BOTH types, prefer a DETERMINISTIC GATE** (hook / CI test / run-profile) over prose where
+>        one fits — the standing `lessons.md` gate-gap lesson: prose doesn't prevent recurrence, a gate
+>        does. Target preference: **gate → rule/skill prose → contract note.**
 >    - **The run NEVER edits its own contract, the skill, or a rule** (cardinal-rule-5 + behaviour rule 5
 >      — governance edits need approval). It only PROPOSES. Applying the fold-back is a deliberate
 >      post-run `goal-creator` **Mode B** action on Abhay's approval, and the next interactive turn ends
