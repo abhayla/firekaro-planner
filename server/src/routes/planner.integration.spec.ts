@@ -158,4 +158,53 @@ dlive("/api/planner integration (live DB — Supabase firekaro-planner)", () => 
     });
     expect(res.status).toBe(400);
   });
+
+  // ===================== A7.4 persistence round-trip integrity =====================
+  // The diff engine + repo are the product plan's own "highest-complexity / silent-data-loss" risk.
+  // The base round-trip test leaves subtypeData undefined — so the per-type natural-granularity
+  // fields (qty/price, principal/rate/bank, gold subtype/grams, RE ownership/role, ESOP grant) are
+  // UNTESTED. A dropped field here is a silent data loss the user never sees until it matters.
+
+  it("subtype round-trip: per-type investment fields survive PUT->GET (no silent field drop)", async () => {
+    const richInvestments = [
+      { id: "stk1", type: "Stocks", value: 50000, ownerId: "you", qty: 100, pricePerShare: 500, bucket: 4, holdingsCount: 3 },
+      { id: "fd1", type: "FD", value: 200000, ownerId: "you", principal: 200000, interestRate: 7.1, maturityYear: 2030, bank: "HDFC" },
+      { id: "gold1", type: "Gold", value: 100000, ownerId: "Joint", subtype: "SGB", grams: 20, pricePerGram: 5000 },
+      { id: "re1", type: "RealEstate", value: 8000000, ownerId: "you", city: "Metro", ownership: "Self", purchaseYear: 2018, realEstateRole: "PrimaryResidence" },
+      { id: "esop1", type: "ESOP", value: 300000, ownerId: "you", totalGrantValue: 500000, vestedPercent: 60 },
+    ];
+    const household = { ...sampleHousehold, investments: richInvestments };
+    const put = await app.request("/api/planner/household", { method: "PUT", headers: H, body: JSON.stringify(household) });
+    expect(put.status).toBe(200);
+
+    const body: any = await (await app.request("/api/planner/household", { headers: H })).json();
+    const byId: Record<string, any> = Object.fromEntries(body.data.investments.map((i: any) => [i.id, i]));
+
+    expect(byId.stk1, "Stocks qty/price/bucket/holdingsCount round-trip").toMatchObject({
+      type: "Stocks", ownerId: "you", qty: 100, pricePerShare: 500, bucket: 4, holdingsCount: 3,
+    });
+    expect(byId.fd1, "FD principal/rate/maturity/bank round-trip").toMatchObject({
+      type: "FD", principal: 200000, interestRate: 7.1, maturityYear: 2030, bank: "HDFC",
+    });
+    expect(byId.gold1, "Gold subtype/grams/pricePerGram + Joint owner round-trip").toMatchObject({
+      type: "Gold", ownerId: "Joint", subtype: "SGB", grams: 20, pricePerGram: 5000,
+    });
+    expect(byId.re1, "RealEstate ownership/role/city/purchaseYear round-trip").toMatchObject({
+      type: "RealEstate", ownership: "Self", realEstateRole: "PrimaryResidence", city: "Metro", purchaseYear: 2018,
+    });
+    expect(byId.esop1, "ESOP grant/vested round-trip").toMatchObject({
+      type: "ESOP", totalGrantValue: 500000, vestedPercent: 60,
+    });
+  });
+
+  it("expense-history round-trip: the separate snapshot key persists deep-equal", async () => {
+    const snapshots = [
+      { period: "2025-04", fy: "2025-26", capturedAt: "2025-04-30T00:00:00.000Z", totalAnnual: 720000, byBucket: { Housing: 360000, Food: 180000, Other: 180000 }, fireNumber: 80000000, netWorth: 11000000 },
+      { period: "2025-05", fy: "2025-26", capturedAt: "2025-05-31T00:00:00.000Z", totalAnnual: 744000, byBucket: { Housing: 360000, Food: 200000, Other: 184000 }, fireTargetYear: 2050 },
+    ];
+    const put = await app.request("/api/planner/expense-history", { method: "PUT", headers: H, body: JSON.stringify(snapshots) });
+    expect(put.status).toBe(200);
+    const body: any = await (await app.request("/api/planner/expense-history", { headers: H })).json();
+    expect(body.data, "expense-history snapshots round-trip deep-equal").toEqual(snapshots);
+  });
 });
