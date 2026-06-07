@@ -87,10 +87,24 @@ events/lessons so future runs (and Abhay) can learn from this one.
 >    blocker / halt; and the final result. **Terse summaries, not detail dumps** — a heartbeat + a
 >    learning trail, never a transcript.
 > 4. **Entry format:** `[YYYY-MM-DD HH:MM] <STAGE|PROGRESS|DEFECT|EVENT|DECISION|RECOVERY|BLOCKER|DONE> — <≤2-line summary>` (get the time with `date "+%Y-%m-%d %H:%M"`).
-> 5. **At run-end, roll the durable learning into COMMITTED homes** (the `.run/` log is ephemeral — it
->    is cleaned with the worktree): summarize the major defects/events/lessons into the run's committed
->    final report, and append any notable error→fix→lesson (with a gate-gap line) to
->    `.claude/tasks/lessons.md` — so the lesson outlives this run.
+> 5. **At run-end, DERIVE learnings from the log and route them by scope — the self-improvement
+>    fold-back, so the same mistake is not repeated next run.** The `.run/` log is ephemeral (cleaned
+>    with the worktree), so the durable output goes to committed homes, routed 3-way (generalize-first):
+>    - **AUTO (only this — low-risk):** append each notable error→fix→lesson to `.claude/tasks/lessons.md`
+>      with a **gate-gap line** (which gate should have caught it + closed-by-hook-or-prose), after a
+>      **dedup check** (grep first — never re-add an existing lesson). `lessons.md` is the designated ledger.
+>    - **PROPOSE (never auto — needs Abhay's approval):** in the run's COMMITTED final report, write a
+>      **"LEARNINGS TO FOLD BACK"** section routing every remaining learning by scope:
+>      (a) **reusable process** (any goal would hit it) → propose lifting it into
+>      `.claude/skills/goal-creator/references/baked-in-rules.md` / the skill, and — per the gate-gap
+>      lesson (prose doesn't prevent recurrence; a hook/CI test does) — prefer a **deterministic gate**
+>      (hook / CI test / run-profile) over prose where one fits;
+>      (b) **goal-type** (this class of goal) → propose a `contract-template.md` edit;
+>      (c) **goal-specific** (only this contract) → propose the edit to THIS contract.
+>    - **The run NEVER edits its own contract, the skill, or a rule** (cardinal-rule-5 + behaviour rule 5
+>      — governance edits need approval). It only PROPOSES. Applying the fold-back is a deliberate
+>      post-run `goal-creator` **Mode B** action on Abhay's approval, and the next interactive turn ends
+>      with the offer *"want me to fold these learnings into the goal/skill so the next run avoids them?"*
 >
 > Example:
 > ```

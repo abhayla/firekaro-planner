@@ -136,6 +136,15 @@ Produce a closing report containing: commit SHAs + per-stage gate results; Rule 
 per screen + PNG paths; Rule 25 verdict per write path; Rule 26 cross-page result; a11y +
 Lighthouse summary; DoD green/amber/red tally; any DEFERRED entries with rule status + reason.
 
+Plus a **LEARNINGS TO FOLD BACK** section (derived from the §0.3 progress log) — the
+self-improvement loop. Route each learning by scope, generalize-first, as PROPOSALS for Abhay
+(never auto-applied — governance edits need approval): **(a) reusable process** → propose into
+`goal-creator` baked-in-rules/skill, preferring a hook/CI/run-profile gate over prose; **(b)
+goal-type** → propose into `contract-template.md`; **(c) goal-specific** → propose into THIS
+contract. Auto-append only the one-line error→fix→lesson (with a gate-gap line, after a dedup
+check) to `.claude/tasks/lessons.md`. The next interactive turn offers to apply the fold-back
+via `goal-creator` Mode B.
+
 ---
 
 ## <N+4>. Guardrails (hard stops)

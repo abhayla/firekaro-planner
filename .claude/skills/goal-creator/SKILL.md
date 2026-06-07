@@ -21,7 +21,7 @@ description: >
 type: workflow
 allowed-tools: "Read Write Edit Grep Glob Bash"
 argument-hint: "[one-line description of the goal, optional]"
-version: "1.1.0"
+version: "1.2.0"
 ---
 
 # Goal Creator
@@ -225,6 +225,35 @@ The skill's deliverable is the contract file and the invocation line — nothing
 
 ---
 
+## Mode B: Fold run learnings back (post-run self-improvement loop)
+
+The above (STEP 0–5) is **Mode A — author a contract**. **Mode B folds a COMPLETED run's learnings
+back** into the goal/skill so the same mistake isn't repeated — the self-improvement loop. Use it when
+a `/goal` run has finished and Abhay wants its learnings applied, OR proactively **offer it at the end
+of any session where a run just completed**. NEVER mid-run (cardinal rule 5 — the in-flight run already
+loaded its contract).
+
+1. **Read the run's learnings** — its `docs/goals/.run/<slug>-PROGRESS.md` (the §0.3 log: defects,
+   "X not working + what I did" events, decisions, recoveries) **and** the committed final report's
+   **"LEARNINGS TO FOLD BACK"** section.
+2. **Route each learning by scope (3-way, generalize-first):**
+   - **(a) reusable process** (any goal would hit it) → `references/baked-in-rules.md` / the skill,
+     and — per the `lessons.md` gate-gap lesson — prefer a **deterministic gate** (hook / CI test /
+     run-profile) over prose where one fits;
+   - **(b) goal-type** (this class of goal) → `references/contract-template.md`;
+   - **(c) goal-specific** (only this contract) → that contract.
+3. **Dedup** — grep the target home before adding; skip anything already covered. Split by the
+   "would another goal hit this?" test.
+4. **PROPOSE, then apply on approval.** These are skill/rule/contract = governance edits (rule 5) →
+   show Abhay the concrete diffs and apply ONLY on his go-ahead. The one-line `lessons.md` entry the
+   run already auto-appended needs no re-approval.
+5. **Honor cardinal rule 5** — if the target contract may be re-run, prefer generalizing (a/b) or a
+   delta; edit a specific contract in place only when Abhay confirms it is safe.
+6. **End with the offer** if it wasn't the trigger: *"Want me to fold these learnings into the
+   goal/skill so the next run avoids them?"*
+
+---
+
 ## CRITICAL RULES
 
 - **NEVER invoke `/goal` and NEVER commit.** Author the contract, print the invocation
@@ -240,6 +269,11 @@ The skill's deliverable is the contract file and the invocation line — nothing
   defect / "something not working + what you did" event / decision / recovery / blocker, so any
   other session can track the run live (`git worktree list` → read the log), and the major
   events/lessons roll into the committed final report + `.claude/tasks/lessons.md` at run-end.
+- **Mode B (fold-back) only PROPOSES skill/rule/contract edits for Abhay's approval** (governance,
+  rule 5); the only auto-write is the one-line `lessons.md` entry. Route learnings 3-way
+  (reusable→skill/rules+gate · goal-type→template · goal-specific→contract), generalize-first, dedup
+  before adding, and end with the offer to fold them in. NEVER fold back into a contract that may be
+  running (cardinal rule 5) — generalize or write a delta instead.
 - **Interview-first, one question at a time, each with a recommended answer**, until every
   fork is resolved. The contract must be zero-user-input.
 - **Every contract bakes in rules 24, 25, 26, 15, 17, 20, 23 + the failure-recovery budget
