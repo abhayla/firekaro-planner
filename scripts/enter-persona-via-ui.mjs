@@ -150,6 +150,106 @@ const PERSONAS = {
     fireAge: [40, 68],
     crud: null,
   },
+
+  // ── Persona #3: IYERS — late-30s sandwich-gen (2 earners + 2 kids + 2 dependent parents). ──
+  // Mapped from src/seeds/iyers.ts. No business, no other-income; ~₹2.5Cr corpus incl. EPF.
+  iyers: {
+    householdName: "The Iyer Family",
+    setupMode: "Couple+Children",
+    earners: [
+      { name: "Ashwin", dob: "1988-06-15", retire: 55, planTo: 90, ctc: 3500000, hike: 10, vpf: 0, basic: 1400000, nps: 0, sector: "private" },
+      { name: "Lakshmi", dob: "1990-06-15", retire: 55, planTo: 90, ctc: 800000, hike: 8, vpf: 0, basic: 320000, nps: 0, sector: "private" },
+    ],
+    dependents: [
+      { name: "Ananya", dob: "2016-06-15", relation: "Daughter", edu: "Primary" },
+      { name: "Rohan", dob: "2018-06-15", relation: "Son", edu: "Primary" },
+      { name: "Ramesh (father)", dob: "1958-06-15", relation: "Father" },
+      { name: "Sudha (mother)", dob: "1961-06-15", relation: "Mother" },
+    ],
+    INVESTMENTS: [
+      { type: "EPF · VPF (auto)", value: 6000000, owner: "Ashwin", epf: true, vpf: 0 },
+      { type: "EPF · VPF (auto)", value: 1600000, owner: "Lakshmi", epf: true, vpf: 0 },
+      { type: "Mutual Funds", label: "Index + Flexi-cap MF", value: 12000000, monthly: 50000, owner: "Ashwin", bucket: "Bucket 3", det: { Units: 120000, "NAV / unit": 100 } },
+      { type: "Mutual Funds", label: "ELSS", value: 2000000, monthly: 12500, owner: "Lakshmi", bucket: "Bucket 3", det: { Units: 20000, "NAV / unit": 100 } },
+      { type: "PPF", label: "Ashwin PPF", value: 1500000, monthly: 12500, owner: "Ashwin", bucket: "Bucket 4", det: { "Account opening year": 2014 } },
+      { type: "NPS", label: "Ashwin NPS T1", value: 800000, monthly: 4200, owner: "Ashwin", bucket: "Bucket 4", det: { "Opening year": 2015 } },
+      { type: "Gold", label: "Sovereign Gold Bonds", value: 500000, owner: "Joint", bucket: "Bucket 3", det: { Grams: 100, "Price/gram": 5000 } },
+      { type: "FD / Bonds", label: "Emergency FD", value: 600000, owner: "Joint", bucket: "Bucket 1", det: { Principal: 600000, "Interest %": 6.5, "Maturity year": 2028, Bank: "SBI" } },
+    ],
+    avgMonthly: 45000,
+    RECURRING: [
+      { label: "Home rent (until home loan ends)", amount: 32000, freq: "Monthly", kind: "General" },
+      { label: "Parents medical + support", amount: 18000, freq: "Monthly", kind: "Parents (sandwich-gen)" },
+      { label: "Kids school fees", amount: 25000, freq: "Monthly", kind: "General" },
+    ],
+    GOALS: [
+      { label: "Ananya's undergrad (Indian Tier-1)", kind: "Education", today: 5000000, year: 2034 },
+      { label: "Rohan's undergrad", kind: "Education", today: 5000000, year: 2036 },
+    ],
+    LOANS: [
+      { name: "Home Loan (SBI)", type: "Home Loan", outstanding: 3600000, emi: 34000, rate: 8.5, owner: "Ashwin", shared: true },
+    ],
+    POLICIES: [
+      { type: "Life", provider: "LIC Term", sum: 20000000, prem: 22000, insured: "Ashwin" },
+      { type: "Health", provider: "Star Family Floater", sum: 1500000, prem: 28000, insured: "Ashwin" },
+      { type: "Health", provider: "Senior Floater (Parents)", sum: 1000000, prem: 45000, insured: "Ramesh (father)" },
+    ],
+    business: null,
+    OTHER_INCOME: [],
+    expected: { members: 6, salaryCTC: 3500000, investments: 8, avgMonthly: 45000, recurring: 3, planned: 2, liabilities: 1, insurance: 3, businesses: 0, otherIncome: 0 },
+    overview: { investments: [[], ["No investments yet"]], expenses: [[], ["No recurring commitments"]], liabilities: [[], []], insurance: [[], []], income: [[], []] },
+    corpus: [23000000, 27000000],
+    fireAge: [45, 70],
+    crud: null,
+  },
+
+  // ── Persona #4: MEHTAS — DINK couple near FIRE (2 earners, NO children, home loan paid off). ──
+  // Mapped from src/seeds/mehtas.ts. ~₹4.5Cr corpus ex-home; RE is the (excluded) primary residence.
+  mehtas: {
+    householdName: "The Mehta Family",
+    setupMode: "Couple",
+    earners: [
+      { name: "Vikram", dob: "1981-06-15", retire: 47, planTo: 90, ctc: 4500000, hike: 6, vpf: 0, basic: 1800000, nps: 0, sector: "private" },
+      { name: "Aanya", dob: "1983-06-15", retire: 48, planTo: 90, ctc: 2800000, hike: 5, vpf: 0, basic: 1120000, nps: 0, sector: "private" },
+    ],
+    dependents: [],
+    INVESTMENTS: [
+      { type: "EPF · VPF (auto)", value: 6500000, owner: "Vikram", epf: true, vpf: 0 },
+      { type: "EPF · VPF (auto)", value: 3800000, owner: "Aanya", epf: true, vpf: 0 },
+      { type: "Stocks", label: "Direct equity (large + mid cap)", value: 8500000, monthly: 50000, owner: "Vikram", holdings: 24, bucket: "Bucket 3", det: { Quantity: 850, "Avg price / share": 10000 } },
+      { type: "Mutual Funds", label: "Mutual fund SIPs (multi-cap)", value: 9200000, monthly: 80000, owner: "Vikram", bucket: "Bucket 3", det: { Units: 92000, "NAV / unit": 100 } },
+      { type: "PPF", label: "PPF (matured + re-extended)", value: 2800000, monthly: 12500, owner: "Vikram", bucket: "Bucket 4", det: { "Account opening year": 2008 } },
+      { type: "PPF", label: "PPF (matured)", value: 2500000, monthly: 12500, owner: "Aanya", bucket: "Bucket 4", det: { "Account opening year": 2009 } },
+      { type: "Real Estate", label: "3BHK Bandra Mumbai", value: 35000000, owner: "Joint", reRole: "Primary residence (excluded from FIRE corpus)", det: { "Purchase year": 2012 } },
+      { type: "Gold", label: "Family gold + SGB", value: 1200000, owner: "Joint", bucket: "Bucket 3", det: { Grams: 240, "Price/gram": 5000 } },
+      { type: "FD / Bonds", label: "Retirement bucket FD", value: 2500000, owner: "Joint", bucket: "Bucket 1", det: { Principal: 2500000, "Interest %": 7, "Maturity year": 2028, Bank: "HDFC" } },
+      { type: "NPS", label: "NPS Tier-I", value: 1800000, monthly: 8000, owner: "Vikram", bucket: "Bucket 4", det: { "Opening year": 2012 } },
+      { type: "ESOP", esopGrant: 8000000, esopVested: 85, label: "Tech company ESOPs", owner: "Vikram", esopExercise: 100, esopFmv: 800 },
+    ],
+    avgMonthly: 162000,
+    RECURRING: [
+      { label: "Society maintenance", amount: 35000, freq: "Monthly", kind: "General" },
+      { label: "Property tax", amount: 45000, freq: "Annual", kind: "General" },
+      { label: "Health insurance premium", amount: 38000, freq: "Annual", kind: "General" },
+    ],
+    GOALS: [
+      { label: "Retirement world tour", kind: "General", today: 1500000, year: 2027 },
+      { label: "Switzerland residency (sabbatical)", kind: "General", today: 2500000, year: 2029 },
+    ],
+    LOANS: [],
+    POLICIES: [
+      { type: "Health", provider: "Apollo Munich Optima Restore", sum: 2500000, prem: 38000, insured: "Vikram" },
+      { type: "Life", provider: "Term cover — HDFC Click2Protect", sum: 50000000, prem: 28000, insured: "Vikram" },
+      { type: "Life", provider: "Term cover — ICICI iProtect", sum: 35000000, prem: 22000, insured: "Aanya" },
+    ],
+    business: null,
+    OTHER_INCOME: [],
+    expected: { members: 2, salaryCTC: 4500000, investments: 11, avgMonthly: 162000, recurring: 3, planned: 2, liabilities: 0, insurance: 3, businesses: 0, otherIncome: 0 },
+    overview: { investments: [[], ["No investments yet"]], expenses: [[], ["No recurring commitments"]], liabilities: [[], []], insurance: [[], []], income: [[], []] },
+    corpus: [42000000, 50000000],
+    fireAge: [44, 60],
+    crud: null,
+  },
 };
 
 const P = PERSONAS[PKEY];
