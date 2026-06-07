@@ -83,7 +83,7 @@ carries ONLY the `whatsappMessageId`; fixed to correlate by that id (commit `996
   non-vacuous: covers >100 files + a positive-fixture regex check). **A full frontend ESLint setup for
   a single invariant is YAGNI** — the targeted guard is the proportionate machine-enforcement. No
   1-word direction needed; resolved.
-- **B6. #32 rental-tax migration — 🚦 deploy-gate (Abhay).** The migration
+- **B6. #32 rental-tax migration — ✅ DONE (applied to prod; live in the box's 9 migrations, confirmed 2026-06-07).** The migration
   `server/prisma/migrations/20260605120000_rental_24b_fields/` adds two nullable columns
   (`homeLoanInterest`, `municipalTaxes`) to `OtherIncomeLine`. It MUST be applied to Supabase via
   `cd server && npm run prisma:migrate:deploy` **BEFORE** the #32 code deploys to prod — otherwise the
@@ -92,7 +92,7 @@ carries ONLY the `whatsappMessageId`; fixed to correlate by that id (commit `996
   the backend live-DB integration spec (`server/src/routes/planner.integration.spec.ts`) fails locally
   with P2022 against a not-yet-migrated DB; it auto-skips on CI (no `DATABASE_URL`), so CI stays green.
 
-- **B7. #46 temporal-contributions migration — 🚦 deploy-gate (Abhay).** The migration
+- **B7. #46 temporal-contributions migration — ✅ DONE (applied to prod 2026-06-07, deploy SHA `d04571c`; smoke green, schema up to date at 10 migrations).** The migration
   `server/prisma/migrations/20260606120000_add_investment_contribution_schedule/` adds ONE nullable
   `contributionSchedule JSONB` column to `Investment` (the time-varying contribution plan; merged to
   `main` @ `c7c70a5`, authored-not-applied per the goal contract). It is applied **automatically** by

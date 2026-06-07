@@ -14,14 +14,16 @@
 
 ## §1 — Goal status (keep current)
 
-**Updated: 2026-06-06.**
+**Updated: 2026-06-07.**
 - **Goal (SSOT `docs/v6-fire-planner-product-plan.md` §9):** research-grounded Indian FIRE planning
   SaaS — correct, honest, sticky, friction-free — serving the **urban salaried accumulator** across
   the whole FIRE lifecycle (5 objectives: effortless setup · honest number · get-there-faster ·
   readiness-to-stop · stay-free-post-FIRE).
-- **Realization: ~30–40%.** Production-live (https://firekaro.com since 2026-06-01); the
-  **correctness/honesty foundation (objective 1) is the strong win**; objectives 0/2/3/4 are
-  partial-to-early; **stickiness is unproven (zero retained users, retention unmeasured).**
+- **Realization: ~55–60%.** Production-live (https://firekaro.com); the must-have **accumulation
+  core — objectives 0, 1, 2, 3 — is now built AND deployed to prod** (deploy 2026-06-07, SHA
+  `d04571c`; #48/#51/#52 closed). **Remaining: objective 4** (post-FIRE decumulation guardrails,
+  **#50** — the last unbuilt must-have) **plus stickiness is still unproven** (zero retained users,
+  retention unmeasured).
 - Calling the goal "achieved" would be the optimism-error the honesty mandate exists to prevent.
 
 ---
@@ -103,6 +105,22 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 ## §3 — Decision log (append-only, newest first)
 
 ### 2026-06-07
+- **D-2026-06-07-02 — DEPLOYED the must-have accumulation core (obj-1/2/3) to production.** Abhay
+  authorized + sequenced the deploy (run obj-4 #50 in a parallel `/goal` session; deploy obj-1/2/3
+  here). Shipped pinned `main` SHA `d04571c` to the VPS (`git archive | ssh tar` — private repo, the
+  box isn't a git checkout), rebuilt the SPA, applied the one pending migration **B7**
+  (`contributionSchedule` JSONB — additive nullable, the only schema change; B6 rental-tax was already
+  live in the box's 9), `pm2 reload firekaro-api` zero-downtime. Pre-deploy code backup
+  `firekaro-backup-predeploy-d04571c-*.tgz` on the box. **Smoke green:** `/api/internal/smoke`
+  {ok, db connected, user.count:3, 125ms}, `/api/health` ok, schema up to date (10 migrations),
+  homepage + `/fire-goals/readiness` 200, and obj-1/2/3 surface copy confirmed in the freshly-built
+  live bundle. **#48/#51/#52 closed (completed AND deployed).** *Backup note:* Supabase free tier has
+  no on-demand PITR; the additive-nullable migration is trivially reversible (`DROP COLUMN`) + daily
+  auto-backup covers it — proceeded on that risk assessment. *Deferred → Tier-2 on-demand:*
+  authenticated UI **functional** verification on prod (needs the dedicated test-account Google
+  session; `testing-strategy.md`). **Registry now: must-have = #50 OPEN only** (obj-4, building in the
+  parallel session). #50's deploy still needs: merge `feat/decumulation-guardrails`→`main` +
+  independent verify (rule 29/33) + a second (migration-free) deploy.
 - **D-2026-06-07-01 — Completed the must-have GitHub-issue registry (filed #50/#51/#52); affirmed
   obj-3/4 as must-have.** At Abhay's request ("find the goal's must-have features; if not logged as
   issues, file them — do not implement yet"), audited the full-lifecycle goal (§9, all 5 objectives)
