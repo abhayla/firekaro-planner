@@ -8,7 +8,8 @@ globs: ["e2e/tests/**/*.spec.ts", "src/pages/**/*.vue", "src/components/**/*.vue
 ## SSOT: GitHub Issues, not files
 
 All bugs in this repo are tracked **only** in GitHub Issues
-(`https://github.com/abhayla/FIREKaro-Vue/issues`). MUST NOT create any
+(`https://github.com/abhayla/firekaro-planner/issues` — this standalone repo's
+own tracker, NOT the retired `FIREKaro-Vue` monorepo). MUST NOT create any
 markdown bug doc under `docs/bugs/` or anywhere else in the repo —
 that folder no longer exists and re-creating it is forbidden. The
 single-source-of-truth invariant means a fix's commit message can
