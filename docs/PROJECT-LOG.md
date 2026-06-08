@@ -126,6 +126,20 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 ## §3 — Decision log (append-only, newest first)
 
 ### 2026-06-08
+- **D-2026-06-08-10 — Remove the redundant "Banking" screen → filed gh #71 (`good-to-have`,
+  area:financial-health/IA, analysis-only).** Abhay: *"why is there a Banking screen at all? clicking 'open
+  holding' takes me to the holdings screen where I enter the details — what's the use of Banking?"* **Verdict:
+  he's right — `/financial-health/banking` (`Banking.vue`) is a value-less read-only re-list, redundant on
+  BOTH ends:** (1) it has zero data entry — FD/Cash entries are created on Investments → Holdings (its own
+  empty-state CTA literally routes there); (2) the liquidity *concept* is already owned, with more value
+  (months-of-burn coverage + 6-month target + gap + adequacy), by the adjacent **Emergency Fund** screen,
+  which uses the SAME `isEmergencyFundEligible` filter. Banking shows a strict subset, minus the math. Root
+  cause: vestigial IA from the retired tax-tracker monorepo (v6 has no bank-account data model — "no bank
+  connections"). Fork → **Option A REMOVE** (recommended); B repurpose-into-bank-manager rejected (contradicts
+  v6 scope); C leave rejected. Tiered `good-to-have` (app works today; not a correctness/honesty regression,
+  so not must-have; but a real IA-friction/clarity fix for objective-0 setup, above nice-to-have). Clean
+  removal: exactly 4 refs (route/page/sidebar/cmdk), no tests/redirects depend on it. **Analysis-only — NOT
+  implemented.** Pointer: gh #71.
 - **D-2026-06-08-09 — Smart cross-link real-estate holding ⇄ rental income (stop double data-entry, both
   directions) → filed gh #70 (`good-to-have`, area:data-entry-ux, analysis-only).** Abhay: a property is
   often both an asset (holding) and a rental-income source, but must be entered twice with no link — the
