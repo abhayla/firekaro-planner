@@ -245,6 +245,15 @@ dedicated note below). Research-grounded math: 4-bucket inflation, per-instrumen
 horizon-driven SWR, variant multipliers, glide path, Floor/Ceiling withdrawal, Monte Carlo
 confidence bands. Keep modules pure (no store/DOM access).
 
+The later-lifecycle + stickiness layers (the 5 objectives, `docs/v6-fire-planner-product-plan.md` §9)
+also live here: `fire-confidence-band.ts` (obj-1 honesty — FIRE date as a band), `contribution-schedule.ts`
+(ADR-0004 temporal contributions), `lever-catalog.ts` + `lever-bands.ts` + `lever-impact.ts` (obj-2
+"get there faster" — per-lever FIRE-date-delta ranking, #48), `readiness.ts` (obj-3 "is it safe to
+stop?"), `decumulation.ts` (obj-4 post-FIRE guardrails), and the **member model + app-wide lens** layer
+`member-earning.ts` + `member-draft.ts` + `member-horizon.ts` (`Member.role` is DERIVED from income, not
+stored; the orthogonal "View as &lt;member&gt;" lens screens member-attributable values app-wide while
+keeping household-solvency ratios coherent — #66/#67, see `docs/goals/2026-06-08-member-model-coherence-and-app-wide-lens.md`).
+
 **Accessible-money bridge (honesty layer, #13/#14/#15 — `derive()` consumes it):** corpus ≥ FIRE
 number does NOT mean retire-ready — locked money (PPF maturing at 60, NPS forced into an annuity on
 early exit) can leave LIQUID money short in the early years. `bridge.ts` (`computeBridgeCoverage`)
