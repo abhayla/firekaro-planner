@@ -126,6 +126,22 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 ## §3 — Decision log (append-only, newest first)
 
 ### 2026-06-08
+- **D-2026-06-08-07 — Family-member ↔ separate-login identity reconciliation: NOT handled, architecturally
+  impossible today → filed gh #68 (`good-to-have`, area:auth-identity, analysis-only).** Abhay's scenario: he
+  adds family members (data records); one member later logs in with their own Google account and re-enters
+  data → the same person now exists in two disconnected tenants with no link/dedup. **Honest verdict
+  (verified):** v6 is single-tenant (ADR-0001) — a member is a `Member` data record owned by one `userId`,
+  with NO `email`/`linkedUserId`/`User` relation (`@@unique([userId,entityId])`, unique per-owner) and NO
+  family/invite/link/merge routes. So the system cannot even detect the two are the same person — by
+  deliberate v6 design (the retired FIREKaro-Vue `Family/FamilyUser/Invitation` multi-user schema was NOT
+  carried over). **NOT a math bug** — the planner's FIRE number reads only its own household, so a member's
+  separate account doesn't corrupt it; harm is data-architecture/SSOT + redundant entry + confusion → not
+  Tier-0. **Tiered `good-to-have`** (goal-anchored: wedge persona = single planner models the household;
+  works without multi-user login; **escalates to must-have IF separate family-member login/invitations are
+  offered**). Identity key MUST be the verified Google **email** (only reliable cross-tenant key).
+  Recommended path (A): keep single-planner households + capture optional member email NOW (cheap
+  future-proofing, YAGNI "cheaper now than retrofit") + clearly communicate members≠logins; defer full
+  multi-user invite/merge (B/C) until greenlit. Implementation gated. Pointer: gh #68.
 - **D-2026-06-08-06 — Member earner-derivation (gh #67) re-tiered `good-to-have` → `must-have`.** Abhay
   overrode my D-04 tiering: "recategorize it to must-have." Rationale he's anchoring to: the member
   earner/non-earner model is a **foundational data-model contract** on the income path that feeds the FIRE
