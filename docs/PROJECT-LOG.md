@@ -126,6 +126,20 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 ## §3 — Decision log (append-only, newest first)
 
 ### 2026-06-08
+- **D-2026-06-08-09 — Smart cross-link real-estate holding ⇄ rental income (stop double data-entry, both
+  directions) → filed gh #70 (`good-to-have`, area:data-entry-ux, analysis-only).** Abhay: a property is
+  often both an asset (holding) and a rental-income source, but must be entered twice with no link — the
+  forms should offer the reciprocal entry. **Verdict: agreed, and architecturally cheap** — the app already
+  has all 3 hooks: the link field (`otherIncomeLine.sourceEntityId`, business-only today), the auto-flow
+  pattern (`autoFlow{EMI,Insurance,Salary}` keyed by `source`+`sourceRefId`, strip/regenerate), and the
+  `realEstateRole==='Investment'` (let-out) signal. So it's an extension of the shipped auto-flow pattern,
+  not new architecture. **Design musts:** link not copy (reuse `sourceRefId`, e.g. `source:"auto-realestate"`);
+  always optional (PrimaryResidence/untracked-source cases); one canonical direction (holding=parent);
+  **NOT a double-count** (value→corpus vs rent→income are distinct — contrast SIP #11) — verify cross-create
+  doesn't inflate corpus inflow; §24 rental tax stays on the income line. **Tiered `good-to-have`**
+  (goal-anchored: strong obj-0 "effortless setup" + 5W-#3 automate-don't-re-ask fit, but product works with
+  manual double-entry and it's not a correctness/honesty error → not must-have/Tier-0; friction band of the
+  Now-order). Top good-to-have. Implementation gated. Pointer: gh #70.
 - **D-2026-06-08-08 — Stale validation errors after a SUCCESSFUL inline Add → filed gh #69 (`bug`,
   `good-to-have`, cross-cutting forms).** Abhay reported (prod): on `/liabilities/loans`, after clicking
   **Add loan** the loan IS added + persists, but the cleared **Loan name** field shows "Name is required".
