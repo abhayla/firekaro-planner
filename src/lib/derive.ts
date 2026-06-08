@@ -14,6 +14,8 @@
  */
 import { isAdultRole, type Household, type OtherIncomeLine } from "@/types/household";
 import { isEarningMember } from "@/lib/member-earning";
+import { expenseOwnerMatches, EXPENSE_OWNER_HOUSEHOLD } from "@/lib/expense-attribution";
+import { computeIndividualFire } from "@/lib/individual-fire";
 import type { Assumptions } from "@/types/assumptions";
 import {
   calculateFIRENumber,
@@ -138,6 +140,30 @@ export function derive(household: Household, assumptions: Assumptions, lens: Der
   // via computeScope below, so adding these does not move the headline (#23 split preserved).
   const lensedBusinesses = household.businesses.filter((b) => ownerMatches(b.ownerId));
   const lensedOtherIncome = household.otherIncome.filter((o) => ownerMatches(o.ownerId));
+
+  // #81 Phase 1: member-attributable itemised-expense DISPLAY collections (mirror of
+  // lensedInvestments). A lensed adult sees their OWN itemised lines + the always-shared
+  // "Household" lines (lib/expense-attribution → expenseOwnerMatches, keyed on "Household"
+  // not "Joint"); the consolidated (no-lens) view sees everything. The `avgMonthly` lump is
+  // un-itemisable → always Household → visible in both. CRUCIAL: this is DISPLAY-only — the
+  // FIRE/household total still reads the WHOLE household via `annualExpensesToday`
+  // (householdScope) below, so the headline stays invariant to member selection (contract §2
+  // decision 7 / the #22/#23 honesty guardrail). On the default lens these equal the full
+  // lists + `totalMonthlyExpenses` byte-for-byte.
+  const expenseLensMatches = (ownerId: string | undefined): boolean =>
+    expenseOwnerMatches(ownerId ?? EXPENSE_OWNER_HOUSEHOLD, applyMemberLens, lensedMemberIds);
+  const lensedRecurringExpenses = household.expenses.recurring.filter((r) =>
+    expenseLensMatches(r.ownerId),
+  );
+  const lensedPlannedExpenses = household.expenses.plannedFuture.filter((p) =>
+    expenseLensMatches(p.ownerId),
+  );
+  const lensedMonthlyExpenses =
+    household.expenses.avgMonthly +
+    lensedRecurringExpenses.reduce(
+      (s, r) => s + toMonthly({ amount: r.amount, period: r.frequency }),
+      0,
+    );
 
   // #23 ROOT FIX: FIRE adequacy is inherently HOUSEHOLD — the family funds one shared corpus and
   // retires together — so an EXPLICIT member drill-down must NOT move the FIRE number/corpus/savings/
@@ -720,6 +746,33 @@ export function derive(household: Household, assumptions: Assumptions, lens: Der
   const progressPercent =
     fireNumber <= 0 ? 0 : Math.min(100, Math.round((fireWithdrawableCorpus / fireNumber) * 100));
 
+  // #81 Phase 2: the canonical HOUSEHOLD FIRE age (anchor + ceil(years-to-FIRE)) — the SINGLE
+  // source every surface displays, so FireHero, the individual-FIRE card, and any future consumer
+  // never disagree (the round-vs-ceil 56/57 drift the rule-33 verifier caught). null when FIRE is
+  // unreachable within the horizon.
+  const householdFireAge = Number.isFinite(yearsToRegular)
+    ? anchorAge + Math.ceil(yearsToRegular)
+    : null;
+
+  // #81 Phase 2: standalone individual FIRE per ADULT — a clearly-caveated SECONDARY view. The
+  // household fireNumber/yearsToRegular above stay the PRIMARY, decision-driving figures and are
+  // INVARIANT to member selection (this block only ADDS; it never feeds the household path). The
+  // gap = household annual expenses − Σ(adults' attributable expenses) = the dependents' costs
+  // (ring 3) + any unsplit remainder — surfaced so the individual numbers are never misread as
+  // "the family can stop". computeIndividualFire owns the attribution (single canonical helper).
+  const individualFireByMember = members
+    .filter((m) => isAdultRole(m.role))
+    .map((m) => computeIndividualFire(household, assumptions, m.id, lens.currentFY))
+    .filter((r): r is NonNullable<ReturnType<typeof computeIndividualFire>> => r != null);
+  const sumAdultAttributableExpenses = individualFireByMember.reduce(
+    (s, r) => s + r.attributableAnnualExpenses,
+    0,
+  );
+  const individualFireExpenseGapAnnual = Math.max(
+    0,
+    Math.round(householdScope.annualExpensesToday - sumAdultAttributableExpenses),
+  );
+
   return {
     applyMemberLens,
     lensedMembers,
@@ -729,6 +782,10 @@ export function derive(household: Household, assumptions: Assumptions, lens: Der
     lensedInsurance,
     lensedBusinesses,
     lensedOtherIncome,
+    // #81 Phase 1 — member-attributable expense DISPLAY (display-only; FIRE total unchanged).
+    lensedRecurringExpenses,
+    lensedPlannedExpenses,
+    lensedMonthlyExpenses,
     anchorAge,
     targetRetirementAge,
     annualExpensesToday,
@@ -788,6 +845,12 @@ export function derive(household: Household, assumptions: Assumptions, lens: Der
     // annualIncome.total / annualTax and nothing changes.
     householdAnnualIncome: householdScope.annualIncome.total,
     householdAnnualTax: householdScope.annualTax,
+    // #81 Phase 2 — standalone individual FIRE per adult + the household−Σ(adults) gap (display-only).
+    individualFireByMember,
+    individualFireExpenseGapAnnual,
+    // Canonical household FIRE age (anchor + ceil(years)); null if unreachable. One source for
+    // every surface (FireHero, the individual-FIRE card) so the displayed age never diverges.
+    householdFireAge,
   };
 }
 

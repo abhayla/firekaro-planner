@@ -2,14 +2,24 @@
 import { computed, ref, watch } from "vue";
 import { useHouseholdStore } from "@/stores/household";
 import { useAssumptionsStore } from "@/stores/assumptions";
+import { useFireDerive } from "@/lib/useFireDerive";
 import { formatINRCompact } from "@/lib/formatters";
 import type { PlannedFutureLine, PlannedFutureKind, InflationBucket } from "@/types/household";
+import { expenseOwnerLabel, EXPENSE_OWNER_HOUSEHOLD } from "@/lib/expense-attribution";
 import EmptyState from "@/components/shared/EmptyState.vue";
 import PanelCard from "@/components/shared/PanelCard.vue";
 import EntityRow from "@/components/shared/EntityRow.vue";
+import ExpenseOwnerSelect from "@/components/expenses/ExpenseOwnerSelect.vue";
 
 const household = useHouseholdStore();
 const assumptions = useAssumptionsStore();
+// #81 Phase 1 — the displayed list is the KERNEL's member-lensed planned set (single source
+// of the lens; household total unchanged). Selected adult → own + shared Household; else all.
+const fire = useFireDerive();
+const showOwnerChip = computed(() => household.data.members.length > 1);
+const visiblePlanned = computed(() => fire.lensedPlannedExpenses.value);
+const ownerLabelFor = (p: PlannedFutureLine): string =>
+  expenseOwnerLabel(p.ownerId, household.data.members);
 
 // v5 P4 (A6.5/A10.3) — goal kind → inflation-bucket routing (mirrors
 // RecurringExpenseForm). Selecting a non-general kind auto-routes the bucket so
@@ -29,6 +39,7 @@ const plannedDraft = ref<{
   durationYears: number;
   kind: PlannedFutureKind;
   inflationBucket: InflationBucket;
+  ownerId: string;
 }>({
   label: "",
   todayAmount: null,
@@ -37,6 +48,7 @@ const plannedDraft = ref<{
   durationYears: 4,
   kind: "general",
   inflationBucket: "general",
+  ownerId: EXPENSE_OWNER_HOUSEHOLD,
 });
 
 watch(
@@ -75,6 +87,7 @@ function addPlanned() {
     durationYears: plannedDraft.value.isMultiYear ? plannedDraft.value.durationYears : undefined,
     kind: plannedDraft.value.kind,
     inflationBucket: plannedDraft.value.inflationBucket,
+    ownerId: plannedDraft.value.ownerId,
   });
   plannedDraft.value = {
     label: "",
@@ -84,6 +97,7 @@ function addPlanned() {
     durationYears: 4,
     kind: "general",
     inflationBucket: "general",
+    ownerId: EXPENSE_OWNER_HOUSEHOLD,
   };
 }
 
@@ -94,7 +108,7 @@ const showEdit = computed({
   set: (v) => { if (!v) editing.value = null; },
 });
 function startEdit(row: PlannedFutureLine) {
-  editing.value = { ...row, kind: row.kind ?? "general" };
+  editing.value = { ...row, kind: row.kind ?? "general", ownerId: row.ownerId ?? EXPENSE_OWNER_HOUSEHOLD };
 }
 function saveEdit() {
   if (!editing.value) return;
@@ -109,6 +123,7 @@ function saveEdit() {
     durationYears: editing.value.isMultiYear ? editing.value.durationYears : undefined,
     kind,
     inflationBucket: bucket,
+    ownerId: editing.value.ownerId ?? EXPENSE_OWNER_HOUSEHOLD,
   });
   editing.value = null;
 }
@@ -149,6 +164,10 @@ function saveEdit() {
             <v-icon icon="mdi-plus" />
           </v-btn>
         </v-col>
+        <!-- #81 Phase 1 — member attribution owner picker (hidden when solo). -->
+        <v-col cols="12" md="4">
+          <ExpenseOwnerSelect v-model="plannedDraft.ownerId" />
+        </v-col>
       </v-row>
       <div
         v-if="plannedDraft.todayAmount && plannedDraft.targetYear"
@@ -160,11 +179,11 @@ function saveEdit() {
       </div>
     </PanelCard>
 
-    <template v-if="household.data.expenses.plannedFuture.length">
+    <template v-if="visiblePlanned.length">
       <div class="section-eyebrow">Your planned expenses</div>
       <PanelCard>
         <EntityRow
-          v-for="p in household.data.expenses.plannedFuture"
+          v-for="p in visiblePlanned"
           :key="p.id"
           :title="p.label"
           :value="formatINRCompact(p.todayAmount)"
@@ -174,6 +193,16 @@ function saveEdit() {
             <v-icon icon="mdi-calendar-star-outline" color="primary" />
           </template>
           <template #meta>
+            <v-chip
+              v-if="showOwnerChip"
+              size="x-small"
+              variant="tonal"
+              color="primary"
+              class="mr-1"
+              data-testid="planned-owner-chip"
+            >
+              {{ ownerLabelFor(p) }}
+            </v-chip>
             {{ p.isMultiYear ? `${p.durationYears} yrs from ${p.targetYear}` : `One-time in ${p.targetYear}` }}
             · inflates to ~{{ formatINRCompact(inflatedAt(p.todayAmount, p.targetYear)) }}
           </template>
@@ -218,6 +247,9 @@ function saveEdit() {
             </v-col>
             <v-col cols="6" md="3" v-if="editing.isMultiYear">
               <v-text-field v-model.number="editing.durationYears" type="number" label="Years" density="comfortable" />
+            </v-col>
+            <v-col cols="12" md="6">
+              <ExpenseOwnerSelect v-model="editing.ownerId" density="comfortable" />
             </v-col>
           </v-row>
           <div

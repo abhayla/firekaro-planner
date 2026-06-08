@@ -1,12 +1,24 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { useHouseholdStore } from "@/stores/household";
+import { useUiStore } from "@/stores/ui";
 import { useFireDerive } from "@/lib/useFireDerive";
 import { formatINRCompact, formatPercent } from "@/lib/formatters";
 import PanelCard from "@/components/shared/PanelCard.vue";
+import MemberLensBadge from "@/components/shared/MemberLensBadge.vue";
 
 const household = useHouseholdStore();
+const ui = useUiStore();
 const fire = useFireDerive();
+
+// #81 Phase 3: Reports follows the FIRE pattern — the HOUSEHOLD report stays primary + the default
+// (byte-identical), and when an adult is selected a clearly-labelled member section is ADDED (their
+// standalone individual FIRE + same-scope income/expenses/net worth from the resolver). The household
+// FIRE number stays the decision-driving figure.
+const fh = computed(() => fire.memberFinancials.value);
+const selectedAdult = computed(
+  () => fire.individualFireByMember.value.find((r) => r.memberId === ui.viewingMemberId) ?? null,
+);
 
 const today = computed(() => new Date().toLocaleDateString("en-IN", { dateStyle: "long" }));
 
@@ -23,8 +35,31 @@ function printReport() {
         <h1 class="page-title-xl font-display">Health Report</h1>
         <div class="text-caption text-medium-emphasis font-mono mt-1">{{ today }}</div>
       </div>
-      <v-btn variant="outlined" prepend-icon="mdi-printer" @click="printReport">Print</v-btn>
+      <div class="d-flex align-center ga-2 no-print">
+        <MemberLensBadge />
+        <v-btn variant="outlined" prepend-icon="mdi-printer" @click="printReport">Print</v-btn>
+      </div>
     </div>
+
+    <PanelCard
+      v-if="selectedAdult"
+      :title="`${selectedAdult.name}'s personal slice`"
+      icon="mdi-account-eye-outline"
+      icon-color="primary"
+      class="mb-4"
+      data-testid="report-member-section"
+    >
+      <div class="report-row"><span>Personal FIRE number</span><span class="text-currency">{{ formatINRCompact(selectedAdult.individualFireNumber) }}</span></div>
+      <div class="report-row"><span>Personal FIRE age</span><span class="font-mono">{{ Number.isFinite(selectedAdult.individualFireAge) ? selectedAdult.individualFireAge : "not within horizon" }}</span></div>
+      <div class="report-row"><span>Their income (incl. their split of shared)</span><span class="text-currency">{{ formatINRCompact(fh.annualIncome) }}</span></div>
+      <div class="report-row"><span>Their expenses (own + their split of shared)</span><span class="text-currency">{{ formatINRCompact(fh.annualExpenses) }}</span></div>
+      <div class="report-row"><span>Their net worth (own + Joint)</span><span class="text-currency">{{ formatINRCompact(fh.netWorth) }}</span></div>
+      <v-alert type="info" variant="tonal" density="compact" class="mt-2">
+        This is {{ selectedAdult.name }}'s own slice (excludes the children + half of shared). The
+        <strong>household FIRE ({{ formatINRCompact(fire.fireNumber.value) }})</strong> below is the
+        decision-driving number for when the family can stop.
+      </v-alert>
+    </PanelCard>
 
     <PanelCard title="Household" icon="mdi-account-group" icon-color="primary" class="mb-4">
       {{ household.data.name || "Your household" }} — {{ household.members.length }} members ({{ household.earners.length }} earners)

@@ -16,6 +16,7 @@ import { derive, bridgeRentalPostTaxAnnual, SEC_24A_DEDUCTION_RATE, SEC_71_HP_LO
 import type { OtherIncomeLine } from "@/types/household";
 import { calculateNpsWithdrawal, postTaxAnnuityIncome } from "@/lib/nps-withdrawal";
 import { calculateYearsToTarget, calculateFIRENumber } from "@/lib/fire-math";
+import { toMonthly } from "@/lib/cashflow";
 
 describe("derive() — pure kernel", () => {
   beforeEach(() => setActivePinia(createPinia()));
@@ -257,6 +258,98 @@ describe("derive() — pure kernel", () => {
       expect(lensed.totalCorpus, `corpus invariant under lens=${memberId}`).toBe(whole.totalCorpus);
       expect(lensed.annualSavings, `savings invariant under lens=${memberId}`).toBe(whole.annualSavings);
     }
+  });
+
+  // #81 Phase 1: member-attributable itemised expenses. The lensed expense DISPLAY mirrors
+  // lensedInvestments (member's own + the always-shared "Household"); the consolidated view
+  // shows all; and the HOUSEHOLD expense/FIRE total stays INVARIANT to member selection.
+  it("#81 Phase 1: lensed expenses = member's own + Household; consolidated = all; household total invariant", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    loadSeedPersona(h, a); // rohit + priya (adults) · aarav + meera (dependents)
+    h.addRecurring({ label: "Rohit gym", amount: 3000, frequency: "M", source: "manual", ownerId: "rohit" });
+    h.addRecurring({ label: "Priya yoga", amount: 2500, frequency: "M", source: "manual", ownerId: "priya" });
+    h.addRecurring({ label: "Groceries", amount: 20000, frequency: "M", source: "manual", ownerId: "Household" });
+    h.addRecurring({ label: "Kids tuition", amount: 8000, frequency: "M", source: "manual", ownerId: "Dependents" });
+    h.addRecurring({ label: "Aarav coaching", amount: 5000, frequency: "M", source: "manual", ownerId: "aarav" });
+
+    const whole = derive(h.data, a.values, { isFamilyView: false, viewingMemberId: null, currentFY: "2025-26" });
+    // Consolidated: every recurring line is visible.
+    expect(whole.lensedRecurringExpenses.length).toBe(h.data.expenses.recurring.length);
+    // Coherence: the default-lens monthly total equals avgMonthly + ALL itemised monthly.
+    const fullMonthly =
+      h.data.expenses.avgMonthly +
+      h.data.expenses.recurring.reduce((s, r) => s + toMonthly({ amount: r.amount, period: r.frequency }), 0);
+    expect(whole.lensedMonthlyExpenses).toBeCloseTo(fullMonthly, 2);
+
+    // Lensed to rohit: only rohit's own + the shared "Household"; never priya's / Dependents / a child's.
+    const lensed = derive(h.data, a.values, { isFamilyView: false, viewingMemberId: "rohit", currentFY: "2025-26" });
+    const labels = lensed.lensedRecurringExpenses.map((r) => r.label);
+    expect(labels).toContain("Rohit gym");
+    expect(labels).toContain("Groceries");
+    expect(labels).not.toContain("Priya yoga");
+    expect(labels).not.toContain("Kids tuition");
+    expect(labels).not.toContain("Aarav coaching");
+    expect(
+      lensed.lensedRecurringExpenses.every((r) => {
+        const o = r.ownerId ?? "Household";
+        return o === "rohit" || o === "Household";
+      }),
+    ).toBe(true);
+    // Lensed itemised set is a strict subset of consolidated.
+    expect(lensed.lensedRecurringExpenses.length).toBeLessThan(whole.lensedRecurringExpenses.length);
+
+    // HONESTY LOCK: the household expense + FIRE totals are INVARIANT to member selection.
+    expect(lensed.annualExpensesToday, "household annual expenses invariant under lens").toBe(whole.annualExpensesToday);
+    expect(lensed.fireNumber, "FIRE number invariant under lens").toBe(whole.fireNumber);
+
+    // lensedPlannedExpenses lenses identically (own + Household; never another member's).
+    h.addPlannedFuture({ label: "Priya sabbatical", todayAmount: 500000, targetYear: 2032, isMultiYear: false, ownerId: "priya" });
+    h.addPlannedFuture({ label: "Family Europe trip", todayAmount: 800000, targetYear: 2030, isMultiYear: false, ownerId: "Household" });
+    const wholeP = derive(h.data, a.values, { isFamilyView: false, viewingMemberId: null, currentFY: "2025-26" });
+    const rohitP = derive(h.data, a.values, { isFamilyView: false, viewingMemberId: "rohit", currentFY: "2025-26" });
+    expect(wholeP.lensedPlannedExpenses.map((p) => p.label)).toEqual(
+      expect.arrayContaining(["Priya sabbatical", "Family Europe trip"]),
+    );
+    const rohitPlanned = rohitP.lensedPlannedExpenses.map((p) => p.label);
+    expect(rohitPlanned).toContain("Family Europe trip"); // Household — shared, visible
+    expect(rohitPlanned).not.toContain("Priya sabbatical"); // Priya's own — hidden under Rohit
+  });
+
+  // #81 Phase 2: standalone individual FIRE is ADDED alongside the household number — the household
+  // path stays byte-identical + invariant, and the gap = household exp − Σ(adults attributable).
+  it("#81 Phase 2: individual FIRE added per adult; household path byte-identical + invariant", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    loadSeedPersona(h, a);
+    const before = derive(h.data, a.values, { isFamilyView: false, viewingMemberId: null, currentFY: "2025-26" });
+
+    // One individual-FIRE entry per ADULT (rohit, priya); dependents excluded.
+    expect(before.individualFireByMember.map((r) => r.memberId).sort()).toEqual(["priya", "rohit"]);
+    // Each individual FIRE number is domain-sane (rule 31) and POSITIVE.
+    for (const r of before.individualFireByMember) {
+      expect(r.individualFireNumber).toBeGreaterThan(0);
+      expect(r.individualFireNumber).toBeLessThan(before.fireNumber); // a single adult's slice < the whole household target
+    }
+    // Gap = household expenses − Σ(adults' attributable). For the all-shared 50/50 seed it is ~0.
+    const sumAttr = before.individualFireByMember.reduce((s, r) => s + r.attributableAnnualExpenses, 0);
+    expect(before.individualFireExpenseGapAnnual).toBe(Math.max(0, Math.round(before.annualExpensesToday - sumAttr)));
+    expect(before.individualFireExpenseGapAnnual).toBeGreaterThanOrEqual(0);
+
+    // HONESTY LOCK: viewing an adult does NOT move the household number (individual block is additive).
+    for (const id of ["rohit", "priya", "aarav"]) {
+      const lensed = derive(h.data, a.values, { isFamilyView: false, viewingMemberId: id, currentFY: "2025-26" });
+      expect(lensed.fireNumber, `household FIRE invariant under lens=${id}`).toBe(before.fireNumber);
+      expect(lensed.yearsToRegular, `years invariant under lens=${id}`).toBe(before.yearsToRegular);
+    }
+
+    // A dependents-tagged cost raises the GAP but NOT any adult's individual FIRE.
+    h.addRecurring({ label: "Kids school", amount: 50000, frequency: "M", source: "manual", ownerId: "Dependents" });
+    const after = derive(h.data, a.values, { isFamilyView: false, viewingMemberId: null, currentFY: "2025-26" });
+    expect(after.individualFireExpenseGapAnnual).toBeGreaterThan(before.individualFireExpenseGapAnnual);
+    const rohitBefore = before.individualFireByMember.find((r) => r.memberId === "rohit")!;
+    const rohitAfter = after.individualFireByMember.find((r) => r.memberId === "rohit")!;
+    expect(rohitAfter.attributableAnnualExpenses).toBeCloseTo(rohitBefore.attributableAnnualExpenses, 0);
   });
 
   it("gh-issue #29: let-out rental is taxed on 70% NAV (Sec 24a) — but cash income stays FULL", () => {

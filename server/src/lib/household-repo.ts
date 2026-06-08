@@ -262,6 +262,7 @@ export async function readHousehold(
           sourceRefId: r.sourceRefId ?? undefined,
           inflationBucket: (r.inflationBucket ?? undefined) as RecurringExpenseLine["inflationBucket"],
           kind: (r.kind ?? undefined) as RecurringExpenseLine["kind"],
+          ownerId: r.ownerId ?? undefined, // #81 member-attribution
         }),
       ),
       plannedFuture: planned.map(
@@ -274,6 +275,7 @@ export async function readHousehold(
           durationYears: p.durationYears ?? undefined,
           inflationBucket: (p.inflationBucket ?? undefined) as PlannedFutureLine["inflationBucket"],
           kind: (p.kind ?? undefined) as PlannedFutureLine["kind"],
+          ownerId: p.ownerId ?? undefined, // #81 member-attribution
         }),
       ),
     },
@@ -534,6 +536,7 @@ export async function applyHouseholdPlan(
         sourceRefId: r.sourceRefId ?? null,
         inflationBucket: r.inflationBucket ?? null,
         kind: r.kind ?? null,
+        ownerId: r.ownerId ?? null, // #81 member-attribution
       };
       if (r.sourceRefId != null) {
         await tx.recurringExpenseLine.upsert({
@@ -569,6 +572,7 @@ export async function applyHouseholdPlan(
         durationYears: p.durationYears ?? null,
         inflationBucket: p.inflationBucket ?? null,
         kind: p.kind ?? null,
+        ownerId: p.ownerId ?? null, // #81 member-attribution
       };
       await tx.plannedFutureLine.upsert({
         where: { userId_entityId: { userId, entityId: p.id } },

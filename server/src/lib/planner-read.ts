@@ -33,6 +33,11 @@ export function mapAssumptionsRow(row: UserAssumptions): Assumptions {
     // What-If lever is non-persisting; default 0). Map to the research default so the server
     // derive()/lifecycle path stays byte-identical to today.
     householdSavingsStepUpPercent: DEFAULT_ASSUMPTIONS.householdSavingsStepUpPercent,
+    // #81 Phase 2 — the household split % drives ONLY the per-adult individual-FIRE display, which
+    // the server (lifecycle/nudge) path never surfaces (it reads the HOUSEHOLD number). Not a
+    // persisted UserAssumptions column → map to the default, mirroring the step-up above, so the
+    // server derive() stays byte-identical. (The frontend persists it in its assumptions document.)
+    householdSplitPercent: DEFAULT_ASSUMPTIONS.householdSplitPercent,
   };
 }
 

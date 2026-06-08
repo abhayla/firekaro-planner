@@ -14,6 +14,7 @@ import type {
 import { genId } from "@/lib/id";
 import { dobFromAge } from "@/lib/age";
 import { isEarningMember } from "@/lib/member-earning";
+import { autoFlowOwnerId, EXPENSE_OWNER_HOUSEHOLD } from "@/lib/expense-attribution";
 import { toMonthly, toAnnual, legacyFreqToPeriod } from "@/lib/cashflow";
 import { makeAdapter } from "@/lib/storage-adapter";
 import { getAuthProvider } from "@/lib/auth-provider";
@@ -42,6 +43,26 @@ export type LegacyMember = Omit<Partial<Member>, "role"> & {
 // unless it is explicitly DEPENDENT. The pre-existing adult/dependent distinction is kept.
 export function migrateRole(raw: string): Member["role"] {
   return raw === "DEPENDENT" ? "DEPENDENT" : "ADULT";
+}
+
+// #81 Phase 1 — resolve the owner a persisted recurring line should backfill to when it
+// predates the member-attribution tag. Auto-flow lines inherit their source record's owner
+// (loan/policy, Joint→Household); everything else defaults to "Household". Pure (arrays passed
+// in) so it is unit-testable + reused by the hydrate backfill.
+export function backfillRecurringOwnerId(
+  r: RecurringExpenseLine,
+  liabilities: readonly Liability[],
+  insurance: readonly InsurancePolicy[],
+): string {
+  if (r.source === "auto-loan" && r.sourceRefId) {
+    const l = liabilities.find((x) => x.id === r.sourceRefId);
+    return l ? autoFlowOwnerId(l.ownerId) : EXPENSE_OWNER_HOUSEHOLD;
+  }
+  if (r.source === "auto-insurance" && r.sourceRefId) {
+    const p = insurance.find((x) => x.id === r.sourceRefId);
+    return p ? autoFlowOwnerId(p.insuredPersonId) : EXPENSE_OWNER_HOUSEHOLD;
+  }
+  return EXPENSE_OWNER_HOUSEHOLD;
 }
 
 export function migrateMember(raw: LegacyMember): Member {
@@ -212,6 +233,12 @@ export const useHouseholdStore = defineStore("household", () => {
           frequency: legacyFreqToPeriod(r.frequency),
           inflationBucket: r.inflationBucket ?? "general",
           kind: r.kind ?? "general",
+          // #81 Phase 1 — backfill member-attribution owner. Auto-flow lines inherit their
+          // source record's owner (loan/policy → Joint→Household); manual lines default to
+          // Household. Keeps existing households' totals byte-identical (display-only tag).
+          ownerId:
+            r.ownerId ??
+            backfillRecurringOwnerId(r, data.value.liabilities, data.value.insurance),
         }));
         // Phase 1 Stage B — backfill inflationBucket + kind on planned-future lines
         // (audit Entry #3 A3.6 + #6 A6.2 + #10 A10.3).
@@ -219,6 +246,8 @@ export const useHouseholdStore = defineStore("household", () => {
           ...p,
           inflationBucket: p.inflationBucket ?? "general",
           kind: p.kind ?? "general",
+          // #81 Phase 1 — planned-future lines default to Household (no auto-flow source).
+          ownerId: p.ownerId ?? EXPENSE_OWNER_HOUSEHOLD,
         }));
         // Phase 1 Stage B — backfill liability coBorrowers (audit Entry #23 A23.1).
         data.value.liabilities = data.value.liabilities.map((l) => ({
@@ -341,6 +370,14 @@ export const useHouseholdStore = defineStore("household", () => {
     data.value.insurance.forEach((p) => (p.insuredPersonId = reassign(p.insuredPersonId)));
     data.value.businesses.forEach((b) => (b.ownerId = reassign(b.ownerId)));
     data.value.otherIncome.forEach((o) => (o.ownerId = reassign(o.ownerId)));
+    // #81 Phase 1 — an itemised expense owned by the removed member becomes a shared
+    // "Household" cost (not reassigned to another specific member — a removed person's
+    // gym fee is not someone else's personal expense). Keeps the per-member view honest;
+    // the household total is unaffected either way (display-only tag).
+    const reassignExpenseOwner = (mid: string | undefined) =>
+      mid === id ? EXPENSE_OWNER_HOUSEHOLD : (mid ?? EXPENSE_OWNER_HOUSEHOLD);
+    data.value.expenses.recurring.forEach((r) => (r.ownerId = reassignExpenseOwner(r.ownerId)));
+    data.value.expenses.plannedFuture.forEach((p) => (p.ownerId = reassignExpenseOwner(p.ownerId)));
   }
 
   // ---------- Other income ----------
@@ -463,6 +500,8 @@ export const useHouseholdStore = defineStore("household", () => {
         frequency: "M",
         source: "auto-insurance",
         sourceRefId: p.id,
+        // #81 Phase 1 — inherit the insured person as the expense owner (Joint → Household).
+        ownerId: autoFlowOwnerId(p.insuredPersonId),
       });
     }
   }
@@ -479,6 +518,8 @@ export const useHouseholdStore = defineStore("household", () => {
         source: "auto-loan",
         sourceRefId: l.id,
         endYear: l.derivedEndYear ?? undefined,
+        // #81 Phase 1 — inherit the loan owner as the expense owner (Joint → Household).
+        ownerId: autoFlowOwnerId(l.ownerId),
       });
     }
   }

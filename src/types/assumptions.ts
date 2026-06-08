@@ -50,6 +50,14 @@ export const assumptionsSchema = z.object({
   // would optimistically pull the FIRE date in). REAL terms — the corpus compounds in the
   // real frame (derive.ts), so a step-up here is growth NET of general inflation.
   householdSavingsStepUpPercent: z.number().min(0).max(15).default(0),
+  // #81 Phase 2 — the unified "household split" %: the share of SHARED costs/assets (ring-2
+  // expenses + "Joint" corpus/debt + joint income streams) attributed to EACH adult when
+  // computing that adult's STANDALONE individual FIRE. Default 50 (a two-adult 50/50 split).
+  // DISPLAY-only for the per-adult individual view — it NEVER touches the household FIRE number
+  // (the primary, decision-driving figure). Clamped 0–100. With N adults a single % is an
+  // intentional simplification (each adult bears `split%` of shared); the household − Σ(adults)
+  // gap surfaces whatever is unsplit (dependents + remainder).
+  householdSplitPercent: z.number().min(0).max(100).default(50),
 });
 
 export type Assumptions = z.infer<typeof assumptionsSchema>;
@@ -78,4 +86,5 @@ export const DEFAULT_ASSUMPTIONS: Assumptions = {
   fatMultiplier: 1.5,
   withdrawalRule: "Constant",
   householdSavingsStepUpPercent: 0,
+  householdSplitPercent: 50,
 };

@@ -371,3 +371,46 @@ describe("acceleration card plausibility — never more optimistic than the head
     });
   }
 });
+
+// #81 Phase 2 — the standalone individual FIRE per adult is a SECONDARY view; it must be
+// domain-SANE on every persona (rule 31), and the HOUSEHOLD number must stay PRIMARY +
+// invariant to member selection. An absurd individual figure (negative, zero, ₹0 corpus, age
+// 110) is a CI failure, not a silently-rendered number.
+describe("#81 individual FIRE plausibility — every adult, every persona", () => {
+  beforeEach(() => setActivePinia(createPinia()));
+  for (const persona of PERSONAS) {
+    it(`${persona.name}: each adult's standalone FIRE is domain-sane + the household stays invariant`, () => {
+      const h = useHouseholdStore();
+      const a = useAssumptionsStore();
+      persona.load(h, a);
+      const k = derive(h.data, a.values, DEFAULT_PRODUCT_LENS);
+
+      for (const r of k.individualFireByMember) {
+        const ctx = `${persona.name}/${r.memberId}: fireNo=${r.individualFireNumber} corpus=${r.attributableCorpus} age=${r.individualFireAge}`;
+        // A real adult's personal FIRE number is positive and not absurd.
+        expect(r.individualFireNumber, `${ctx} — individual FIRE > 0`).toBeGreaterThan(0);
+        expect(r.individualFireNumber, `${ctx} — < ₹500 Cr (absurd ceiling)`).toBeLessThan(500_00_00_000);
+        expect(r.attributableAnnualExpenses, `${ctx} — attributable expenses ≥ 0`).toBeGreaterThanOrEqual(0);
+        expect(r.attributableCorpus, `${ctx} — attributable corpus ≥ 0`).toBeGreaterThanOrEqual(0);
+        // The personal FIRE age is either UNREACHABLE (Infinity — honest) or a plausible age,
+        // never an absurd finite value like 110.
+        if (Number.isFinite(r.individualFireAge)) {
+          // A finite individual FIRE age must land within the plan horizon (never an absurd 100+).
+          expect(r.individualFireAge, `${ctx} — personal FIRE age ≤ plan horizon`).toBeLessThanOrEqual(k.planToAge);
+          expect(r.individualFireAge, `${ctx} — personal FIRE age ≥ anchor`).toBeGreaterThanOrEqual(r.anchorAge);
+        }
+        // A single adult's slice cannot exceed the whole household FIRE target.
+        expect(r.individualFireNumber, `${ctx} — individual ≤ household target`).toBeLessThanOrEqual(k.fireNumber + 1);
+      }
+      // The gap is non-negative (dependents + unsplit remainder), never negative.
+      expect(k.individualFireExpenseGapAnnual, `${persona.name}: gap ≥ 0`).toBeGreaterThanOrEqual(0);
+
+      // HONESTY LOCK: the household FIRE number is INVARIANT to viewing any adult.
+      for (const r of k.individualFireByMember) {
+        const lensed = derive(h.data, a.values, { ...DEFAULT_PRODUCT_LENS, viewingMemberId: r.memberId });
+        expect(lensed.fireNumber, `${persona.name}: household FIRE invariant under lens=${r.memberId}`).toBe(k.fireNumber);
+        expect(lensed.yearsToRegular, `${persona.name}: household years invariant under lens=${r.memberId}`).toBe(k.yearsToRegular);
+      }
+    });
+  }
+});

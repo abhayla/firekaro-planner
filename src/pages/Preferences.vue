@@ -537,6 +537,20 @@ const featuresBySection = computed(() => {
                 @update:model-value="(val: string) => { if (household.data) household.data.healthcareCorpusReservationPercent = Number(val) / 100 }"
               />
             </v-col>
+            <!-- #81 Phase 2 — the household split % for the per-adult INDIVIDUAL FIRE view. -->
+            <v-col cols="12" md="6">
+              <v-text-field
+                label="Household split per adult (%)"
+                type="number"
+                :model-value="v.householdSplitPercent"
+                hint="Each adult's share of shared costs/assets in the individual-FIRE view. Default 50 (two-adult 50/50). Does NOT affect the household FIRE number."
+                persistent-hint
+                variant="outlined"
+                density="comfortable"
+                data-testid="pref-household-split"
+                @update:model-value="(val: string) => assumptions.set('householdSplitPercent', Number(val))"
+              />
+            </v-col>
           </v-row>
 
           <!-- Phase 6 Stage R — re-enable dismissed nudges affordance. -->

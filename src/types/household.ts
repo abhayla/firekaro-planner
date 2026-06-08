@@ -426,6 +426,12 @@ export const recurringExpenseLineSchema = z.object({
   inflationBucket: inflationBucketSchema.optional(),
   // Phase 1 Stage B audit Entry #6 A6.1 + #10 A10.2 — expense classification.
   kind: recurringExpenseKindSchema.optional(),
+  // #81 Phase 1 — member attribution. A member id | "Household" (shared, default) |
+  // "Dependents" (kids-shared). Optional with consumer-side fallback to "Household"
+  // (lib/expense-attribution.ts) — keeps existing persisted rows byte-identical; the
+  // hydrate backfill + add/auto-flow write paths populate it explicitly. DISPLAY-only:
+  // never changes what feeds the household FIRE total (contract §2 decision 7).
+  ownerId: z.string().optional(),
 });
 export type RecurringExpenseLine = z.infer<typeof recurringExpenseLineSchema>;
 
@@ -451,6 +457,9 @@ export const plannedFutureLineSchema = z.object({
   inflationBucket: inflationBucketSchema.optional(),
   // Phase 1 Stage B audit Entry #6 A6.2 + #10 A10.3 — goal classification.
   kind: plannedFutureKindSchema.optional(),
+  // #81 Phase 1 — member attribution (same contract as recurring lines). A member id |
+  // "Household" (shared, default) | "Dependents". Optional + "Household" fallback. DISPLAY-only.
+  ownerId: z.string().optional(),
 });
 export type PlannedFutureLine = z.infer<typeof plannedFutureLineSchema>;
 
