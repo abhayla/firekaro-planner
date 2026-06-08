@@ -41,7 +41,7 @@ const TYPES: { value: LoanType; label: string; defaultRate: number; helper?: str
 ];
 
 const earnerOptions = computed(() =>
-  household.earners.map((m) => ({ value: m.id, label: m.name || "Earner" })),
+  household.adults.map((m) => ({ value: m.id, label: m.name || "Earner" })),
 );
 
 const draft = ref<{
@@ -59,7 +59,7 @@ const draft = ref<{
   outstandingBalance: null,
   monthlyEMI: null,
   interestRate: 8.5,
-  ownerId: household.earners[0]?.id ?? household.members[0]?.id ?? "you",
+  ownerId: household.adults[0]?.id ?? household.members[0]?.id ?? "you",
   isSharedWithSpouse: false,
   coBorrowers: [],
 });

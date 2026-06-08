@@ -46,7 +46,7 @@ const memberOptions = computed(() => [
   { value: "Joint", label: "Joint" },
 ]);
 const earnerOptions = computed(() =>
-  household.earners.map((m) => ({ value: m.id, label: m.name || "Earner" })),
+  household.adults.map((m) => ({ value: m.id, label: m.name || "Earner" })),
 );
 
 // Q9 (v3) — per-type natural-granularity fields. Tradable types (Stocks, MutualFunds,
@@ -94,7 +94,7 @@ const draft = ref<{
   label: "",
   value: null,
   monthlyContribution: null,
-  ownerId: household.earners[0]?.id ?? household.members[0]?.id ?? "you",
+  ownerId: household.adults[0]?.id ?? household.members[0]?.id ?? "you",
   holdingsCount: null,
   vpfTopUp: 0,
   totalGrantValue: null,
@@ -170,7 +170,7 @@ watch(
   () => draft.value.type,
   (t) => {
     if (t === "EPF_VPF" || t === "ESOP") {
-      const e = household.earners[0]?.id;
+      const e = household.adults[0]?.id;
       if (e) draft.value.ownerId = e;
     }
     if (t !== "Stocks") draft.value.holdingsCount = null;

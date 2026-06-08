@@ -26,8 +26,9 @@ function ctcOf(m: Member): number {
   return m.salary?.annualCTC ?? 0;
 }
 
-// Earners sorted by annual CTC desc — the rail/dashboard axis.
-const rankedEarners = computed(() => [...household.earners].sort((a, b) => ctcOf(b) - ctcOf(a)));
+// gh #67: the Salary screen manages every ADULT (the editing roster — a non-earning adult appears
+// with ₹0 so you can give them income, which then derives them as an earner). Sorted by CTC desc.
+const rankedEarners = computed(() => [...household.adults].sort((a, b) => ctcOf(b) - ctcOf(a)));
 
 // Whole-household salary total. Sourced from the un-lensed store aggregate so the
 // Salary screen, the Income Overview KPI and household.totalAnnualIncome all agree
@@ -39,7 +40,7 @@ const employedCount = computed(
   () => household.earners.filter((m) => m.employmentStatus === "Employed").length,
 );
 const avgHike = computed(() => {
-  const list = household.earners;
+  const list = household.earners; // hike averaged over actual earners only
   if (!list.length) return 0;
   return list.reduce((s, m) => s + (m.salary?.hikePercent ?? 0), 0) / list.length;
 });
@@ -109,10 +110,12 @@ function openAddEarner() {
   draftNewEarner.value = [
     {
       id: crypto.randomUUID().slice(0, 8),
-      name: "Earner",
+      name: "Adult",
       dateOfBirth: dobFromAge(30),
-      role: "EARNER",
-      targetRetirementAge: 50,
+      role: "ADULT",
+      // gh #67: non-earning until salary is set via the pencil → EarnerSalaryForm below.
+      isEarning: false,
+      targetRetirementAge: null,
       planToAge: 90,
       relation: "",
       city: "Metro",
@@ -120,7 +123,7 @@ function openAddEarner() {
       educationStage: null,
       riskAppetite: "Moderate",
       marital: "Married",
-      employmentStatus: "Employed",
+      employmentStatus: null,
     },
   ];
   showAddEarner.value = true;
@@ -129,18 +132,18 @@ function openAddEarner() {
 function commitAddEarner() {
   const draft = draftNewEarner.value[0];
   if (!draft || !/^\d{4}-\d{2}-\d{2}$/.test(draft.dateOfBirth)) return;
+  // gh #67: add an ADULT; they become an earner once their salary is entered (derived from income).
   household.addMember({
     id: draft.id,
-    name: draft.name || "Earner",
+    name: draft.name || "Adult",
     dateOfBirth: draft.dateOfBirth,
-    role: "EARNER",
-    targetRetirementAge: draft.targetRetirementAge ?? 50,
+    role: "ADULT",
+    planToAge: draft.planToAge ?? 90,
     relation: draft.relation || undefined,
     city: draft.city,
     health: draft.health,
     riskAppetite: draft.riskAppetite,
     marital: draft.marital,
-    employmentStatus: draft.employmentStatus ?? "Employed",
   });
   household.autoFlowSalaryToEPF();
   showAddEarner.value = false;
@@ -155,7 +158,7 @@ function commitAddEarner() {
       description="Annual CTC per earner. Expected hike % drives the multi-year FIRE projection. Click a card to edit the full salary structure."
     />
 
-    <template v-if="household.earners.length">
+    <template v-if="household.adults.length">
       <StatDashboard
         :kpis="kpis"
         :donut-segments="donutSegments"
@@ -172,13 +175,13 @@ function commitAddEarner() {
       <div class="section-eyebrow">Browse by earner</div>
       <div class="rails-wrap mb-6">
         <FeaturedRail
-          title="Earners"
+          title="Adults"
           icon="mdi-account-group"
           accent-color="primary"
           :total="formatINRCompact(totalCTC)"
-          :count-label="`${household.earners.length} ${household.earners.length === 1 ? 'earner' : 'earners'}`"
+          :count-label="`${household.adults.length} ${household.adults.length === 1 ? 'adult' : 'adults'}`"
           :entries="rankedEarners"
-          add-sub-label="earner"
+          add-sub-label="adult"
           @edit="startEditEarner"
           @add="openAddEarner"
         >
@@ -204,9 +207,9 @@ function commitAddEarner() {
     <EmptyState
       v-else
       icon="mdi-account-tie-outline"
-      title="No earners on file"
-      copy="Add at least one earner to populate salary, employer details, and your savings rate. Or manage the full household on Profile."
-      cta-label="Add an earner"
+      title="No adults on file"
+      copy="Add an adult, then set their salary to populate employer details and your savings rate — they become an earner once income is added. Or manage the full household on Profile."
+      cta-label="Add an adult"
       cta-icon="mdi-account-plus"
       @cta="openAddEarner"
     />

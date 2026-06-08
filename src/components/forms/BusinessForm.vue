@@ -9,7 +9,7 @@ import { BUSINESS_LEGAL_KINDS as LEGAL_KINDS, labelForLegalKind } from "@/lib/bu
 const household = useHouseholdStore();
 
 const earnerOptions = computed(() =>
-  household.earners.map((m) => ({ value: m.id, label: m.name || "Earner" })),
+  household.adults.map((m) => ({ value: m.id, label: m.name || "Earner" })),
 );
 
 const bizDraft = ref<Partial<Business>>({
@@ -18,7 +18,7 @@ const bizDraft = ref<Partial<Business>>({
   annualProfit: undefined,
   frequency: "A",
   sharePercent: 100,
-  ownerId: household.earners[0]?.id ?? household.members[0]?.id ?? "you",
+  ownerId: household.adults[0]?.id ?? household.members[0]?.id ?? "you",
   isOperated: true,
 });
 

@@ -14,11 +14,11 @@ const household = useHouseholdStore();
     </p>
 
     <h3 class="text-subtitle-1 font-weight-bold mb-2">Salary</h3>
-    <div v-if="household.earners.length === 0" class="text-caption text-medium-emphasis mb-3">
-      No earners in Profile. Go back to add one.
+    <div v-if="household.adults.length === 0" class="text-caption text-medium-emphasis mb-3">
+      No adults in Profile. Go back to add one.
     </div>
     <EarnerSalaryForm
-      v-for="earner in household.earners"
+      v-for="earner in household.adults"
       :key="earner.id"
       :earner="earner"
     />

@@ -3,6 +3,7 @@ import { computed, ref } from "vue";
 import { useHouseholdStore } from "@/stores/household";
 import { formatINRCompact } from "@/lib/formatters";
 import { lifeCoverAdequacy, healthCoverAdequacy } from "@/lib/adequacy";
+import { isEarningMember } from "@/lib/member-earning";
 import type { InsuranceType, InsurancePolicy } from "@/types/household";
 import EmptyState from "@/components/shared/EmptyState.vue";
 import PanelCard from "@/components/shared/PanelCard.vue";
@@ -35,7 +36,7 @@ const draft = ref<{
   provider: "",
   sumAssured: null,
   annualPremium: null,
-  insuredPersonId: household.earners[0]?.id ?? household.members[0]?.id ?? "you",
+  insuredPersonId: household.adults[0]?.id ?? household.members[0]?.id ?? "you",
   premiumPer: "yearly",
 });
 
@@ -89,7 +90,8 @@ function adequacyFor(policy: InsurancePolicy) {
 function isNonEarnerLife(policy: InsurancePolicy): boolean {
   if (policy.type !== "Life") return false;
   const insured = household.members.find((m) => m.id === policy.insuredPersonId);
-  return insured?.role !== "EARNER";
+  // gh #67: "life cover on a non-earner" flag — derived from actual labour income, not a role flag.
+  return !insured || !isEarningMember(insured, household.data.businesses);
 }
 
 function insuredNameFor(id: string): string {

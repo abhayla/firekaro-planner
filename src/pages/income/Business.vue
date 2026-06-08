@@ -134,12 +134,12 @@ function blankDraft(kind: BusinessLegalKind, operated = true): Partial<Business>
     annualProfit: undefined,
     frequency: recent?.frequency ?? "A",
     sharePercent: recent?.sharePercent ?? 100,
-    ownerId: recent?.ownerId ?? household.earners[0]?.id ?? household.members[0]?.id ?? "you",
+    ownerId: recent?.ownerId ?? household.adults[0]?.id ?? household.members[0]?.id ?? "you",
     isOperated: operated,
   };
 }
 
-const earnerOptions = computed(() => household.earners.map((m) => ({ value: m.id, label: m.name || "Earner" })));
+const earnerOptions = computed(() => household.adults.map((m) => ({ value: m.id, label: m.name || "Earner" })));
 const nameRules = [(v: string) => (!!v && v.trim().length > 0) || "Name required"];
 const profitRules = [(v: number | null | undefined) => (v !== null && v !== undefined && v >= 0) || "Profit must be >= 0"];
 const sharePercentRules = [(v: number | null | undefined) => (v !== null && v !== undefined && v >= 1 && v <= 100) || "1-100"];

@@ -157,7 +157,7 @@ function blankDraft(type: OtherIncomeType): Partial<OtherIncomeLine> {
     label: "",
     amount: undefined,
     frequency: recent?.frequency ?? "M",
-    ownerId: recent?.ownerId ?? household.earners[0]?.id ?? household.members[0]?.id ?? "you",
+    ownerId: recent?.ownerId ?? household.adults[0]?.id ?? household.members[0]?.id ?? "you",
     isTaxExempt: recent?.isTaxExempt ?? false,
   };
 }

@@ -36,26 +36,15 @@ function colorVars(id: string) {
   };
 }
 
-// Q2.1 — role-aware defaults for the 6 onboarding fields. Earners: Married + Employed
-// (matches India median household). Dependents: Single + Preschool stage (children).
+// gh #67: role-aware defaults. A NEW adult starts non-earning (no salary yet → earning is derived
+// once income is added on the Salary/Income screen), so it carries no job. Dependents: child stage.
 function defaultsForRole(role: MemberRole) {
-  if (role === "EARNER") {
+  if (role === "ADULT") {
     return {
       city: "Metro" as const,
       health: "Healthy" as const,
       educationStage: null,
       riskAppetite: "Moderate" as const,
-      marital: "Married" as const,
-      employmentStatus: "Employed" as const,
-    };
-  }
-  if (role === "NON_EARNING_ADULT") {
-    // gh #34: homemaker / non-earning spouse — adult, no education stage, no job.
-    return {
-      city: "Metro" as const,
-      health: "Healthy" as const,
-      educationStage: null,
-      riskAppetite: "Conservative" as const,
       marital: "Married" as const,
       employmentStatus: null,
     };
@@ -71,9 +60,7 @@ function defaultsForRole(role: MemberRole) {
 }
 
 function defaultName(role: MemberRole): string {
-  if (role === "EARNER") return "Earner";
-  if (role === "NON_EARNING_ADULT") return "Spouse";
-  return "Dependent";
+  return role === "ADULT" ? "Adult" : "Dependent";
 }
 
 function addPerson(role: MemberRole) {
@@ -84,10 +71,12 @@ function addPerson(role: MemberRole) {
     name: defaultName(role),
     dateOfBirth: dobFromAge(adult ? 30 : 5),
     role,
-    targetRetirementAge: role === "EARNER" ? 50 : null,
-    // gh #34: a non-earning adult has a plan-to age (longevity to fund); a child does not.
+    // gh #67: a brand-new adult is non-earning until income is added on the Salary screen.
+    isEarning: false,
+    targetRetirementAge: null,
+    // gh #34: an adult has a plan-to age (longevity to fund); a child does not.
     planToAge: adult ? 90 : null,
-    relation: role === "EARNER" ? "" : role === "NON_EARNING_ADULT" ? "Spouse" : "Child",
+    relation: role === "ADULT" ? "" : "Child",
     ...defaultsForRole(role),
   });
   expandedIds.value = new Set(expandedIds.value).add(id);
@@ -97,11 +86,9 @@ function removeAt(idx: number) {
   members.value.splice(idx, 1);
 }
 
-const earners = computed(() => members.value.filter((m) => m.role === "EARNER"));
-const nonEarningAdults = computed(() => members.value.filter((m) => m.role === "NON_EARNING_ADULT"));
+const adults = computed(() => members.value.filter((m) => m.role === "ADULT"));
 const dependents = computed(() => members.value.filter((m) => m.role === "DEPENDENT"));
-const earnerCount = computed(() => earners.value.length);
-const nonEarningAdultCount = computed(() => nonEarningAdults.value.length);
+const adultCount = computed(() => adults.value.length);
 const dependentCount = computed(() => dependents.value.length);
 
 // Initials for the identity avatar — up to two letters, derived from the name field.
@@ -116,12 +103,23 @@ interface SummaryItem {
   icon: string;
   label: string;
 }
-function earnerSummary(m: MemberDraft): SummaryItem[] {
+// gh #67: one adult summary that branches on DERIVED earning. An earning adult leads with their
+// retire-from-job age; a non-earning adult (homemaker / career break) leads with longevity.
+function adultSummary(m: MemberDraft): SummaryItem[] {
+  if (m.isEarning) {
+    return [
+      { icon: "mdi-beach", label: m.targetRetirementAge ? `Retires ${m.targetRetirementAge}` : "Retirement —" },
+      { icon: "mdi-map-marker-outline", label: m.city },
+      { icon: "mdi-briefcase-outline", label: m.employmentStatus ?? "—" },
+      { icon: "mdi-chart-line-variant", label: `${m.riskAppetite} risk` },
+      { icon: "mdi-heart-pulse", label: m.health },
+      { icon: "mdi-ring", label: m.marital },
+    ];
+  }
   return [
-    { icon: "mdi-beach", label: m.targetRetirementAge ? `Retires ${m.targetRetirementAge}` : "Retirement —" },
+    { icon: "mdi-account-heart-outline", label: "Non-earning" },
+    { icon: "mdi-timeline-clock-outline", label: m.planToAge ? `Plan to ${m.planToAge}` : "Plan-to —" },
     { icon: "mdi-map-marker-outline", label: m.city },
-    { icon: "mdi-briefcase-outline", label: m.employmentStatus ?? "—" },
-    { icon: "mdi-chart-line-variant", label: `${m.riskAppetite} risk` },
     { icon: "mdi-heart-pulse", label: m.health },
     { icon: "mdi-ring", label: m.marital },
   ];
@@ -133,20 +131,11 @@ function dependentSummary(m: MemberDraft): SummaryItem[] {
     { icon: "mdi-heart-pulse", label: m.health },
   ];
 }
-function nonEarningAdultSummary(m: MemberDraft): SummaryItem[] {
-  return [
-    { icon: "mdi-timeline-clock-outline", label: m.planToAge ? `Plan to ${m.planToAge}` : "Plan-to —" },
-    { icon: "mdi-map-marker-outline", label: m.city },
-    { icon: "mdi-heart-pulse", label: m.health },
-    { icon: "mdi-ring", label: m.marital },
-  ];
-}
 
-// A5.x — horizon sanity validation. Earners only; blocks plan-to ≤ retire and
-// horizon < 5, soft-warns horizon < 20 / > 60 and retirement < 35. The horizon
-// chip on the Dashboard is the read-only display; this is the editing-time guard.
+// A5.x — horizon sanity validation. Earning adults only (the retire-from-job horizon); blocks
+// plan-to ≤ retire and horizon < 5, soft-warns horizon < 20 / > 60 and retirement < 35.
 function horizonIssues(m: MemberDraft): HorizonIssue[] {
-  if (m.role !== "EARNER") return [];
+  if (m.role !== "ADULT" || !m.isEarning) return [];
   return validateMemberHorizon({
     retirementAge: m.targetRetirementAge,
     planToAge: m.planToAge,
@@ -190,19 +179,19 @@ const employmentItems = [
 
 <template>
   <div>
-    <!-- ───── Earners ───── -->
+    <!-- ───── Adults (gh #67 — earning vs non-earning is DERIVED from income, not a role) ───── -->
     <div class="section-head">
-      <span class="section-eyebrow">Earners</span>
-      <span class="section-count">{{ earnerCount }}</span>
+      <span class="section-eyebrow">Adults</span>
+      <span class="section-count">{{ adultCount }}</span>
       <v-spacer />
-      <v-btn size="small" color="primary" variant="tonal" rounded="lg" @click="addPerson('EARNER')">
-        <v-icon icon="mdi-plus" class="mr-1" /> Add earner
+      <v-btn size="small" color="primary" variant="tonal" rounded="lg" @click="addPerson('ADULT')">
+        <v-icon icon="mdi-plus" class="mr-1" /> Add adult
       </v-btn>
     </div>
 
-    <div v-if="earnerCount" class="person-grid">
+    <div v-if="adultCount" class="person-grid">
       <div
-        v-for="(m, idx) in earners"
+        v-for="(m, idx) in adults"
         :key="m.id"
         class="person-card"
         :class="{ 'person-card--open': isExpanded(m.id) }"
@@ -213,7 +202,9 @@ const employmentItems = [
             <v-avatar size="46" class="person-card__avatar">
               <span class="person-card__initials">{{ initials(m.name) }}</span>
             </v-avatar>
-            <span class="person-card__badge"><v-icon icon="mdi-account-tie" size="12" /></span>
+            <span class="person-card__badge">
+              <v-icon :icon="m.isEarning ? 'mdi-account-tie' : 'mdi-account-heart-outline'" size="12" />
+            </span>
           </div>
           <div class="person-card__id" @click.stop>
             <v-text-field
@@ -225,7 +216,7 @@ const employmentItems = [
               placeholder="Name"
               class="person-card__name-input"
             />
-            <div class="person-card__role">Earner</div>
+            <div class="person-card__role">{{ m.isEarning ? "Earning adult" : "Non-earning adult" }}</div>
           </div>
           <v-chip size="small" variant="tonal" :color="memberColor(m.id)" class="person-card__age">
             Age {{ ageFromDOB(m.dateOfBirth) }}
@@ -244,7 +235,7 @@ const employmentItems = [
             icon
             variant="text"
             size="small"
-            :aria-label="`Remove ${m.name || 'earner'}`"
+            :aria-label="`Remove ${m.name || 'adult'}`"
             @click.stop="removeAt(members.indexOf(m))"
           >
             <v-icon icon="mdi-delete-outline" />
@@ -252,7 +243,7 @@ const employmentItems = [
         </div>
 
         <div v-if="!isExpanded(m.id)" class="person-card__summary">
-          <span v-for="(s, i) in earnerSummary(m)" :key="i" class="summary-chip">
+          <span v-for="(s, i) in adultSummary(m)" :key="i" class="summary-chip">
             <v-icon :icon="s.icon" size="13" />{{ s.label }}
           </span>
         </div>
@@ -262,19 +253,30 @@ const employmentItems = [
             <v-col cols="6" md="3">
               <v-text-field v-model="m.dateOfBirth" type="date" label="Date of birth" prepend-inner-icon="mdi-cake-variant-outline" variant="outlined" density="comfortable" hide-details />
             </v-col>
-            <v-col cols="6" md="3">
+            <!-- gh #67: retire-from-job age + employment render ONLY for an EARNING adult (derived). -->
+            <v-col v-if="m.isEarning" cols="6" md="3">
               <v-text-field v-model.number="m.targetRetirementAge" type="number" label="Target retirement age" prepend-inner-icon="mdi-beach" variant="outlined" density="comfortable" hide-details min="30" max="80" data-testid="member-retire-age" />
             </v-col>
             <v-col cols="6" md="3">
               <v-text-field v-model.number="m.planToAge" type="number" label="Plan-to age" prepend-inner-icon="mdi-timeline-clock-outline" variant="outlined" density="comfortable" hide-details min="50" max="110" data-testid="member-plan-to-age" />
             </v-col>
+            <v-col v-if="m.isEarning" cols="6" md="3">
+              <v-select v-model="m.employmentStatus" :items="employmentItems" label="Employment" variant="outlined" density="comfortable" hide-details />
+            </v-col>
+            <v-col cols="6" md="3">
+              <v-text-field v-model="m.relation" label="Relation" prepend-inner-icon="mdi-account-heart-outline" variant="outlined" density="comfortable" hide-details placeholder="Self / Spouse / Parent / …" />
+            </v-col>
             <v-col cols="6" md="3">
               <v-select v-model="m.city" :items="cityItems" label="City tier" variant="outlined" density="comfortable" hide-details />
             </v-col>
-            <v-col cols="6" md="3">
-              <v-select v-model="m.employmentStatus" :items="employmentItems" label="Employment" variant="outlined" density="comfortable" hide-details />
+            <!-- gh #67: non-earning adult hint — earning (and the retire-from-job age) follows income. -->
+            <v-col v-if="!m.isEarning" cols="12">
+              <v-alert type="info" variant="tonal" density="compact" class="mb-1" data-testid="non-earning-adult-hint">
+                Non-earning adult. Add their salary on the <strong>Income → Salary</strong> screen to mark
+                them as earning and set a retire-from-job age.
+              </v-alert>
             </v-col>
-            <!-- A5.x — inline horizon sanity messages (blocking + soft-warn). -->
+            <!-- A5.x — inline horizon sanity messages (blocking + soft-warn), earning adults only. -->
             <v-col v-if="horizonIssues(m).length" cols="12">
               <v-alert
                 v-for="(issue, i) in horizonIssues(m)"
@@ -305,107 +307,12 @@ const employmentItems = [
     <EmptyState
       v-else
       icon="mdi-account-tie-outline"
-      title="No earners yet"
-      copy="Add at least one earner — their salary, age and target retirement age drive every income, tax and FIRE projection."
-      cta-label="Add an earner"
+      title="No adults yet"
+      copy="Add at least one adult — add their salary on the Income screen and they become an earner whose age and target retirement age drive every income, tax and FIRE projection."
+      cta-label="Add an adult"
       cta-icon="mdi-account-plus"
-      @cta="addPerson('EARNER')"
+      @cta="addPerson('ADULT')"
     />
-
-    <!-- ───── Non-earning adults (gh #34 — homemaker / non-earning spouse) ───── -->
-    <div class="section-head mt-6">
-      <span class="section-eyebrow">Non-earning adults</span>
-      <span class="section-count">{{ nonEarningAdultCount }}</span>
-      <v-spacer />
-      <v-btn size="small" color="secondary" variant="tonal" rounded="lg" @click="addPerson('NON_EARNING_ADULT')">
-        <v-icon icon="mdi-plus" class="mr-1" /> Add non-earning adult
-      </v-btn>
-    </div>
-
-    <div v-if="nonEarningAdultCount" class="person-grid">
-      <div
-        v-for="(m, idx) in nonEarningAdults"
-        :key="m.id"
-        class="person-card"
-        :class="{ 'person-card--open': isExpanded(m.id) }"
-        :style="{ ...colorVars(m.id), '--enter-delay': `${idx * 45}ms` }"
-      >
-        <div class="person-card__head" @click="toggleExpand(m.id)">
-          <div class="person-card__avatar-wrap">
-            <v-avatar size="46" class="person-card__avatar">
-              <span class="person-card__initials">{{ initials(m.name) }}</span>
-            </v-avatar>
-            <span class="person-card__badge"><v-icon icon="mdi-account-heart-outline" size="12" /></span>
-          </div>
-          <div class="person-card__id" @click.stop>
-            <v-text-field
-              v-model="m.name"
-              variant="plain"
-              density="compact"
-              hide-details
-              aria-label="Name"
-              placeholder="Name"
-              class="person-card__name-input"
-            />
-            <div class="person-card__role">{{ m.relation || "Non-earning adult" }}</div>
-          </div>
-          <v-chip size="small" variant="tonal" :color="memberColor(m.id)" class="person-card__age">
-            Age {{ ageFromDOB(m.dateOfBirth) }}
-          </v-chip>
-          <v-btn
-            icon
-            variant="text"
-            size="small"
-            class="person-card__chevron"
-            :aria-label="isExpanded(m.id) ? 'Collapse details' : 'Edit details'"
-            @click.stop="toggleExpand(m.id)"
-          >
-            <v-icon :icon="isExpanded(m.id) ? 'mdi-chevron-up' : 'mdi-pencil-outline'" />
-          </v-btn>
-          <v-btn
-            icon
-            variant="text"
-            size="small"
-            :aria-label="`Remove ${m.name || 'non-earning adult'}`"
-            @click.stop="removeAt(members.indexOf(m))"
-          >
-            <v-icon icon="mdi-delete-outline" />
-          </v-btn>
-        </div>
-
-        <div v-if="!isExpanded(m.id)" class="person-card__summary">
-          <span v-for="(s, i) in nonEarningAdultSummary(m)" :key="i" class="summary-chip">
-            <v-icon :icon="s.icon" size="13" />{{ s.label }}
-          </span>
-        </div>
-
-        <v-expand-transition>
-          <v-row v-if="isExpanded(m.id)" dense class="person-card__fields">
-            <v-col cols="6" md="3">
-              <v-text-field v-model="m.dateOfBirth" type="date" label="Date of birth" prepend-inner-icon="mdi-cake-variant-outline" variant="outlined" density="comfortable" hide-details />
-            </v-col>
-            <v-col cols="6" md="3">
-              <v-text-field v-model.number="m.planToAge" type="number" label="Plan-to age" prepend-inner-icon="mdi-timeline-clock-outline" variant="outlined" density="comfortable" hide-details min="50" max="110" data-testid="non-earning-plan-to-age" />
-            </v-col>
-            <v-col cols="6" md="3">
-              <v-text-field v-model="m.relation" label="Relation" prepend-inner-icon="mdi-account-heart-outline" variant="outlined" density="comfortable" hide-details placeholder="Spouse / Parent / …" />
-            </v-col>
-            <v-col cols="6" md="3">
-              <v-select v-model="m.city" :items="cityItems" label="City tier" variant="outlined" density="comfortable" hide-details />
-            </v-col>
-            <v-col cols="12" sm="4">
-              <v-select v-model="m.riskAppetite" :items="riskItems" label="Risk appetite" variant="outlined" density="comfortable" hide-details />
-            </v-col>
-            <v-col cols="12" sm="4">
-              <v-select v-model="m.health" :items="healthItems" label="Health" variant="outlined" density="comfortable" hide-details />
-            </v-col>
-            <v-col cols="12" sm="4">
-              <v-select v-model="m.marital" :items="maritalItems" label="Marital status" variant="outlined" density="comfortable" hide-details />
-            </v-col>
-          </v-row>
-        </v-expand-transition>
-      </div>
-    </div>
 
     <!-- ───── Dependents ───── -->
     <div class="section-head mt-6">
