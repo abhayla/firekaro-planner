@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, ref } from "vue";
 import { useHouseholdStore } from "@/stores/household";
+import { useFireDerive } from "@/lib/useFireDerive";
 import { formatINRCompact } from "@/lib/formatters";
 import { toAnnual } from "@/lib/cashflow";
 import { buildDonutSegments } from "@/lib/donut";
@@ -13,6 +14,7 @@ import AddTypeChips, { type AddTypeChip } from "@/components/income-layout/AddTy
 import EntryDialog from "@/components/income-layout/EntryDialog.vue";
 
 const household = useHouseholdStore();
+const fire = useFireDerive();
 
 interface KindMeta {
   label: string;
@@ -46,8 +48,12 @@ function periodSuffix(p: Period): string {
   return p === "M" ? "/mo" : p === "Q" ? "/qtr" : "/yr";
 }
 
-const activeBusinesses = computed(() => household.data.businesses.filter((b) => b.isOperated !== false));
-const passiveBusinesses = computed(() => household.data.businesses.filter((b) => b.isOperated === false));
+// gh #66: DISPLAY lists are member-lensed (filtered to the selected member + "Joint"); on the
+// default "Whole household" view fire.lensedBusinesses equals household.data.businesses, so this is
+// unchanged. The form's owner-options and "recent entry" defaults intentionally stay on the full
+// household.data.businesses / household.adults (a non-earning adult can still own a business).
+const activeBusinesses = computed(() => fire.lensedBusinesses.value.filter((b) => b.isOperated !== false));
+const passiveBusinesses = computed(() => fire.lensedBusinesses.value.filter((b) => b.isOperated === false));
 const totalShare = computed(() => activeBusinesses.value.reduce((s, b) => s + personalShare(b), 0));
 
 const byKind = computed(() => {

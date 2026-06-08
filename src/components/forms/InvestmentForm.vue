@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { useHouseholdStore } from "@/stores/household";
+import { useFireDerive } from "@/lib/useFireDerive";
 import { formatINRCompact } from "@/lib/formatters";
 import { canonicalizeSegments } from "@/lib/contribution-schedule";
 import type { Investment, InvestmentType } from "@/types/household";
@@ -9,6 +10,14 @@ import PanelCard from "@/components/shared/PanelCard.vue";
 import EntityRow from "@/components/shared/EntityRow.vue";
 
 const household = useHouseholdStore();
+const fire = useFireDerive();
+
+// gh #66: the "Your holdings" DISPLAY list is member-lensed (selected member + "Joint"); equals
+// household.data.investments on the default "Whole household" view and in the onboarding wizard
+// (where no member is selected). The owner-options, draft defaults, derived-EPF preview and the
+// real-estate loan prompt intentionally stay on the full household.data (a non-earning adult can
+// own assets, and the RE-loan prompt is a whole-household validation cue).
+const lensedInvestments = computed(() => fire.lensedInvestments.value);
 
 const TYPES: { value: InvestmentType; label: string; placeholder: string; allowJoint: boolean }[] = [
   { value: "Stocks", label: "Stocks", placeholder: "My equity portfolio", allowJoint: true },
@@ -800,11 +809,11 @@ function saveEdit() {
       Do you have an outstanding loan on your Real Estate ({{ formatINRCompact(reTotalValue) }} added)? Add it on the Liabilities step so we can model the EMI + interest correctly.
     </v-alert>
 
-    <template v-if="household.data.investments.length">
+    <template v-if="lensedInvestments.length">
       <div class="section-eyebrow">Your holdings</div>
       <PanelCard>
         <EntityRow
-          v-for="i in household.data.investments"
+          v-for="i in lensedInvestments"
           :key="i.id"
           :title="i.label || typeLabelFor(i.type)"
           :value="formatINRCompact(i.value)"

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { useHouseholdStore } from "@/stores/household";
+import { useFireDerive } from "@/lib/useFireDerive";
 import { formatINRCompact } from "@/lib/formatters";
 import { lifeCoverAdequacy, healthCoverAdequacy } from "@/lib/adequacy";
 import EmptyState from "@/components/shared/EmptyState.vue";
@@ -8,17 +8,20 @@ import LeafPageHeader from "@/components/income-layout/LeafPageHeader.vue";
 import MetricCard from "@/components/shared/MetricCard.vue";
 import LimitMeter from "@/components/shared/LimitMeter.vue";
 
-const household = useHouseholdStore();
+const fire = useFireDerive();
 
-const lifePolicies = computed(() => household.data.insurance.filter((p) => p.type === "Life"));
-const healthPolicies = computed(() => household.data.insurance.filter((p) => p.type === "Health"));
-const vehiclePolicies = computed(() => household.data.insurance.filter((p) => p.type === "Vehicle"));
+// gh #66: policy splits + premium are member-lensed (selected member + "Joint"); equal the full
+// household.data.insurance on the default "Whole household" view. The life-adequacy benchmark uses
+// the lensed primary earner so the "cover vs 10× income" ratio is member-scoped under a lens.
+const lifePolicies = computed(() => fire.lensedInsurance.value.filter((p) => p.type === "Life"));
+const healthPolicies = computed(() => fire.lensedInsurance.value.filter((p) => p.type === "Health"));
+const vehiclePolicies = computed(() => fire.lensedInsurance.value.filter((p) => p.type === "Vehicle"));
 
 const totalLifeCover = computed(() => lifePolicies.value.reduce((s, p) => s + p.sumAssured, 0));
 const totalHealthCover = computed(() => healthPolicies.value.reduce((s, p) => s + p.sumAssured, 0));
-const annualPremium = computed(() => household.data.insurance.reduce((s, p) => s + p.annualPremium, 0));
+const annualPremium = computed(() => fire.lensedInsurance.value.reduce((s, p) => s + p.annualPremium, 0));
 
-const primaryEarner = computed(() => household.earners[0]);
+const primaryEarner = computed(() => fire.lensedEarners.value[0]);
 const primaryIncome = computed(() => primaryEarner.value?.salary?.annualCTC ?? 0);
 
 const lifeAdequacy = computed(() =>
@@ -33,7 +36,7 @@ const healthAdequacy = computed(() =>
 const lifeTarget = computed(() => primaryIncome.value * 10);
 const HEALTH_TARGET = 500_000;
 
-const noPolicies = computed(() => household.data.insurance.length === 0);
+const noPolicies = computed(() => fire.lensedInsurance.value.length === 0);
 </script>
 
 <template>

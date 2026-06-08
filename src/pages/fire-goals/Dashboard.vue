@@ -17,6 +17,7 @@ import FireProjectionChart from "@/components/dashboard/FireProjectionChart.vue"
 import AssetAllocationDonut from "@/components/dashboard/AssetAllocationDonut.vue";
 import SectionCard from "@/components/dashboard/SectionCard.vue";
 import LeafPageHeader from "@/components/income-layout/LeafPageHeader.vue";
+import WholeHouseholdBadge from "@/components/shared/WholeHouseholdBadge.vue";
 import FamilyLayerCard from "@/components/dashboard/FamilyLayerCard.vue";
 import FireMilestonesCard from "@/components/dashboard/FireMilestonesCard.vue";
 import NudgeStack from "@/components/dashboard/NudgeStack.vue";
@@ -222,6 +223,9 @@ onMounted(() => {
 
       <!-- P5 (A5.x / A36) — horizon + estate-readiness chips beside the hero. -->
       <div class="d-flex flex-wrap ga-2 mb-2">
+        <!-- gh #66: the FIRE headline is a whole-household figure (the #22/#23 honesty guardrail) —
+             the badge makes explicit it does NOT change when viewing a single member. -->
+        <WholeHouseholdBadge />
         <v-chip size="small" variant="tonal" color="primary" prepend-icon="mdi-timer-sand">
           Planning horizon: {{ planningHorizonYears }} yrs
           (retire @{{ fire.targetRetirementAge.value }} → plan-to {{ fire.planToAge.value }})

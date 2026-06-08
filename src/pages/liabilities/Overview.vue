@@ -1,20 +1,22 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { useHouseholdStore } from "@/stores/household";
 import { useFireDerive } from "@/lib/useFireDerive";
 import { formatINRCompact } from "@/lib/formatters";
 import EmptyState from "@/components/shared/EmptyState.vue";
 import LeafPageHeader from "@/components/income-layout/LeafPageHeader.vue";
 import MetricCard from "@/components/shared/MetricCard.vue";
 
-const household = useHouseholdStore();
 const fire = useFireDerive();
 
+// gh #66: member-lensed DISPLAY (selected member + "Joint"); equals household.data.liabilities on
+// the default "Whole household" view. DTI uses the lensed take-home (fire.monthlyTakeHome) so the
+// debt-burden ratio is member-scoped when a member is selected.
+const lensedLiabilities = computed(() => fire.lensedLiabilities.value);
 const totalOutstanding = computed(() =>
-  household.data.liabilities.reduce((s, l) => s + l.outstandingBalance, 0),
+  lensedLiabilities.value.reduce((s, l) => s + l.outstandingBalance, 0),
 );
 const monthlyEMI = computed(() =>
-  household.data.liabilities.reduce((s, l) => s + l.monthlyEMI, 0),
+  lensedLiabilities.value.reduce((s, l) => s + l.monthlyEMI, 0),
 );
 const monthlyTakeHome = computed(() => fire.monthlyTakeHome.value);
 const dtiRatio = computed(() =>
@@ -26,7 +28,7 @@ const dtiColor = computed(() => {
   return "error";
 });
 const nextEnd = computed(() => {
-  const ends = household.data.liabilities
+  const ends = lensedLiabilities.value
     .map((l) => l.derivedEndYear)
     .filter((v): v is number => typeof v === "number");
   if (!ends.length) return null;
@@ -55,7 +57,7 @@ function deltaPct(trend: number[]): number {
 
 const outstandingTrend = computed(() => buildPaydownTrend(totalOutstanding.value, 1.12, 2));
 const emiTrend = computed(() => buildPaydownTrend(monthlyEMI.value, 1.04, 1));
-const noLiabilities = computed(() => household.data.liabilities.length === 0);
+const noLiabilities = computed(() => lensedLiabilities.value.length === 0);
 </script>
 
 <template>
@@ -82,7 +84,7 @@ const noLiabilities = computed(() => household.data.liabilities.length === 0);
           :value="formatINRCompact(totalOutstanding)"
           :delta="deltaPct(outstandingTrend)"
           delta-invert
-          :delta-meta="`${household.data.liabilities.length} loan${household.data.liabilities.length === 1 ? '' : 's'}`"
+          :delta-meta="`${lensedLiabilities.length} loan${lensedLiabilities.length === 1 ? '' : 's'}`"
           :sparkline="outstandingTrend"
           sparkline-color="var(--color-error)"
         />

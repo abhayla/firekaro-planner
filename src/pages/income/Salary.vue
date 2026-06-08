@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from "vue";
 import { useHouseholdStore } from "@/stores/household";
+import { useUiStore } from "@/stores/ui";
 import { dobFromAge } from "@/lib/age";
 import { formatINRCompact } from "@/lib/formatters";
 import { buildDonutSegments } from "@/lib/donut";
@@ -15,6 +16,7 @@ import MembersForm from "@/components/forms/MembersForm.vue";
 import EmptyState from "@/components/shared/EmptyState.vue";
 
 const household = useHouseholdStore();
+const ui = useUiStore();
 
 // Earner-axis palette — cycled by index for donut + ranked bars.
 const PALETTE = ["primary", "success", "info", "warning", "secondary", "fire-orange"];
@@ -28,19 +30,25 @@ function ctcOf(m: Member): number {
 
 // gh #67: the Salary screen manages every ADULT (the editing roster — a non-earning adult appears
 // with ₹0 so you can give them income, which then derives them as an earner). Sorted by CTC desc.
-const rankedEarners = computed(() => [...household.adults].sort((a, b) => ctcOf(b) - ctcOf(a)));
+// gh #66: member-lensed DISPLAY roster — when a specific member is selected in the "Viewing as"
+// control, show only that adult; on the default "Whole household" view show every adult. The
+// add-earner / edit-earner forms below intentionally stay on the full household.adults roster.
+const rankedEarners = computed(() => {
+  const roster =
+    ui.viewingMemberId != null
+      ? household.adults.filter((m) => m.id === ui.viewingMemberId)
+      : household.adults;
+  return [...roster].sort((a, b) => ctcOf(b) - ctcOf(a));
+});
 
-// Whole-household salary total. Sourced from the un-lensed store aggregate so the
-// Salary screen, the Income Overview KPI and household.totalAnnualIncome all agree
-// (Rule 26 cross-page consistency). useFireDerive().annualIncome.salaryIncome is the
-// SAME computation behind a viewing-lens and is intentionally not used here — the
-// Salary screen manages every earner, not just the lens member.
-const totalCTC = computed(() => household.totalAnnualIncome.salaryIncome);
+// KPIs follow the lensed roster (member-scoped when a member is selected, whole-household otherwise).
+const totalCTC = computed(() => rankedEarners.value.reduce((s, m) => s + ctcOf(m), 0));
 const employedCount = computed(
-  () => household.earners.filter((m) => m.employmentStatus === "Employed").length,
+  () => rankedEarners.value.filter((m) => m.employmentStatus === "Employed").length,
 );
 const avgHike = computed(() => {
-  const list = household.earners; // hike averaged over actual earners only
+  // hike averaged over the lensed roster's actual earners (those with salary on file)
+  const list = rankedEarners.value.filter((m) => (m.salary?.annualCTC ?? 0) > 0);
   if (!list.length) return 0;
   return list.reduce((s, m) => s + (m.salary?.hikePercent ?? 0), 0) / list.length;
 });
@@ -51,7 +59,7 @@ const kpis = computed<KpiTile[]>(() => {
     { eyebrow: "Total CTC · per year", value: formatINRCompact(totalCTC.value), accent: true },
     {
       eyebrow: "Earners",
-      value: String(household.earners.length),
+      value: String(rankedEarners.value.filter((m) => (m.salary?.annualCTC ?? 0) > 0).length),
       meta: `${employedCount.value} at work`,
     },
     { eyebrow: "Avg hike", value: `${avgHike.value.toFixed(1)}%`, meta: "expected / yr" },
@@ -158,7 +166,7 @@ function commitAddEarner() {
       description="Annual CTC per earner. Expected hike % drives the multi-year FIRE projection. Click a card to edit the full salary structure."
     />
 
-    <template v-if="household.adults.length">
+    <template v-if="rankedEarners.length">
       <StatDashboard
         :kpis="kpis"
         :donut-segments="donutSegments"
@@ -179,7 +187,7 @@ function commitAddEarner() {
           icon="mdi-account-group"
           accent-color="primary"
           :total="formatINRCompact(totalCTC)"
-          :count-label="`${household.adults.length} ${household.adults.length === 1 ? 'adult' : 'adults'}`"
+          :count-label="`${rankedEarners.length} ${rankedEarners.length === 1 ? 'adult' : 'adults'}`"
           :entries="rankedEarners"
           add-sub-label="adult"
           @edit="startEditEarner"

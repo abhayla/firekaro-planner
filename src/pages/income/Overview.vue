@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { useHouseholdStore } from "@/stores/household";
+import { useFireDerive } from "@/lib/useFireDerive";
+import { toAnnual } from "@/lib/cashflow";
 import { formatINRCompact } from "@/lib/formatters";
 import { buildDonutSegments } from "@/lib/donut";
 import LeafPageHeader from "@/components/income-layout/LeafPageHeader.vue";
@@ -9,17 +10,30 @@ import RankedBars, { type RankedBar } from "@/components/income-layout/RankedBar
 import IncomeVsExpenses from "@/components/charts/IncomeVsExpenses.vue";
 import EmptyState from "@/components/shared/EmptyState.vue";
 
-const household = useHouseholdStore();
+const fire = useFireDerive();
 
-// Whole-household income buckets — un-lensed so this roll-up agrees with the
-// Salary / Business / Other Sources screens and the store aggregate (Rule 26).
-// The viewing lens is a FIRE-dashboard concern, not an income roll-up one.
-const income = computed(() => household.totalAnnualIncome);
-const salaryTotal = computed(() => income.value.salaryIncome);
-const businessTotal = computed(() => income.value.businessShare);
-const otherTotal = computed(() => income.value.otherTaxable + income.value.otherExempt);
-const otherExempt = computed(() => income.value.otherExempt);
-const grandTotal = computed(() => income.value.total);
+// gh #66: income roll-up buckets are member-lensed so this overview agrees with the (now also
+// lensed) Salary / Business / Other Sources screens under a viewing lens. On the default
+// "Whole household" view the lensed collections equal the full set, so this is byte-identical to
+// the un-lensed roll-up. Salary is summed from the lensed earner roster; business/other from the
+// lensed collections — keeping all income screens coherent for the selected member.
+const salaryTotal = computed(() =>
+  fire.lensedEarners.value.reduce((s, m) => s + (m.salary?.annualCTC ?? 0), 0),
+);
+const businessTotal = computed(() =>
+  fire.lensedBusinesses.value
+    .filter((b) => b.isOperated !== false)
+    .reduce((s, b) => s + toAnnual({ amount: b.annualProfit, period: b.frequency }) * (b.sharePercent / 100), 0),
+);
+const otherExempt = computed(() =>
+  fire.lensedOtherIncome.value
+    .filter((o) => o.isTaxExempt)
+    .reduce((s, o) => s + toAnnual({ amount: o.amount, period: o.frequency }), 0),
+);
+const otherTotal = computed(() =>
+  fire.lensedOtherIncome.value.reduce((s, o) => s + toAnnual({ amount: o.amount, period: o.frequency }), 0),
+);
+const grandTotal = computed(() => salaryTotal.value + businessTotal.value + otherTotal.value);
 
 interface SourceBucket {
   key: string;
@@ -45,7 +59,7 @@ const kpis = computed<KpiTile[]>(() => {
       eyebrow: "Total household · per year",
       value: formatINRCompact(grandTotal.value),
       accent: true,
-      meta: `${household.earners.length} ${household.earners.length === 1 ? "earner" : "earners"}`,
+      meta: `${fire.lensedEarners.value.length} ${fire.lensedEarners.value.length === 1 ? "earner" : "earners"}`,
     },
     { eyebrow: "Salary", value: formatINRCompact(salaryTotal.value) },
     { eyebrow: "Business", value: formatINRCompact(businessTotal.value) },
@@ -103,7 +117,7 @@ const rankedBars = computed<RankedBar[]>(() =>
 
     <div class="section-eyebrow">Per-earner breakdown</div>
     <v-card variant="outlined">
-      <v-table v-if="household.earners.length > 0" density="compact">
+      <v-table v-if="fire.lensedEarners.value.length > 0" density="compact">
         <thead>
           <tr>
             <th>Earner</th>
@@ -113,7 +127,7 @@ const rankedBars = computed<RankedBar[]>(() =>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="m in household.earners" :key="m.id">
+          <tr v-for="m in fire.lensedEarners.value" :key="m.id">
             <td>{{ m.name }}</td>
             <td class="text-right text-currency">{{ formatINRCompact(m.salary?.annualCTC ?? 0) }}</td>
             <td class="text-right font-mono">{{ m.salary?.hikePercent ?? 8 }}%</td>

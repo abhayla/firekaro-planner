@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { useHouseholdStore } from "@/stores/household";
+import { useFireDerive } from "@/lib/useFireDerive";
 import { formatINRCompact } from "@/lib/formatters";
 import { lifeCoverAdequacy, healthCoverAdequacy } from "@/lib/adequacy";
 import { isEarningMember } from "@/lib/member-earning";
@@ -10,6 +11,12 @@ import PanelCard from "@/components/shared/PanelCard.vue";
 import EntityRow from "@/components/shared/EntityRow.vue";
 
 const household = useHouseholdStore();
+const fire = useFireDerive();
+
+// gh #66: the "Your policies" DISPLAY list is member-lensed (selected member + "Joint"); equals
+// household.data.insurance on the default "Whole household" view and in the onboarding wizard.
+// Insured-person options and draft defaults intentionally stay on the full household roster.
+const lensedInsurance = computed(() => fire.lensedInsurance.value);
 
 const TYPES: { value: InsuranceType; label: string; icon: string; color: string }[] = [
   { value: "Life", label: "Life", icon: "mdi-shield-account", color: "primary" },
@@ -180,11 +187,11 @@ function saveEdit() {
       </v-row>
     </PanelCard>
 
-    <template v-if="household.data.insurance.length">
+    <template v-if="lensedInsurance.length">
       <div class="section-eyebrow">Your policies</div>
       <PanelCard>
         <EntityRow
-          v-for="p in household.data.insurance"
+          v-for="p in lensedInsurance"
           :key="p.id"
           :title="p.provider"
           :value="formatINRCompact(p.sumAssured)"

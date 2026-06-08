@@ -10,7 +10,6 @@
  * controlled when surfaced).
  */
 import { computed } from "vue";
-import { useHouseholdStore } from "@/stores/household";
 import { useFireDerive } from "@/lib/useFireDerive";
 import { formatINRCompact } from "@/lib/formatters";
 import type { Investment } from "@/types/household";
@@ -18,7 +17,6 @@ import { typeColor, typeLabel } from "@/lib/investment-traits";
 import DiscoveryFooter from "@/components/shared/DiscoveryFooter.vue";
 import EntityRow from "@/components/shared/EntityRow.vue";
 
-const household = useHouseholdStore();
 const fire = useFireDerive();
 
 interface BucketDef {
@@ -35,9 +33,11 @@ const BUCKETS: BucketDef[] = [
   { num: 4, label: "Bucket 4 (Aggressive growth)", range: "25+ years", description: "Equity-heavy; survives multiple market cycles.", color: "warning" },
 ];
 
+// gh #66: member-lensed (selected member + "Joint"); equals the full set on the default
+// "Whole household" view. SORR/coverage is then computed over the member-scoped holdings.
 const investmentsByBucket = computed(() => {
   const out: Record<1 | 2 | 3 | 4, Investment[]> = { 1: [], 2: [], 3: [], 4: [] };
-  for (const inv of household.data.investments) {
+  for (const inv of fire.lensedInvestments.value) {
     if (inv.bucket && [1, 2, 3, 4].includes(inv.bucket)) {
       out[inv.bucket as 1 | 2 | 3 | 4].push(inv);
     }
@@ -46,7 +46,7 @@ const investmentsByBucket = computed(() => {
 });
 
 const unassigned = computed(() =>
-  household.data.investments.filter((i) => !i.bucket),
+  fire.lensedInvestments.value.filter((i) => !i.bucket),
 );
 
 const bucketTotal = (n: 1 | 2 | 3 | 4) =>
