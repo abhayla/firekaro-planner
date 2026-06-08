@@ -215,6 +215,50 @@ describe("derive() — pure kernel", () => {
     expect(rohitTaxAfter).toBe(rohitTaxBaseline);
   });
 
+  // gh #66: the member lens re-scopes the member-attributable DISPLAY collections (income/
+  // investments/liabilities/insurance/business) to the selected member + "Joint", while FIRE /
+  // adequacy stays household-scoped (the #22/#23 honesty guardrail). These two tests lock both legs.
+  it("gh #66: lensed display collections SHRINK to the selected member (+ Joint), and orthogonal to family-view", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    loadSeedPersona(h, a); // Sharmas: rohit + priya (earners), aarav + meera (dependents)
+    const whole = derive(h.data, a.values, { isFamilyView: false, viewingMemberId: null, currentFY: "2025-26" });
+    const lensed = derive(h.data, a.values, { isFamilyView: false, viewingMemberId: "rohit", currentFY: "2025-26" });
+
+    // Every member-attributable collection is re-scoped to rohit (+ Joint), so it is a STRICT subset.
+    expect(lensed.lensedInvestments.length).toBeLessThan(whole.lensedInvestments.length);
+    expect(lensed.lensedInvestments.length).toBeGreaterThan(0);
+    expect(lensed.lensedInvestments.every((i) => i.ownerId === "rohit" || i.ownerId === "Joint")).toBe(true);
+    expect(lensed.lensedEarners.length).toBe(1);
+    expect(lensed.lensedEarners[0].id).toBe("rohit");
+    expect(lensed.lensedLiabilities.every((l) => l.ownerId === "rohit" || l.ownerId === "Joint" || l.isSharedWithSpouse)).toBe(true);
+    expect(lensed.lensedInsurance.every((p) => p.insuredPersonId === "rohit")).toBe(true);
+    expect(lensed.lensedBusinesses.every((b) => b.ownerId === "rohit" || b.ownerId === "Joint")).toBe(true);
+    expect(lensed.lensedOtherIncome.every((o) => o.ownerId === "rohit" || o.ownerId === "Joint")).toBe(true);
+    // The lensed income DISPLAY changes too (only rohit's salary, not the household total).
+    expect(lensed.annualIncome.salaryIncome).toBeLessThan(whole.annualIncome.salaryIncome);
+
+    // #66 orthogonality: the member lens applies even with family-view ON.
+    const lensedFamilyOn = derive(h.data, a.values, { isFamilyView: true, viewingMemberId: "rohit", currentFY: "2025-26" });
+    expect(lensedFamilyOn.lensedInvestments.length).toBe(lensed.lensedInvestments.length);
+    expect(lensedFamilyOn.annualIncome.salaryIncome).toBe(lensed.annualIncome.salaryIncome);
+  });
+
+  it("gh #66 honesty lock: FIRE number/age is INVARIANT to member selection (household figure)", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    loadSeedPersona(h, a);
+    const whole = derive(h.data, a.values, { isFamilyView: false, viewingMemberId: null, currentFY: "2025-26" });
+    for (const memberId of ["rohit", "priya", "aarav"]) {
+      const lensed = derive(h.data, a.values, { isFamilyView: false, viewingMemberId: memberId, currentFY: "2025-26" });
+      // The household FIRE adequacy leg must NOT move when a member is viewed — the #22/#23 guardrail.
+      expect(lensed.fireNumber, `FIRE number invariant under lens=${memberId}`).toBe(whole.fireNumber);
+      expect(lensed.yearsToRegular, `years-to-FIRE invariant under lens=${memberId}`).toBe(whole.yearsToRegular);
+      expect(lensed.totalCorpus, `corpus invariant under lens=${memberId}`).toBe(whole.totalCorpus);
+      expect(lensed.annualSavings, `savings invariant under lens=${memberId}`).toBe(whole.annualSavings);
+    }
+  });
+
   it("gh-issue #29: let-out rental is taxed on 70% NAV (Sec 24a) — but cash income stays FULL", () => {
     const h = useHouseholdStore();
     const a = useAssumptionsStore();

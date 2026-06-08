@@ -101,7 +101,16 @@ export function derive(household: Household, assumptions: Assumptions, lens: Der
   // savings → an incoherent FIRE age (Sharmas age 81 vs the true household 62). When
   // not lensed, the entire engine — income, tax, AND FIRE adequacy — runs on the
   // household, so every consumer is coherent by construction.
-  const applyMemberLens = !isSolo && !lens.isFamilyView && lens.viewingMemberId != null;
+  //
+  // #66: "Viewing as <member>" and "Family view" are ORTHOGONAL — selecting a member
+  // lenses the member-attributable DISPLAY surfaces regardless of the family-view toggle
+  // (the global app-bar control implies whole-app filtering). The gate no longer keys off
+  // `!isFamilyView`. Crucially this is still DISPLAY-ONLY: the lensedScope/householdScope
+  // split below routes FIRE/adequacy/expenses through the HOUSEHOLD scope, so the headline
+  // stays invariant to member selection (the #22/#23 honesty guardrail — locked by
+  // headline-plausibility.spec). The member lens re-scopes only what a single person "owns":
+  // their income/tax display + their investments/liabilities/insurance/business slices.
+  const applyMemberLens = !isSolo && lens.viewingMemberId != null;
   const effectiveLensMemberId: string | null = applyMemberLens ? lens.viewingMemberId : null;
   const lensedMemberIds: Set<string> = applyMemberLens && effectiveLensMemberId
     ? new Set([effectiveLensMemberId])
@@ -123,7 +132,12 @@ export function derive(household: Household, assumptions: Assumptions, lens: Der
   const lensedInsurance = household.insurance.filter((p) =>
     applyMemberLens ? lensedMemberIds.has(p.insuredPersonId) : true,
   );
-  // (businesses + other-income are scoped INSIDE computeScope below, per #23 — no top-level lensed set.)
+  // #66: member-attributable DISPLAY collections for the income Business/Other-Sources screens —
+  // owned by the lensed member (+ "Joint" always visible). These are DISPLAY-only, exactly like
+  // lensedInvestments/Liabilities/Insurance; the FIRE adequacy leg still reads the HOUSEHOLD scope
+  // via computeScope below, so adding these does not move the headline (#23 split preserved).
+  const lensedBusinesses = household.businesses.filter((b) => ownerMatches(b.ownerId));
+  const lensedOtherIncome = household.otherIncome.filter((o) => ownerMatches(o.ownerId));
 
   // #23 ROOT FIX: FIRE adequacy is inherently HOUSEHOLD — the family funds one shared corpus and
   // retires together — so an EXPLICIT member drill-down must NOT move the FIRE number/corpus/savings/
@@ -713,6 +727,8 @@ export function derive(household: Household, assumptions: Assumptions, lens: Der
     lensedInvestments,
     lensedLiabilities,
     lensedInsurance,
+    lensedBusinesses,
+    lensedOtherIncome,
     anchorAge,
     targetRetirementAge,
     annualExpensesToday,
