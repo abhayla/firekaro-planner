@@ -126,6 +126,16 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 ## §3 — Decision log (append-only, newest first)
 
 ### 2026-06-08
+- **D-2026-06-08-19 — Build-now selection: the 2 must-haves (#67 → #66); focus lock lifted for these two;
+  goal contract authored.** Abhay: "suggest which ones to implement now; implement them as goal." Selected
+  the only 2 must-haves, sequenced **#67 (member-model coherence: earner derived from income) FIRST →
+  #66 (app-wide member lens)** — same member/owner domain, and #66's lens reads #67's clean model. The 14
+  good-to-haves stay parked (next-strongest if scope widens: the honesty bugs #64/#65). All design forks
+  pre-resolved (see the contract's authorization trail: #67 earning=labour-income-only + role ADULT/DEPENDENT
+  + computed isEarning + role-migration; #66 Viewing-as⊥Family-view, lens member-attributable surfaces only,
+  FIRE stays household-scoped + invariant). **Goal contract authored** (analysis→build handoff per rule 28):
+  `docs/goals/2026-06-08-member-model-coherence-and-app-wide-lens.md`. Contract is NOT committed and NOT run
+  — committing + invoking `/goal` are Abhay's (feedback_goal_is_user_invoked). Pointers: gh #67, gh #66.
 - **D-2026-06-08-18 — Capture email + mobile in profile → filed gh #79 (`enhancement`, `good-to-have`,
   area:auth-identity, analysis-only). CEO opinion: agree on direction, push back on 2 of the rules.** Abhay
   proposed email mandatory for logged-in user + adult members, optional for child; mobile optional. **Verified:**
