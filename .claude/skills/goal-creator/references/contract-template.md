@@ -86,8 +86,11 @@ must NOT touch>`.
 
 ### <Stage> acceptance (run the §<N> gate sweep before committing this stage)
 - <Concrete, checkable acceptance criteria.>
-- **Stage gate sweep:** static → Rule 24 → Rule 25 (if writes) → Rule 26 (cross-page) →
-  a11y/Lighthouse (if UI). All green or DEFERRED-with-reason before the stage's commit.
+- **Stage gate sweep (gate by blast radius of the changed surface — see the conditional-gating
+  table in `references/baked-in-rules.md`):** static → Rule 24 (render) → Rule 32 (controls work,
+  if interactive UI) → Rule 25 (if writes) → API behavioral test (if `server/`/`/api/**` touched) →
+  Rule 26 (cross-page, always) → Rule 33 (blind re-verify any test verdict, always when a verdict
+  exists) → a11y/Lighthouse (if UI). All green or DEFERRED-with-reason before the stage's commit.
 
 <Repeat STAGE B, C, … as needed.>
 
@@ -126,14 +129,23 @@ what untracked items to leave alone. Branch + push target. Co-author trailer.>
 **Static gates:**
 - [ ] type-check 0 errors · unit tests no regression · build succeeds <+ bundle budget if any>.
 
-**Rule 24 (per UI screen):**
+**Rule 24 (per UI screen — render):**
 - [ ] screenshot + ARIA snapshot + console_messages pass; PNG read + confirmed; zero NEW console errors.
+
+**Rule 32 (per interactive UI screen — functionality):**
+- [ ] primary controls exercised (clicks/tabs/FY/forms/dialogs/filters) and each RESPONDS (state/data/FIRE figure updates); no NEW console error. (Skip w/ reason if no interactive UI change.)
 
 **Rule 25 (per write path):**
 - [ ] dual-signal: UI reflects change AND <persistence> round-trip confirms expected shape/values.
 
+**API behavioral test (if `server/`/`/api/**` touched):**
+- [ ] status code + envelope shape + auth-gate + ownership/IDOR asserted for each changed `/api/**` route or `household-*` lib. (Skip w/ reason if no server/API change.)
+
 **Rule 26 (cross-page consistency):**
 - [ ] mutated resource propagates to every cross-page consumer (name them) — values equal (±1 rounding).
+
+**Rule 33 (blind independent test verification):**
+- [ ] every test verdict re-checked by a separate context-blind agent (same inputs + raw evidence); coverage + verdict-correctness concur; dissents reconciled (`independent-test-verification.md`).
 
 **a11y / Lighthouse (if UI):**
 - [ ] zero Critical+Serious WCAG 2.1 AA (or DEFERRED w/ reason) · Lighthouse within target (or DEFERRED).
@@ -187,7 +199,9 @@ offers to apply the fold-back via `goal-creator` Mode B.
 
 ## References (loaded transitively by the skills this contract invokes)
 
-- `rules/claude-behavior.md` — rules 15, 17, 20, 23, 24, 25, 26
+- `rules/claude-behavior.md` — rules 15, 17, 20, 23, 24, 25, 26, 32, 33
+- `rules/testing-strategy.md` — test PLACEMENT SSOT (which test type runs in which env)
+- `rules/independent-test-verification.md` — rule 33 blind test re-verification
 - `rules/tdd.md` — red-green-refactor (if the contract does TDD)
 - `rules/dev-bypass-auth.md` — `x-dev-bypass: true` for root-app Rule 26 API checks
 - <the storage-adapter / mvp/CLAUDE.md / section-plan / e2e rule files relevant to this goal>
