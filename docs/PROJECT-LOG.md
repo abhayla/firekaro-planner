@@ -126,6 +126,17 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 ## §3 — Decision log (append-only, newest first)
 
 ### 2026-06-08
+- **D-2026-06-08-13 — "What we assumed" (FIRE dashboard Bridge card) should be collapsible → filed gh #74
+  (`enhancement`, `good-to-have`, area:design-system, analysis-only).** Abhay (screenshot, prod): the
+  "WHAT WE ASSUMED — estimates you can correct" block is a long always-expanded list that clutters the
+  dashboard. **Verified:** `BridgeBreakdownCard.vue:159-188` renders the assumptions `v-for` unconditionally
+  (one row + Fix btn per holding), so it scales into a wall of text. Fix: collapse toggle on the header +
+  `v-expand-transition` (project standard, not v-show) + show the count when collapsed (keeps the honesty
+  caveats discoverable). **Default-state minor fork:** recommend collapsed-by-default-with-count (declutter
+  while transparency stays one tap away); expanded-default is the alternative. **Tiered `good-to-have`**
+  (readability polish; info fully present today, no wrong number → not Tier-0). Sibling: if other dashboard
+  cards have unbounded always-expanded disclosure blocks, standardize the collapsible pattern in
+  SCREEN-STANDARD (rule 27). Implementation gated. Pointer: gh #74.
 - **D-2026-06-08-12 — "Net Worth over time" chart blank for a populated user → filed gh #73 (`bug`,
   `good-to-have`, financial-health).** Abhay reported (prod): the Net Worth over time graph on
   `/financial-health/networth` is blank despite entering full data. **Root cause (verified — by-design +
