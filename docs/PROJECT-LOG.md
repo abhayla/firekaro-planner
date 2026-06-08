@@ -14,16 +14,22 @@
 
 ## §1 — Goal status (keep current)
 
-**Updated: 2026-06-07.**
+**Updated: 2026-06-08.**
 - **Goal (SSOT `docs/v6-fire-planner-product-plan.md` §9):** research-grounded Indian FIRE planning
   SaaS — correct, honest, sticky, friction-free — serving the **urban salaried accumulator** across
   the whole FIRE lifecycle (5 objectives: effortless setup · honest number · get-there-faster ·
   readiness-to-stop · stay-free-post-FIRE).
 - **Realization: ~65%.** Production-live (https://firekaro.com); the **full-lifecycle must-have core
-  — objectives 0, 1, 2, 3 AND 4 — is now built, deployed to prod, AND functionally verified live**
-  (deploys 2026-06-07, SHAs `d04571c` → `45201dc`; **#48/#50/#51/#52 all closed — must-have registry
-  empty**). **Remaining: stickiness is still unproven** (zero retained users, retention unmeasured) +
-  good-to-have (#41/#44/#45/#46/#49) + nice-to-have (#43/#47/#53) + adjacent personas (NRI/HUF).
+  — objectives 0, 1, 2, 3 AND 4 — is built, deployed to prod, AND functionally verified live**
+  (deploys 2026-06-07, SHAs `d04571c` → `45201dc`; **#48/#50/#51/#52 closed — must-have registry empty**).
+- **NEW (2026-06-08): the full-lifecycle QA verification & hardening cycle is COMPLETE** — Phase A
+  (deep correctness + the from-scratch UI data-entry journey across all 4 personas, blind-verified, +
+  tax-mutation hardening + the server-mode auth gate) merged to `main` (`b8fadd7`), and **Phase B
+  re-verified the LIVE site healthy** (25-screen authed sweep + interactive + blind-verify all PASS,
+  D-2026-06-08-02). So the core is now not just built but **independently hardened + prod-verified**.
+  (No realization-% bump — QA verifies, it doesn't add features.)
+- **Remaining: stickiness is still unproven** (zero retained users, retention unmeasured) + good-to-have
+  (#41/#44/#45/#46/#49/#62) + nice-to-have (#43/#47/#53/#63) + adjacent personas (NRI/HUF).
 - Calling the goal "achieved" would be the optimism-error the honesty mandate exists to prevent.
 
 ---
@@ -31,12 +37,19 @@
 ## §2 — Active priority / roadmap (the "Now" order: correctness → stickiness → friction)
 
 **FOCUS LOCK (2026-06-07, D-2026-06-07-07): MUST-HAVE ONLY** — no new good-to-have/nice-to-have build
-without Abhay's explicit per-item approval (`.claude/rules/must-have-only-focus.md`). The must-have
-registry is empty (obj 0→4 shipped), so the **current active work = full-lifecycle QA verification &
-hardening** of what's built — contract `docs/goals/2026-06-07-full-lifecycle-qa-verification.md`
-(Phase A pre-prod gate → Abhay deploy gate → Phase B post-prod verification; run via `/goal`).
-Testing/hardening/bug-fixing existing features is the rule's allowed carve-out; good-to-have
-(#41/#44/#45/#46/#49) + nice-to-have (#43/#47/#53) stay BLOCKED pending approval.
+without Abhay's explicit per-item approval (`.claude/rules/must-have-only-focus.md`).
+
+**✅ The full-lifecycle QA verification & hardening cycle is now DONE (2026-06-08, D-08-01/02):** Phase A
+merged to `main` (`b8fadd7`) + Phase B prod-verified PASS. **So the allowed must-have/hardening queue is
+now EMPTY.** Everything that remains — stickiness/retention (#44/#45), the other good-to-have
+(#41/#46/#49/#62), nice-to-have (#43/#47/#53/#63), adjacent personas (NRI/HUF) — is **BLOCKED by the
+focus lock pending Abhay's explicit approval**. **Next decision is Abhay's:** lift the lock for the next
+tier (most goal-anchored candidate = stickiness/retention, #44 measurement then #45 loop — the biggest
+unproven risk to the goal), or hold. No autonomous work proceeds on lower-tier items until then.
+
+**Prior active work (now complete):** the QA contract `docs/goals/2026-06-07-full-lifecycle-qa-verification.md`
+(Phase A pre-prod gate → deploy gate → Phase B post-prod). Testing/hardening of existing features was the
+lock's allowed carve-out; that carve-out is now exhausted.
 
 **Prior focus (2026-06-06, REPRIORITIZED by Abhay): COMPLETE THE MUST-HAVE CORE before
 stickiness.** Rationale (goal-anchored): there is no point measuring/improving retention on an
