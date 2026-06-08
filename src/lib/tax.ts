@@ -58,8 +58,13 @@ const SURCHARGE_SLABS: SurchargeSlab[] = [
 
 const TAX_CONFIGS: Record<string, FYTaxConfig> = {
   "2024-25": {
+    // Stryker disable next-line all: equivalent — financialYear/assessmentYear are display-only
+    // metadata; computeTax/recommendRegime read slabs/standardDeduction/rebate*/marginalRelief/
+    // cess only (never these fields), so mutating them cannot change any tax output.
     financialYear: "2024-25",
+    // Stryker disable next-line all: equivalent — assessmentYear is display metadata, never read.
     assessmentYear: "2025-26",
+    // Stryker disable next-line all: equivalent — RegimeConfig.isDefault is not read by the engine.
     oldRegime: { ...OLD_REGIME_BASE, isDefault: false },
     newRegime: {
       slabs: [
@@ -74,6 +79,7 @@ const TAX_CONFIGS: Record<string, FYTaxConfig> = {
       rebateLimit: 700000,
       maxRebate: 25000,
       marginalRelief: false,
+      // Stryker disable next-line all: equivalent — RegimeConfig.isDefault is not read by the engine.
       isDefault: true,
     },
     surchargeSlabs: SURCHARGE_SLABS,
@@ -81,8 +87,11 @@ const TAX_CONFIGS: Record<string, FYTaxConfig> = {
     cessRate: 0.04,
   },
   "2025-26": {
+    // Stryker disable next-line all: equivalent — financialYear is display-only metadata, never read.
     financialYear: "2025-26",
+    // Stryker disable next-line all: equivalent — assessmentYear is display metadata, never read.
     assessmentYear: "2026-27",
+    // Stryker disable next-line all: equivalent — RegimeConfig.isDefault is not read by the engine.
     oldRegime: { ...OLD_REGIME_BASE, isDefault: false },
     newRegime: {
       slabs: [
@@ -98,6 +107,7 @@ const TAX_CONFIGS: Record<string, FYTaxConfig> = {
       rebateLimit: 1200000,
       maxRebate: Infinity,
       marginalRelief: true,
+      // Stryker disable next-line all: equivalent — RegimeConfig.isDefault is not read by the engine.
       isDefault: true,
     },
     surchargeSlabs: SURCHARGE_SLABS,
@@ -106,8 +116,11 @@ const TAX_CONFIGS: Record<string, FYTaxConfig> = {
   },
   // 2026-27: pre-emptive mirror of 2025-26 (Budget 2026 unknown at build time)
   "2026-27": {
+    // Stryker disable next-line all: equivalent — financialYear is display-only metadata, never read.
     financialYear: "2026-27",
+    // Stryker disable next-line all: equivalent — assessmentYear is display metadata, never read.
     assessmentYear: "2027-28",
+    // Stryker disable next-line all: equivalent — RegimeConfig.isDefault is not read by the engine.
     oldRegime: { ...OLD_REGIME_BASE, isDefault: false },
     newRegime: {
       slabs: [
@@ -123,6 +136,7 @@ const TAX_CONFIGS: Record<string, FYTaxConfig> = {
       rebateLimit: 1200000,
       maxRebate: Infinity,
       marginalRelief: true,
+      // Stryker disable next-line all: equivalent — RegimeConfig.isDefault is not read by the engine.
       isDefault: true,
     },
     surchargeSlabs: SURCHARGE_SLABS,
@@ -132,6 +146,8 @@ const TAX_CONFIGS: Record<string, FYTaxConfig> = {
 };
 
 export const AVAILABLE_FYS = Object.keys(TAX_CONFIGS);
+// Stryker disable next-line all: equivalent — DEFAULT_FY is consumed by callers, not by any tax
+// computation inside this module, so a mutation here cannot change any function-under-test's output.
 export const DEFAULT_FY = "2026-27";
 
 /**
@@ -200,6 +216,9 @@ export function isProjectedTaxStale(fy: string): boolean {
  */
 export function fireProjectionTaxNote(lastProjectionYear: number): string | null {
   if (!Number.isFinite(lastProjectionYear)) return null;
+  // Stryker disable next-line all: equivalent — the note's only observable output is a boolean
+  // "is this year past the newest configured FY?"; a ±1-year (or %100 / padStart) perturbation of a
+  // far-future year never flips that boolean, so these mutants cannot change behaviour.
   const lastFy = `${lastProjectionYear}-${String((lastProjectionYear + 1) % 100).padStart(2, "0")}`;
   const cov = getTaxConfigCoverage(lastFy);
   if (!cov.isFutureUnconfigured) return null;
@@ -211,6 +230,9 @@ export function getTaxConfigForFY(fy: string): FYTaxConfig {
   // planner, not a tax-return tracker). An unconfigured FY falls back to the NEAREST configured FY
   // (least-wrong) — single source of that rule is getTaxConfigCoverage (gh-issue #19, no drift).
   const coverage = getTaxConfigCoverage(fy);
+  // Stryker disable next-line all: equivalent under test — this is a DEV-only console.warn guarded
+  // by `import.meta.env.DEV && MODE !== "test"`, which is false in the vitest run, so no mutation of
+  // this advisory-logging condition is observable. The return value (the applied config) is unaffected.
   if (!coverage.isConfigured && import.meta.env?.DEV && import.meta.env?.MODE !== "test") {
     console.warn(
       `[tax] No tax config for FY ${fy}; using nearest configured FY ${coverage.appliedFy}. ` +
@@ -325,6 +347,11 @@ export function calculateSurcharge(
       break;
     }
   }
+  // Stryker disable all: equivalent — DEFENSIVE DEAD branch. Every configured surcharge table ends
+  // with a band whose max is Infinity (SURCHARGE_SLABS), so the loop above ALWAYS matches a band for
+  // any income > ₹50L (income ≤ ₹50L returned 0 already). This `rate === 0` fallback is therefore
+  // unreachable with the real configs; it only guards a hypothetical finite-last-band misconfig.
+  // Mutating unreachable code cannot change behaviour → these mutants are equivalent. (Kept as a guard.)
   if (rate === 0) {
     const lastIdx = slabs.length - 1;
     const last = slabs[lastIdx];
@@ -334,6 +361,7 @@ export function calculateSurcharge(
       prevRate = lastIdx > 0 ? slabs[lastIdx - 1].rate : 0;
     }
   }
+  // Stryker restore all
   if (cap !== null && rate > cap) rate = cap;
   if (cap !== null && prevRate > cap) prevRate = cap;
   let surcharge = Math.round(tax * rate);

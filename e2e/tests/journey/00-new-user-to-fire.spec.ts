@@ -11,9 +11,14 @@
  * Runs in DEMO mode (localStorage adapter — the mode these splash specs need; the "Try the sample"
  * CTA is intentionally hidden in server mode, gh#36/#53). Headed-maximized by design (§1.1).
  *
- * DEFERRED to a server-mode run (documented, not silently skipped): the dev-bypass-OFF /login bounce,
- * and the first-login localStorage→ServerAdapter transition — both require VITE_USE_SERVER_ADAPTER=on
- * + the backend, which conflicts with the demo-mode "Try the sample" surface exercised here.
+ * Server-mode auth (dev-bypass-OFF) is verified OUTSIDE this demo-mode spec (it requires
+ * VITE_USE_SERVER_ADAPTER=on + dev-bypass OFF, which conflicts with the "Try the sample" surface here):
+ *  • the 3-factor gate (header alone never bypasses) → server/src/middleware/auth.spec.ts (regression lock);
+ *  • the live A2.5d sub-run (2026-06-07, #60) proved /api/planner/* → 401 (even WITH the x-dev-bypass
+ *    header) and every guarded route → /login bounce;
+ *  • the first-login localStorage→ServerAdapter transition (NO auto-migration by design — main.ts only
+ *    warms the cache) is documented as a known seam (gh issue, low severity: prod is always server-mode
+ *    + login-first, so demo data never accrues in the same origin).
  */
 import { test, expect, type Page } from "@playwright/test";
 
