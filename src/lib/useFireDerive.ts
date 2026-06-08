@@ -45,6 +45,10 @@ export function useFireDerive() {
     lensedRecurringExpenses: computed(() => d.value.lensedRecurringExpenses),
     lensedPlannedExpenses: computed(() => d.value.lensedPlannedExpenses),
     lensedMonthlyExpenses: computed(() => d.value.lensedMonthlyExpenses),
+    // #81 Phase 2 — standalone individual FIRE per adult + the household−Σ(adults) gap.
+    individualFireByMember: computed(() => d.value.individualFireByMember),
+    individualFireExpenseGapAnnual: computed(() => d.value.individualFireExpenseGapAnnual),
+    householdFireAge: computed(() => d.value.householdFireAge),
     anchorAge: computed(() => d.value.anchorAge),
     targetRetirementAge: computed(() => d.value.targetRetirementAge),
     annualExpensesToday: computed(() => d.value.annualExpensesToday),

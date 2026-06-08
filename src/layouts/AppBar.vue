@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, onMounted, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useUiStore } from "@/stores/ui";
 import { useHouseholdStore } from "@/stores/household";
+import { isAdultRole } from "@/types/household";
 import AssumptionsPanel from "@/components/shared/AssumptionsPanel.vue";
 import { SEED_META, loadSeed, getActiveSeed, type SeedName } from "@/seeds";
 import { authClient } from "@/lib/auth-client";
@@ -50,15 +51,43 @@ async function onSwitchSeed(name: SeedName) {
   setTimeout(() => window.location.reload(), 50);
 }
 
-const memberOptions = computed(() => [
-  { value: "all", label: "Whole household" },
-  ...household.members.map((m) => ({ value: m.id, label: m.name || "Member" })),
-]);
+// #81 Phase 2 (decision 7): the "Viewing as" lens membership is Household + ALL ADULTS
+// (earning or not). DEPENDENTS are HIDDEN here — a child has no standalone financial view;
+// their costs are attributed to the household / the children ring in the expense owner picker
+// instead. The logged-in user (the first adult) is tagged "(you)" for orientation.
+const adultMembers = computed(() => household.members.filter((m) => isAdultRole(m.role)));
+const showMemberFilter = computed(() => adultMembers.value.length > 1);
+const memberOptions = computed(() => {
+  const youId = adultMembers.value[0]?.id;
+  return [
+    { value: "all", label: "Whole household" },
+    ...adultMembers.value.map((m) => ({
+      value: m.id,
+      label: (m.name || "Adult") + (m.id === youId ? " (you)" : ""),
+    })),
+  ];
+});
 
 const viewingValue = computed({
-  get: () => ui.viewingMemberId ?? "all",
+  // Coerce a stale selection that points at a now-hidden dependent (or an unknown id) back to
+  // "Whole household" so the select never shows a blank/invalid value.
+  get: () => {
+    const v = ui.viewingMemberId;
+    if (!v) return "all";
+    return adultMembers.value.some((m) => m.id === v) ? v : "all";
+  },
   set: (v: string) => ui.setViewingMemberId(v === "all" ? null : v),
 });
+
+// Reset a STALE store selection (a now-hidden dependent / removed member) to null so the lens the
+// dashboard actually COMPUTES (derive reads ui.viewingMemberId raw) always matches the filter shown
+// — not just the select's display. Reactive (no reload). Code-review #81 Phase 2 MED-2.
+function normalizeViewingSelection() {
+  const v = ui.viewingMemberId;
+  if (v && !adultMembers.value.some((m) => m.id === v)) ui.setViewingMemberId(null);
+}
+onMounted(normalizeViewingSelection);
+watch(adultMembers, normalizeViewingSelection);
 
 const savedLabel = computed(() => {
   if (!household.lastSavedAt) return "";
@@ -126,7 +155,7 @@ const savedLabel = computed(() => {
       </v-btn>
 
       <v-select
-        v-if="!household.isSolo"
+        v-if="showMemberFilter"
         v-model="viewingValue"
         :items="memberOptions"
         item-title="label"

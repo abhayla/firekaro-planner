@@ -316,6 +316,42 @@ describe("derive() — pure kernel", () => {
     expect(rohitPlanned).not.toContain("Priya sabbatical"); // Priya's own — hidden under Rohit
   });
 
+  // #81 Phase 2: standalone individual FIRE is ADDED alongside the household number — the household
+  // path stays byte-identical + invariant, and the gap = household exp − Σ(adults attributable).
+  it("#81 Phase 2: individual FIRE added per adult; household path byte-identical + invariant", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    loadSeedPersona(h, a);
+    const before = derive(h.data, a.values, { isFamilyView: false, viewingMemberId: null, currentFY: "2025-26" });
+
+    // One individual-FIRE entry per ADULT (rohit, priya); dependents excluded.
+    expect(before.individualFireByMember.map((r) => r.memberId).sort()).toEqual(["priya", "rohit"]);
+    // Each individual FIRE number is domain-sane (rule 31) and POSITIVE.
+    for (const r of before.individualFireByMember) {
+      expect(r.individualFireNumber).toBeGreaterThan(0);
+      expect(r.individualFireNumber).toBeLessThan(before.fireNumber); // a single adult's slice < the whole household target
+    }
+    // Gap = household expenses − Σ(adults' attributable). For the all-shared 50/50 seed it is ~0.
+    const sumAttr = before.individualFireByMember.reduce((s, r) => s + r.attributableAnnualExpenses, 0);
+    expect(before.individualFireExpenseGapAnnual).toBe(Math.max(0, Math.round(before.annualExpensesToday - sumAttr)));
+    expect(before.individualFireExpenseGapAnnual).toBeGreaterThanOrEqual(0);
+
+    // HONESTY LOCK: viewing an adult does NOT move the household number (individual block is additive).
+    for (const id of ["rohit", "priya", "aarav"]) {
+      const lensed = derive(h.data, a.values, { isFamilyView: false, viewingMemberId: id, currentFY: "2025-26" });
+      expect(lensed.fireNumber, `household FIRE invariant under lens=${id}`).toBe(before.fireNumber);
+      expect(lensed.yearsToRegular, `years invariant under lens=${id}`).toBe(before.yearsToRegular);
+    }
+
+    // A dependents-tagged cost raises the GAP but NOT any adult's individual FIRE.
+    h.addRecurring({ label: "Kids school", amount: 50000, frequency: "M", source: "manual", ownerId: "Dependents" });
+    const after = derive(h.data, a.values, { isFamilyView: false, viewingMemberId: null, currentFY: "2025-26" });
+    expect(after.individualFireExpenseGapAnnual).toBeGreaterThan(before.individualFireExpenseGapAnnual);
+    const rohitBefore = before.individualFireByMember.find((r) => r.memberId === "rohit")!;
+    const rohitAfter = after.individualFireByMember.find((r) => r.memberId === "rohit")!;
+    expect(rohitAfter.attributableAnnualExpenses).toBeCloseTo(rohitBefore.attributableAnnualExpenses, 0);
+  });
+
   it("gh-issue #29: let-out rental is taxed on 70% NAV (Sec 24a) — but cash income stays FULL", () => {
     const h = useHouseholdStore();
     const a = useAssumptionsStore();

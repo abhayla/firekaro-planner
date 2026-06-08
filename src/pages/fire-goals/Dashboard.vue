@@ -13,6 +13,7 @@ import FireHero from "@/components/dashboard/FireHero.vue";
 import LifecycleDigestCard from "@/components/dashboard/LifecycleDigestCard.vue";
 import BridgeBreakdownCard from "@/components/dashboard/BridgeBreakdownCard.vue";
 import AccelerationCard from "@/components/dashboard/AccelerationCard.vue";
+import IndividualFireCard from "@/components/dashboard/IndividualFireCard.vue";
 import FireProjectionChart from "@/components/dashboard/FireProjectionChart.vue";
 import AssetAllocationDonut from "@/components/dashboard/AssetAllocationDonut.vue";
 import SectionCard from "@/components/dashboard/SectionCard.vue";
@@ -266,6 +267,11 @@ onMounted(() => {
       <LifecycleDigestCard />
 
       <FireHero />
+
+      <!-- #81 Phase 2 — household (primary) vs each adult's standalone personal FIRE + the gap,
+           with the honesty caveat. Placed right under the headline so the household number is
+           never confused with a rosier individual figure. -->
+      <IndividualFireCard class="mt-4" />
 
       <!-- #15 — accessible-money bridge: reachable vs locked, unlock timeline,
            liquidity shortfall + every assumption with a one-tap fix. Self-hides
