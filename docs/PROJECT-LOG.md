@@ -126,6 +126,15 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 ## §3 — Decision log (append-only, newest first)
 
 ### 2026-06-08
+- **D-2026-06-08-06 — Member earner-derivation (gh #67) re-tiered `good-to-have` → `must-have`.** Abhay
+  overrode my D-04 tiering: "recategorize it to must-have." Rationale he's anchoring to: the member
+  earner/non-earner model is a **foundational data-model contract** on the income path that feeds the FIRE
+  headline (`derive.ts` gates ALL income on `role==="EARNER"`), not peripheral polish — the member model
+  doesn't genuinely work correctly until earner-status stops being a flag that can silently disagree with the
+  income data (honest-number + effortless-setup for the core salaried-accumulator-+-spouse persona). Issue
+  #67 label swapped (`good-to-have`→`must-have`) + body tiering section rewritten. **Still analysis-only —
+  NOT implemented** (Abhay's standing "don't implement it yet" holds; must-have status ≠ build-now until he
+  gives the go). Supersedes the tiering in D-2026-06-08-04. Pointer: gh #67.
 - **D-2026-06-08-05 — "Viewing as &lt;member&gt;" lens re-tiered `good-to-have` → `must-have`; product fork
   resolved to Option A (lens the member-attributable screens app-wide) → gh #66 reframed (analysis-only, NOT
   implemented).** Abhay reported on prod (firekaro.com) that changing the global "Viewing as" dropdown doesn't
@@ -150,10 +159,8 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
   (IS derivable from income presence, the redundant flag). Today `derive.ts` gates ALL income on
   `role==="EARNER"` (lines 91/116/189), fully decoupled from whether salary exists → two-sources-of-truth
   contradiction (NON_EARNING_ADULT-with-salary silently drops income; EARNER-with-no-salary = ₹0 earner).
-  **Tiered `good-to-have`** (goal-anchored): failure modes are conservative/confusing, not optimistic-dangerous
-  (no corpus inflation), and the product works today — so not Tier-0; but it's a real coherence + automate
-  (5W #3) + UX-honesty win for the wedge persona. **Implementation gated on Abhay's approval** (must-have-only
-  focus lock). Consumer/surface map + open design questions in the issue body. Pointer: gh #67.
+  **Tiered `good-to-have`** (goal-anchored) — **⚠ tiering SUPERSEDED by D-2026-06-08-06 (→ `must-have`).**
+  Consumer/surface map + open design questions in the issue body. Pointer: gh #67.
 - **D-2026-06-08-03 — HEADED production verification (Abhay-requested, watchable) → PASS; 2 coherence nits
   filed.** Abhay: "perform the same type of test in production also, as much as possible, headed." **Honest
   boundary held:** the dev test's from-scratch data-ENTRY writes data → forbidden on prod by
