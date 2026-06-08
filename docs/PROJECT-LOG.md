@@ -112,6 +112,27 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 
 ## §3 — Decision log (append-only, newest first)
 
+### 2026-06-08
+- **D-2026-06-08-01 — QA re-run (delta) SUPERVISOR-VERIFIED + merged to main; Phase A complete; deploy is
+  near-optional (no product change).** The re-run (`chore/full-lifecycle-qa-2`) executed the 3 deltas and
+  self-reported "Phase A DoD fully met." Supervisor check (rules 29/33, not a rubber-stamp): **§A2.6** —
+  all 4 personas (Mauryas/Sharmas/Iyers/Mehtas) hand-entered from scratch through the real forms (every
+  field), each gated to a CLEAN run, **blind-verified by a context-blind agent**, 40 post-entry
+  screenshots; it **found + fixed a real bug** (Sharmas 2nd-earner salary selector → FIRE 69→56) ✅;
+  **#60** — server-mode dev-bypass-OFF auth gate verified (401 even with header; all guarded routes →
+  /login) + locked (`auth.spec.ts` 6 tests); first-login = no demo→server migration BY DESIGN
+  (code-confirmed) → filed **gh #62** (good-to-have; prod is always server-mode+login-first) ✅; **#59** —
+  tax.ts mutation 68.85%→**85.27%** via 75 exact-value differential tests + exclusion of
+  **genuinely-equivalent** mutants — I read every Stryker-disable: all `financialYear`/`assessmentYear`/
+  `isDefault` display-metadata never read by any computation + a DEV-only warn + a far-future ±1yr note
+  (legit equivalents, not gaming); zero killable survivors on reachable slab/surcharge/relief ✅. Also
+  filed **gh #63** (demo seed-switcher chip; nice-to-have). **Merged `chore/full-lifecycle-qa-2`→`main`
+  (`b8fadd7`)**, clean (disjoint); post-merge gate GREEN (root 1053 / server 162, type-check 0, lint 0);
+  pushed. **The ONLY product-code delta since the last prod deploy (`45201dc`, D-07-06) is
+  `server/src/lib/logger.ts` — a no-behavior redaction refactor** → a new deploy ships nothing user-facing;
+  **Phase B (prod verification) can run against the current live site, or after an optional hygiene
+  redeploy.** Deploy + the SSH push remain Abhay's gate/credential. *Why logged:* records the verified
+  Phase-A completion + the deploy-is-optional finding before the deploy/Phase-B decision. → §2.
 ### 2026-06-07
 - **D-2026-06-07-13 — Re-run PREP done: merged the completed Phase-A QA branch to main + verified main green.**
   Abhay delegated the prep ("you do all the prep; I'll run /goal in another session"). Merged
