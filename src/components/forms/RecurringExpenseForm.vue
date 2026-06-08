@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { useHouseholdStore } from "@/stores/household";
+import { useFireDerive } from "@/lib/useFireDerive";
 import { formatINRCompact } from "@/lib/formatters";
 import type {
   RecurringExpenseLine,
@@ -8,10 +9,19 @@ import type {
   RecurringExpenseKind,
   InflationBucket,
 } from "@/types/household";
+import { expenseOwnerLabel, EXPENSE_OWNER_HOUSEHOLD } from "@/lib/expense-attribution";
 import PanelCard from "@/components/shared/PanelCard.vue";
 import EntityRow from "@/components/shared/EntityRow.vue";
+import ExpenseOwnerSelect from "@/components/expenses/ExpenseOwnerSelect.vue";
 
 const household = useHouseholdStore();
+// #81 Phase 1 — the displayed list is the KERNEL's member-lensed set (single source of the
+// lens; no re-derivation here). A selected adult sees own + shared "Household"; consolidated =
+// all. The household total is unchanged — this only filters what's shown.
+const fire = useFireDerive();
+const ownerLabelFor = (r: RecurringExpenseLine): string =>
+  expenseOwnerLabel(r.ownerId, household.data.members);
+const showOwnerChip = computed(() => household.data.members.length > 1);
 
 const FREQ_OPTIONS = [
   { value: "M", label: "Monthly" },
@@ -36,6 +46,7 @@ const recurringDraft = ref<{
   endYear: number | null;
   kind: RecurringExpenseKind;
   inflationBucket: InflationBucket;
+  ownerId: string;
 }>({
   label: "",
   amount: null,
@@ -43,6 +54,7 @@ const recurringDraft = ref<{
   endYear: null,
   kind: "general",
   inflationBucket: "general",
+  ownerId: EXPENSE_OWNER_HOUSEHOLD,
 });
 
 // Phase 4 Stage L — when kind changes, auto-route inflationBucket per
@@ -66,6 +78,7 @@ function addRecurring() {
     source: "manual",
     kind: recurringDraft.value.kind,
     inflationBucket: recurringDraft.value.inflationBucket,
+    ownerId: recurringDraft.value.ownerId,
   });
   recurringDraft.value = {
     label: "",
@@ -74,6 +87,7 @@ function addRecurring() {
     endYear: null,
     kind: "general",
     inflationBucket: "general",
+    ownerId: EXPENSE_OWNER_HOUSEHOLD,
   };
 }
 
@@ -92,10 +106,10 @@ const isEditValid = computed(
 );
 
 const manualRecurring = computed(() =>
-  household.data.expenses.recurring.filter((r) => r.source === "manual"),
+  fire.lensedRecurringExpenses.value.filter((r) => r.source === "manual"),
 );
 const autoRecurring = computed(() =>
-  household.data.expenses.recurring.filter((r) => r.source !== "manual"),
+  fire.lensedRecurringExpenses.value.filter((r) => r.source !== "manual"),
 );
 
 // Q4 (v3) — pencil-edit pattern. Click pencil → dialog opens with row pre-populated.
@@ -116,6 +130,7 @@ function saveEdit() {
     amount: Number(editing.value.amount),
     frequency: editing.value.frequency,
     endYear: editing.value.endYear ?? undefined,
+    ownerId: editing.value.ownerId ?? EXPENSE_OWNER_HOUSEHOLD,
   });
   editing.value = null;
 }
@@ -163,6 +178,10 @@ function saveEdit() {
             data-testid="recurring-kind"
           />
         </v-col>
+        <!-- #81 Phase 1 — member attribution owner picker (hidden when solo). -->
+        <v-col cols="12" md="6">
+          <ExpenseOwnerSelect v-model="recurringDraft.ownerId" />
+        </v-col>
       </v-row>
     </PanelCard>
 
@@ -179,7 +198,19 @@ function saveEdit() {
           <template #leading>
             <v-icon icon="mdi-calendar-refresh-outline" color="warning" />
           </template>
-          <template v-if="r.endYear" #meta>Until {{ r.endYear }}</template>
+          <template v-if="showOwnerChip || r.endYear" #meta>
+            <v-chip
+              v-if="showOwnerChip"
+              size="x-small"
+              variant="tonal"
+              color="primary"
+              class="mr-1"
+              data-testid="recurring-owner-chip"
+            >
+              {{ ownerLabelFor(r) }}
+            </v-chip>
+            <span v-if="r.endYear">Until {{ r.endYear }}</span>
+          </template>
           <template #trailing>
             <v-btn icon size="x-small" variant="text" aria-label="Edit" @click="startEdit(r)">
               <v-icon icon="mdi-pencil" />
@@ -207,7 +238,19 @@ function saveEdit() {
               {{ r.source === "auto-insurance" ? "Insurance" : "Loan" }}
             </v-chip>
           </template>
-          <template #meta>Edit on the source step{{ r.endYear ? ` · ends ${r.endYear}` : "" }}</template>
+          <template #meta>
+            <v-chip
+              v-if="showOwnerChip"
+              size="x-small"
+              variant="tonal"
+              color="primary"
+              class="mr-1"
+              data-testid="recurring-owner-chip"
+            >
+              {{ ownerLabelFor(r) }}
+            </v-chip>
+            Edit on the source step{{ r.endYear ? ` · ends ${r.endYear}` : "" }}
+          </template>
         </EntityRow>
       </PanelCard>
     </template>
@@ -236,6 +279,9 @@ function saveEdit() {
             </v-col>
             <v-col cols="6" md="6">
               <v-text-field v-model.number="editing.endYear" type="number" label="End year (optional)" density="comfortable" />
+            </v-col>
+            <v-col cols="12" md="6">
+              <ExpenseOwnerSelect v-model="editing.ownerId" density="comfortable" />
             </v-col>
           </v-row>
         </v-card-text>

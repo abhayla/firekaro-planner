@@ -14,6 +14,7 @@
  */
 import { isAdultRole, type Household, type OtherIncomeLine } from "@/types/household";
 import { isEarningMember } from "@/lib/member-earning";
+import { expenseOwnerMatches, EXPENSE_OWNER_HOUSEHOLD } from "@/lib/expense-attribution";
 import type { Assumptions } from "@/types/assumptions";
 import {
   calculateFIRENumber,
@@ -138,6 +139,30 @@ export function derive(household: Household, assumptions: Assumptions, lens: Der
   // via computeScope below, so adding these does not move the headline (#23 split preserved).
   const lensedBusinesses = household.businesses.filter((b) => ownerMatches(b.ownerId));
   const lensedOtherIncome = household.otherIncome.filter((o) => ownerMatches(o.ownerId));
+
+  // #81 Phase 1: member-attributable itemised-expense DISPLAY collections (mirror of
+  // lensedInvestments). A lensed adult sees their OWN itemised lines + the always-shared
+  // "Household" lines (lib/expense-attribution → expenseOwnerMatches, keyed on "Household"
+  // not "Joint"); the consolidated (no-lens) view sees everything. The `avgMonthly` lump is
+  // un-itemisable → always Household → visible in both. CRUCIAL: this is DISPLAY-only — the
+  // FIRE/household total still reads the WHOLE household via `annualExpensesToday`
+  // (householdScope) below, so the headline stays invariant to member selection (contract §2
+  // decision 7 / the #22/#23 honesty guardrail). On the default lens these equal the full
+  // lists + `totalMonthlyExpenses` byte-for-byte.
+  const expenseLensMatches = (ownerId: string | undefined): boolean =>
+    expenseOwnerMatches(ownerId ?? EXPENSE_OWNER_HOUSEHOLD, applyMemberLens, lensedMemberIds);
+  const lensedRecurringExpenses = household.expenses.recurring.filter((r) =>
+    expenseLensMatches(r.ownerId),
+  );
+  const lensedPlannedExpenses = household.expenses.plannedFuture.filter((p) =>
+    expenseLensMatches(p.ownerId),
+  );
+  const lensedMonthlyExpenses =
+    household.expenses.avgMonthly +
+    lensedRecurringExpenses.reduce(
+      (s, r) => s + toMonthly({ amount: r.amount, period: r.frequency }),
+      0,
+    );
 
   // #23 ROOT FIX: FIRE adequacy is inherently HOUSEHOLD — the family funds one shared corpus and
   // retires together — so an EXPLICIT member drill-down must NOT move the FIRE number/corpus/savings/
@@ -729,6 +754,10 @@ export function derive(household: Household, assumptions: Assumptions, lens: Der
     lensedInsurance,
     lensedBusinesses,
     lensedOtherIncome,
+    // #81 Phase 1 — member-attributable expense DISPLAY (display-only; FIRE total unchanged).
+    lensedRecurringExpenses,
+    lensedPlannedExpenses,
+    lensedMonthlyExpenses,
     anchorAge,
     targetRetirementAge,
     annualExpensesToday,

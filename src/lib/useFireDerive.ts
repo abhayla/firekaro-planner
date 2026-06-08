@@ -41,6 +41,10 @@ export function useFireDerive() {
     // #66: member-attributable income collections for the Business / Other-Sources screens.
     lensedBusinesses: computed(() => d.value.lensedBusinesses),
     lensedOtherIncome: computed(() => d.value.lensedOtherIncome),
+    // #81 Phase 1 — member-attributable expense display (display-only; FIRE total unchanged).
+    lensedRecurringExpenses: computed(() => d.value.lensedRecurringExpenses),
+    lensedPlannedExpenses: computed(() => d.value.lensedPlannedExpenses),
+    lensedMonthlyExpenses: computed(() => d.value.lensedMonthlyExpenses),
     anchorAge: computed(() => d.value.anchorAge),
     targetRetirementAge: computed(() => d.value.targetRetirementAge),
     annualExpensesToday: computed(() => d.value.annualExpensesToday),
