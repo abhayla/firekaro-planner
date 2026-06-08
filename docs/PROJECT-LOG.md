@@ -130,7 +130,13 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
   PASS, blind-verified. The full QA goal lifecycle is now complete.** Abhay: "you take the decision and
   perform." **Deploy decision:** NO redeploy — the only product-code change since the last prod release
   (`45201dc`) is a no-behavior `logger.ts` redaction refactor, so a deploy ships zero user-facing change;
-  not worth the prod risk. Went straight to **Phase B against the live site** (non-destructive, read-only):
+  not worth the prod risk. **(Correction 2026-06-08, after Abhay flagged it: the product-code delta since
+  `45201dc` is actually TWO files — `server/src/lib/logger.ts` (redaction refactor) AND `src/lib/tax.ts`
+  — but `tax.ts`'s +28 lines are 100% `// Stryker disable` COMMENTS (zero runtime/build change; verified
+  non-comment-line count = 0), so both are genuinely no-behavior and the deployed bundle is byte-identical.
+  Everything else changed since the deploy is test specs / scripts / docs / screenshots — dev artifacts NOT
+  shipped to prod. The "no user-facing change → deploy optional" conclusion stands; the earlier "only
+  logger.ts" phrasing was imprecise.)** Went straight to **Phase B against the live site** (non-destructive, read-only):
   **B1** `/api/health` GREEN (prod up, env=production, DB connected) + unauth `/login` render PASS (zero
   page errors; the 401 is the expected auth-gate); `/api/internal/smoke` honestly SKIPPED (no local
   `SMOKE_TOKEN` — `/api/health` covers DB). **B2** test-account session valid (`abhayfaircent@gmail.com`,
