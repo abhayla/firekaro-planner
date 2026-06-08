@@ -21,7 +21,7 @@ export function loadSeedPersona(household: HStore, assumptions: AStore) {
     id: "rohit",
     name: "Rohit",
     dateOfBirth: dobFromAge(30),
-    role: "EARNER",
+    role: "ADULT",
     targetRetirementAge: 47,
     salary: { annualCTC: 2500000, hikePercent: 9 },
     // Q2.1 — Indian techie persona defaults
@@ -35,7 +35,7 @@ export function loadSeedPersona(household: HStore, assumptions: AStore) {
     id: "priya",
     name: "Priya",
     dateOfBirth: dobFromAge(29),
-    role: "EARNER",
+    role: "ADULT",
     targetRetirementAge: 50,
     salary: { annualCTC: 1800000, hikePercent: 8 },
     city: "Metro",

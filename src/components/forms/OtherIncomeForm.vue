@@ -45,7 +45,7 @@ const otherDraft = ref<Partial<OtherIncomeLine>>({
   label: "",
   amount: undefined,
   frequency: "M",
-  ownerId: household.earners[0]?.id ?? household.members[0]?.id ?? "you",
+  ownerId: household.adults[0]?.id ?? household.members[0]?.id ?? "you",
   isTaxExempt: false,
   homeLoanInterest: undefined,
   municipalTaxes: undefined,

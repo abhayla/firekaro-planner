@@ -32,8 +32,8 @@ const sampleHousehold = {
   profileComplete: true,
   wizardCompleted: true,
   members: [
-    { id: "you", name: "You", dateOfBirth: "1985-01-01", role: "EARNER", city: "Metro", health: "Healthy", riskAppetite: "Moderate", marital: "Married" },
-    { id: "spouse", name: "Spouse", dateOfBirth: "1987-01-01", role: "EARNER", city: "Metro", health: "Healthy", riskAppetite: "Moderate", marital: "Married" },
+    { id: "you", name: "You", dateOfBirth: "1985-01-01", role: "ADULT", city: "Metro", health: "Healthy", riskAppetite: "Moderate", marital: "Married" },
+    { id: "spouse", name: "Spouse", dateOfBirth: "1987-01-01", role: "ADULT", city: "Metro", health: "Healthy", riskAppetite: "Moderate", marital: "Married" },
   ],
   businesses: [],
   otherIncome: [],
@@ -152,7 +152,7 @@ dlive("/api/planner integration (live DB — Supabase firekaro-planner)", () => 
         ...sampleHousehold,
         name: "TenantB",
         members: [
-          { id: "tb-you", name: TENANT_B_MARKER, dateOfBirth: "1980-01-01", role: "EARNER", city: "Metro", health: "Healthy", riskAppetite: "Moderate", marital: "Single" },
+          { id: "tb-you", name: TENANT_B_MARKER, dateOfBirth: "1980-01-01", role: "ADULT", city: "Metro", health: "Healthy", riskAppetite: "Moderate", marital: "Single" },
         ],
         investments: [],
         liabilities: [],

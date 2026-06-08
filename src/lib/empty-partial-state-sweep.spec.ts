@@ -33,7 +33,7 @@ function newEarner() {
     id: "you",
     name: "You",
     dateOfBirth: "1990-01-01",
-    role: "EARNER",
+    role: "ADULT",
     targetRetirementAge: 50,
     planToAge: 90,
     city: "Metro",

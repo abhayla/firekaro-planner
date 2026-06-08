@@ -1,14 +1,16 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { useHouseholdStore } from "@/stores/household";
+import { useFireDerive } from "@/lib/useFireDerive";
 import InvestmentForm from "@/components/forms/InvestmentForm.vue";
 import EmptyState from "@/components/shared/EmptyState.vue";
 import LeafPageHeader from "@/components/income-layout/LeafPageHeader.vue";
 
-const household = useHouseholdStore();
+const fire = useFireDerive();
 const showForm = ref(false);
+// gh #66: member-lensed — an empty lensed view (selected member owns no holdings) shows the empty
+// state; on the default "Whole household" view this equals the full holdings count.
 const hasHoldings = computed(
-  () => household.data.investments.length > 0 || showForm.value,
+  () => fire.lensedInvestments.value.length > 0 || showForm.value,
 );
 </script>
 

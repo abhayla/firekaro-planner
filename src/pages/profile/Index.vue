@@ -4,6 +4,7 @@ import { useHouseholdStore } from "@/stores/household";
 import type { MemberDraft, SetupMode } from "@/types/household";
 import { ageFromDOB } from "@/lib/age";
 import { finalizeMemberDraft } from "@/lib/member-draft";
+import { isEarningMember } from "@/lib/member-earning";
 import { formatINRCompact } from "@/lib/formatters";
 import LeafPageHeader from "@/components/income-layout/LeafPageHeader.vue";
 import HouseholdSetupForm from "@/components/forms/HouseholdSetupForm.vue";
@@ -23,6 +24,8 @@ function membersFromStore(): MemberDraft[] {
     name: m.name,
     dateOfBirth: m.dateOfBirth,
     role: m.role,
+    // gh #67: earning derived from the committed member's labour income, not a stored flag.
+    isEarning: isEarningMember(m, household.data.businesses),
     targetRetirementAge: m.targetRetirementAge ?? null,
     planToAge: m.planToAge ?? null,
     relation: m.relation ?? "",
@@ -85,20 +88,19 @@ watch(
 );
 
 // ───── Household summary strip (at-a-glance anchor) ─────
-const draftEarners = computed(() => draftMembers.value.filter((m) => m.role === "EARNER"));
-const earnerCount = computed(() => draftEarners.value.length);
-const nonEarningAdultCount = computed(
-  () => draftMembers.value.filter((m) => m.role === "NON_EARNING_ADULT").length,
-);
-const dependentCount = computed(() => draftMembers.value.filter((m) => m.role === "DEPENDENT").length);
-const primaryEarner = computed(() => draftEarners.value[0] ?? null);
+// gh #67: earner/non-earner counts are DERIVED from the store's income data, not from the draft's
+// (retired) role flag. The draft edits identity/role; earning follows salary added on the Income screen.
+const earnerCount = computed(() => household.earners.length);
+const nonEarningAdultCount = computed(() => household.adults.length - household.earners.length);
+const dependentCount = computed(() => household.dependents.length);
+const primaryEarner = computed(() => household.earners[0] ?? null);
 const earliestRetirement = computed(() => {
-  const ages = draftEarners.value
+  const ages = household.earners
     .map((m) => m.targetRetirementAge)
     .filter((a): a is number => typeof a === "number");
   if (!ages.length) return null;
   const min = Math.min(...ages);
-  const who = draftEarners.value.find((m) => m.targetRetirementAge === min);
+  const who = household.earners.find((m) => m.targetRetirementAge === min);
   return { age: min, name: who?.name ?? "" };
 });
 // Combined CTC comes from the store (salary is edited on the Salary screen, not here).

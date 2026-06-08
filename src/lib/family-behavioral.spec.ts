@@ -190,8 +190,8 @@ describe("evaluateNudges — joint loan deduction", () => {
   it("fires when home loan has < 2 coBorrowers and household has >1 member", () => {
     const hh = emptyHH();
     hh.members = [
-      { id: "m1", name: "A", dateOfBirth: "1990-01-01", role: "EARNER", city: "Metro", health: "Healthy", riskAppetite: "Moderate", marital: "Married" },
-      { id: "m2", name: "B", dateOfBirth: "1992-01-01", role: "EARNER", city: "Metro", health: "Healthy", riskAppetite: "Moderate", marital: "Married" },
+      { id: "m1", name: "A", dateOfBirth: "1990-01-01", role: "ADULT", city: "Metro", health: "Healthy", riskAppetite: "Moderate", marital: "Married" },
+      { id: "m2", name: "B", dateOfBirth: "1992-01-01", role: "ADULT", city: "Metro", health: "Healthy", riskAppetite: "Moderate", marital: "Married" },
     ];
     hh.liabilities = [
       { id: "l1", name: "Home", type: "HomeLoan", outstandingBalance: 5_000_000, monthlyEMI: 50_000, interestRate: 8.0, ownerId: "m1", isSharedWithSpouse: false, coBorrowers: ["m1"] },

@@ -4,6 +4,7 @@ import { useHouseholdStore } from "@/stores/household";
 import type { MemberDraft, SetupMode, MemberRole } from "@/types/household";
 import { ageFromDOB, dobFromAge } from "@/lib/age";
 import { finalizeMemberDraft } from "@/lib/member-draft";
+import { isEarningMember } from "@/lib/member-earning";
 import { validateMemberHorizon, hasBlockingHorizonIssue } from "@/lib/member-horizon";
 import HouseholdSetupForm from "@/components/forms/HouseholdSetupForm.vue";
 import MembersForm from "@/components/forms/MembersForm.vue";
@@ -21,24 +22,13 @@ function defaultsForRole(role: MemberRole): Pick<
   MemberDraft,
   "city" | "health" | "educationStage" | "riskAppetite" | "marital" | "employmentStatus"
 > {
-  if (role === "EARNER") {
+  if (role === "ADULT") {
+    // gh #67: a fresh adult is non-earning until salary is added on the Income screen → no job yet.
     return {
       city: "Metro",
       health: "Healthy",
       educationStage: null,
       riskAppetite: "Moderate",
-      marital: "Married",
-      employmentStatus: "Employed",
-    };
-  }
-  if (role === "NON_EARNING_ADULT") {
-    // gh #34: a homemaker / non-earning spouse — an adult (no educationStage, no job),
-    // typically married, conservative by default. Their planToAge funds their longevity.
-    return {
-      city: "Metro",
-      health: "Healthy",
-      educationStage: null,
-      riskAppetite: "Conservative",
       marital: "Married",
       employmentStatus: null,
     };
@@ -60,6 +50,8 @@ function membersFromStore(): MemberDraft[] {
       name: m.name,
       dateOfBirth: m.dateOfBirth,
       role: m.role,
+      // gh #67: earning is DERIVED from the committed member's labour income, not a stored flag.
+      isEarning: isEarningMember(m, household.data.businesses),
       targetRetirementAge: m.targetRetirementAge ?? null,
       planToAge: m.planToAge ?? null,
       relation: m.relation ?? "",
@@ -75,29 +67,27 @@ function membersFromStore(): MemberDraft[] {
 }
 
 function defaultsForMode(mode: SetupMode): MemberDraft[] {
-  const earnerDOB = dobFromAge(30);
+  const adultDOB = dobFromAge(30);
   const childDOB = dobFromAge(5);
+  // gh #67: fresh adults are non-earning (isEarning:false) until salary is added on the Income step.
+  const adult = (id: string, name: string, relation: string): MemberDraft => ({
+    id, name, dateOfBirth: adultDOB, role: "ADULT", isEarning: false,
+    targetRetirementAge: null, planToAge: 90, relation, ...defaultsForRole("ADULT"),
+  });
   switch (mode) {
     case "Solo":
-      return [
-        { id: "you", name: "You", dateOfBirth: earnerDOB, role: "EARNER", targetRetirementAge: 50, planToAge: 90, relation: "", ...defaultsForRole("EARNER") },
-      ];
+      return [adult("you", "You", "")];
     case "Couple":
-      return [
-        { id: "you", name: "You", dateOfBirth: earnerDOB, role: "EARNER", targetRetirementAge: 50, planToAge: 90, relation: "", ...defaultsForRole("EARNER") },
-        { id: "spouse", name: "Spouse", dateOfBirth: earnerDOB, role: "EARNER", targetRetirementAge: 50, planToAge: 90, relation: "Spouse", ...defaultsForRole("EARNER") },
-      ];
+      return [adult("you", "You", ""), adult("spouse", "Spouse", "Spouse")];
     case "Couple+Children":
       return [
-        { id: "you", name: "You", dateOfBirth: earnerDOB, role: "EARNER", targetRetirementAge: 50, planToAge: 90, relation: "", ...defaultsForRole("EARNER") },
-        { id: "spouse", name: "Spouse", dateOfBirth: earnerDOB, role: "EARNER", targetRetirementAge: 50, planToAge: 90, relation: "Spouse", ...defaultsForRole("EARNER") },
-        { id: "child1", name: "Child", dateOfBirth: childDOB, role: "DEPENDENT", targetRetirementAge: null, planToAge: null, relation: "Child", ...defaultsForRole("DEPENDENT") },
+        adult("you", "You", ""),
+        adult("spouse", "Spouse", "Spouse"),
+        { id: "child1", name: "Child", dateOfBirth: childDOB, role: "DEPENDENT", isEarning: false, targetRetirementAge: null, planToAge: null, relation: "Child", ...defaultsForRole("DEPENDENT") },
       ];
     case "Custom":
     default:
-      return [
-        { id: "you", name: "You", dateOfBirth: earnerDOB, role: "EARNER", targetRetirementAge: 50, planToAge: 90, relation: "", ...defaultsForRole("EARNER") },
-      ];
+      return [adult("you", "You", "")];
   }
 }
 
@@ -109,25 +99,26 @@ watch(setupMode, (mode) => {
   }
 });
 
-const earnerCount = computed(() => draftMembers.value.filter((m) => m.role === "EARNER").length);
+// gh #67: a household needs ≥1 ADULT (earning is established later via income, not at profile time).
+const adultCount = computed(() => draftMembers.value.filter((m) => m.role === "ADULT").length);
 
 // Q2 — validate via DOB-derived age instead of stored age. Bounds: 0–120 inclusive.
 const canSave = computed(() => {
-  if (earnerCount.value === 0) return false;
+  if (adultCount.value === 0) return false;
   return draftMembers.value.every((m) => {
     const validDOB = /^\d{4}-\d{2}-\d{2}$/.test(m.dateOfBirth) && ageFromDOB(m.dateOfBirth) <= 120;
     if (!validDOB) return false;
-    if (m.role === "EARNER" && (typeof m.targetRetirementAge !== "number" || m.targetRetirementAge < 30)) {
-      return false;
-    }
-    // A5.x — block proceed on any blocking horizon issue (plan-to ≤ retire, horizon < 5).
-    if (
-      m.role === "EARNER" &&
-      hasBlockingHorizonIssue(
-        validateMemberHorizon({ retirementAge: m.targetRetirementAge, planToAge: m.planToAge }),
-      )
-    ) {
-      return false;
+    // Retire-from-job age only applies to an EARNING adult; a non-earning adult has none yet.
+    if (m.role === "ADULT" && m.isEarning) {
+      if (typeof m.targetRetirementAge !== "number" || m.targetRetirementAge < 30) return false;
+      // A5.x — block proceed on any blocking horizon issue (plan-to ≤ retire, horizon < 5).
+      if (
+        hasBlockingHorizonIssue(
+          validateMemberHorizon({ retirementAge: m.targetRetirementAge, planToAge: m.planToAge }),
+        )
+      ) {
+        return false;
+      }
     }
     return true;
   });

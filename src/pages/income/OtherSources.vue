@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, ref } from "vue";
 import { useHouseholdStore } from "@/stores/household";
+import { useFireDerive } from "@/lib/useFireDerive";
 import { formatINRCompact } from "@/lib/formatters";
 import { toAnnual } from "@/lib/cashflow";
 import { buildDonutSegments } from "@/lib/donut";
@@ -13,6 +14,13 @@ import AddTypeChips, { type AddTypeChip } from "@/components/income-layout/AddTy
 import EntryDialog from "@/components/income-layout/EntryDialog.vue";
 
 const household = useHouseholdStore();
+const fire = useFireDerive();
+
+// gh #66: the DISPLAY collection is member-lensed (selected member + "Joint"); equals the full
+// household.data.otherIncome on the default "Whole household" view. The form's owner-options,
+// "recent entry" defaults, and the business source-entity lookups intentionally stay on the full
+// household.data (a non-earning adult can own a passive income line).
+const lensedOtherIncome = computed(() => fire.lensedOtherIncome.value);
 
 interface TypeMeta {
   label: string;
@@ -52,16 +60,16 @@ function businessDefaultExempt(kind: BusinessLegalKind): boolean {
 }
 
 const totalAnnual = computed(() =>
-  household.data.otherIncome.reduce((s, o) => s + lineAnnual(o), 0),
+  lensedOtherIncome.value.reduce((s, o) => s + lineAnnual(o), 0),
 );
 const taxableAnnual = computed(() =>
-  household.data.otherIncome.filter((o) => !o.isTaxExempt).reduce((s, o) => s + lineAnnual(o), 0),
+  lensedOtherIncome.value.filter((o) => !o.isTaxExempt).reduce((s, o) => s + lineAnnual(o), 0),
 );
 const exemptAnnual = computed(() => totalAnnual.value - taxableAnnual.value);
 
 const byType = computed(() => {
   const out = { Rental: 0, Dividend: 0, Interest: 0, CapitalGains: 0, Other: 0 } as Record<OtherIncomeType, number>;
-  for (const o of household.data.otherIncome) out[o.type] += lineAnnual(o);
+  for (const o of lensedOtherIncome.value) out[o.type] += lineAnnual(o);
   return out;
 });
 const typesWithMoney = computed(() =>
@@ -111,7 +119,7 @@ const cashflowMonths = computed<CashflowMonth[]>(() => {
     total: 0,
     segments: typesWithMoney.value.map((t) => ({ key: t, value: 0, color: TYPE_META[t].color })),
   }));
-  for (const line of household.data.otherIncome) {
+  for (const line of lensedOtherIncome.value) {
     const slots = line.frequency === "M" ? [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
       : line.frequency === "Q" ? [2, 5, 8, 11] : [11];
     for (const i of slots) {
@@ -130,7 +138,7 @@ const typeColumns = computed<RailColumn[]>(() =>
     type: t,
     meta: TYPE_META[t],
     total: byType.value[t],
-    entries: household.data.otherIncome
+    entries: lensedOtherIncome.value
       .filter((l) => l.type === t)
       .sort((a, b) => lineAnnual(b) - lineAnnual(a)),
   })),
@@ -157,7 +165,7 @@ function blankDraft(type: OtherIncomeType): Partial<OtherIncomeLine> {
     label: "",
     amount: undefined,
     frequency: recent?.frequency ?? "M",
-    ownerId: recent?.ownerId ?? household.earners[0]?.id ?? household.members[0]?.id ?? "you",
+    ownerId: recent?.ownerId ?? household.adults[0]?.id ?? household.members[0]?.id ?? "you",
     isTaxExempt: recent?.isTaxExempt ?? false,
   };
 }
@@ -255,7 +263,7 @@ function deleteEditing() {
       description="Rental, dividends, interest, capital gains, business distributions. Tax treatment defaults from entity kind (HUF / LLP / Partnership exempt; Pvt Ltd / Other taxed at slab). Enter only the amount that reached your personal bank account."
     />
 
-    <template v-if="household.data.otherIncome.length">
+    <template v-if="lensedOtherIncome.length">
       <StatDashboard
         :kpis="kpis"
         :donut-segments="donutSegments"

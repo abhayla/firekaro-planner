@@ -2,17 +2,17 @@
 // Member patch — shared by the onboarding wizard (ProfileStep.vue) and the profile
 // page (profile/Index.vue), which previously carried copy-pasted, drift-prone logic.
 //
-// gh #34: the field gating is BY ROLE and must be coherent:
-//   - targetRetirementAge / employmentStatus / salary → EARNER only (retiring from a job).
-//   - planToAge (longevity) → every ADULT (EARNER + NON_EARNING_ADULT). The old logic kept
-//     planToAge for EARNER only, silently dropping a non-earning spouse's longevity, so the
-//     household plan horizon (derive.ts) under-provisioned a surviving homemaker.
+// gh #67: field gating is now BY (role + DERIVED earning), never a manual earner flag:
+//   - targetRetirementAge / employmentStatus → only when the adult is EARNING (has labour income).
+//     A non-earning adult (homemaker / career break) shows no retire-from-job age. (gh #67 Q3.)
+//   - planToAge (longevity) → every ADULT (earning or not). The old logic kept planToAge for earners
+//     only, silently dropping a non-earning spouse's longevity, so the household plan horizon
+//     (derive.ts) under-provisioned a surviving homemaker (gh #34).
 //   - educationStage → DEPENDENT (child) only.
 import { isAdultRole, type MemberDraft, type MemberRole } from "@/types/household";
 
 function fallbackName(role: MemberRole): string {
-  if (role === "EARNER") return "Earner";
-  if (role === "NON_EARNING_ADULT") return "Spouse"; // matches MembersForm.addPerson default
+  if (role === "ADULT") return "Adult";
   return "Dependent";
 }
 
@@ -22,11 +22,14 @@ function fallbackName(role: MemberRole): string {
  */
 export function finalizeMemberDraft(m: MemberDraft) {
   const adult = isAdultRole(m.role);
+  // gh #67: an earning adult keeps retire-from-job age + employmentStatus; a non-earning adult
+  // (or dependent) carries neither. `isEarning` is the derived projection set on the draft at load.
+  const earning = adult && m.isEarning;
   return {
     name: m.name || fallbackName(m.role),
     dateOfBirth: m.dateOfBirth,
     role: m.role,
-    targetRetirementAge: m.role === "EARNER" ? (m.targetRetirementAge ?? 50) : undefined,
+    targetRetirementAge: earning ? (m.targetRetirementAge ?? 50) : undefined,
     // gh #34: adults (incl. a non-earning spouse) keep their plan-to age; children don't have one.
     planToAge: adult ? (m.planToAge ?? 90) : undefined,
     relation: m.relation || undefined,
@@ -35,6 +38,6 @@ export function finalizeMemberDraft(m: MemberDraft) {
     educationStage: m.role === "DEPENDENT" ? (m.educationStage ?? undefined) : undefined,
     riskAppetite: m.riskAppetite,
     marital: m.marital,
-    employmentStatus: m.role === "EARNER" ? (m.employmentStatus ?? undefined) : undefined,
+    employmentStatus: earning ? (m.employmentStatus ?? undefined) : undefined,
   };
 }

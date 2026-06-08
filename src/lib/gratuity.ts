@@ -122,7 +122,8 @@ export function deriveGratuityForMember(
   marginalSlabRate: number,
   _asOf: Date = new Date(),
 ): GratuityResult | null {
-  if (member.role !== "EARNER" || !member.salary) return null;
+  // gh #67: gratuity is a salaried-employment benefit — gate on adult + actual salary, not a flag.
+  if (member.role !== "ADULT" || !member.salary) return null;
 
   const retirementAge = member.targetRetirementAge ?? EPS_NORMAL_START_AGE;
   const yearsOfService = Math.max(0, retirementAge - ASSUMED_CAREER_START_AGE);

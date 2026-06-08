@@ -7,6 +7,7 @@ import { toMonthly } from "@/lib/cashflow";
 import AvgMonthlyBurnField from "@/components/forms/AvgMonthlyBurnField.vue";
 import IncomeVsExpenses from "@/components/charts/IncomeVsExpenses.vue";
 import ExpenseTrendChart from "@/components/charts/ExpenseTrendChart.vue";
+import WholeHouseholdBadge from "@/components/shared/WholeHouseholdBadge.vue";
 import LeafPageHeader from "@/components/income-layout/LeafPageHeader.vue";
 import PanelCard from "@/components/shared/PanelCard.vue";
 import MetricCard from "@/components/shared/MetricCard.vue";
@@ -38,7 +39,11 @@ function inflatedAt(amount: number, year: number): number {
       eyebrow="Expenses · Overview"
       title="Expenses"
       description="Three buckets: average monthly burn · recurring commitments · planned future. Drill into each child page to manage entries."
-    />
+    >
+      <template #actions>
+        <WholeHouseholdBadge />
+      </template>
+    </LeafPageHeader>
 
     <v-row dense class="mb-4">
       <v-col cols="12" md="6">

@@ -86,7 +86,7 @@ describe("deriveEpsPensionForMember — derives service from age, discloses assu
       id: "m1",
       name: "Rohit",
       dateOfBirth: "1986-01-01", // age 40 as of asOf
-      role: "EARNER",
+      role: "ADULT",
       targetRetirementAge: 50,
       city: "Metro",
       health: "Healthy",

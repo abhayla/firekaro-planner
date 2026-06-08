@@ -13,6 +13,7 @@ import { isEmergencyFundEligible } from "@/lib/investment-traits";
 import Sparkline from "@/components/shared/Sparkline.vue";
 import DeltaChip from "@/components/shared/DeltaChip.vue";
 import InfoTip from "@/components/shared/InfoTip.vue";
+import WholeHouseholdBadge from "@/components/shared/WholeHouseholdBadge.vue";
 import LeafPageHeader from "@/components/income-layout/LeafPageHeader.vue";
 
 const household = useHouseholdStore();
@@ -142,7 +143,11 @@ const overallStatusColor = computed(() => {
       eyebrow="Financial Health · Score"
       title="Health Score"
       description="A composite read on five financial dimensions — savings rate, debt, emergency cover, insurance adequacy, and FIRE progress. Updated whenever your household data changes."
-    />
+    >
+      <template #actions>
+        <WholeHouseholdBadge />
+      </template>
+    </LeafPageHeader>
 
     <!-- Hero score strip -->
     <v-card variant="outlined" class="pa-6 mb-5 hero-card">

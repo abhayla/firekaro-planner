@@ -13,6 +13,7 @@ import type {
 } from "@/types/household";
 import { genId } from "@/lib/id";
 import { dobFromAge } from "@/lib/age";
+import { isEarningMember } from "@/lib/member-earning";
 import { toMonthly, toAnnual, legacyFreqToPeriod } from "@/lib/cashflow";
 import { makeAdapter } from "@/lib/storage-adapter";
 import { getAuthProvider } from "@/lib/auth-provider";
@@ -26,19 +27,33 @@ import {
 // v2→v3 hydrate migration. Older serialized members (in localStorage) carry `age: number`
 // but no `dateOfBirth` / no 6-field Q2.1 onboarding info. This adapter fills both so the
 // rest of the app sees only v3-shaped Members.
-type LegacyMember = Partial<Member> & {
+// gh #67: `role` widens to `string` here because legacy localStorage carries the retired
+// "EARNER" / "NON_EARNING_ADULT" values that `migrateRole()` collapses to "ADULT".
+export type LegacyMember = Omit<Partial<Member>, "role"> & {
   id: string;
   name: string;
-  role: Member["role"];
+  role: string;
   age?: number;
   dateOfBirth?: string;
 };
 
-function migrateMember(raw: LegacyMember): Member {
+// gh #67: collapse the retired earner/non-earning-adult role flag → "ADULT" (earning is now derived
+// from income, never stored). DEPENDENT is preserved; any unknown legacy value defaults to ADULT
+// unless it is explicitly DEPENDENT. The pre-existing adult/dependent distinction is kept.
+export function migrateRole(raw: string): Member["role"] {
+  return raw === "DEPENDENT" ? "DEPENDENT" : "ADULT";
+}
+
+export function migrateMember(raw: LegacyMember): Member {
   const dateOfBirth =
     raw.dateOfBirth && /^\d{4}-\d{2}-\d{2}$/.test(raw.dateOfBirth)
       ? raw.dateOfBirth
       : dobFromAge(typeof raw.age === "number" ? raw.age : 30);
+  const role = migrateRole(raw.role);
+  const isDependent = role === "DEPENDENT";
+  // gh #67: a migrated adult that actually carries salary keeps "Employed"; a non-earning adult
+  // (homemaker) carries no employmentStatus — earning is derived, so don't fabricate a job.
+  const hasSalary = (raw.salary?.annualCTC ?? 0) > 0;
 
   return {
     id: raw.id,
@@ -47,7 +62,7 @@ function migrateMember(raw: LegacyMember): Member {
     userId: raw.userId ?? getAuthProvider().getCurrentUserId(),
     name: raw.name,
     dateOfBirth,
-    role: raw.role,
+    role,
     targetRetirementAge: raw.targetRetirementAge,
     // Phase 1 Stage B — planToAge backfill (audit Entry #1 A1.2 default 90).
     planToAge: raw.planToAge ?? 90,
@@ -55,11 +70,11 @@ function migrateMember(raw: LegacyMember): Member {
     salary: raw.salary,
     city: raw.city ?? "Metro",
     health: raw.health ?? "Healthy",
-    educationStage: raw.educationStage ?? (raw.role === "DEPENDENT" ? "Preschool" : undefined),
-    riskAppetite: raw.riskAppetite ?? (raw.role === "EARNER" ? "Moderate" : "Conservative"),
-    // gh #34: adults (earner OR non-earning spouse) default Married; only child dependents Single.
-    marital: raw.marital ?? (raw.role === "DEPENDENT" ? "Single" : "Married"),
-    employmentStatus: raw.employmentStatus ?? (raw.role === "EARNER" ? "Employed" : undefined),
+    educationStage: raw.educationStage ?? (isDependent ? "Preschool" : undefined),
+    riskAppetite: raw.riskAppetite ?? (isDependent ? "Conservative" : "Moderate"),
+    // gh #34: adults default Married; only child dependents Single.
+    marital: raw.marital ?? (isDependent ? "Single" : "Married"),
+    employmentStatus: raw.employmentStatus ?? (hasSalary ? "Employed" : undefined),
   };
 }
 
@@ -165,7 +180,7 @@ export const useHouseholdStore = defineStore("household", () => {
         // v2→v3 (Q3): collapse ownerEntities[] into businesses[] as passive entities,
         // preserving the entity id so any OtherIncomeLine.sourceEntityId references still resolve.
         if (Array.isArray(parsed.ownerEntities) && parsed.ownerEntities.length > 0) {
-          const firstEarnerId = data.value.members.find((m) => m.role === "EARNER")?.id
+          const firstEarnerId = data.value.members.find((m) => m.role === "ADULT")?.id
             ?? data.value.members[0]?.id
             ?? "you";
           const migratedBiz = (parsed.ownerEntities as LegacyOwnerEntity[]).map((e) =>
@@ -471,7 +486,8 @@ export const useHouseholdStore = defineStore("household", () => {
     // For each earner with salary, ensure an EPF·VPF investment exists with derived monthly contribution.
     // 12% statutory of basic (estimated as 40% of CTC) + 12% employer match; monthly = (annual × (1 + topUp%)) / 12
     for (const m of data.value.members) {
-      if (m.role !== "EARNER" || !m.salary?.annualCTC) continue;
+      // gh #67: EPF auto-flow is salary-driven — an adult with actual CTC. Earning is derived.
+      if (m.role !== "ADULT" || !m.salary?.annualCTC) continue;
       const basic = m.salary.annualCTC * 0.4;
       const topUp = (m.salary.vpfTopUpPercent ?? 0) / 100;
       const annualEmpEmployee = basic * 0.12 * (1 + topUp);
@@ -511,7 +527,14 @@ export const useHouseholdStore = defineStore("household", () => {
 
   // ---------- Derived getters ----------
   const members = computed(() => data.value.members);
-  const earners = computed(() => data.value.members.filter((m) => m.role === "EARNER"));
+  // gh #67: `adults` = the role-driven roster (who CAN earn / own assets / enter salary). This is the
+  // editing axis used by the Salary/Income screens + owner dropdowns, so a non-earning adult is still
+  // selectable and can be given income (the no-earner→no-salary-input deadlock the derived earner set
+  // would otherwise create). `earners` is DERIVED from that income (the math/display axis).
+  const adults = computed(() => data.value.members.filter((m) => m.role === "ADULT"));
+  const earners = computed(() =>
+    data.value.members.filter((m) => isEarningMember(m, data.value.businesses)),
+  );
   const dependents = computed(() => data.value.members.filter((m) => m.role === "DEPENDENT"));
   const isSolo = computed(() => data.value.members.length <= 1);
   const profileComplete = computed(() => data.value.profileComplete);
@@ -557,6 +580,7 @@ export const useHouseholdStore = defineStore("household", () => {
     data,
     lastSavedAt,
     members,
+    adults,
     earners,
     dependents,
     isSolo,

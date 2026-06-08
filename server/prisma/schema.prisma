@@ -145,7 +145,7 @@ model Member {
 
   name                 String
   dateOfBirth          String // ISO YYYY-MM-DD
-  role                 String // EARNER | DEPENDENT
+  role                 String // gh #67: ADULT | DEPENDENT (earning is DERIVED from income, not stored)
   targetRetirementAge  Int?
   planToAge            Int?
   relation             String?

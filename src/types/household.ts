@@ -1,20 +1,24 @@
 import { z } from "zod";
 
 // ---------- Member ----------
-// gh #34: three member kinds, each with a coherent field set:
-//   EARNER            — earns income: salary + employmentStatus + targetRetirementAge + planToAge.
-//   NON_EARNING_ADULT — a homemaker / non-earning spouse: an ADULT with longevity (planToAge) +
-//                       own health, but NO salary, NO educationStage, NO retirement-from-job age.
-//                       Their longevity MUST extend the household plan horizon (derive.ts) so the
-//                       corpus covers a surviving spouse — otherwise the plan is under-provisioned.
-//   DEPENDENT         — a child: educationStage, NO planToAge, NO salary.
-export const memberRoleSchema = z.enum(["EARNER", "NON_EARNING_ADULT", "DEPENDENT"]);
+// gh #67: `role` carries ONE axis only — adult vs dependent (NOT derivable from data, so it
+// stays an explicit choice). Earning-status is NO LONGER a role flag; it is DERIVED from whether
+// the member has labour income (salary or an active business) via lib/member-earning.ts
+// (isEarningMember). This removes the two-sources-of-truth contradiction where a manual `EARNER`
+// flag could silently disagree with the actual salary data.
+//   ADULT      — a household adult (earning OR non-earning). Has longevity (planToAge) + own health.
+//                If they have labour income they are an EARNER (derived) and get a retire-from-job
+//                age + employmentStatus; a non-earning adult (homemaker / career break) shows neither.
+//                Their longevity MUST extend the household plan horizon (derive.ts) so the corpus
+//                covers a surviving spouse — otherwise the plan is under-provisioned (gh #34).
+//   DEPENDENT  — a child: educationStage, NO planToAge, NO salary, never an earner.
+export const memberRoleSchema = z.enum(["ADULT", "DEPENDENT"]);
 export type MemberRole = z.infer<typeof memberRoleSchema>;
 
-/** Adult members (earners + non-earning adults) — their longevity drives the plan horizon. */
-export const ADULT_ROLES: readonly MemberRole[] = ["EARNER", "NON_EARNING_ADULT"];
+/** Adult members — their longevity drives the plan horizon (gh #34). Earning is derived, not a role. */
+export const ADULT_ROLES: readonly MemberRole[] = ["ADULT"];
 export function isAdultRole(role: MemberRole): boolean {
-  return role === "EARNER" || role === "NON_EARNING_ADULT";
+  return role === "ADULT";
 }
 
 export const memberSalarySchema = z.object({
@@ -96,6 +100,11 @@ export interface MemberDraft {
   name: string;
   dateOfBirth: string;
   role: MemberRole;
+  // gh #67: DERIVED, read-only projection of "does this adult have labour income?" — computed at
+  // load time via isEarningMember() from the committed member's salary/business, NOT a user flag.
+  // Drives the conditional render of targetRetirementAge/employmentStatus on the member form.
+  // A brand-new adult starts non-earning until income is added on the Salary/Income screen.
+  isEarning: boolean;
   targetRetirementAge: number | null;
   // Phase 1 Stage B (audit Entry #1 A1.2) — end-of-horizon plan-to age,
   // editable on the member form (A5.x). Earners only; null while mid-edit.

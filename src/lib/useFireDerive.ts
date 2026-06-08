@@ -38,6 +38,9 @@ export function useFireDerive() {
     lensedInvestments: computed(() => d.value.lensedInvestments),
     lensedLiabilities: computed(() => d.value.lensedLiabilities),
     lensedInsurance: computed(() => d.value.lensedInsurance),
+    // #66: member-attributable income collections for the Business / Other-Sources screens.
+    lensedBusinesses: computed(() => d.value.lensedBusinesses),
+    lensedOtherIncome: computed(() => d.value.lensedOtherIncome),
     anchorAge: computed(() => d.value.anchorAge),
     targetRetirementAge: computed(() => d.value.targetRetirementAge),
     annualExpensesToday: computed(() => d.value.annualExpensesToday),

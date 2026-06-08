@@ -126,6 +126,29 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 ## §3 — Decision log (append-only, newest first)
 
 ### 2026-06-08
+- **D-2026-06-08-20 — BUILT + SHIPPED: the 2 must-haves #67 → #66 (member-model coherence + app-wide member
+  lens), via the `/goal` autonomous run of the D-2026-06-08-19 contract.** Branch
+  `feat/member-model-coherence-and-lens`, merged `--no-ff` → main. **Phase 1 (#67):** `role` collapsed to
+  `ADULT | DEPENDENT`; "earner" is now DERIVED from labour income via ONE canonical helper
+  `isEarningMember(member, businesses)` (salary CTC>0 OR active business; capital income excluded) — zero
+  `role === "EARNER"` left in `src/`; the store gained a derived `earners` getter + a new `adults` roster
+  (so a salary-less adult is still selectable/giveable income — the no-earner→no-salary-input deadlock the
+  derived set would otherwise create); hydrate + Prisma data-migration map old roles → ADULT; **every seed's
+  FIRE number/age is byte-identical** (derived earner set reproduces the old EARNER set; locked by the seed +
+  plausibility + migration specs). **Phase 2 (#66):** the "Viewing as &lt;member&gt;" lens is now orthogonal
+  to family-view and lenses every member-attributable screen (income / investments / liabilities / insurance /
+  tax) to that member + Joint, while household-only screens (expenses / financial-health / fire-goals) stay
+  household-scoped behind a new `WholeHouseholdBadge` ("Whole household"). **FIRE / adequacy stays
+  household-scoped and INVARIANT to member selection** — the #22/#23 honesty guardrail held (FinTech
+  adversarial-traced: only 5 DISPLAY fields read lensedScope; all adequacy reads householdScope).
+  **Verification:** static green both trees (FE type-check + 1070 unit incl. new member-earning / migration /
+  #66-lens / business-only-earner specs; server type-check + lint + 161 incl. live-DB integration round-tripping
+  the ADULT role through Supabase); Rule 24/25/26/31/32 UI demo-mode (non-earning→earning transition, lens
+  re-scoping ₹1.40Cr→₹35L, badges) + a server-adapter sub-run (Supabase hydration + lens-via-dropdown);
+  rule-29 independent FinTech + code-review (both PASS) + rule-33 blind verifiers (reconciled). A post-review
+  pass fixed 4 lens-coherence display issues (DTI / SORR / income-total / investments-Overview hero —
+  numerator-lensed/denominator-household mismatches that emitted misleading per-member signals). Closes #67 +
+  #66. Pointers: gh #67, gh #66; contract `docs/goals/2026-06-08-member-model-coherence-and-app-wide-lens.md`.
 - **D-2026-06-08-19 — Build-now selection: the 2 must-haves (#67 → #66); focus lock lifted for these two;
   goal contract authored.** Abhay: "suggest which ones to implement now; implement them as goal." Selected
   the only 2 must-haves, sequenced **#67 (member-model coherence: earner derived from income) FIRST →

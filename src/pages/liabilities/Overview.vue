@@ -1,24 +1,34 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { useHouseholdStore } from "@/stores/household";
 import { useFireDerive } from "@/lib/useFireDerive";
+import { useHouseholdStore } from "@/stores/household";
 import { formatINRCompact } from "@/lib/formatters";
 import EmptyState from "@/components/shared/EmptyState.vue";
 import LeafPageHeader from "@/components/income-layout/LeafPageHeader.vue";
 import MetricCard from "@/components/shared/MetricCard.vue";
 
-const household = useHouseholdStore();
 const fire = useFireDerive();
+const household = useHouseholdStore();
 
+// gh #66: the loans LIST + outstanding/EMI totals are member-lensed DISPLAY (selected member +
+// "Joint"; equals household.data.liabilities on the default view).
+const lensedLiabilities = computed(() => fire.lensedLiabilities.value);
 const totalOutstanding = computed(() =>
-  household.data.liabilities.reduce((s, l) => s + l.outstandingBalance, 0),
+  lensedLiabilities.value.reduce((s, l) => s + l.outstandingBalance, 0),
 );
 const monthlyEMI = computed(() =>
+  lensedLiabilities.value.reduce((s, l) => s + l.monthlyEMI, 0),
+);
+// gh #66 coherence: DTI is a HOUSEHOLD solvency ratio — total debt service vs total household
+// take-home. It MUST stay whole-household (both legs from the same set), NOT lensed EMI ÷ household
+// take-home (which would emit a misleading per-member debt-burden under a lens). fire.monthlyTakeHome
+// is the householdScope take-home, so we pair it with the household EMI, not the lensed EMI.
+const householdMonthlyEMI = computed(() =>
   household.data.liabilities.reduce((s, l) => s + l.monthlyEMI, 0),
 );
 const monthlyTakeHome = computed(() => fire.monthlyTakeHome.value);
 const dtiRatio = computed(() =>
-  monthlyTakeHome.value > 0 ? (monthlyEMI.value / monthlyTakeHome.value) * 100 : 0,
+  monthlyTakeHome.value > 0 ? (householdMonthlyEMI.value / monthlyTakeHome.value) * 100 : 0,
 );
 const dtiColor = computed(() => {
   if (dtiRatio.value < 30) return "success";
@@ -26,7 +36,7 @@ const dtiColor = computed(() => {
   return "error";
 });
 const nextEnd = computed(() => {
-  const ends = household.data.liabilities
+  const ends = lensedLiabilities.value
     .map((l) => l.derivedEndYear)
     .filter((v): v is number => typeof v === "number");
   if (!ends.length) return null;
@@ -55,7 +65,7 @@ function deltaPct(trend: number[]): number {
 
 const outstandingTrend = computed(() => buildPaydownTrend(totalOutstanding.value, 1.12, 2));
 const emiTrend = computed(() => buildPaydownTrend(monthlyEMI.value, 1.04, 1));
-const noLiabilities = computed(() => household.data.liabilities.length === 0);
+const noLiabilities = computed(() => lensedLiabilities.value.length === 0);
 </script>
 
 <template>
@@ -82,7 +92,7 @@ const noLiabilities = computed(() => household.data.liabilities.length === 0);
           :value="formatINRCompact(totalOutstanding)"
           :delta="deltaPct(outstandingTrend)"
           delta-invert
-          :delta-meta="`${household.data.liabilities.length} loan${household.data.liabilities.length === 1 ? '' : 's'}`"
+          :delta-meta="`${lensedLiabilities.length} loan${lensedLiabilities.length === 1 ? '' : 's'}`"
           :sparkline="outstandingTrend"
           sparkline-color="var(--color-error)"
         />

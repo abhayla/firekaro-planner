@@ -34,6 +34,7 @@ import { loadMehtasSeed } from "@/seeds/mehtas";
 import { loadIyersSeed } from "@/seeds/iyers";
 import { loadMauryasSeed } from "@/seeds/mauryas";
 import { derive } from "@/lib/derive";
+import { isEarningMember } from "@/lib/member-earning";
 import { computeTax, AVAILABLE_FYS } from "@/lib/tax";
 import { floorCeilingWithdrawal } from "@/lib/withdrawal-strategy";
 
@@ -149,7 +150,7 @@ describe("A7.1 kernel invariants — per-persona metamorphic (fast-check)", () =
       const a = useAssumptionsStore();
       persona.load(h, a);
       const base = a.values;
-      const earners = h.data.members.filter((m) => m.role === "EARNER").length;
+      const earners = h.data.members.filter((m) => isEarningMember(m, h.data.businesses)).length;
       fc.assert(
         fc.property(fc.double({ min: 0, max: 15, noNaN: true }), (stepUp) => {
           const k = derive(h.data, { ...base, householdSavingsStepUpPercent: stepUp }, LENS);

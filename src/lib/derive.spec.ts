@@ -54,14 +54,14 @@ describe("derive() — pure kernel", () => {
     // Earner plans to 88; homemaker spouse plans to 95. Household horizon must be 95.
     h.data.members = [
       {
-        id: "you", name: "You", dateOfBirth: "1986-01-01", role: "EARNER",
+        id: "you", name: "You", dateOfBirth: "1986-01-01", role: "ADULT",
         targetRetirementAge: 55, planToAge: 88, relation: "",
         city: "Metro", health: "Healthy", riskAppetite: "Moderate", marital: "Married",
         employmentStatus: "Employed",
         salary: { annualCTC: 3_000_000, hikePercent: 8 },
       },
       {
-        id: "spouse", name: "Spouse", dateOfBirth: "1988-01-01", role: "NON_EARNING_ADULT",
+        id: "spouse", name: "Spouse", dateOfBirth: "1988-01-01", role: "ADULT",
         planToAge: 95, relation: "Spouse",
         city: "Metro", health: "Healthy", riskAppetite: "Conservative", marital: "Married",
       },
@@ -77,18 +77,18 @@ describe("derive() — pure kernel", () => {
   // field. Demoting her to a child DEPENDENT (no planToAge) drops the horizon back to the earner.
   it("gh #34: a non-earning spouse who outlives the earner RAISES the FIRE number vs. ignoring her longevity", () => {
     const a = useAssumptionsStore();
-    const build = (spouseRole: "NON_EARNING_ADULT" | "DEPENDENT") => {
+    const build = (spouseRole: "ADULT" | "DEPENDENT") => {
       const h = useHouseholdStore();
       h.data.members = [
         {
-          id: "you", name: "You", dateOfBirth: "1986-01-01", role: "EARNER",
+          id: "you", name: "You", dateOfBirth: "1986-01-01", role: "ADULT",
           targetRetirementAge: 55, planToAge: 85, relation: "",
           city: "Metro", health: "Healthy", riskAppetite: "Moderate", marital: "Married",
           employmentStatus: "Employed", salary: { annualCTC: 3_000_000, hikePercent: 8 },
         },
         {
           id: "spouse", name: "Spouse", dateOfBirth: "1988-01-01", role: spouseRole,
-          planToAge: spouseRole === "NON_EARNING_ADULT" ? 98 : null, relation: "Spouse",
+          planToAge: spouseRole === "ADULT" ? 98 : null, relation: "Spouse",
           city: "Metro", health: "Healthy", riskAppetite: "Conservative", marital: "Married",
         },
       ] as typeof h.data.members;
@@ -96,7 +96,7 @@ describe("derive() — pure kernel", () => {
       return derive(h.data, a.values, { isFamilyView: false, viewingMemberId: null, currentFY: "2025-26" });
     };
     setActivePinia(createPinia());
-    const withSpouse = build("NON_EARNING_ADULT");
+    const withSpouse = build("ADULT");
     setActivePinia(createPinia());
     const ignoringSpouse = build("DEPENDENT");
 
@@ -106,18 +106,49 @@ describe("derive() — pure kernel", () => {
     expect(withSpouse.fireNumber).toBeGreaterThan(ignoringSpouse.fireNumber);
   });
 
+  // gh #67: a salary-less ADULT who owns an ACTIVE business is an earner (derived) — the only
+  // genuinely-new classification the income-derived model introduces. Their business profit flows
+  // into income and they count in lensedEarners; EPS/gratuity (salaried-only) correctly skip them.
+  it("gh #67: a salary-less adult with an active business derives as an earner (businessShare counted)", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    h.data.members = [
+      {
+        id: "owner", name: "Owner", dateOfBirth: "1986-01-01", role: "ADULT",
+        targetRetirementAge: 55, planToAge: 88, relation: "",
+        city: "Metro", health: "Healthy", riskAppetite: "Moderate", marital: "Married",
+      },
+    ] as typeof h.data.members;
+    h.data.businesses = [
+      { id: "biz", name: "Shop", legalKind: "SoleProp", annualProfit: 1_800_000, frequency: "A",
+        sharePercent: 100, ownerId: "owner", isOperated: true },
+    ] as typeof h.data.businesses;
+    h.data.expenses.avgMonthly = 60_000;
+
+    const k = derive(h.data, a.values, { isFamilyView: false, viewingMemberId: null, currentFY: "2025-26" });
+    // The business owner is a derived earner...
+    expect(k.lensedEarners.length).toBe(1);
+    expect(k.lensedEarners[0].id).toBe("owner");
+    // ...whose business profit is in income (no salary, but businessShare > 0)...
+    expect(k.annualIncome.salaryIncome).toBe(0);
+    expect(k.annualIncome.businessShare).toBe(1_800_000);
+    // ...and the FIRE headline is real (reachable, positive number).
+    expect(k.fireNumber).toBeGreaterThan(0);
+    expect(Number.isFinite(k.yearsToRegular)).toBe(true);
+  });
+
   it("gh #34: when the earner is the longest-lived adult, the horizon stays the earner's planToAge", () => {
     const h = useHouseholdStore();
     const a = useAssumptionsStore();
     h.data.members = [
       {
-        id: "you", name: "You", dateOfBirth: "1986-01-01", role: "EARNER",
+        id: "you", name: "You", dateOfBirth: "1986-01-01", role: "ADULT",
         targetRetirementAge: 55, planToAge: 92, relation: "",
         city: "Metro", health: "Healthy", riskAppetite: "Moderate", marital: "Married",
         employmentStatus: "Employed", salary: { annualCTC: 3_000_000, hikePercent: 8 },
       },
       {
-        id: "spouse", name: "Spouse", dateOfBirth: "1988-01-01", role: "NON_EARNING_ADULT",
+        id: "spouse", name: "Spouse", dateOfBirth: "1988-01-01", role: "ADULT",
         planToAge: 85, relation: "Spouse",
         city: "Metro", health: "Healthy", riskAppetite: "Conservative", marital: "Married",
       },
@@ -182,6 +213,50 @@ describe("derive() — pure kernel", () => {
     // Rohit's lensed tax must be unchanged — Priya's employer NPS is her deduction, not his.
     // (Before the fix, deriveDeductions summed unlensed members and leaked it into his tax.)
     expect(rohitTaxAfter).toBe(rohitTaxBaseline);
+  });
+
+  // gh #66: the member lens re-scopes the member-attributable DISPLAY collections (income/
+  // investments/liabilities/insurance/business) to the selected member + "Joint", while FIRE /
+  // adequacy stays household-scoped (the #22/#23 honesty guardrail). These two tests lock both legs.
+  it("gh #66: lensed display collections SHRINK to the selected member (+ Joint), and orthogonal to family-view", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    loadSeedPersona(h, a); // Sharmas: rohit + priya (earners), aarav + meera (dependents)
+    const whole = derive(h.data, a.values, { isFamilyView: false, viewingMemberId: null, currentFY: "2025-26" });
+    const lensed = derive(h.data, a.values, { isFamilyView: false, viewingMemberId: "rohit", currentFY: "2025-26" });
+
+    // Every member-attributable collection is re-scoped to rohit (+ Joint), so it is a STRICT subset.
+    expect(lensed.lensedInvestments.length).toBeLessThan(whole.lensedInvestments.length);
+    expect(lensed.lensedInvestments.length).toBeGreaterThan(0);
+    expect(lensed.lensedInvestments.every((i) => i.ownerId === "rohit" || i.ownerId === "Joint")).toBe(true);
+    expect(lensed.lensedEarners.length).toBe(1);
+    expect(lensed.lensedEarners[0].id).toBe("rohit");
+    expect(lensed.lensedLiabilities.every((l) => l.ownerId === "rohit" || l.ownerId === "Joint" || l.isSharedWithSpouse)).toBe(true);
+    expect(lensed.lensedInsurance.every((p) => p.insuredPersonId === "rohit")).toBe(true);
+    expect(lensed.lensedBusinesses.every((b) => b.ownerId === "rohit" || b.ownerId === "Joint")).toBe(true);
+    expect(lensed.lensedOtherIncome.every((o) => o.ownerId === "rohit" || o.ownerId === "Joint")).toBe(true);
+    // The lensed income DISPLAY changes too (only rohit's salary, not the household total).
+    expect(lensed.annualIncome.salaryIncome).toBeLessThan(whole.annualIncome.salaryIncome);
+
+    // #66 orthogonality: the member lens applies even with family-view ON.
+    const lensedFamilyOn = derive(h.data, a.values, { isFamilyView: true, viewingMemberId: "rohit", currentFY: "2025-26" });
+    expect(lensedFamilyOn.lensedInvestments.length).toBe(lensed.lensedInvestments.length);
+    expect(lensedFamilyOn.annualIncome.salaryIncome).toBe(lensed.annualIncome.salaryIncome);
+  });
+
+  it("gh #66 honesty lock: FIRE number/age is INVARIANT to member selection (household figure)", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    loadSeedPersona(h, a);
+    const whole = derive(h.data, a.values, { isFamilyView: false, viewingMemberId: null, currentFY: "2025-26" });
+    for (const memberId of ["rohit", "priya", "aarav"]) {
+      const lensed = derive(h.data, a.values, { isFamilyView: false, viewingMemberId: memberId, currentFY: "2025-26" });
+      // The household FIRE adequacy leg must NOT move when a member is viewed — the #22/#23 guardrail.
+      expect(lensed.fireNumber, `FIRE number invariant under lens=${memberId}`).toBe(whole.fireNumber);
+      expect(lensed.yearsToRegular, `years-to-FIRE invariant under lens=${memberId}`).toBe(whole.yearsToRegular);
+      expect(lensed.totalCorpus, `corpus invariant under lens=${memberId}`).toBe(whole.totalCorpus);
+      expect(lensed.annualSavings, `savings invariant under lens=${memberId}`).toBe(whole.annualSavings);
+    }
   });
 
   it("gh-issue #29: let-out rental is taxed on 70% NAV (Sec 24a) — but cash income stays FULL", () => {
@@ -596,7 +671,7 @@ describe("derive() — pure kernel", () => {
     // in a no-opening-year PPF (assumed locked till 60) → the liquid runway can't
     // bridge the early-retirement years → headline pushed later.
     h.data.investments = [];
-    h.data.members.forEach((m) => { if (m.role === "EARNER") m.targetRetirementAge = 45; });
+    h.data.members.forEach((m) => { if (m.role === "ADULT") m.targetRetirementAge = 45; });
     h.addInvestment({ type: "FD", label: "Liquid", value: 2_000_000, monthlyContribution: 0, ownerId: "rohit" });
     h.addInvestment({ type: "PPF", label: "Big PPF", value: 200_000_000, monthlyContribution: 0, ownerId: "rohit" });
     const k = derive(h.data, a.values, lens);

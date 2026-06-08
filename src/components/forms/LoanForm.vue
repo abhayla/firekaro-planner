@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { useHouseholdStore } from "@/stores/household";
+import { useFireDerive } from "@/lib/useFireDerive";
 import { derivedEndYear } from "@/lib/amortization";
 import { formatINRCompact } from "@/lib/formatters";
 import type { LoanType, Liability } from "@/types/household";
@@ -9,6 +10,12 @@ import PanelCard from "@/components/shared/PanelCard.vue";
 import EntityRow from "@/components/shared/EntityRow.vue";
 
 const household = useHouseholdStore();
+const fire = useFireDerive();
+
+// gh #66: the "Your loans" DISPLAY list is member-lensed (selected member + "Joint"); equals
+// household.data.liabilities on the default "Whole household" view and in the onboarding wizard.
+// Owner-options and draft defaults intentionally stay on the full household.adults / household.data.
+const lensedLiabilities = computed(() => fire.lensedLiabilities.value);
 
 // Per-loan-type colour for the EntityRow accent + leading chip.
 function loanColor(t: LoanType): string {
@@ -41,7 +48,7 @@ const TYPES: { value: LoanType; label: string; defaultRate: number; helper?: str
 ];
 
 const earnerOptions = computed(() =>
-  household.earners.map((m) => ({ value: m.id, label: m.name || "Earner" })),
+  household.adults.map((m) => ({ value: m.id, label: m.name || "Earner" })),
 );
 
 const draft = ref<{
@@ -59,7 +66,7 @@ const draft = ref<{
   outstandingBalance: null,
   monthlyEMI: null,
   interestRate: 8.5,
-  ownerId: household.earners[0]?.id ?? household.members[0]?.id ?? "you",
+  ownerId: household.adults[0]?.id ?? household.members[0]?.id ?? "you",
   isSharedWithSpouse: false,
   coBorrowers: [],
 });
@@ -234,11 +241,11 @@ function saveEdit() {
       </v-alert>
     </PanelCard>
 
-    <template v-if="household.data.liabilities.length">
+    <template v-if="lensedLiabilities.length">
       <div class="section-eyebrow">Your loans</div>
       <PanelCard>
         <EntityRow
-          v-for="l in household.data.liabilities"
+          v-for="l in lensedLiabilities"
           :key="l.id"
           :title="l.name"
           :value="formatINRCompact(l.outstandingBalance)"
