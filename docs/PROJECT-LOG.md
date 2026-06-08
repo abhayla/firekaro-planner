@@ -126,6 +126,22 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 ## §3 — Decision log (append-only, newest first)
 
 ### 2026-06-08
+- **D-2026-06-08-05 — "Viewing as &lt;member&gt;" lens re-tiered `good-to-have` → `must-have`; product fork
+  resolved to Option A (lens the member-attributable screens app-wide) → gh #66 reframed (analysis-only, NOT
+  implemented).** Abhay reported on prod (firekaro.com) that changing the global "Viewing as" dropdown doesn't
+  change screen data; root-caused (verified at kernel: `derive()` re-scopes `lensedInvestments` 11→9 on the
+  Sharmas seed; only 3 `*.vue` surfaces consume the lensed outputs; all other section screens read
+  `household.data` un-lensed by design). Originally tiered `good-to-have` (wedge persona is often solo → dropdown
+  hidden). **Abhay overrode: "to me this is a must-have feature."** That call also resolves the A/B fix fork →
+  **Option A** (the lens MUST filter app-wide), not B (scope the control down). **Honesty-bounded scope (the
+  load-bearing #22/#23 constraint):** lens only the genuinely member-attributable surfaces — income
+  (salary per-member + business/other-income `ownerId`), investments/liabilities/insurance (`ownerId`/`insuredPersonId`),
+  tax (lensed `annualTax`/`fyTax`). **Do NOT lens** (no ownership data OR honesty-core): expenses (recurring/planned
+  carry NO `ownerId` → inherently household), and FIRE/adequacy/readiness/drawdown/stress/net-worth/health-score
+  (must stay household-scoped — the FIRE-age-81 #22 class). `derive()` already exposes most lensed collections
+  (`lensedInvestments/Liabilities/Insurance/Earners` + lensed display fields); income business/other-income need
+  lensed outputs added or page-level `ownerId` filtering. **Implementation gated** ("don't implement yet"). Full
+  surface map + acceptance criteria + test plan in the issue. Pointer: gh #66.
 - **D-2026-06-08-04 — Member "earner" should be DERIVED from income, not a manual role flag → filed gh #67
   (`good-to-have`, analysis-only).** Abhay flagged that marking an adult `EARNER`/`NON_EARNING_ADULT` "does
   not look correct — if earnings are added for him then he is an earner, else not." FinTech+PM verdict: he's
