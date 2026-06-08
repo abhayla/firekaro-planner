@@ -126,6 +126,20 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 ## §3 — Decision log (append-only, newest first)
 
 ### 2026-06-08
+- **D-2026-06-08-14 — Omnipresent FIRE summary on every screen → filed gh #75 (`enhancement`, `good-to-have`,
+  area:design-system, analysis-only). Recommended: AppBar chip → expandable popover.** Abhay: the user should
+  see the FIRE headline/details from any screen (persistent element / floating window / other). **Analysis:**
+  data is already global (`useFireDerive()` reads stores app-wide) → pure UX-surface question; reuse
+  `FireHero.vue`; no persistent widget exists; host = `SidebarLayout.vue` (compact app-bar + v-main).
+  **Recommendation = Option A: compact persistent FIRE chip in the AppBar (always-visible key figure) that
+  expands to a rich popover** (FireHero content + dashboard link). Beats B floating/FAB (obscures content,
+  gimmicky), C sticky-strip (eats vertical space), D right-rail (competes with nav). Goal-anchored: keeps the
+  honest FIRE number omnipresent (obj-1) + strong stickiness lever, no content obstruction, reuses the
+  existing v-menu pattern. **Must:** chip is prominent + mobile-collapses; figure stays HOUSEHOLD-scoped under
+  the member lens (honesty, cf #66); graceful "finish setup" empty state; no FIRE-math duplication. **Tiered
+  `good-to-have`** (stickiness/omnipresence; product works without it; not a correctness error → not Tier-0;
+  stickiness sits after the must-have core in the Now-order). Final pattern pick is Abhay's; lead = A.
+  Implementation gated. Pointer: gh #75.
 - **D-2026-06-08-13 — "What we assumed" (FIRE dashboard Bridge card) should be collapsible → filed gh #74
   (`enhancement`, `good-to-have`, area:design-system, analysis-only).** Abhay (screenshot, prod): the
   "WHAT WE ASSUMED — estimates you can correct" block is a long always-expanded list that clutters the
