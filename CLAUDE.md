@@ -107,6 +107,7 @@ npm run test:unit -- src/lib/tax.spec.ts   # single spec file
 npm run test:unit -- -t "marginal relief"  # filter by test name (vitest -t)
 npm run test:unit:watch   # vitest watch mode
 npm run test:coverage     # vitest run --coverage
+npx stryker run           # mutation-test the honesty-critical kernel (fire-math/tax/withdrawal-strategy/epf-vpf) — a KILLED MUTANT, not coverage %, is the real proof the specs protect the math (config: stryker.config.json)
 npm run type-check        # vue-tsc --build --force  (banner: firekaro-mvp)
 npm run build             # vue-tsc -b && vite build
 npm run preview           # serve the production build locally
