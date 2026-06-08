@@ -21,7 +21,7 @@ description: >
 type: workflow
 allowed-tools: "Read Write Edit Grep Glob Bash"
 argument-hint: "[one-line description of the goal, optional]"
-version: "1.3.0"
+version: "1.4.0"
 ---
 
 # Goal Creator
@@ -50,8 +50,8 @@ they are the spec for what you produce. The two best references (both committed)
 2. **Never commit.** You write the file and stop. Committing the contract is Abhay's call.
 3. **Interview-first, always.** Resolve every fork via the Clarification Gate (STEP 2)
    before writing a single line of the contract. The output must be zero-user-input.
-4. **Bake in the standing rules.** Every contract folds in rules 24, 25, 26, 15, 17, 20,
-   23 plus the failure-recovery budget block AND the three opening blocks §0.1 (worktree
+4. **Bake in the standing rules.** Every contract folds in rules 24, 25, 26, 32, 33, 15, 17,
+   20, 23 plus the failure-recovery budget block AND the three opening blocks §0.1 (worktree
    isolation), §0.2 (idempotency preflight), §0.3 (live progress log) — see
    `references/baked-in-rules.md`. These are why these contracts produce *proven-working*
    results, not *claimed-working* ones, and why a long run is trackable + learnable from
@@ -295,8 +295,12 @@ loaded its contract).
   generalize or write a delta instead.
 - **Interview-first, one question at a time, each with a recommended answer**, until every
   fork is resolved. The contract must be zero-user-input.
-- **Every contract bakes in rules 24, 25, 26, 15, 17, 20, 23 + the failure-recovery budget
-  block** (`references/baked-in-rules.md`), with mechanics adapted to the target app tree.
+- **Every contract bakes in rules 24, 25, 26, 32, 33, 15, 17, 20, 23 + the failure-recovery
+  budget block** (`references/baked-in-rules.md`), with mechanics adapted to the target app
+  tree, and tests **by blast radius of the changed surface** (the conditional-gating table:
+  UI render+functionality, UI→persistence, a dedicated API behavioral test for server/API
+  changes, cross-page sweep + blind re-verify always). Test PLACEMENT (which type runs where)
+  follows `.claude/rules/testing-strategy.md`.
 - **Match the house format** in `docs/goals/` and the skeleton in
   `references/contract-template.md`. Concrete paths/components/commands, never abstractions.
 - **Resolve the persistence mode first** — localStorage demo adapter (default) vs ServerAdapter

@@ -145,12 +145,18 @@ events/lessons so future runs (and Abhay) can learn from this one.
 
 ## Process bar (carry forward verbatim)
 
-> **All 26 rules in `.claude/rules/claude-behavior.md` are operative for this run.** The
+> **All rules in `.claude/rules/claude-behavior.md` are operative for this run.** The
 > rules below are called out because they are the load-bearing ones for an autonomous
-> `/goal` run. **Rules 24, 25, 26 are MANDATORY gates at every task AND every stage
-> boundary** — a standing Abhay mandate. Do not skip, soften, or defer the 24/25/26 sweep
-> to "later". They are why this contract yields *proven-working* output, not
+> `/goal` run. **Rules 24, 25, 26, 32, 33 are MANDATORY gates at every task AND every stage
+> boundary** — a standing Abhay mandate. Do not skip, soften, or defer the 24/25/26/32/33
+> sweep to "later". They are why this contract yields *proven-working* output, not
 > *claimed-working* output.
+>
+> **Test PLACEMENT is governed by `.claude/rules/testing-strategy.md` (the SSOT) — which
+> test type runs in which environment.** The rules below are the dev-time verification
+> *mandates* that compose with it; the contract tests **by blast radius of the changed
+> surface** (the conditional-gating table below) — full depth within each layer the change
+> touches, not "all types always" and not "render-only".
 
 ---
 
@@ -223,6 +229,30 @@ comfortable "all-green" waypoint while authorized work remains. Pause only for a
 hard blocker (below) or a shared-state action that needs approval. Context-budget anxiety is
 NOT a stop condition (`feedback_dont_defer_on_context_judgment.md`).
 
+### Rule 32 — interactive functionality (per UI screen with controls, MANDATORY)
+
+"It renders" is shape; "it functions" is substance. After Rule 24 confirms a screen *renders*,
+EXERCISE its interactive controls — clicks, tab switches, FY/period selectors, form fill +
+submit, dialog open/save/cancel, filters, expand/collapse, and the screen's primary action(s) —
+and confirm each *responds* (state changes, data updates, the FIRE figure recomputes, no NEW
+console error). A screen can render perfectly with every control dead — that exact gap is why
+this rule exists. A "verified" claim that only checked render/console/layout is INCOMPLETE.
+(On prod, NON-DESTRUCTIVE interactions only — tab/FY/expand/dialog-open-then-cancel; destructive
+functional flows belong to the pre-merge E2E suite, per `testing-strategy.md`.)
+
+### Rule 33 — blind independent test verification (per test verdict, MANDATORY)
+
+Any test verdict this run produces (Playwright/E2E/UI/persistence/any pass-fail) MUST be
+re-checked by a **SEPARATE, context-blind** agent given the SAME inputs + the RAW evidence
+(screenshots/ARIA/console/persisted data) — NOT this run's own conclusions presented as fact.
+The verifier judges BOTH (a) was the testing done *completely* (coverage — substance, rule 32)
+and (b) is the verdict *correct* (does the evidence support it — plausibility, rule 31), and is
+**adversarial** (find what was missed, not rubber-stamp). Do NOT accept/report a verdict the
+blind verifier dissents on — reconcile first. Single-level dispatch: the run's orchestrator
+dispatches the tester wave, then dispatches the blind-verifier wave itself with **evidence
+paths only**. Applies to the run's OWN test runs too. Full rule:
+`.claude/rules/independent-test-verification.md`.
+
 ---
 
 ## Failure-recovery budget block (carry forward verbatim, tune the numbers per goal)
@@ -244,16 +274,24 @@ NOT a stop condition (`feedback_dont_defer_on_context_judgment.md`).
 
 ## Conditional gating (for fix/process contracts where not every task touches UI)
 
-Some contracts (e.g. a bug-fix loop) touch UI on some tasks and not others. Gate 24/25 on
-the diff; 26 always fires:
+Some contracts (e.g. a bug-fix loop) touch UI on some tasks and not others. Gate 24/25/32 and
+the API behavioral test on the diff; 26 and 33 always fire. **Test by blast radius of the
+changed surface — full depth in every layer the change touches** (not "all types always", not
+"render-only"). A typical full-stack feature (UI + write path + API) trips every row:
 
-| Rule | Trigger | Behavior on skip |
+| Rule / check | Trigger | Behavior on skip |
 |---|---|---|
-| **26** post-phase independent verification | **ALWAYS fires** | n/a — non-skippable |
-| **24** UI screenshot verification | diff touches `*.vue` / component / page / composable | commit msg: `rule 24 skipped: no UI change` |
-| **25** UI→persistence verification | diff introduces a UI create/update/delete flow | commit msg: `rule 25 skipped: no write-path change` |
+| **26** post-phase independent + cross-page sweep | **ALWAYS fires** | n/a — non-skippable |
+| **33** blind independent test re-verification | fires whenever ANY test verdict is produced | n/a — non-skippable when a verdict exists |
+| **24** UI screenshot/ARIA/console (render) | diff touches `*.vue` / component / page / composable | commit msg: `rule 24 skipped: no UI change` |
+| **32** interactive functionality (controls work) | diff touches UI with interactive controls (forms/tabs/dialogs/filters/primary action) | commit msg: `rule 32 skipped: no interactive UI change` |
+| **25** UI→persistence | diff introduces a UI create/update/delete flow | commit msg: `rule 25 skipped: no write-path change` |
+| **API behavioral test** (status · envelope · auth-gate · ownership/IDOR) | diff touches `server/src/routes/**`, `server/src/lib/household-*`, or any `/api/**` contract | commit msg: `api test skipped: no server/API change` |
 
-If a fix produces a surprise change to product/write-path code, the gates fire even when
+API-only/server-only changes (no UI) still run static gates (`cd server && type-check + lint +
+test:unit`, incl. the `DATABASE_URL`-gated integration spec) + the API behavioral test + Rule 26;
+24/25/32 skip. UI-only changes (no write path) run 24 + 32 + 26; 25 + the API test skip. If a fix
+produces a surprise change to product/write-path/API code, the corresponding gates fire even when
 expected to skip.
 
 ---
