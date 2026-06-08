@@ -126,6 +126,19 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 ## §3 — Decision log (append-only, newest first)
 
 ### 2026-06-08
+- **D-2026-06-08-16 — Tooltips (`InfoTip`) are low-contrast / washed-out → filed gh #77 (`enhancement`,
+  `good-to-have`, area:design-system, analysis-only).** Abhay (screenshot, `/fire-goals/what-if`): the
+  "Required corpus" tooltip is open but not clearly visible. **Root cause (in code):** `InfoTip.vue` renders a
+  BARE `<v-tooltip>` with no custom content styling → inherits Vuetify's default ~0.9-opacity translucent
+  tooltip + 12px `text-caption` text; busy page bleeds through → washed-out. No global tooltip theming exists,
+  and it contradicts the project's own `chart-theme-system.md` (which mandates solid slate-900 tooltips).
+  Single-fix-wide-impact: shared `InfoTip` used in 4 surfaces (FireHero, EarnerSalaryForm, HealthScore,
+  WhatIf) + sibling raw `v-tooltip` in DiscoveryFooter. Fix direction: opaque high-contrast surface
+  (match chart-theme) + `text-body-2` + verify WCAG AA, centralized in InfoTip/vuetify defaults. **Honesty
+  caveat:** report came via a glare-affected phone photo so on-screen severity is unconfirmed, but the CSS
+  defect is real in code. Tiered `good-to-have` (app works + info present → not must-have; but a real
+  readability/WCAG-contrast defect on the jargon-comprehension layer for the FIRE-novice persona → above
+  nice-to-have). **Analysis-only — NOT implemented.** Pointer: gh #77.
 - **D-2026-06-08-15 — "What we assumed" bridge card duplicated on Dashboard + Readiness → filed gh #76
   (`enhancement`, `good-to-have`, area:design-system, analysis-only).** Abhay asked why the duplication.
   **Verified:** same component `<BridgeBreakdownCard/>` rendered on both `Dashboard.vue:269` and
