@@ -36,21 +36,25 @@ release-readiness sign-off, and a post-deploy verification report.
 
 ## 0.0 PREREQUISITE before a re-run (read FIRST)
 
-> **✅ DONE (2026-06-07).** The first Phase-A run's branch `chore/full-lifecycle-qa` (~63 green locks)
-> was **merged into `main` (merge commit `086bc67`) and pushed**; the post-merge gate is green (root
-> type-check 0 / 978 tests; server type-check 0 / lint 0 / 156 tests). The old branch + worktree are
-> removed. So `main` now carries BOTH the prior work AND this hardened contract — §0.2's idempotency
-> preflight (reads `main` + `git log`) WILL see the prior work and skip it, doing only the delta
-> (§A2.6 + #59 + #60). **Nothing to merge before the re-run.** This re-run uses a FRESH worktree/branch
-> off `main` (§0.1).
+> **✅ PHASE A COMPLETE + MERGED (2026-06-08).** Both Phase-A runs are merged to `main`: run 1's ~63
+> locks (`086bc67`) AND run 2's delta — §A2.6 (all 4 personas hand-entered, blind-verified), #59 (tax.ts
+> 85.27%), #60 (auth gate locked) — merged at **`b8fadd7`**, post-merge gate green (root 1053 / server
+> 162). **Phase A's DoD is fully met on `main`; there is nothing left to do in Phase A.** A re-run's §0.2
+> preflight will skip ALL of Phase A and proceed to the **DEPLOY GATE → Phase B (post-prod)**.
+>
+> **Deploy is near-optional:** the only product-code change since the last prod deploy (`45201dc`) is a
+> no-behavior `logger.ts` redaction refactor — a new deploy ships nothing user-facing. **Phase B can run
+> against the CURRENT live site**, or after an optional hygiene redeploy of `b8fadd7`. Deploy + the SSH
+> push are Abhay's gate/credential.
 
 ## 0.1 WORKTREE ISOLATION (paste FIRST)
 
 > **First action, before §0.2 and any stage. Non-negotiable.** Dedicated worktree, NEW branch off `main`:
 > 1. If `root=$(git rev-parse --show-toplevel)` is the primary checkout, run:
->    `git worktree add ../firekaro-goal-qa2 -b chore/full-lifecycle-qa-2 main` (a FRESH worktree/branch —
->    the prior `chore/full-lifecycle-qa` is the completed-run branch; see §0.0) and run EVERY stage from
->    `../firekaro-goal-qa2`. Reuse it if it exists (§0.2 makes re-runs idempotent).
+>    `git worktree add ../firekaro-goal-qa3 -b chore/full-lifecycle-qa-3 main` (a FRESH worktree/branch —
+>    the prior `chore/full-lifecycle-qa` + `-2` are completed+merged; their dirs may linger on disk, so use
+>    a NEW name; see §0.0) and run EVERY stage from `../firekaro-goal-qa3`. Reuse it if it exists (§0.2
+>    makes re-runs idempotent). A Phase-B-only re-run needs no build branch — it verifies prod read-only.
 > 2. Claim: `export GOAL_RUN_TOKEN=qa-<short-nonce>` → write `.goal-active.lock` with it.
 > 3. Release on exit (after last commit OR any halt): `rm -f "$(git rev-parse --show-toplevel)/.goal-active.lock"`.
 > If `git worktree` is unavailable, note it and proceed — never run in the primary checkout.
