@@ -126,6 +126,18 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 ## §3 — Decision log (append-only, newest first)
 
 ### 2026-06-08
+- **D-2026-06-08-17 — What-If sandbox slider min/max ranges too narrow → filed gh #78 (`enhancement`,
+  `good-to-have`, fire-goals).** Abhay (screenshot, `/fire-goals/what-if`): widen lower/upper limits on all
+  sliders (e.g. inflation capped — healthcare 15%, general only 10%). **Verified caps in `WhatIf.vue`:**
+  step-up 0–15 (L411), expected-return 3–18% (L435), SWR 2–5% (L441), general-inflation 2–10% (L447),
+  healthcare-inflation 3–15% (L453), retire-by-age →75 (L240); equity 0–100 already full. **Scope sharpened
+  by sibling audit:** the caps are essentially **localized to the What-If sandbox** — `AssumptionsPanel.vue`
+  (the REAL plan, Preferences) is mostly **free numeric entry** (no min/max) except an SWR clamp 0.5–10% (L32),
+  so the committed plan is NOT capped → this is sandbox-exploration friction, not a Tier-0 honesty block.
+  **FinTech guardrails for the fix (gated):** SWR floor strictly >0 (`fireNumber=expenses/swr` ∞ at 0); engine
+  already shows "—" for non-converging combos (return≤inflation). Proposed wider bounds in issue. **Tiered
+  `good-to-have`** (flagship obj-2 exploration improved + mild honesty angle—can't model 12% inflation in
+  sandbox; but real plan already free-entry, feature works). Implementation gated. Pointer: gh #78.
 - **D-2026-06-08-16 — Tooltips (`InfoTip`) are low-contrast / washed-out → filed gh #77 (`enhancement`,
   `good-to-have`, area:design-system, analysis-only).** Abhay (screenshot, `/fire-goals/what-if`): the
   "Required corpus" tooltip is open but not clearly visible. **Root cause (in code):** `InfoTip.vue` renders a
