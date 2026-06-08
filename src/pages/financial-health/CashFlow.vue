@@ -5,27 +5,29 @@ import { formatINRCompact } from "@/lib/formatters";
 import CashflowWaterfall from "@/components/charts/CashflowWaterfall.vue";
 import LeafPageHeader from "@/components/income-layout/LeafPageHeader.vue";
 import MetricCard from "@/components/shared/MetricCard.vue";
+import MemberLensBadge from "@/components/shared/MemberLensBadge.vue";
 
 const fire = useFireDerive();
 
-// #23 follow-up: this page derives surplus = income − tax − expenses. Expenses are inherently
-// HOUSEHOLD (not modeled per-member), so income AND tax MUST also be household-scoped — else a
-// member lens renders a spurious negative surplus. household* === the lensed values on the default
-// lens, so the page is unchanged there.
-const annualIncome = computed(() => fire.householdAnnualIncome.value ?? 0);
-const annualExpenses = computed(() => fire.annualExpensesToday.value);
-const annualTax = computed(() => fire.householdAnnualTax.value ?? 0);
-const annualSurplus = computed(() =>
-  Math.max(0, annualIncome.value - annualExpenses.value - annualTax.value),
-);
+// #81 Phase 3: cash flow = income − tax − expenses, member-LENSED via the SAME-SCOPE resolver.
+// When an adult is selected all three are THAT member's own slice (income/tax + ring-1 + their
+// split of ring-2 expenses — supersedes the #23 household-only workaround, which existed only
+// because expenses had no owner before Phase 1). On the default lens all three are the household
+// figures, so the page is byte-identical. Same-scope guarantees no spurious member÷household surplus.
+const fh = computed(() => fire.memberFinancials.value);
+const annualIncome = computed(() => fh.value.annualIncome);
+const annualExpenses = computed(() => fh.value.annualExpenses);
+const annualTax = computed(() => fh.value.annualTax);
+const annualSurplus = computed(() => fh.value.surplus);
 const monthlyIncome = computed(() => Math.round(annualIncome.value / 12));
 const monthlyExpenses = computed(() => Math.round(annualExpenses.value / 12));
 const monthlyTax = computed(() => Math.round(annualTax.value / 12));
-const monthlySurplus = computed(() => Math.round(annualSurplus.value / 12));
+const monthlySurplus = computed(() => fh.value.monthlySurplus);
 
-const savingsRate = computed(() =>
-  annualIncome.value > 0 ? Math.round((annualSurplus.value / annualIncome.value) * 100) : 0,
-);
+// Savings rate reads the CANONICAL (take-home-denominator) figure from the resolver, so it matches
+// the FireHero headline + Health Score + Reports app-wide — not a screen-local gross-income variant
+// (FinTech #81 Phase-3 MED-1).
+const savingsRate = computed(() => fh.value.savingsRatePercent);
 </script>
 
 <template>
@@ -34,7 +36,11 @@ const savingsRate = computed(() =>
       eyebrow="Financial Health · Cash Flow"
       title="Cash Flow"
       description="Annual income vs tax vs expenses vs surplus. The waterfall below shows exactly where each rupee lands."
-    />
+    >
+      <template #actions>
+        <MemberLensBadge />
+      </template>
+    </LeafPageHeader>
 
     <v-row dense class="mb-2">
       <v-col cols="12">

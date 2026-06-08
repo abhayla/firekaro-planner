@@ -4,6 +4,7 @@ import { useAssumptionsStore } from "@/stores/assumptions";
 import { useUiStore } from "@/stores/ui";
 import { derive } from "@/lib/derive";
 import { runMonteCarloFire, INDIA_EQUITY_ANNUAL_RETURNS } from "@/lib/monte-carlo";
+import { isEmergencyFundEligible } from "@/lib/investment-traits";
 
 /**
  * Single source of truth for all FIRE dashboard math — now a thin Pinia-aware
@@ -31,7 +32,97 @@ export function useFireDerive() {
     }),
   );
 
+  // #81 Phase 3 — the SAME-SCOPE Financial-Health resolver. When an adult is selected in "Viewing
+  // as", every figure is THAT member's own slice; on the default "Whole household" view it is the
+  // full household (byte-identical). CRUCIAL: a member's share of "Joint"/shared assets, liquid,
+  // liabilities and EMI is taken at the SAME `householdSplitPercent` the income/expense attribution
+  // uses (FinTech #81 Phase-3 HIGH-1/2 fix). So EVERY FH ratio — net worth (assets − liab), savings
+  // rate, DTI (EMI ÷ take-home), emergency months (liquid ÷ burn), health score — divides figures
+  // built on ONE identical Joint convention. Mixing a 100%-Joint numerator with a split denominator
+  // (the deeper #23 trap) over-states a member's safety; unifying the split kills it. Member-owned =
+  // 100%; "Joint"/shared = × split; dependent-owned excluded. Same-scope enforced ONCE, here.
+  const memberFinancials = computed(() => {
+    const k = d.value;
+    const adult = k.individualFireByMember.find((r) => r.memberId === ui.viewingMemberId) ?? null;
+    const split = Math.min(100, Math.max(0, a.values.householdSplitPercent ?? 50)) / 100;
+    const memberId = adult?.memberId ?? null;
+    // The Joint weight applied to every member-scoped FH figure (1 by default = household view).
+    const invWeight = (ownerId: string): number =>
+      !adult ? 1 : ownerId === memberId ? 1 : ownerId === "Joint" ? split : 0;
+    const liabWeight = (ownerId: string, isSharedWithSpouse: boolean): number =>
+      !adult ? 1 : ownerId === memberId ? 1 : ownerId === "Joint" || isSharedWithSpouse ? split : 0;
+
+    // Split-scoped lists — the member's SHARE of each holding/loan (own full, Joint × split). The
+    // FH screens read these for both totals AND per-row breakdowns, so every screen uses one convention.
+    const scopedInvestments = k.lensedInvestments.map((i) => ({
+      ...i,
+      value: Math.round(i.value * invWeight(i.ownerId)),
+    }));
+    const scopedLiabilities = k.lensedLiabilities.map((l) => ({
+      ...l,
+      outstandingBalance: Math.round(l.outstandingBalance * liabWeight(l.ownerId, l.isSharedWithSpouse)),
+      monthlyEMI: Math.round(l.monthlyEMI * liabWeight(l.ownerId, l.isSharedWithSpouse)),
+    }));
+
+    const totalAssets = scopedInvestments.reduce((s, i) => s + i.value, 0);
+    const totalLiabilities = scopedLiabilities.reduce((s, l) => s + l.outstandingBalance, 0);
+    const liquid = scopedInvestments
+      .filter((i) => isEmergencyFundEligible(i))
+      .reduce((s, i) => s + i.value, 0);
+    const monthlyEMI = scopedLiabilities.reduce((s, l) => s + l.monthlyEMI, 0);
+    // Insurance is per insured-person (not Joint) — lensedInsurance is already the member's own policies.
+    const lifeCover = k.lensedInsurance
+      .filter((p) => p.type === "Life")
+      .reduce((s, p) => s + p.sumAssured, 0);
+    const healthCover = k.lensedInsurance
+      .filter((p) => p.type === "Health")
+      .reduce((s, p) => s + p.sumAssured, 0);
+    // Income/tax/expenses: member attribution when lensed (already split-Joint), household by default.
+    const annualIncome = adult ? adult.attributableAnnualIncome : k.householdAnnualIncome ?? 0;
+    const annualTax = adult ? adult.attributableAnnualTax : k.householdAnnualTax ?? 0;
+    const annualExpenses = adult ? adult.attributableAnnualExpenses : k.annualExpensesToday;
+    const annualTakeHome = annualIncome - annualTax;
+    const surplus = Math.max(0, annualTakeHome - annualExpenses);
+    const adultMember = adult ? h.data.members.find((m) => m.id === adult.memberId) ?? null : null;
+    return {
+      isMemberView: adult != null,
+      memberName: adult?.name ?? null,
+      // Is the lensed adult an earner? (drives the non-earner health-score caveat.)
+      isEarner: adult ? k.lensedEarners.some((m) => m.id === adult.memberId) : true,
+      annualIncome,
+      annualTax,
+      annualExpenses,
+      surplus,
+      monthlySurplus: Math.round(surplus / 12),
+      // Split-scoped lists for the NetWorth/Banking breakdowns (one convention with the ratios).
+      scopedInvestments,
+      scopedLiabilities,
+      totalAssets,
+      totalLiabilities,
+      netWorth: totalAssets - totalLiabilities,
+      liquid,
+      // Health-score inputs — each member-scoped (one Joint convention) when lensed, kernel by default.
+      monthlyTakeHome: adult ? Math.round(annualTakeHome / 12) : k.monthlyTakeHome,
+      monthlyEMI,
+      savingsRatePercent: adult
+        ? annualTakeHome > 0
+          ? Math.round((surplus / annualTakeHome) * 100)
+          : 0
+        : k.savingsRate,
+      fireProgressPercent: adult
+        ? adult.individualFireNumber > 0
+          ? Math.min(100, Math.round((adult.attributableCorpus / adult.individualFireNumber) * 100))
+          : 0
+        : k.progressPercent,
+      lifeCover,
+      healthCover,
+      primaryIncome: adult ? adultMember?.salary?.annualCTC ?? 0 : h.earners[0]?.salary?.annualCTC ?? 0,
+    };
+  });
+
   return {
+    // #81 Phase 3 — the centralized same-scope Financial-Health resolver (member or household).
+    memberFinancials,
     applyMemberLens: computed(() => d.value.applyMemberLens),
     lensedMembers: computed(() => d.value.lensedMembers),
     lensedEarners: computed(() => d.value.lensedEarners),

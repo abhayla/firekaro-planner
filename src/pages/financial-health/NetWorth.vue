@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { useHouseholdStore } from "@/stores/household";
+import { useFireDerive } from "@/lib/useFireDerive";
 import { formatINRCompact } from "@/lib/formatters";
 import type { InvestmentType, LoanType } from "@/types/household";
 import { typeLabel as investmentTypeLabel } from "@/lib/investment-traits";
@@ -9,15 +9,20 @@ import LeafPageHeader from "@/components/income-layout/LeafPageHeader.vue";
 import MetricCard from "@/components/shared/MetricCard.vue";
 import PanelCard from "@/components/shared/PanelCard.vue";
 import EntityRow from "@/components/shared/EntityRow.vue";
+import MemberLensBadge from "@/components/shared/MemberLensBadge.vue";
 
-const household = useHouseholdStore();
+// #81 Phase 3: net worth is member-LENSED via the SAME-SCOPE resolver. It reads the split-scoped
+// lists (member-owned at 100% + Joint at the household split %) so a member's net worth = THEIR
+// share — coherent with their FIRE progress + every other member-scoped FH figure (one Joint
+// convention everywhere). On the default "Whole household" view the split weight is 1, so the figure
+// is byte-identical to before. Both sides (assets − liabilities) use the identical convention.
+const fire = useFireDerive();
+const fh = computed(() => fire.memberFinancials.value);
+const investments = computed(() => fh.value.scopedInvestments);
+const liabilities = computed(() => fh.value.scopedLiabilities);
 
-const totalAssets = computed(() =>
-  household.data.investments.reduce((s, i) => s + i.value, 0),
-);
-const totalLiabilities = computed(() =>
-  household.data.liabilities.reduce((s, l) => s + l.outstandingBalance, 0),
-);
+const totalAssets = computed(() => fh.value.totalAssets);
+const totalLiabilities = computed(() => fh.value.totalLiabilities);
 const netWorth = computed(() => totalAssets.value - totalLiabilities.value);
 const netWorthDelta = computed(() =>
   totalAssets.value > 0 ? Math.round(((netWorth.value - netWorth.value * 0.85) / Math.abs(netWorth.value * 0.85)) * 100) : 0,
@@ -35,7 +40,7 @@ const LOAN_LABEL: Record<LoanType, string> = {
 
 const assetsByType = computed(() => {
   const map = new Map<InvestmentType, number>();
-  for (const inv of household.data.investments) {
+  for (const inv of investments.value) {
     map.set(inv.type, (map.get(inv.type) ?? 0) + inv.value);
   }
   return Array.from(map.entries()).map(([type, value]) => ({ type, label: investmentTypeLabel(type), value }));
@@ -43,7 +48,7 @@ const assetsByType = computed(() => {
 
 const liabilitiesByType = computed(() => {
   const map = new Map<LoanType, number>();
-  for (const l of household.data.liabilities) {
+  for (const l of liabilities.value) {
     map.set(l.type, (map.get(l.type) ?? 0) + l.outstandingBalance);
   }
   return Array.from(map.entries()).map(([type, value]) => ({ type, label: LOAN_LABEL[type], value }));
@@ -56,7 +61,11 @@ const liabilitiesByType = computed(() => {
       eyebrow="Financial Health · Net Worth"
       title="Net Worth"
       description="Current snapshot — total assets minus total liabilities — and how it has tracked over the last 36 months."
-    />
+    >
+      <template #actions>
+        <MemberLensBadge />
+      </template>
+    </LeafPageHeader>
 
     <v-row dense>
       <v-col cols="12" md="4">
@@ -76,7 +85,9 @@ const liabilitiesByType = computed(() => {
       </v-col>
     </v-row>
 
-    <v-row dense class="mt-4">
+    <!-- The 36-month trend is HOUSEHOLD-level (snapshots have no per-member history), so it is hidden
+         under a member lens to avoid showing a household series beneath a member headline. -->
+    <v-row v-if="!fh.isMemberView" dense class="mt-4">
       <v-col cols="12">
         <NetWorthOverTime :months="36" />
       </v-col>

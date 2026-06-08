@@ -1,28 +1,19 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { useHouseholdStore } from "@/stores/household";
+import { useFireDerive } from "@/lib/useFireDerive";
 import { formatINRCompact } from "@/lib/formatters";
-import { toMonthly } from "@/lib/cashflow";
-import { isEmergencyFundEligible } from "@/lib/investment-traits";
 import LeafPageHeader from "@/components/income-layout/LeafPageHeader.vue";
 import PanelCard from "@/components/shared/PanelCard.vue";
 import LimitMeter from "@/components/shared/LimitMeter.vue";
+import MemberLensBadge from "@/components/shared/MemberLensBadge.vue";
 
-const household = useHouseholdStore();
-
-const monthlyBurn = computed(() => {
-  const recurring = household.data.expenses.recurring.reduce(
-    (s, r) => s + toMonthly({ amount: r.amount, period: r.frequency }),
-    0,
-  );
-  return household.data.expenses.avgMonthly + recurring;
-});
-
-const liquidAssets = computed(() =>
-  household.data.investments
-    .filter(isEmergencyFundEligible)
-    .reduce((s, i) => s + i.value, 0),
-);
+// #81 Phase 3: months-covered = liquid ÷ monthly burn — member-LENSED via the SAME-SCOPE resolver:
+// a member's OWN liquid ÷ a member's OWN burn (× the same 6-month target). Never member-liquid ÷
+// household-burn (the #23 trap). On the default lens both are the household figures (byte-identical).
+const fire = useFireDerive();
+const fh = computed(() => fire.memberFinancials.value);
+const monthlyBurn = computed(() => Math.round(fh.value.annualExpenses / 12));
+const liquidAssets = computed(() => fh.value.liquid);
 
 const monthsCovered = computed(() =>
   monthlyBurn.value > 0 ? liquidAssets.value / monthlyBurn.value : 0,
@@ -48,7 +39,11 @@ const statusColor = computed(() =>
       eyebrow="Financial Health · Emergency Fund"
       title="Emergency Fund"
       description="Standard advisor benchmark is 6 months of monthly burn parked in liquid assets you can reach in a week."
-    />
+    >
+      <template #actions>
+        <MemberLensBadge />
+      </template>
+    </LeafPageHeader>
 
     <v-row dense>
       <v-col cols="12" md="4">

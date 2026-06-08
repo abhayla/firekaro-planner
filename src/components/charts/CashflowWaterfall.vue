@@ -21,12 +21,16 @@ const fire = useFireDerive();
 // Implemented as a stacked-floating-bar trick: the "transparent" base series
 // positions each bar at the cumulative running total; the "value" series renders the bar.
 const chartData = computed(() => {
-  // #23 follow-up: cashflow mixes income with HOUSEHOLD expenses/savings, so income MUST be the
-  // whole-household figure — a lensed (one-member) income over a household expense base renders a
-  // spurious negative surplus. householdAnnualIncome === annualIncome.total on the default lens.
-  const monthlyIncome = (fire.householdAnnualIncome.value ?? 0) / 12;
-  const monthlyExpenses = fire.annualExpensesToday.value / 12;
-  const monthlySavings = (fire.annualSavings.value || 0) / 12;
+  // #81 Phase 3: member-LENSED via the same-scope resolver. When an adult is selected, income +
+  // expenses + savings are all THAT member's own slice (no spurious member÷household mix). On the
+  // default lens the resolver returns the household figures + the household annualSavings, so the
+  // chart is byte-identical to before.
+  const fh = fire.memberFinancials.value;
+  const monthlyIncome = fh.annualIncome / 12;
+  const monthlyExpenses = fh.annualExpenses / 12;
+  const monthlySavings = fh.isMemberView
+    ? Math.max(0, fh.annualIncome - fh.annualTax - fh.annualExpenses) / 12
+    : (fire.annualSavings.value || 0) / 12;
   const monthlyInvestments = Math.max(0, monthlyIncome - monthlyExpenses - monthlySavings);
   const monthlyNet = monthlyIncome - monthlyExpenses - monthlyInvestments;
 

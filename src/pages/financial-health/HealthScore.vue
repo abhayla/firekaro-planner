@@ -4,71 +4,53 @@
  * Layout: large numeric hero + trend sparkline below + 4 factor cards with mini sparklines + delta chips.
  */
 import { computed } from "vue";
-import { useHouseholdStore } from "@/stores/household";
 import { useFireDerive } from "@/lib/useFireDerive";
 import { computeFreedomScore, statusColor } from "@/lib/freedom-score";
 import { lifeCoverAdequacy, healthCoverAdequacy } from "@/lib/adequacy";
-import { toMonthly } from "@/lib/cashflow";
-import { isEmergencyFundEligible } from "@/lib/investment-traits";
 import Sparkline from "@/components/shared/Sparkline.vue";
 import DeltaChip from "@/components/shared/DeltaChip.vue";
 import InfoTip from "@/components/shared/InfoTip.vue";
-import WholeHouseholdBadge from "@/components/shared/WholeHouseholdBadge.vue";
+import MemberLensBadge from "@/components/shared/MemberLensBadge.vue";
 import LeafPageHeader from "@/components/income-layout/LeafPageHeader.vue";
 
-const household = useHouseholdStore();
+// #81 Phase 3: the health score is member-LENSED via the SAME-SCOPE resolver. Every input — savings
+// rate, DTI, emergency months, insurance adequacy, FIRE progress — is read from `fire.memberFinancials`,
+// so when an adult is selected ALL of them are that member's own slice (member income, member EMI,
+// member liquid, member burn, member insurance, member FIRE progress). Never a member numerator over a
+// household denominator (the #23 / 281b994 trap). On the default lens it is byte-identical to before.
 const fire = useFireDerive();
+const fh = computed(() => fire.memberFinancials.value);
 
-const monthlyBurn = computed(() => {
-  const recurring = household.data.expenses.recurring.reduce(
-    (s, r) => s + toMonthly({ amount: r.amount, period: r.frequency }),
-    0,
-  );
-  return household.data.expenses.avgMonthly + recurring;
+const emergencyMonths = computed(() => {
+  const monthlyBurn = fh.value.annualExpenses / 12;
+  return monthlyBurn > 0 ? fh.value.liquid / monthlyBurn : 0;
 });
-
-const liquidAssets = computed(() =>
-  household.data.investments
-    .filter(isEmergencyFundEligible)
-    .reduce((s, i) => s + i.value, 0),
-);
-
-const emergencyMonths = computed(() =>
-  monthlyBurn.value > 0 ? liquidAssets.value / monthlyBurn.value : 0,
-);
-
-const monthlyEMI = computed(() =>
-  household.data.liabilities.reduce((s, l) => s + l.monthlyEMI, 0),
-);
 const dtiPercent = computed(() =>
-  fire.monthlyTakeHome.value > 0 ? (monthlyEMI.value / fire.monthlyTakeHome.value) * 100 : 0,
-);
-
-const primaryIncome = computed(() => household.earners[0]?.salary?.annualCTC ?? 0);
-const totalLifeCover = computed(() =>
-  household.data.insurance.filter((p) => p.type === "Life").reduce((s, p) => s + p.sumAssured, 0),
-);
-const totalHealthCover = computed(() =>
-  household.data.insurance.filter((p) => p.type === "Health").reduce((s, p) => s + p.sumAssured, 0),
+  fh.value.monthlyTakeHome > 0 ? (fh.value.monthlyEMI / fh.value.monthlyTakeHome) * 100 : 0,
 );
 const lifeAdequate = computed(() =>
-  primaryIncome.value > 0 && lifeCoverAdequacy(totalLifeCover.value, primaryIncome.value).status === "adequate",
+  fh.value.primaryIncome > 0 &&
+  lifeCoverAdequacy(fh.value.lifeCover, fh.value.primaryIncome).status === "adequate",
 );
 const healthAdequate = computed(
-  () => healthCoverAdequacy(totalHealthCover.value, true).status === "adequate",
+  () => healthCoverAdequacy(fh.value.healthCover, true).status === "adequate",
 );
 
 const scoreResult = computed(() =>
   computeFreedomScore({
-    savingsRatePercent: fire.savingsRate.value,
+    savingsRatePercent: fh.value.savingsRatePercent,
     dtiPercent: dtiPercent.value,
-    hasIncome: fire.monthlyTakeHome.value > 0,
+    hasIncome: fh.value.monthlyTakeHome > 0,
     emergencyMonths: emergencyMonths.value,
     lifeAdequate: lifeAdequate.value,
     healthAdequate: healthAdequate.value,
-    fireProgressPercent: fire.progressPercent.value,
+    fireProgressPercent: fh.value.fireProgressPercent,
   }),
 );
+
+// Non-earner caveat: a non-earning adult's own score reflects their own income/assets — they are
+// SUPPORTED by the household, not "unhealthy". Shown only on a lensed non-earner view.
+const showNonEarnerCaveat = computed(() => fh.value.isMemberView && !fh.value.isEarner);
 
 // Synthetic 12-month trend — derive from current corpus trajectory so the
 // sparkline tells a credible story without claiming real historical data.
@@ -145,9 +127,22 @@ const overallStatusColor = computed(() => {
       description="A composite read on five financial dimensions — savings rate, debt, emergency cover, insurance adequacy, and FIRE progress. Updated whenever your household data changes."
     >
       <template #actions>
-        <WholeHouseholdBadge />
+        <MemberLensBadge />
       </template>
     </LeafPageHeader>
+
+    <v-alert
+      v-if="showNonEarnerCaveat"
+      type="info"
+      variant="tonal"
+      density="compact"
+      class="mb-4"
+      data-testid="non-earner-caveat"
+    >
+      This is {{ fh.memberName }}'s OWN score — it reflects their own income and assets, and they are
+      supported by the household. A lower personal score here does not mean "unhealthy"; switch to
+      <strong>Whole household</strong> for the family's true financial health.
+    </v-alert>
 
     <!-- Hero score strip -->
     <v-card variant="outlined" class="pa-6 mb-5 hero-card">
