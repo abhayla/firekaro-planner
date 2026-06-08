@@ -126,6 +126,20 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 ## §3 — Decision log (append-only, newest first)
 
 ### 2026-06-08
+- **D-2026-06-08-21 — Member-level financial view (attributable expenses + individual/household FIRE + FH
+  lens) → filed gh #81 + authored goal contract (good-to-have, NOT run).** Grilled with Abhay one-question-
+  at-a-time (after he corrected me for assuming household-only FIRE instead of asking — see
+  [[feedback_grill_on_multi_option_forks]]); full design resolved. **Key decisions:** individual FIRE =
+  STANDALONE (each adult a mini-household); dependents EXCLUDED from individual, shown as the household−Σadults
+  gap; expense `ownerId` widened to any member + "Kids (shared)" (rings derive from owner+role); unified split
+  % (default 50/50, configurable) for shared expenses + joint corpus; surfaced via "Viewing as" + a comparison
+  card + caveat; **view filter = Household + ALL adults (earning or not), dependents hidden** (Abhay's
+  pushback: a housewife-with-prior-corpus + a kid-turning-18 must stay visible); FH lenses the
+  member-attributable screens incl. an individual Health Score (same-scope + non-earner caveat). **Honesty
+  invariants:** household FIRE/figures primary + invariant to member selection (no #22/#23); never
+  member-numerator ÷ household-denominator (#23/`281b994`). One goal, **3 phases**, sequenced after #66/#67
+  (now merged). Contract `docs/goals/2026-06-08-member-level-financial-view.md` — NOT committed, NOT run
+  (Abhay commits + runs `/goal`). Pointer: gh #81; extends #66/#67.
 - **D-2026-06-08-20 — BUILT + SHIPPED: the 2 must-haves #67 → #66 (member-model coherence + app-wide member
   lens), via the `/goal` autonomous run of the D-2026-06-08-19 contract.** Branch
   `feat/member-model-coherence-and-lens`, merged `--no-ff` → main. **Phase 1 (#67):** `role` collapsed to
