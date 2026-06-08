@@ -126,6 +126,17 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 ## §3 — Decision log (append-only, newest first)
 
 ### 2026-06-08
+- **D-2026-06-08-11 — "Financial Health" section mislabeled "Health" + heart icon (medical misread) → filed
+  gh #72 (`bug`, `good-to-have`, area:design-system, analysis-only).** Abhay: the section gives a wrong
+  (medical) feeling. **Verified:** `SidebarNav.vue:75-76` = `title:"Health"` + `icon:"mdi-heart-pulse"` (path
+  `/financial-health`); `cmdk-registry.ts:41-46` mirrors it. **Why:** sidebar uses short labels (Income/Taxes/
+  Investments/…) so "Financial Health" was shortened to "Health" — but unlike the unambiguous siblings,
+  "Health" collides with the member Health attribute + Health insurance, and mdi-heart-pulse reinforces the
+  medical read. **Contained to 2 files** (page headers like "Health Score"/"Net Worth" are legitimate
+  sub-page names — safe). Fix: rename → "Financial Health" (fits the Investments/Liabilities length) +
+  finance-semantic icon (e.g. mdi-finance/mdi-chart-line); mirror in cmd-K; reflect in design SSOT (rule 27).
+  **Tiered `good-to-have`** (clarity/trust polish on a core nav element; cheap, high-ROI; not a wrong-number/
+  functional defect → not must-have/Tier-0). Implementation gated. Pointer: gh #72.
 - **D-2026-06-08-10 — Remove the redundant "Banking" screen → filed gh #71 (`good-to-have`,
   area:financial-health/IA, analysis-only).** Abhay: *"why is there a Banking screen at all? clicking 'open
   holding' takes me to the holdings screen where I enter the details — what's the use of Banking?"* **Verdict:
