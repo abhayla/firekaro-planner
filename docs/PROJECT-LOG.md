@@ -126,6 +126,24 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 ## §3 — Decision log (append-only, newest first)
 
 ### 2026-06-08
+- **D-2026-06-08-12 — "Net Worth over time" chart blank for a populated user → filed gh #73 (`bug`,
+  `good-to-have`, financial-health).** Abhay reported (prod): the Net Worth over time graph on
+  `/financial-health/networth` is blank despite entering full data. **Root cause (verified — by-design +
+  a wiring gap, NOT a crash):** `NetWorthOverTime.vue` is real-history-only (Rule-20 honesty, no synthetic
+  back-projection) — `isEmpty` when `netWorth` points ≤1 (L27); the series accrues **one real point per
+  calendar month**, and `netWorth` is stamped **only when the Dashboard is visited** (`Dashboard.vue` L190
+  `recordFireSnapshot(..., netWorth)`; `maybeCaptureSnapshot` records none). So a current-month user has ≤1
+  point → honest empty-state. Storage is fine (adapter→server `/api/planner/expense-history`, not
+  localStorage-only). **Secondary genuine gap:** the Net Worth screen itself doesn't call
+  `recordFireSnapshot`, so a user who never opens the Dashboard accrues 0 points → blank **forever** (the very
+  screen showing the trend doesn't feed it). **Fix (gated):** (1) capture netWorth from `NetWorth.vue` too
+  (clear bug); (2) product call — show a labelled forward *projection* (planning value) vs. wait for real
+  history. **Sibling class:** same "historical-only, needs ≥2 monthly points, Dashboard-only capture" applies
+  to `FireTrajectoryChart` + `ExpenseTrendChart` (tracked together). **Why missed:** specs drive
+  `recordFireSnapshot` directly, never assert a non-Dashboard screen captures a point, nor the
+  fully-populated-new-user screen experience (shape-vs-substance). **Tiered `good-to-have`** (data correct +
+  core FIRE number works; secondary-chart value/UX + latent wiring gap, not Tier-0 correctness/data-loss);
+  noted Abhay may bump to must-have (blank-forever "looks broken"). Implementation gated. Pointer: gh #73.
 - **D-2026-06-08-11 — "Financial Health" section mislabeled "Health" + heart icon (medical misread) → filed
   gh #72 (`bug`, `good-to-have`, area:design-system, analysis-only).** Abhay: the section gives a wrong
   (medical) feeling. **Verified:** `SidebarNav.vue:75-76` = `title:"Health"` + `icon:"mdi-heart-pulse"` (path
