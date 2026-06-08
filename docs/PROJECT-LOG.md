@@ -126,6 +126,22 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 ## §3 — Decision log (append-only, newest first)
 
 ### 2026-06-08
+- **D-2026-06-08-22 — BUILT + SHIPPED: member-level financial view (#81), via the `/goal` autonomous run of
+  the D-2026-06-08-21 contract.** Merged `--no-ff` → `main` (`01f0866`, **Closes #81**), pushed; branch
+  `feat/member-level-financial-view` (Phase commits `fb82345`+`4d2c1e9`, `b2aead2`, `52328d4`). **3 phases,
+  each independently FinTech-validated + code-reviewed + blind-verified (rule 33):** (1) member-attributable
+  itemised expenses (`ownerId` rings + owner picker; household FIRE total invariant); (2) standalone
+  individual FIRE per adult + household−Σ(adults) gap + caveat card + "Viewing as" restricted to adults; (3)
+  Financial-Health member lens on all 6 screens via one **same-scope resolver** (`useFireDerive().memberFinancials`
+  — a member's Joint share uses the same split % on both sides of every ratio) + non-earner health-score
+  caveat. Honesty invariants held: household FIRE primary + invariant to member selection; never member÷household.
+  **The verification edge caught + forced fixes for 3 real defects:** a pre-existing **#67 migration bug**
+  (`UPDATE "Member"` vs `@@map("members")` → 42P01, never deployed — fixed + both pending migrations deployed
+  to Supabase); a Phase-2 **absurd-age leak** (`calculateYearsToTarget` 1200-month cap → finite age 130+, now
+  unreachable→∞); a Phase-3 **optimistic same-scope mismatch** (Joint at 100% over a split denominator
+  over-stated a member's emergency runway ~2× → unified to the split). Static green both trees (root 1100 unit
+  + build; server 161 incl. live Supabase integration). Tier: good-to-have (built on Abhay's explicit `/goal`
+  invocation). Pointer: gh #81 (closed); the #67 migration gap → propose a CI migrate-dry-run gate (see lessons).
 - **D-2026-06-08-21 — Member-level financial view (attributable expenses + individual/household FIRE + FH
   lens) → filed gh #81 + authored goal contract (good-to-have, NOT run).** Grilled with Abhay one-question-
   at-a-time (after he corrected me for assuming household-only FIRE instead of asking — see
