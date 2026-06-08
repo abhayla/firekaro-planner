@@ -20,10 +20,14 @@ const fire = useFireDerive();
 const salaryTotal = computed(() =>
   fire.lensedEarners.value.reduce((s, m) => s + (m.salary?.annualCTC ?? 0), 0),
 );
+// gh #66 coherence: count ALL businesses' profit (no isOperated filter) — matching the kernel's
+// businessShare (derive.ts) so this Overview grand-total equals householdAnnualIncome / the cashflow
+// + financial-health income on the default lens. A passive entity's distributed profit IS income.
 const businessTotal = computed(() =>
-  fire.lensedBusinesses.value
-    .filter((b) => b.isOperated !== false)
-    .reduce((s, b) => s + toAnnual({ amount: b.annualProfit, period: b.frequency }) * (b.sharePercent / 100), 0),
+  fire.lensedBusinesses.value.reduce(
+    (s, b) => s + toAnnual({ amount: b.annualProfit, period: b.frequency }) * (b.sharePercent / 100),
+    0,
+  ),
 );
 const otherExempt = computed(() =>
   fire.lensedOtherIncome.value

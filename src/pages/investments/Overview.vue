@@ -31,9 +31,11 @@ const rollup = computed<ClassRollup[]>(() => {
     gold: 0,
     cashOther: 0,
   };
-  // Use the SAME lens-scoped set as totalCorpus (derive's lensedInvestments) — else under a member
-  // lens the rollup stays whole-household while totalCorpus shrinks, and homeExcludedFromCorpus
-  // (rollupTotal − totalCorpus) reports a wrong rupee figure. Default lens = whole household. #27
+  // gh #66/#27: the rollup AND the corpus hero below BOTH read the lensed investment set, so under a
+  // member lens the portfolio hero, the allocation bars, and the home-exclusion footnote all describe
+  // the SAME (member-scoped) holdings. On the default "Whole household" lens lensedInvestments === the
+  // full set, so this is byte-identical to the household corpus. (Previously the hero used the
+  // household-invariant fire.totalCorpus while the bars lensed — a hero-vs-bars scope mismatch.)
   for (const inv of fire.lensedInvestments.value) {
     switch (assetClass(inv)) {
       case "equity":
@@ -64,7 +66,15 @@ const rollup = computed<ClassRollup[]>(() => {
   ];
 });
 
-const totalCorpus = computed(() => fire.totalCorpus.value);
+// gh #66 coherence: the investments-Overview "FIRE corpus" hero is the LENSED portfolio (primary
+// residence excluded — it can't fund early retirement), so it matches the lensed allocation bars
+// under a member lens. On the default lens this equals fire.totalCorpus (householdScope, also
+// primary-residence-excluded), so the whole-household display is byte-identical.
+const totalCorpus = computed(() =>
+  fire.lensedInvestments.value
+    .filter((i) => !(i.type === "RealEstate" && i.realEstateRole === "PrimaryResidence"))
+    .reduce((s, i) => s + i.value, 0),
+);
 // All-holdings total (incl. the primary residence that the FIRE corpus excludes). The per-class
 // footnote % MUST divide by THIS (what the rollup shows), not totalCorpus — else the numerator
 // (incl. home) and denominator (excl. home) disagree and the percentages exceed 100%. gh-issue #27.

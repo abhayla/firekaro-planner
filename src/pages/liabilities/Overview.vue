@@ -1,16 +1,17 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { useFireDerive } from "@/lib/useFireDerive";
+import { useHouseholdStore } from "@/stores/household";
 import { formatINRCompact } from "@/lib/formatters";
 import EmptyState from "@/components/shared/EmptyState.vue";
 import LeafPageHeader from "@/components/income-layout/LeafPageHeader.vue";
 import MetricCard from "@/components/shared/MetricCard.vue";
 
 const fire = useFireDerive();
+const household = useHouseholdStore();
 
-// gh #66: member-lensed DISPLAY (selected member + "Joint"); equals household.data.liabilities on
-// the default "Whole household" view. DTI uses the lensed take-home (fire.monthlyTakeHome) so the
-// debt-burden ratio is member-scoped when a member is selected.
+// gh #66: the loans LIST + outstanding/EMI totals are member-lensed DISPLAY (selected member +
+// "Joint"; equals household.data.liabilities on the default view).
 const lensedLiabilities = computed(() => fire.lensedLiabilities.value);
 const totalOutstanding = computed(() =>
   lensedLiabilities.value.reduce((s, l) => s + l.outstandingBalance, 0),
@@ -18,9 +19,16 @@ const totalOutstanding = computed(() =>
 const monthlyEMI = computed(() =>
   lensedLiabilities.value.reduce((s, l) => s + l.monthlyEMI, 0),
 );
+// gh #66 coherence: DTI is a HOUSEHOLD solvency ratio — total debt service vs total household
+// take-home. It MUST stay whole-household (both legs from the same set), NOT lensed EMI ÷ household
+// take-home (which would emit a misleading per-member debt-burden under a lens). fire.monthlyTakeHome
+// is the householdScope take-home, so we pair it with the household EMI, not the lensed EMI.
+const householdMonthlyEMI = computed(() =>
+  household.data.liabilities.reduce((s, l) => s + l.monthlyEMI, 0),
+);
 const monthlyTakeHome = computed(() => fire.monthlyTakeHome.value);
 const dtiRatio = computed(() =>
-  monthlyTakeHome.value > 0 ? (monthlyEMI.value / monthlyTakeHome.value) * 100 : 0,
+  monthlyTakeHome.value > 0 ? (householdMonthlyEMI.value / monthlyTakeHome.value) * 100 : 0,
 );
 const dtiColor = computed(() => {
   if (dtiRatio.value < 30) return "success";
