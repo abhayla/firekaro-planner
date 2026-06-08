@@ -126,6 +126,21 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 ## §3 — Decision log (append-only, newest first)
 
 ### 2026-06-08
+- **D-2026-06-08-18 — Capture email + mobile in profile → filed gh #79 (`enhancement`, `good-to-have`,
+  area:auth-identity, analysis-only). CEO opinion: agree on direction, push back on 2 of the rules.** Abhay
+  proposed email mandatory for logged-in user + adult members, optional for child; mobile optional. **Verified:**
+  Member has no email/phone (net-new); logged-in user email ALREADY held via Better Auth/OAuth (`User.email`);
+  mobile already exists as consent-gated `CommsConsent.whatsappNumber`. **My refinements (honest CEO pushback):**
+  (1) don't re-ask logged-in user email — confirm read-only from OAuth (automate-don't-re-ask); their mobile
+  reuses the comms whatsappNumber (consent-gated), not a parallel field; (2) adult-member email MANDATORY →
+  recommend **optional** — it's third-party PII captured without that person's consent (DPDP lawful-basis), the
+  FIRE math doesn't need it, only useful once we message/reconcile (#68, not live), blocks obj-0 setup; require
+  email at the point of INVITING a member (when #68 ships), not at profile entry; (3) child contact = minors'
+  PII (DPDP verifiable-parental-consent) → optional, prefer don't-prompt. **Capture ≠ consent-to-message**
+  (consent stays the separate gate). **Open decision (Abhay's):** adult-member email mandatory vs optional;
+  lead = optional. **Tiered `good-to-have`** (enabler for #68 identity + comms/stickiness; FIRE core works
+  without it; logged-in email already held → not must-have/Tier-0). Enabler for gh #68. Implementation gated.
+  Pointer: gh #79.
 - **D-2026-06-08-17 — What-If sandbox slider min/max ranges too narrow → filed gh #78 (`enhancement`,
   `good-to-have`, fire-goals).** Abhay (screenshot, `/fire-goals/what-if`): widen lower/upper limits on all
   sliders (e.g. inflation capped — healthcare 15%, general only 10%). **Verified caps in `WhatIf.vue`:**
