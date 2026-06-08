@@ -126,6 +126,18 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 ## §3 — Decision log (append-only, newest first)
 
 ### 2026-06-08
+- **D-2026-06-08-04 — Member "earner" should be DERIVED from income, not a manual role flag → filed gh #67
+  (`good-to-have`, analysis-only).** Abhay flagged that marking an adult `EARNER`/`NON_EARNING_ADULT` "does
+  not look correct — if earnings are added for him then he is an earner, else not." FinTech+PM verdict: he's
+  right, with a refinement — `role` conflates TWO orthogonal axes: **adult-vs-dependent** (NOT derivable —
+  homemaker & child both ₹0 but differ in longevity/horizon, MUST stay explicit) and **earning-vs-non-earning**
+  (IS derivable from income presence, the redundant flag). Today `derive.ts` gates ALL income on
+  `role==="EARNER"` (lines 91/116/189), fully decoupled from whether salary exists → two-sources-of-truth
+  contradiction (NON_EARNING_ADULT-with-salary silently drops income; EARNER-with-no-salary = ₹0 earner).
+  **Tiered `good-to-have`** (goal-anchored): failure modes are conservative/confusing, not optimistic-dangerous
+  (no corpus inflation), and the product works today — so not Tier-0; but it's a real coherence + automate
+  (5W #3) + UX-honesty win for the wedge persona. **Implementation gated on Abhay's approval** (must-have-only
+  focus lock). Consumer/surface map + open design questions in the issue body. Pointer: gh #67.
 - **D-2026-06-08-03 — HEADED production verification (Abhay-requested, watchable) → PASS; 2 coherence nits
   filed.** Abhay: "perform the same type of test in production also, as much as possible, headed." **Honest
   boundary held:** the dev test's from-scratch data-ENTRY writes data → forbidden on prod by
