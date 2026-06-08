@@ -10,10 +10,10 @@ const OUT = `verification-screenshots/PROD-functional-${TS}`;
 mkdirSync(OUT, { recursive: true });
 const sleep = (ms) => new Promise((f) => setTimeout(f, ms));
 
-const browser = await chromium.launch({ channel: "chrome", headless: true });
+const browser = await chromium.launch({ channel: "chrome", headless: process.env.HEADED ? false : true, args: process.env.HEADED ? ["--start-maximized"] : [] });
 const ctx = await browser.newContext({
   storageState: "e2e/.auth/prod-user.json",
-  viewport: { width: 1440, height: 900 },
+  viewport: process.env.HEADED ? null : { width: 1440, height: 900 },
 });
 const p = await ctx.newPage();
 const cerr = [];

@@ -126,6 +126,23 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 ## §3 — Decision log (append-only, newest first)
 
 ### 2026-06-08
+- **D-2026-06-08-03 — HEADED production verification (Abhay-requested, watchable) → PASS; 2 coherence nits
+  filed.** Abhay: "perform the same type of test in production also, as much as possible, headed." **Honest
+  boundary held:** the dev test's from-scratch data-ENTRY writes data → forbidden on prod by
+  `testing-strategy.md` (non-destructive only, even on the test account), so this is the maximum
+  NON-DESTRUCTIVE prod test, headed. Ran `prod-authed-sweep-full.mjs` (already headed) + `prod-functional-sweep.mjs`
+  (added a `HEADED` env toggle) **via the PowerShell tool** (native display = watchable; Bash runs on an
+  invisible display per `ui-verification.md`). Results: **25-screen authenticated sweep PASS** (all render,
+  0 console/page errors, no bounces, fresh screenshots) + **interactive sweep PASS** (levers, assumptions
+  dialog open→close, readiness verdict age-56 coherent, tax-year selector, staleness banner correctly
+  absent). **Blind re-verify (rule 33):** a context-blind agent opened 24/25 + 3/3 → PASS (healthy, no
+  NaN/errors, FIRE age 56 plausible, cross-screen figures reconcile — income ₹51.70L, portfolio ₹2.05Cr,
+  net worth ₹1.67Cr, planned-expenses match Goals). **2 non-blocking coherence nits found + filed:** **#64**
+  (retirement-age labels read inconsistent across screens — 56 vs 55/50 vs 47, same year 2052; investigate
+  labeling-vs-off-by-one), **#65** (two "annual tax" figures ₹12.22L vs ₹11.66L without explaining the model
+  difference). Both good-to-have (filing a finding is allowed under the focus lock; building the fix is not,
+  pending approval). *Why logged:* completes the watchable prod test Abhay asked for — prod re-confirmed
+  healthy headed + independently, with 2 honest UX-coherence follow-ups tracked. → §1.
 - **D-2026-06-08-02 — DECISION (taken, Abhay delegated): NO deploy; executed Phase B prod verification →
   PASS, blind-verified. The full QA goal lifecycle is now complete.** Abhay: "you take the decision and
   perform." **Deploy decision:** NO redeploy — the only product-code change since the last prod release
