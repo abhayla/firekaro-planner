@@ -147,10 +147,10 @@ events/lessons so future runs (and Abhay) can learn from this one.
 
 > **All rules in `.claude/rules/claude-behavior.md` are operative for this run.** The
 > rules below are called out because they are the load-bearing ones for an autonomous
-> `/goal` run. **Rules 24, 25, 26, 32, 33 are MANDATORY gates at every task AND every stage
-> boundary** — a standing Abhay mandate. Do not skip, soften, or defer the 24/25/26/32/33
-> sweep to "later". They are why this contract yields *proven-working* output, not
-> *claimed-working* output.
+> `/goal` run. **Rules 24, 25, 26, 29, 31, 32, 33 are MANDATORY gates at every task AND every
+> stage boundary** — a standing Abhay mandate. Do not skip, soften, or defer the
+> 24/25/26/29/31/32/33 sweep to "later". They are why this contract yields *proven-working*
+> output, not *claimed-working* output.
 >
 > **Test PLACEMENT is governed by `.claude/rules/testing-strategy.md` (the SSOT) — which
 > test type runs in which environment.** The rules below are the dev-time verification
@@ -204,6 +204,30 @@ with the discrepancy as the failing observation; if still unresolved, log to the
 file with `Rule 26 stage drift` and proceed with the degraded state noted — never silently
 mark green.
 
+### Rule 29 — independent review of the IMPLEMENTATION (not just tests, MANDATORY for non-trivial)
+
+Tests passing proves "it works", not "it's correct + clean". After a non-trivial stage is green,
+dispatch an INDEPENDENT reviewer in a fresh context — this run is the orchestrator, so it dispatches
+the reviewer wave itself (single-level dispatch): `code-reviewer-agent` on the diff; **ALSO
+`fintech-domain-analyst` WHENEVER the diff touches `src/lib/*` tax/FIRE/EPF/withdrawal math or
+`src/types/assumptions.ts`** (validate against Indian tax law / FIRE research — the 80CCD(2)-leak
+class); `quality-gate-evaluator-agent` for larger/cross-file changes. The reviewer is adversarial
+(find the bug, not bless). Act on every blocker/HIGH finding before the stage's commit; track
+deferred-but-real findings as GitHub Issues, never silently drop. The run is NEVER the sole verifier
+of its own code.
+
+### Rule 31 — output plausibility (semantic sanity, MANDATORY when a value is user-facing)
+
+A number can render, type-check, and pass tests and still be domain-ABSURD (a 30-year-old retiring at
+81). For any change that reaches a user-facing value — above all a FIRE/financial headline — apply a
+SEMANTIC sanity check on the **DEFAULT product lens** the user actually sees (not a convenient one):
+"would the persona / a domain expert flinch at this?" If it's off, STOP and root-cause — never accept
+mechanical-green. For any new flagship output add/extend a sane-bounds assertion in
+`src/lib/headline-plausibility.spec.ts`; for financial-math changes have `fintech-domain-analyst`
+validate the END-TO-END headline against persona-sane bounds, not just the engine internals. A shape
+lock ("matches the current computation") is NOT a correctness proof — pair each with a substance
+assertion (sane bounds / a coherence invariant / agreement with an independent path).
+
 ### Rule 15 — test failures → use the skills (no ad-hoc retrying)
 
 When tests fail: known retest command → `/fix-loop`; unclear root cause or 2+ failed
@@ -215,6 +239,8 @@ times. Never just log a failure and stop — detect → diagnose → fix → (le
 
 Find and fix the root cause. No band-aid workarounds when the underlying issue can be
 identified and fixed properly. (Abhay standing directive: `feedback_root_cause_over_patch.md`.)
+**For fix-loop contracts this means red-first** (`rules/tdd-rule.md`): reproduce the bug with a FAILING
+test BEFORE the fix, then make it pass — the failing test is the proof the root cause was found.
 
 ### Rule 20 — epistemic honesty / no fabrication
 
@@ -283,16 +309,21 @@ changed surface — full depth in every layer the change touches** (not "all typ
 |---|---|---|
 | **26** post-phase independent + cross-page sweep | **ALWAYS fires** | n/a — non-skippable |
 | **33** blind independent test re-verification | fires whenever ANY test verdict is produced | n/a — non-skippable when a verdict exists |
+| **29** independent code review (+ `fintech-domain-analyst` if math, + `quality-gate-evaluator-agent` if large) | any NON-TRIVIAL implementation diff (code, not docs) | `rule 29 n/a: trivial / docs-only` |
+| **31** output plausibility (sane on the default lens) | diff reaches a user-facing / headline value | commit msg: `rule 31 skipped: no user-facing value` |
 | **24** UI screenshot/ARIA/console (render) | diff touches `*.vue` / component / page / composable | commit msg: `rule 24 skipped: no UI change` |
 | **32** interactive functionality (controls work) | diff touches UI with interactive controls (forms/tabs/dialogs/filters/primary action) | commit msg: `rule 32 skipped: no interactive UI change` |
 | **25** UI→persistence | diff introduces a UI create/update/delete flow | commit msg: `rule 25 skipped: no write-path change` |
 | **API behavioral test** (status · envelope · auth-gate · ownership/IDOR) | diff touches `server/src/routes/**`, `server/src/lib/household-*`, or any `/api/**` contract | commit msg: `api test skipped: no server/API change` |
 
 API-only/server-only changes (no UI) still run static gates (`cd server && type-check + lint +
-test:unit`, incl. the `DATABASE_URL`-gated integration spec) + the API behavioral test + Rule 26;
-24/25/32 skip. UI-only changes (no write path) run 24 + 32 + 26; 25 + the API test skip. If a fix
-produces a surprise change to product/write-path/API code, the corresponding gates fire even when
-expected to skip.
+test:unit`, incl. the `DATABASE_URL`-gated integration spec) + the API behavioral test + Rule 29 +
+Rule 26; 24/25/32 skip. UI-only changes (no write path) run 24 + 32 + 29 + 26; 25 + the API test
+skip. **Rule 29 (independent code review; + FinTech analyst for any `src/lib/*` math or
+`assumptions.ts`) fires on EVERY non-trivial code change regardless of layer; Rule 31 (plausibility on
+the default lens) fires whenever the change reaches a user-facing/headline value** — both are
+layer-agnostic. If a fix produces a surprise change to product/write-path/API code, the corresponding
+gates fire even when expected to skip.
 
 ---
 

@@ -89,8 +89,10 @@ must NOT touch>`.
 - **Stage gate sweep (gate by blast radius of the changed surface — see the conditional-gating
   table in `references/baked-in-rules.md`):** static → Rule 24 (render) → Rule 32 (controls work,
   if interactive UI) → Rule 25 (if writes) → API behavioral test (if `server/`/`/api/**` touched) →
-  Rule 26 (cross-page, always) → Rule 33 (blind re-verify any test verdict, always when a verdict
-  exists) → a11y/Lighthouse (if UI). All green or DEFERRED-with-reason before the stage's commit.
+  Rule 31 (plausibility, if a user-facing value) → Rule 29 (independent code review + `fintech-domain-analyst`
+  if math, every non-trivial diff) → Rule 26 (cross-page, always) → Rule 33 (blind re-verify any test
+  verdict, always when one exists) → a11y/Lighthouse (if UI). All green or DEFERRED-with-reason before
+  the stage's commit.
 
 <Repeat STAGE B, C, … as needed.>
 
@@ -140,6 +142,12 @@ what untracked items to leave alone. Branch + push target. Co-author trailer.>
 
 **API behavioral test (if `server/`/`/api/**` touched):**
 - [ ] status code + envelope shape + auth-gate + ownership/IDOR asserted for each changed `/api/**` route or `household-*` lib. (Skip w/ reason if no server/API change.)
+
+**Rule 31 (output plausibility — if a user-facing value):**
+- [ ] headline/flagship value is SANE on the default product lens (persona wouldn't flinch); sane-bounds assertion added/extended in `src/lib/headline-plausibility.spec.ts`; for math, FinTech-validated end-to-end. (Skip w/ reason if no user-facing value.)
+
+**Rule 29 (independent code review — every non-trivial diff):**
+- [ ] `code-reviewer-agent` ran on the diff (+ `fintech-domain-analyst` if `src/lib/*` math / `assumptions.ts`; + `quality-gate-evaluator-agent` if large); every blocker/HIGH acted on or filed as an Issue.
 
 **Rule 26 (cross-page consistency):**
 - [ ] mutated resource propagates to every cross-page consumer (name them) — values equal (±1 rounding).
@@ -199,10 +207,12 @@ offers to apply the fold-back via `goal-creator` Mode B.
 
 ## References (loaded transitively by the skills this contract invokes)
 
-- `rules/claude-behavior.md` — rules 15, 17, 20, 23, 24, 25, 26, 32, 33
+- `rules/claude-behavior.md` — rules 15, 17, 20, 23, 24, 25, 26, 29, 31, 32, 33
 - `rules/testing-strategy.md` — test PLACEMENT SSOT (which test type runs in which env)
 - `rules/independent-test-verification.md` — rule 33 blind test re-verification
-- `rules/tdd.md` — red-green-refactor (if the contract does TDD)
+- `rules/output-plausibility-verification.md` — rule 31 semantic sanity on the default lens
+- `rules/operating-model.md` — rule 29 independent-reviewer edge (+ `fintech-domain-analyst` for math)
+- `rules/tdd-rule.md` — red-green-refactor (red-first is MANDATORY for build + fix-loop contracts)
 - `rules/dev-bypass-auth.md` — `x-dev-bypass: true` for root-app Rule 26 API checks
 - <the storage-adapter / mvp/CLAUDE.md / section-plan / e2e rule files relevant to this goal>
 - <the skills this contract drives: /fix-issue, /fix-loop, /auto-verify, /systematic-debugging, /a11y-audit, etc.>

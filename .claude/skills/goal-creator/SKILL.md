@@ -21,7 +21,7 @@ description: >
 type: workflow
 allowed-tools: "Read Write Edit Grep Glob Bash"
 argument-hint: "[one-line description of the goal, optional]"
-version: "1.4.1"
+version: "1.5.0"
 ---
 
 # Goal Creator
@@ -50,8 +50,8 @@ they are the spec for what you produce. The two best references (both committed)
 2. **Never commit.** You write the file and stop. Committing the contract is Abhay's call.
 3. **Interview-first, always.** Resolve every fork via the Clarification Gate (STEP 2)
    before writing a single line of the contract. The output must be zero-user-input.
-4. **Bake in the standing rules.** Every contract folds in rules 24, 25, 26, 32, 33, 15, 17,
-   20, 23 plus the failure-recovery budget block AND the three opening blocks §0.1 (worktree
+4. **Bake in the standing rules.** Every contract folds in rules 24, 25, 26, 29, 31, 32, 33,
+   15, 17, 20, 23 plus the failure-recovery budget block AND the three opening blocks §0.1 (worktree
    isolation), §0.2 (idempotency preflight), §0.3 (live progress log) — see
    `references/baked-in-rules.md`. These are why these contracts produce *proven-working*
    results, not *claimed-working* ones, and why a long run is trackable + learnable from
@@ -229,6 +229,27 @@ long on purpose: length here buys an unattended run that builds the right thing.
 
 ---
 
+## STEP 4.5: Self-validate the written contract (zero-open-questions gate)
+
+The skill's whole promise is a **zero-user-input** contract — a residual fork or un-pasted block is a
+defect that becomes an hours-long run building the wrong thing. Before handing off, MECHANICALLY check
+the file you just wrote:
+
+```bash
+# 1) No unresolved forks / placeholders left behind:
+grep -nE '<[^>]+>|[Dd]ecide whether|[Cc]hoose (between|whether)|\bTBD\b|TODO\(decide\)|\?\?\?' docs/goals/<file>.md
+# 2) Every "← PASTE …" marker was actually replaced with the real block (§0.1/§0.2/§0.3 + verification gates):
+grep -n 'PASTE' docs/goals/<file>.md
+```
+
+Both greps MUST come back clean before STEP 5. The only tolerated hits on grep #1 are legitimate
+literals inside a quoted code sample (e.g. a generic `<T>`, a real prop type) — eyeball those and
+confirm they are not unresolved decisions. Any "decide whether…", `TBD`, `TODO(decide)`, `???`, or a
+surviving `<…>` placeholder is a BUG: resolve it (re-interview if it is a genuine fork, STEP 2) and
+re-run the check. Do not hand off a contract that fails this gate.
+
+---
+
 ## STEP 5: Stop — hand off, don't execute
 
 Print, and then stop:
@@ -295,12 +316,13 @@ loaded its contract).
   generalize or write a delta instead.
 - **Interview-first, one question at a time, each with a recommended answer**, until every
   fork is resolved. The contract must be zero-user-input.
-- **Every contract bakes in rules 24, 25, 26, 32, 33, 15, 17, 20, 23 + the failure-recovery
-  budget block** (`references/baked-in-rules.md`), with mechanics adapted to the target app
-  tree, and tests **by blast radius of the changed surface** (the conditional-gating table:
-  UI render+functionality, UI→persistence, a dedicated API behavioral test for server/API
-  changes, cross-page sweep + blind re-verify always). Test PLACEMENT (which type runs where)
-  follows `.claude/rules/testing-strategy.md`.
+- **Every contract bakes in rules 24, 25, 26, 29, 31, 32, 33, 15, 17, 20, 23 + the
+  failure-recovery budget block** (`references/baked-in-rules.md`), with mechanics adapted to the
+  target app tree, and tests **by blast radius of the changed surface** (the conditional-gating
+  table: UI render+functionality, UI→persistence, a dedicated API behavioral test for server/API
+  changes, an independent code review — + `fintech-domain-analyst` for math — on every non-trivial
+  diff, a plausibility check whenever a user-facing value is reached, cross-page sweep + blind
+  re-verify always). Test PLACEMENT (which type runs where) follows `.claude/rules/testing-strategy.md`.
 - **Match the house format** in `docs/goals/` and the skeleton in
   `references/contract-template.md`. Concrete paths/components/commands, never abstractions.
 - **Resolve the persistence mode first** — localStorage demo adapter (default) vs ServerAdapter
