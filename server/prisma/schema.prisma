@@ -337,6 +337,7 @@ model RecurringExpenseLine {
   sourceRefId     String?
   inflationBucket String? // general | healthcare | education | housing
   kind            String? // general | parents | extended-contingency | medical
+  ownerId         String? // #81 member-attribution: member id | "Household" | "Dependents"
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -363,6 +364,7 @@ model PlannedFutureLine {
   durationYears   Int?
   inflationBucket String? // general | healthcare | education | housing
   kind            String? // general | education | marriage | medical
+  ownerId         String? // #81 member-attribution: member id | "Household" | "Dependents"
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
