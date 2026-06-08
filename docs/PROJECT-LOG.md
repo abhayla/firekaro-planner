@@ -126,6 +126,23 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 ## §3 — Decision log (append-only, newest first)
 
 ### 2026-06-08
+- **D-2026-06-08-08 — Stale validation errors after a SUCCESSFUL inline Add → filed gh #69 (`bug`,
+  `good-to-have`, cross-cutting forms).** Abhay reported (prod): on `/liabilities/loans`, after clicking
+  **Add loan** the loan IS added + persists, but the cleared **Loan name** field shows "Name is required".
+  **Root cause (verified):** `src/components/forms/LoanForm.vue` — fields carry Vuetify reactive `:rules`
+  (`nameRules` L85/172, `positiveRules`, `rateRules`); `addLoan()` resets `draft` to empty/null (L113–122)
+  after a successful add, which **re-triggers reactive validation** on the now-dirty-but-empty fields →
+  stale "required"/"> 0" errors. Add button is correctly `:disabled` by `isAddValid`, so this is a
+  **stale-validation-DISPLAY bug, NOT a data bug** (loan saves fine). **Sibling audit:** shared "inline Add X"
+  pattern — class extends to **7 forms** (LoanForm + RecurringExpense/PlannedFuture/InsurancePolicy/Business/
+  Investment/OtherIncome), **EarnerSalaryForm safe** (edit-only, no add-reset). ≥3 instances → prefer ONE
+  shared fix instrument (`v-form` ref + `resetValidation()` after add, or a `useInlineAddForm()` composable)
+  + one generic catch-test, per `bug-filing-and-sibling-audit.md`. **Why missed:** no coverage of post-add
+  *form state* — existing checks assert the row persisted (data substance) but never "no error visible after
+  a successful add" (form-UX shape-vs-substance gap). **Tiered `good-to-have`** (goal-anchored: data entry +
+  honest FIRE number genuinely WORK; this is trust/friction on objective-0 setup, not Tier-0 financial-honesty
+  or data-correctness; not nice-to-have because it's a visible "looks broken" artifact app-wide). Implementation
+  gated — no fix until Abhay says go. Pointer: gh #69.
 - **D-2026-06-08-07 — Family-member ↔ separate-login identity reconciliation: NOT handled, architecturally
   impossible today → filed gh #68 (`good-to-have`, area:auth-identity, analysis-only).** Abhay's scenario: he
   adds family members (data records); one member later logs in with their own Google account and re-enters
