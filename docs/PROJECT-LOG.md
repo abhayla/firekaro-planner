@@ -126,6 +126,17 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 ## §3 — Decision log (append-only, newest first)
 
 ### 2026-06-08
+- **D-2026-06-08-15 — "What we assumed" bridge card duplicated on Dashboard + Readiness → filed gh #76
+  (`enhancement`, `good-to-have`, area:design-system, analysis-only).** Abhay asked why the duplication.
+  **Verified:** same component `<BridgeBreakdownCard/>` rendered on both `Dashboard.vue:269` and
+  `Readiness.vue:44` → **NOT code duplication** (correct DRY component reuse); the redundancy is **IA/content**
+  (same heavy card + assumptions wall on two screens). Intent: bridge is relevant to both the headline-honesty
+  (dashboard, it moves FIRE age) and the readiness verdict (Readiness, evidence for "can I stop?"); fine in
+  isolation, redundant back-to-back. **Recommendation: one canonical full home + compact reference on the
+  other** — lead = full on **Readiness** (the decision screen), compact bridge summary + link on Dashboard;
+  alt lighter fix = collapsed-by-default on the secondary (pairs with #74). **Tiered `good-to-have`** (IA
+  declutter; correct + present, nothing broken → not Tier-0). Final canonical-home pick is Abhay's. Related:
+  #74 (collapsible), #75 (omnipresent FIRE). Implementation gated. Pointer: gh #76.
 - **D-2026-06-08-14 — Omnipresent FIRE summary on every screen → filed gh #75 (`enhancement`, `good-to-have`,
   area:design-system, analysis-only). Recommended: AppBar chip → expandable popover.** Abhay: the user should
   see the FIRE headline/details from any screen (persistent element / floating window / other). **Analysis:**
