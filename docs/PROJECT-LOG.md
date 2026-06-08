@@ -113,6 +113,27 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 ## §3 — Decision log (append-only, newest first)
 
 ### 2026-06-08
+- **D-2026-06-08-02 — DECISION (taken, Abhay delegated): NO deploy; executed Phase B prod verification →
+  PASS, blind-verified. The full QA goal lifecycle is now complete.** Abhay: "you take the decision and
+  perform." **Deploy decision:** NO redeploy — the only product-code change since the last prod release
+  (`45201dc`) is a no-behavior `logger.ts` redaction refactor, so a deploy ships zero user-facing change;
+  not worth the prod risk. Went straight to **Phase B against the live site** (non-destructive, read-only):
+  **B1** `/api/health` GREEN (prod up, env=production, DB connected) + unauth `/login` render PASS (zero
+  page errors; the 401 is the expected auth-gate); `/api/internal/smoke` honestly SKIPPED (no local
+  `SMOKE_TOKEN` — `/api/health` covers DB). **B2** test-account session valid (`abhayfaircent@gmail.com`,
+  `/api/planner/me` 200) → **25-screen authenticated sweep PASS** (every route renders, no `/login`
+  bounces, **zero console/page errors**) + **interactive functional sweep PASS** (obj-2 levers compute
+  "5 months earlier", assumptions dialog open+close, obj-3 readiness "Not yet" age 56 coherent with
+  dashboard, tax-year selector interactive, staleness banner correctly absent) — all NON-DESTRUCTIVE
+  (`testing-strategy.md`). **B3 blind re-verify (rule 33):** a context-blind agent reviewed the prod
+  screenshots → PASS (healthy, no NaN/errors, FIRE age 56 + figures domain-plausible + cross-screen
+  coherent; re-derived the EF + net-worth math). **B4 rollback:** N/A (no deploy, no failure). Evidence:
+  `verification-screenshots/PROD-authed-FULL-*` (25) + `PROD-functional-*`. **Net: Phase A (verified+merged
+  `b8fadd7`) → deploy gate (no-deploy decision) → Phase B (prod PASS) — the full-lifecycle QA goal is
+  COMPLETE; prod is verified healthy.** Honest caveats: `/api/internal/smoke` not run (no token); the blind
+  agent opened a 15/25 + 3/3 representative spread; 2 new issues from the re-run remain open (#62 first-login
+  no-migration good-to-have, #63 demo seed-switcher nice-to-have). *Why logged:* records the delegated deploy
+  decision + the prod-verification result that closes the goal. → §1/§2.
 - **D-2026-06-08-01 — QA re-run (delta) SUPERVISOR-VERIFIED + merged to main; Phase A complete; deploy is
   near-optional (no product change).** The re-run (`chore/full-lifecycle-qa-2`) executed the 3 deltas and
   self-reported "Phase A DoD fully met." Supervisor check (rules 29/33, not a rubber-stamp): **§A2.6** —
