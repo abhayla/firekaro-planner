@@ -28,7 +28,7 @@ export function loadMauryasSeed(household: HStore, assumptions: AStore) {
     id: "abhay",
     name: "Abhay Maurya",
     dateOfBirth: "1981-12-28",
-    role: "EARNER",
+    role: "ADULT",
     targetRetirementAge: 50, // aspiration — the headline FIRE age is derived, not this (see derive.ts)
     planToAge: 90,
     // Hike is a blended long-run average (good-year-8 / lean-year-5 / no-hike-0
@@ -50,9 +50,10 @@ export function loadMauryasSeed(household: HStore, assumptions: AStore) {
     id: "madhu",
     name: "Madhu Kushwaha",
     dateOfBirth: "1981-04-15",
-    // gh #34: a homemaker / non-earning spouse is a first-class NON_EARNING_ADULT — an adult
-    // whose longevity (planToAge 92) MUST extend the household plan horizon, not a child DEPENDENT.
-    role: "NON_EARNING_ADULT",
+    // gh #34/#67: a homemaker / non-earning spouse is a first-class ADULT (no salary, no active
+    // business → derived isEarning = false) whose longevity (planToAge 92) MUST extend the household
+    // plan horizon, not a child DEPENDENT.
+    role: "ADULT",
     relation: "Spouse",
     planToAge: 92,
     city: "Metro",

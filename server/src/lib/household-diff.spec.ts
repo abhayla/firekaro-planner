@@ -20,7 +20,7 @@ function makeMember(id: string, over: Partial<Member> = {}): Member {
     id,
     name: `Member ${id}`,
     dateOfBirth: "1985-01-01",
-    role: "EARNER",
+    role: "ADULT",
     city: "Metro",
     health: "Healthy",
     riskAppetite: "Moderate",

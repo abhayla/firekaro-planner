@@ -13,6 +13,7 @@
  * the always-visible joint pool.
  */
 import { isAdultRole, type Household, type OtherIncomeLine } from "@/types/household";
+import { isEarningMember } from "@/lib/member-earning";
 import type { Assumptions } from "@/types/assumptions";
 import {
   calculateFIRENumber,
@@ -88,7 +89,8 @@ export interface DeriveLens {
 
 export function derive(household: Household, assumptions: Assumptions, lens: DeriveLens) {
   const members = household.members;
-  const earners = members.filter((m) => m.role === "EARNER");
+  // gh #67: earning is DERIVED from labour income (salary / active business), not a role flag.
+  const earners = members.filter((m) => isEarningMember(m, household.businesses));
   const isSolo = members.length <= 1;
 
   // #22 ROOT FIX: the member lens applies ONLY when a member is EXPLICITLY selected
@@ -113,7 +115,7 @@ export function derive(household: Household, assumptions: Assumptions, lens: Der
   }
 
   const lensedMembers = members.filter((m) => lensedMemberIds.has(m.id));
-  const lensedEarners = lensedMembers.filter((m) => m.role === "EARNER");
+  const lensedEarners = lensedMembers.filter((m) => isEarningMember(m, household.businesses));
   const lensedInvestments = household.investments.filter((i) => ownerMatches(i.ownerId));
   const lensedLiabilities = household.liabilities.filter(
     (l) => ownerMatches(l.ownerId) || l.isSharedWithSpouse,
@@ -186,7 +188,7 @@ export function derive(household: Household, assumptions: Assumptions, lens: Der
   function computeScope(scopeMemberIds: Set<string>, scoped: boolean) {
     const scopeIsLensed = scoped && applyMemberLens;
     const scopeMembers = members.filter((m) => scopeMemberIds.has(m.id));
-    const scopeEarners = scopeMembers.filter((m) => m.role === "EARNER");
+    const scopeEarners = scopeMembers.filter((m) => isEarningMember(m, household.businesses));
     const scopeOwnerMatches = (ownerId: string): boolean => {
       if (!scopeIsLensed) return true;
       if (ownerId === "Joint") return true;

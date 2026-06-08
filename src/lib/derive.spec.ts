@@ -54,14 +54,14 @@ describe("derive() — pure kernel", () => {
     // Earner plans to 88; homemaker spouse plans to 95. Household horizon must be 95.
     h.data.members = [
       {
-        id: "you", name: "You", dateOfBirth: "1986-01-01", role: "EARNER",
+        id: "you", name: "You", dateOfBirth: "1986-01-01", role: "ADULT",
         targetRetirementAge: 55, planToAge: 88, relation: "",
         city: "Metro", health: "Healthy", riskAppetite: "Moderate", marital: "Married",
         employmentStatus: "Employed",
         salary: { annualCTC: 3_000_000, hikePercent: 8 },
       },
       {
-        id: "spouse", name: "Spouse", dateOfBirth: "1988-01-01", role: "NON_EARNING_ADULT",
+        id: "spouse", name: "Spouse", dateOfBirth: "1988-01-01", role: "ADULT",
         planToAge: 95, relation: "Spouse",
         city: "Metro", health: "Healthy", riskAppetite: "Conservative", marital: "Married",
       },
@@ -77,18 +77,18 @@ describe("derive() — pure kernel", () => {
   // field. Demoting her to a child DEPENDENT (no planToAge) drops the horizon back to the earner.
   it("gh #34: a non-earning spouse who outlives the earner RAISES the FIRE number vs. ignoring her longevity", () => {
     const a = useAssumptionsStore();
-    const build = (spouseRole: "NON_EARNING_ADULT" | "DEPENDENT") => {
+    const build = (spouseRole: "ADULT" | "DEPENDENT") => {
       const h = useHouseholdStore();
       h.data.members = [
         {
-          id: "you", name: "You", dateOfBirth: "1986-01-01", role: "EARNER",
+          id: "you", name: "You", dateOfBirth: "1986-01-01", role: "ADULT",
           targetRetirementAge: 55, planToAge: 85, relation: "",
           city: "Metro", health: "Healthy", riskAppetite: "Moderate", marital: "Married",
           employmentStatus: "Employed", salary: { annualCTC: 3_000_000, hikePercent: 8 },
         },
         {
           id: "spouse", name: "Spouse", dateOfBirth: "1988-01-01", role: spouseRole,
-          planToAge: spouseRole === "NON_EARNING_ADULT" ? 98 : null, relation: "Spouse",
+          planToAge: spouseRole === "ADULT" ? 98 : null, relation: "Spouse",
           city: "Metro", health: "Healthy", riskAppetite: "Conservative", marital: "Married",
         },
       ] as typeof h.data.members;
@@ -96,7 +96,7 @@ describe("derive() — pure kernel", () => {
       return derive(h.data, a.values, { isFamilyView: false, viewingMemberId: null, currentFY: "2025-26" });
     };
     setActivePinia(createPinia());
-    const withSpouse = build("NON_EARNING_ADULT");
+    const withSpouse = build("ADULT");
     setActivePinia(createPinia());
     const ignoringSpouse = build("DEPENDENT");
 
@@ -106,18 +106,49 @@ describe("derive() — pure kernel", () => {
     expect(withSpouse.fireNumber).toBeGreaterThan(ignoringSpouse.fireNumber);
   });
 
+  // gh #67: a salary-less ADULT who owns an ACTIVE business is an earner (derived) — the only
+  // genuinely-new classification the income-derived model introduces. Their business profit flows
+  // into income and they count in lensedEarners; EPS/gratuity (salaried-only) correctly skip them.
+  it("gh #67: a salary-less adult with an active business derives as an earner (businessShare counted)", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    h.data.members = [
+      {
+        id: "owner", name: "Owner", dateOfBirth: "1986-01-01", role: "ADULT",
+        targetRetirementAge: 55, planToAge: 88, relation: "",
+        city: "Metro", health: "Healthy", riskAppetite: "Moderate", marital: "Married",
+      },
+    ] as typeof h.data.members;
+    h.data.businesses = [
+      { id: "biz", name: "Shop", legalKind: "SoleProp", annualProfit: 1_800_000, frequency: "A",
+        sharePercent: 100, ownerId: "owner", isOperated: true },
+    ] as typeof h.data.businesses;
+    h.data.expenses.avgMonthly = 60_000;
+
+    const k = derive(h.data, a.values, { isFamilyView: false, viewingMemberId: null, currentFY: "2025-26" });
+    // The business owner is a derived earner...
+    expect(k.lensedEarners.length).toBe(1);
+    expect(k.lensedEarners[0].id).toBe("owner");
+    // ...whose business profit is in income (no salary, but businessShare > 0)...
+    expect(k.annualIncome.salaryIncome).toBe(0);
+    expect(k.annualIncome.businessShare).toBe(1_800_000);
+    // ...and the FIRE headline is real (reachable, positive number).
+    expect(k.fireNumber).toBeGreaterThan(0);
+    expect(Number.isFinite(k.yearsToRegular)).toBe(true);
+  });
+
   it("gh #34: when the earner is the longest-lived adult, the horizon stays the earner's planToAge", () => {
     const h = useHouseholdStore();
     const a = useAssumptionsStore();
     h.data.members = [
       {
-        id: "you", name: "You", dateOfBirth: "1986-01-01", role: "EARNER",
+        id: "you", name: "You", dateOfBirth: "1986-01-01", role: "ADULT",
         targetRetirementAge: 55, planToAge: 92, relation: "",
         city: "Metro", health: "Healthy", riskAppetite: "Moderate", marital: "Married",
         employmentStatus: "Employed", salary: { annualCTC: 3_000_000, hikePercent: 8 },
       },
       {
-        id: "spouse", name: "Spouse", dateOfBirth: "1988-01-01", role: "NON_EARNING_ADULT",
+        id: "spouse", name: "Spouse", dateOfBirth: "1988-01-01", role: "ADULT",
         planToAge: 85, relation: "Spouse",
         city: "Metro", health: "Healthy", riskAppetite: "Conservative", marital: "Married",
       },
@@ -596,7 +627,7 @@ describe("derive() — pure kernel", () => {
     // in a no-opening-year PPF (assumed locked till 60) → the liquid runway can't
     // bridge the early-retirement years → headline pushed later.
     h.data.investments = [];
-    h.data.members.forEach((m) => { if (m.role === "EARNER") m.targetRetirementAge = 45; });
+    h.data.members.forEach((m) => { if (m.role === "ADULT") m.targetRetirementAge = 45; });
     h.addInvestment({ type: "FD", label: "Liquid", value: 2_000_000, monthlyContribution: 0, ownerId: "rohit" });
     h.addInvestment({ type: "PPF", label: "Big PPF", value: 200_000_000, monthlyContribution: 0, ownerId: "rohit" });
     const k = derive(h.data, a.values, lens);

@@ -55,7 +55,7 @@ function makeHousehold(seed: number): Household {
       id: i === 0 ? "you" : i === 1 ? "spouse" : `dep-${i}`,
       name: i === 0 ? "Primary" : i === 1 ? "Spouse" : `Child ${i}`,
       dateOfBirth: `${1980 + rint(0, 25)}-0${rint(1, 9)}-1${rint(0, 8)}`,
-      role: earner ? "EARNER" : "DEPENDENT",
+      role: earner ? "ADULT" : "DEPENDENT",
       city: pick(["Metro", "Tier-1", "Tier-2"]),
       health: pick(["Healthy", "Chronic", "Special"]),
       riskAppetite: pick(["Conservative", "Moderate", "Aggressive"]),

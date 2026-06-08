@@ -142,7 +142,9 @@ export function deriveEpsPensionForMember(
   member: Member,
   _asOf: Date = new Date(),
 ): EpsPensionResult | null {
-  if (member.role !== "EARNER" || !member.salary) return null;
+  // gh #67: EPS is salaried-employment pension — gate on adult + actual salary (the labour-income
+  // signal), not a manual earner flag. A non-adult / salary-less member has no EPS.
+  if (member.role !== "ADULT" || !member.salary) return null;
 
   const retirementAge = member.targetRetirementAge ?? EPS_NORMAL_START_AGE;
   const serviceYears = Math.max(0, retirementAge - ASSUMED_CAREER_START_AGE);

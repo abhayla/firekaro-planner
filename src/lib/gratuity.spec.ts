@@ -63,7 +63,7 @@ describe("deriveGratuityForMember — derives basic + service, conservative + di
       id: "m1",
       name: "Rohit",
       dateOfBirth: "1986-01-01",
-      role: "EARNER",
+      role: "ADULT",
       targetRetirementAge: 50,
       city: "Metro",
       health: "Healthy",

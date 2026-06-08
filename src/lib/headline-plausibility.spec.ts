@@ -27,6 +27,7 @@ import { loadMehtasSeed } from "@/seeds/mehtas";
 import { loadIyersSeed } from "@/seeds/iyers";
 import { loadMauryasSeed } from "@/seeds/mauryas";
 import { derive } from "@/lib/derive";
+import { isEarningMember } from "@/lib/member-earning";
 import { useFireDerive } from "@/lib/useFireDerive";
 import { calculateYearsToTarget } from "@/lib/fire-math";
 import { buildContributionResolver } from "@/lib/contribution-schedule";
@@ -72,7 +73,7 @@ describe("headline plausibility — DEFAULT product lens (#22 foolproof gate)", 
 
       // (3) The default lens MUST count EVERY household earner — the #22 bug silently
       // scoped a dual-income household to the primary earner only.
-      const householdEarners = h.data.members.filter((m) => m.role === "EARNER").length;
+      const householdEarners = h.data.members.filter((m) => isEarningMember(m, h.data.businesses)).length;
       expect(k.lensedEarners.length, `${ctx} — default lens pools all ${householdEarners} earners`).toBe(
         householdEarners,
       );
@@ -143,7 +144,7 @@ describe("headline plausibility — DEFAULT product lens (#22 foolproof gate)", 
       const h = useHouseholdStore();
       const a = useAssumptionsStore();
       persona.load(h, a);
-      const earners = h.data.members.filter((m) => m.role === "EARNER");
+      const earners = h.data.members.filter((m) => isEarningMember(m, h.data.businesses));
       if (earners.length < 2) return; // a member lens is only meaningful for a multi-earner household
       const household = derive(h.data, a.values, DEFAULT_PRODUCT_LENS);
       const lensed = derive(h.data, a.values, { ...DEFAULT_PRODUCT_LENS, viewingMemberId: earners[0].id });
@@ -329,7 +330,7 @@ describe("headline plausibility — EMPTY state (gh #39: no 'achieved' on zero d
     const h = useHouseholdStore();
     const a = useAssumptionsStore();
     h.addMember({
-      id: "you", name: "You", dateOfBirth: "1990-01-01", role: "EARNER",
+      id: "you", name: "You", dateOfBirth: "1990-01-01", role: "ADULT",
       targetRetirementAge: 50, planToAge: 90, city: "Metro", health: "Healthy",
       riskAppetite: "Moderate", marital: "Married", employmentStatus: "Employed",
     } as never);
