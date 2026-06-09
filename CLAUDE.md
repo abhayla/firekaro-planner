@@ -108,6 +108,7 @@ npm run test:unit -- -t "marginal relief"  # filter by test name (vitest -t)
 npm run test:unit:watch   # vitest watch mode
 npm run test:coverage     # vitest run --coverage
 npx stryker run           # mutation-test the honesty-critical kernel (fire-math/tax/withdrawal-strategy/epf-vpf) — a KILLED MUTANT, not coverage %, is the real proof the specs protect the math (config: stryker.config.json)
+# Property/metamorphic kernel guard (fast-check): src/lib/kernel-invariants.property.spec.ts generates 1000s of valid perturbations off the real seeds and asserts the Tier-0 honesty invariants (savings/return monotonicity, no NaN/−∞ reaching a user, default-lens earner pooling, tax & withdrawal bounds). Runs inside npm run test:unit. Pairs with src/lib/headline-plausibility.spec.ts (5 fixed-fixture sane-bounds locks).
 npm run type-check        # vue-tsc --build --force  (banner: firekaro-mvp)
 npm run build             # vue-tsc -b && vite build
 npm run preview           # serve the production build locally
