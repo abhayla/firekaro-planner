@@ -2,7 +2,7 @@
   "_meta": {
     "created": "2026-03-24T16:55:53.203553+00:00",
     "hub_repo": "abhayla/claude-best-practices",
-    "last_sync": "2026-05-01T10:15:45.392+00:00",
+    "last_sync": "2026-06-09T15:30:10.704878+00:00",
     "version": "1.0.0"
   },
   "files": {
@@ -811,8 +811,8 @@
       "synced_at": "2026-05-01T10:15:45.392+00:00"
     },
     "skills/fix-issue/SKILL.md": {
-      "hub_hash": "sha256:c71d0109c4413c9ec9e347c55525299f43ab2a339710c152e9caca94f26d1bcb",
-      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+      "hub_hash": "sha256:f0287e3cea43247d7e2e1ed5d15ac356b116fc299070cd14ceaec325a2bd1e38",
+      "synced_at": "2026-06-09T15:30:10.704878+00:00"
     },
     "skills/fix-loop/SKILL.md": {
       "hub_hash": "sha256:f5c8399879ebc3d90871f55071e7d71ced185f8e4bb12b012e9b13552cd6f966",
@@ -1751,116 +1751,116 @@
       "synced_at": "2026-04-26T19:12:22.569794+00:00"
     },
     "skills/ui-ux-pro-max/SKILL.md": {
-      "hub_hash": "sha256:2df4842f3cb08b52b96b2a37bcaf9576c26a1ac9174453ddd6db452ae4faae1d",
-      "synced_at": "2026-04-26T19:12:22.569794+00:00"
+      "hub_hash": "sha256:e894964879a06795b91e0721da111829136607985123007d82a1e9e6977eb747",
+      "synced_at": "2026-06-09T15:30:10.704878+00:00"
     },
     "skills/ui-ux-pro-max/data/charts.csv": {
-      "hub_hash": "sha256:77d32cf4d9e78f80795baf391e1cc8f9ee137351aab29ca682938ec9d8ebe7e4",
-      "synced_at": "2026-03-26T17:23:22.264243+00:00"
+      "hub_hash": "sha256:a70ef7460b0eaaea8614f86a0d09a4bc38b467804179762464b5ca45b491baac",
+      "synced_at": "2026-06-09T15:30:10.704878+00:00"
     },
     "skills/ui-ux-pro-max/data/colors.csv": {
-      "hub_hash": "sha256:19a74a1fe858f92dc9213553bb6b8326b7f32dc6bfc0857668e2b4da32322f8a",
-      "synced_at": "2026-03-26T17:23:22.264243+00:00"
+      "hub_hash": "sha256:5a6cb6c5d6f19b5f5e51865ae1e643e4baa05d04304d0bab976f064632149a6a",
+      "synced_at": "2026-06-09T15:30:10.704878+00:00"
     },
     "skills/ui-ux-pro-max/data/icons.csv": {
-      "hub_hash": "sha256:351fe61ba45b8146c66de6ea7d67297654639d79a94f537b4d0bad570058c28f",
-      "synced_at": "2026-03-26T17:23:22.264243+00:00"
+      "hub_hash": "sha256:f376c29fb4df37b4bdb366a5aa70cb211ba3dd8b435390aaa03152a64b07d2e8",
+      "synced_at": "2026-06-09T15:30:10.704878+00:00"
     },
     "skills/ui-ux-pro-max/data/landing.csv": {
-      "hub_hash": "sha256:51021dbadc40b0305c42f80c270eb515420440afe9f3482dfd048dc2475dbfbd",
-      "synced_at": "2026-03-26T17:23:22.264243+00:00"
+      "hub_hash": "sha256:121a2cac7cf21050234b5f80e7b4e182f10123536032e0f9ad862ad3aec9677d",
+      "synced_at": "2026-06-09T15:30:10.704878+00:00"
     },
     "skills/ui-ux-pro-max/data/products.csv": {
-      "hub_hash": "sha256:6f9c9be6fdb53a415af273dac6221e87a418d1600da2ee39f974b997e880050e",
-      "synced_at": "2026-03-26T17:23:22.264243+00:00"
+      "hub_hash": "sha256:9fd9e776ba847cf44c1ea78f95fe5e33b2c56bb7e186e3cfff9c49bc7fcb691b",
+      "synced_at": "2026-06-09T15:30:10.704878+00:00"
     },
     "skills/ui-ux-pro-max/data/react-performance.csv": {
       "hub_hash": "sha256:904c8afcda229629545912dde0e8ac37503757131f0169f80b016f1f58c4fd3f",
-      "synced_at": "2026-03-26T17:23:22.264243+00:00"
+      "synced_at": "2026-06-09T15:30:10.704878+00:00"
     },
     "skills/ui-ux-pro-max/data/stacks/astro.csv": {
       "hub_hash": "sha256:ad18dae3ab6d148d37d144592df80dc1825b6c9e86d9d2d68fdda77434206a37",
-      "synced_at": "2026-03-26T17:23:22.264243+00:00"
+      "synced_at": "2026-06-09T15:30:10.704878+00:00"
     },
     "skills/ui-ux-pro-max/data/stacks/flutter.csv": {
       "hub_hash": "sha256:fe36d404c799781e8ba6e9a8179b45799ed5126a545528550cd2eb0f2346e8c5",
-      "synced_at": "2026-03-26T17:23:22.264243+00:00"
+      "synced_at": "2026-06-09T15:30:10.704878+00:00"
     },
     "skills/ui-ux-pro-max/data/stacks/html-tailwind.csv": {
       "hub_hash": "sha256:7aef38e75c53559470afcfa91580a9917ca8b7dbf8b92110389e23e93703ac52",
-      "synced_at": "2026-03-26T17:23:22.264243+00:00"
+      "synced_at": "2026-06-09T15:30:10.704878+00:00"
     },
     "skills/ui-ux-pro-max/data/stacks/jetpack-compose.csv": {
       "hub_hash": "sha256:6c8fd4b0391c342c12b0af15610cd5becbeccaef0bbe8dcfc01d928c3195d93e",
-      "synced_at": "2026-03-26T17:23:22.264243+00:00"
+      "synced_at": "2026-06-09T15:30:10.704878+00:00"
     },
     "skills/ui-ux-pro-max/data/stacks/nextjs.csv": {
       "hub_hash": "sha256:e828ccc04843742f52f545a068e8a9ab0d2b97c0e771f7e93bf0cef74da05554",
-      "synced_at": "2026-03-26T17:23:22.264243+00:00"
+      "synced_at": "2026-06-09T15:30:10.704878+00:00"
     },
     "skills/ui-ux-pro-max/data/stacks/nuxt-ui.csv": {
       "hub_hash": "sha256:05d6e74501b2b6a636faed32450622759f49a5bcafad971f5f4e7eba0eb7be71",
-      "synced_at": "2026-03-26T17:23:22.264243+00:00"
+      "synced_at": "2026-06-09T15:30:10.704878+00:00"
     },
     "skills/ui-ux-pro-max/data/stacks/nuxtjs.csv": {
       "hub_hash": "sha256:f7a3f2d9542856d00199f85c6c023b7c284cc698e2e6e12d61afce2edacb24d6",
-      "synced_at": "2026-03-26T17:23:22.264243+00:00"
+      "synced_at": "2026-06-09T15:30:10.704878+00:00"
     },
     "skills/ui-ux-pro-max/data/stacks/react-native.csv": {
       "hub_hash": "sha256:077aefc81d194895ecf7936b3ed298b978e36961f183e3a275f8acda19b5f621",
-      "synced_at": "2026-03-26T17:23:22.264243+00:00"
+      "synced_at": "2026-06-09T15:30:10.704878+00:00"
     },
     "skills/ui-ux-pro-max/data/stacks/react.csv": {
       "hub_hash": "sha256:e5624ab41d33427d88e41d07581ce4eca59b37b36ab72a6ad43a9c8e2d0a1c72",
-      "synced_at": "2026-03-26T17:23:22.264243+00:00"
+      "synced_at": "2026-06-09T15:30:10.704878+00:00"
     },
     "skills/ui-ux-pro-max/data/stacks/shadcn.csv": {
       "hub_hash": "sha256:395c2e415ef6f48a474acccdc8eb2c7258a6ed751a5037ba171a2d8823e02ded",
-      "synced_at": "2026-03-26T17:23:22.264243+00:00"
+      "synced_at": "2026-06-09T15:30:10.704878+00:00"
     },
     "skills/ui-ux-pro-max/data/stacks/svelte.csv": {
       "hub_hash": "sha256:71af52d64f266c88070b91dbbaa900c2f8074b6baae9f35eaea6ba9cec6fd803",
-      "synced_at": "2026-03-26T17:23:22.264243+00:00"
+      "synced_at": "2026-06-09T15:30:10.704878+00:00"
     },
     "skills/ui-ux-pro-max/data/stacks/swiftui.csv": {
       "hub_hash": "sha256:c9c2d2510f8e66281a2514e8dd0125a6b653b9ef53a71281b5e7dfe003d5b569",
-      "synced_at": "2026-03-26T17:23:22.264243+00:00"
+      "synced_at": "2026-06-09T15:30:10.704878+00:00"
     },
     "skills/ui-ux-pro-max/data/stacks/vue.csv": {
       "hub_hash": "sha256:c2724915d3c11cd67263f25896cff721f787a0fdd8326002d31e9f5806dfd8f8",
-      "synced_at": "2026-03-26T17:23:22.264243+00:00"
+      "synced_at": "2026-06-09T15:30:10.704878+00:00"
     },
     "skills/ui-ux-pro-max/data/styles.csv": {
-      "hub_hash": "sha256:663ac9775e6f5b874b32d930fa0951591c45e39cde8ac7033278f42a0881c037",
-      "synced_at": "2026-03-26T17:23:22.264243+00:00"
+      "hub_hash": "sha256:f37eb20e7403a715d440efd45ce6952ea6a445d6143fd130c52e219a4bec9911",
+      "synced_at": "2026-06-09T15:30:10.704878+00:00"
     },
     "skills/ui-ux-pro-max/data/typography.csv": {
-      "hub_hash": "sha256:64695e05ac335ba534aff396c4ba9241c642f80ea53b424251d2669b71c4772b",
-      "synced_at": "2026-03-26T17:23:22.264243+00:00"
+      "hub_hash": "sha256:dbea262a54e3bfa2e6c3b15989a365d5ef4c43349316aff46635e82ca825adce",
+      "synced_at": "2026-06-09T15:30:10.704878+00:00"
     },
     "skills/ui-ux-pro-max/data/ui-reasoning.csv": {
-      "hub_hash": "sha256:58fc52fff69f62709f8c7dd460de6f6693699ea820f24287f3301a427c2b554e",
-      "synced_at": "2026-03-26T17:23:22.264243+00:00"
+      "hub_hash": "sha256:06e4369445388ba9b7a57347510b125b7a2145bbf8546a327ba50292503b204a",
+      "synced_at": "2026-06-09T15:30:10.704878+00:00"
     },
     "skills/ui-ux-pro-max/data/ux-guidelines.csv": {
       "hub_hash": "sha256:e01943c433b2cad3040f19389b3b0455673758a569b7a927b5bedf65c989cb96",
-      "synced_at": "2026-03-26T17:23:22.264243+00:00"
+      "synced_at": "2026-06-09T15:30:10.704878+00:00"
     },
     "skills/ui-ux-pro-max/data/web-interface.csv": {
       "hub_hash": "sha256:10bfc24e09a6a15db8309e6ef9b6881e1d4af97dffb7c99418aefb8e30df7d54",
       "synced_at": "2026-03-26T17:23:22.264243+00:00"
     },
     "skills/ui-ux-pro-max/scripts/core.py": {
-      "hub_hash": "sha256:5459d1f04eea03dfb913742d0c03edc5065ac67f6227e4807fa87699662588cb",
-      "synced_at": "2026-03-26T17:23:22.264243+00:00"
+      "hub_hash": "sha256:772b4d567c7a948c5d4a10343473b4123fec04238d250c9ffce31d0733f752c0",
+      "synced_at": "2026-06-09T15:30:10.704878+00:00"
     },
     "skills/ui-ux-pro-max/scripts/design_system.py": {
-      "hub_hash": "sha256:cd59a11dac93d06b8d33e724b156c5c30b46fef951bb7c2a7810b7c5bfe36a48",
-      "synced_at": "2026-03-26T17:23:22.264243+00:00"
+      "hub_hash": "sha256:f7a21e83739c5ac6ca3738846220f6a9eb7f3c1ae7a44989c5aaa2061ca60310",
+      "synced_at": "2026-06-09T15:30:10.704878+00:00"
     },
     "skills/ui-ux-pro-max/scripts/search.py": {
-      "hub_hash": "sha256:126cb38b67fd8158a245fafab734b641795905313c84f08761c199d507a176a3",
-      "synced_at": "2026-03-26T17:23:22.264243+00:00"
+      "hub_hash": "sha256:211546b262fb14d397228dbf982e32254c938d364b6386da69b62e7c3805b319",
+      "synced_at": "2026-06-09T15:30:10.704878+00:00"
     },
     "skills/update-practices/SKILL.md": {
       "hub_hash": "sha256:83fd93613050c9fb10ec89c8ef8c97f55e507a09e04a10e44acf0a5c2a9fecd0",
@@ -1957,6 +1957,86 @@
     "skills/writing-skills/SKILL.md": {
       "hub_hash": "sha256:9a74fdc785df99886576a9a40985e80e9c5fe45e9f193a8bea3d50d311f6d546",
       "synced_at": "2026-04-26T19:12:22.569794+00:00"
+    },
+    "skills/grill-me/SKILL.md": {
+      "hub_hash": "sha256:c1251151196b04823d7adaacfa6c2187f871b74b6da03954657d3e1fae526ab1",
+      "synced_at": "2026-06-09T15:30:10.704878+00:00"
+    },
+    "skills/grill-with-docs/SKILL.md": {
+      "hub_hash": "sha256:5ef5e80d026f349086005110233d89138ef91529abe1d6f1301ac73c5d5e22a7",
+      "synced_at": "2026-06-09T15:30:10.704878+00:00"
+    },
+    "skills/grill-with-docs/references/ADR-FORMAT.md": {
+      "hub_hash": "sha256:9f4799fc86698f9e908a0d362ddae46c3a669a81925531802e1ee0a39d7fd42c",
+      "synced_at": "2026-06-09T15:30:10.704878+00:00"
+    },
+    "skills/grill-with-docs/references/CONTEXT-FORMAT.md": {
+      "hub_hash": "sha256:f5c2ee4273fe26b7f5c26f18d57c86aae235e780ed80caf788473e68b23563ea",
+      "synced_at": "2026-06-09T15:30:10.704878+00:00"
+    },
+    "skills/improve-codebase-architecture/SKILL.md": {
+      "hub_hash": "sha256:bd1722830006f710994882cdaa79a0211ff062620bb1d3068b727f2a2f1b7fc1",
+      "synced_at": "2026-06-09T15:30:10.704878+00:00"
+    },
+    "skills/improve-codebase-architecture/references/DEEPENING.md": {
+      "hub_hash": "sha256:4579994814341629c00e611a03a54fce5da71015a1bcdd73ca9ad0d79450bf45",
+      "synced_at": "2026-06-09T15:30:10.704878+00:00"
+    },
+    "skills/improve-codebase-architecture/references/HTML-REPORT.md": {
+      "hub_hash": "sha256:62eec38e4d0130dc529893c2eb2fa99a977d92549f630d3cbd47d5a27eb7aba3",
+      "synced_at": "2026-06-09T15:30:10.704878+00:00"
+    },
+    "skills/improve-codebase-architecture/references/INTERFACE-DESIGN.md": {
+      "hub_hash": "sha256:0cdde7e60115858f636d42fb7162fe32a7832ae45a7ab256cd0f16ce4df2cab2",
+      "synced_at": "2026-06-09T15:30:10.704878+00:00"
+    },
+    "skills/improve-codebase-architecture/references/LANGUAGE.md": {
+      "hub_hash": "sha256:a8241f3aa80f9dc01811968ae44cd75f66c0b329e07fef44fc9d2a4de066ea94",
+      "synced_at": "2026-06-09T15:30:10.704878+00:00"
+    },
+    "skills/to-prd/SKILL.md": {
+      "hub_hash": "sha256:87c1e7a2b542fba5d408233108f760936b640345c269a0de36946692105096b0",
+      "synced_at": "2026-06-09T15:30:10.704878+00:00"
+    },
+    "skills/ui-ux-pro-max/data/_sync_all.py": {
+      "hub_hash": "sha256:b540b3a4f87598ae29048b3cceae1fc17b39b629aee2cbe5c802ffc7b48abf6d",
+      "synced_at": "2026-06-09T15:30:10.704878+00:00"
+    },
+    "skills/ui-ux-pro-max/data/app-interface.csv": {
+      "hub_hash": "sha256:2a17ef810dab715ce1f339861817a8fbe3ccc38142b70517301e874803e838ac",
+      "synced_at": "2026-06-09T15:30:10.704878+00:00"
+    },
+    "skills/ui-ux-pro-max/data/design.csv": {
+      "hub_hash": "sha256:6f0ae42f16b3cbfa3f07050268387557859ff666e2651b1b82763f099d724b3f",
+      "synced_at": "2026-06-09T15:30:10.704878+00:00"
+    },
+    "skills/ui-ux-pro-max/data/draft.csv": {
+      "hub_hash": "sha256:e190c796b707858a5436dc4c27f9ee9bb6618014ca73f533e423abe5ce9e4d06",
+      "synced_at": "2026-06-09T15:30:10.704878+00:00"
+    },
+    "skills/ui-ux-pro-max/data/google-fonts.csv": {
+      "hub_hash": "sha256:3fd2898fb0fdd31ba758bf05cfcd2b58cd0f038a20cf08e417d09e5a8a4a509e",
+      "synced_at": "2026-06-09T15:30:10.704878+00:00"
+    },
+    "skills/ui-ux-pro-max/data/stacks/angular.csv": {
+      "hub_hash": "sha256:dd7cc2a2b34cd8f0508bd05b067545e7a44f7724440c432d491d92a61a8fb6c1",
+      "synced_at": "2026-06-09T15:30:10.704878+00:00"
+    },
+    "skills/ui-ux-pro-max/data/stacks/laravel.csv": {
+      "hub_hash": "sha256:50e11e60a64b30f329af25ae71f4b8bbdb43bafc1865451b74f9f540a88964d5",
+      "synced_at": "2026-06-09T15:30:10.704878+00:00"
+    },
+    "skills/ui-ux-pro-max/data/stacks/threejs.csv": {
+      "hub_hash": "sha256:f1c05f8f269fc4784170c837f4ff43b50042f00bbd6ba7dbef2896081a052544",
+      "synced_at": "2026-06-09T15:30:10.704878+00:00"
+    },
+    "skills/zoom-out/SKILL.md": {
+      "hub_hash": "sha256:6671bd5b1c990338543e497993dcfa390d93678baf673c4a144cba827c6c3c08",
+      "synced_at": "2026-06-09T15:30:10.704878+00:00"
+    },
+    "skills/fix-github-issue/SKILL.md": {
+      "hub_hash": "sha256:d5604fc982a6de3b8549b10b9ed10f3a37d771fe48b3f3ab2e24978872b73465",
+      "synced_at": "2026-06-09T15:31:21.376094+00:00"
     }
   }
 }

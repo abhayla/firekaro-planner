@@ -11,7 +11,7 @@
 # silently re-pull them.
 
 hub_repo: abhayla/claude-best-practices
-last_sync: "2026-05-01T10:15:45+00:00"  # carry forward from sync-manifest.json
+last_sync: "2026-06-09T15:30:10.704878+00:00"  # carry forward from sync-manifest.json
 
 # Stacks this project actively uses. Future hub-side stack-aware filtering
 # can use these tags to scope pattern selection.
@@ -80,8 +80,6 @@ exclude:
     - solidity-audit
     - remotion-video
     - obsidian
-    - reddit
-    - twitter-x
     - html-prototype
     - pm2-deploy
     - k8s-deploy
