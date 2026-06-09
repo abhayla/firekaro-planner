@@ -42,10 +42,10 @@ const entry = computed<GlossaryEntry>(() => TERM_GLOSSARY[props.term] as Glossar
           />
         </button>
       </template>
-      <div class="text-caption">
+      <div class="text-body-2">
         <div class="font-weight-bold mb-1">{{ entry.label }}</div>
         <div>{{ entry.explanation }}</div>
-        <div v-if="entry.formula" class="text-caption mt-1 font-italic">
+        <div v-if="entry.formula" class="text-body-2 mt-1 font-italic">
           {{ entry.formula }}
         </div>
       </div>

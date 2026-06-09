@@ -55,6 +55,10 @@ export default createVuetify({
     VAlert: { rounded: "lg", variant: "tonal" },
     VDialog: { rounded: "lg" },
     VMenu: { rounded: "lg" },
+    // #77 — opaque high-contrast tooltip surface. The .fk-tooltip rule (tokens.css)
+    // gives every v-tooltip a solid slate-900 surface so the busy page never bleeds
+    // through the jargon explanation. Covers all v-tooltip users globally.
+    VTooltip: { contentClass: "fk-tooltip" },
     VNavigationDrawer: { elevation: 0 },
     VAppBar: { elevation: 0 },
     VTabs: { rounded: "lg" },
