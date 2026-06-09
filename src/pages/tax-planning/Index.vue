@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { useHouseholdStore } from "@/stores/household";
+import { useFireDerive } from "@/lib/useFireDerive";
+import { useUiStore } from "@/stores/ui";
 import { computeTax, npsCeilingFor, AVAILABLE_FYS } from "@/lib/tax";
 import { getCurrentFinancialYear } from "@/lib/expense-history";
 import { toAnnual } from "@/lib/cashflow";
@@ -27,6 +29,26 @@ import LimitMeter from "@/components/shared/LimitMeter.vue";
 import TaxCliffChart from "@/components/charts/TaxCliffChart.vue";
 
 const household = useHouseholdStore();
+const fire = useFireDerive();
+const ui = useUiStore();
+
+// gh #86 — lens the tax screen to the selected member (D-2026-06-08-05). FinTech "B'-fallback":
+// recompute at the page-local selectedFY over the MEMBER-SCOPED sets so income AND deductions are
+// SAME-SCOPE — never member-income ÷ household-deductions (the #23 honesty leak). Default = whole
+// household (byte-identical to before). Each adult files their own ITR, so a member's individual tax
+// on their own income + own deductions is the honest figure; "Joint" lines count on BOTH sides.
+const lensActive = computed(() => ui.viewingMemberId != null && !household.isSolo);
+const scopedHousehold = computed(() =>
+  lensActive.value
+    ? {
+        ...household.data,
+        members: fire.lensedMembers.value,
+        investments: fire.lensedInvestments.value,
+        liabilities: fire.lensedLiabilities.value,
+        insurance: fire.lensedInsurance.value,
+      }
+    : household.data,
+);
 
 // Page-local tax-year selector — drives ONLY this screen's regime comparison
 // and cliff chart. It NEVER mutates global state: the dashboard FIRE plan always
@@ -62,7 +84,8 @@ const OTHER_INCOME_VIS: Record<string, { icon: string; color: string }> = {
 };
 const incomeRows = computed<IncomeRow[]>(() => {
   const rows: IncomeRow[] = [];
-  for (const m of household.earners) {
+  // gh #86 — member-scoped income when a lens is active (same-scope with the deductions below).
+  for (const m of fire.lensedEarners.value) {
     if (m.salary?.annualCTC) {
       rows.push({
         label: `Salary — ${m.name || "Earner"}`,
@@ -73,7 +96,7 @@ const incomeRows = computed<IncomeRow[]>(() => {
       });
     }
   }
-  for (const b of household.data.businesses) {
+  for (const b of fire.lensedBusinesses.value) {
     const annual = toAnnual({ amount: b.annualProfit, period: b.frequency });
     const share = annual * (b.sharePercent / 100);
     const exemptKinds: string[] = ["LLP", "Partnership", "HUF"];
@@ -85,7 +108,7 @@ const incomeRows = computed<IncomeRow[]>(() => {
       color: "primary",
     });
   }
-  for (const o of household.data.otherIncome) {
+  for (const o of fire.lensedOtherIncome.value) {
     const annual = toAnnual({ amount: o.amount, period: o.frequency });
     const vis = OTHER_INCOME_VIS[o.type] ?? { icon: "mdi-cash", color: "info" };
     rows.push({
@@ -101,7 +124,10 @@ const incomeRows = computed<IncomeRow[]>(() => {
 
 // Phase 4 Stage J — replace v4's hardcoded `150000 + 25000` dummy with the
 // audit-grounded auto-deductions derivation (audit Entry #12 A12.2).
-const derivedDeductions = computed(() => deriveDeductions(household.data));
+// gh #86 — deductions over the SAME member scope as the income above (FinTech B'-fallback; deriveDeductions
+// is scope-agnostic, so a member-scoped household yields member-scoped 80C/80CCD/80D/§24/80CCD(2)). This is
+// the load-bearing same-scope fix: lensing income but keeping household deductions would be the #23 leak.
+const derivedDeductions = computed(() => deriveDeductions(scopedHousehold.value));
 
 // 80CCD(2) employer-NPS is the one deduction allowed in BOTH regimes — show the CAPPED value
 // at the displayed regime's ceiling (per-member), so the tax-reducing figure is visible (gh-issue #4).
@@ -131,7 +157,7 @@ const totalTaxable = computed(() =>
 // full rent), and feed this §24a-collapsed base into computeTax. SAME shared helper
 // derive.ts uses, so this screen and the Cash-Flow/FIRE-model tax can never diverge (gh-issue #65).
 const rentalTaxDeduction = computed(
-  () => computeHousePropertyTax(household.data.otherIncome).rentalTaxDeduction,
+  () => computeHousePropertyTax(fire.lensedOtherIncome.value).rentalTaxDeduction,
 );
 const taxableIncomeForTax = computed(() =>
   Math.max(0, totalTaxable.value - rentalTaxDeduction.value),
@@ -202,7 +228,8 @@ const pageRecommended = computed<"OLD" | "NEW">(() =>
 );
 
 const monthlyTakeHome = computed(() => {
-  const annualSavingsContrib = household.data.investments.reduce(
+  // gh #86 — savings contribution is the member's own (lensed) investments when a lens is active.
+  const annualSavingsContrib = scopedHousehold.value.investments.reduce(
     (s, i) => s + (i.monthlyContribution ?? 0) * 12,
     0,
   );
@@ -520,8 +547,9 @@ const takeHomeSegments = computed<ProportionSegment[]>(() => {
       </v-col>
     </v-row>
 
-    <!-- ───── Per earner ───── -->
-    <template v-if="household.earners.length >= 2">
+    <!-- ───── Per earner (household view only — the whole-household breakdown; the lensed view
+             already IS a single member, so this comparison table is hidden then). gh #86. ───── -->
+    <template v-if="!lensActive && household.earners.length >= 2">
       <div class="section-eyebrow">Per earner</div>
       <PanelCard>
         <v-table density="comfortable" class="bg-transparent earner-table">
