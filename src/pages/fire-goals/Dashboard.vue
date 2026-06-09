@@ -273,10 +273,10 @@ onMounted(() => {
            never confused with a rosier individual figure. -->
       <IndividualFireCard class="mt-4" />
 
-      <!-- #15 — accessible-money bridge: reachable vs locked, unlock timeline,
-           liquidity shortfall + every assumption with a one-tap fix. Self-hides
-           for a fully-liquid household. -->
-      <BridgeBreakdownCard />
+      <!-- #15 — accessible-money bridge (compact on the dashboard, #74/#76): keeps the honest
+           verdict + spendable/locked bar + bridge-income, and links to Readiness for the full
+           unlock-timeline + "what we assumed" detail. Self-hides for a fully-liquid household. -->
+      <BridgeBreakdownCard variant="compact" />
 
       <!-- #48 obj-2 — "your biggest achievable wins": ranked accelerators (years sooner) for THIS
            household, the risk-notch with a confidence range, + a live save-more what-if. The
