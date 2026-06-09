@@ -126,6 +126,19 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 ## §3 — Decision log (append-only, newest first)
 
 ### 2026-06-09
+- **D-2026-06-09-06 — FIXED (#86): tax-planning now lenses to the selected member, same-scope.** The one
+  genuinely-broken screen (per D-05/06). FinTech-spec'd ("B'-fallback") → Full-Stack built → independent
+  code-review (rule 29) clean on the #23 same-scope axis → on-screen verified. The screen now reads income
+  from `fire.lensedEarners/Businesses/OtherIncome` AND deductions from a member-scoped `deriveDeductions`
+  (over `{...household.data, members: lensedEarners, investments/liabilities/insurance: lensed*}`), so
+  member-income and member-deductions are SAME-SCOPE — never the #23 leak (member-income ÷ household-deductions).
+  Per-earner table hidden under the lens. **Verified on-screen (Sharmas): household tax ₹11.66L → Rohit
+  ₹5.74L → Priya ₹1.85L; figures domain-plausible (rule 31).** Default no-lens path byte-identical (type-check
+  + 1114 unit). Commits `15c08e8` (fix) + `0a94d8e` (review MEDIUMs: earners-set deductions + typed
+  scopedHousehold). The static gate un-skipped (now green) + tax-planning moved to the E2E sweep's WORKING.
+  **FinTech flagged a SEPARATE pre-existing issue (not this fix): the household-aggregate tax view computes
+  tax on COMBINED income as one filer (₹11.66L) which over-states vs the sum of individual ITRs (~₹7.59L) —
+  candidate for its own issue.** Not pushed (local for review). Pointer: gh #86.
 - **D-2026-06-09-05 — EMPIRICAL on-screen lens sweep (#86) OVERTURNS the static broken-list; static
   analysis proven unreliable (vindicates the E2E mandate).** Abhay challenged my static "5 broken" list
   ("did you review on the screen?"). Drove the REAL "Viewing as" dropdown across all 27 routes via

@@ -73,10 +73,9 @@ describe("member-lens coverage invariant — every member-attributable screen co
     );
   });
 
-  // RED catch-test (gh #86) — currently fails on the 5 dead screens (tax-planning/Index,
-  // liabilities/Loans, insurance/Policies, expenses/Recurring, expenses/Planned). Un-skip
-  // it as the member-lens fix wires each screen to a lensed output; it must be GREEN before #86 closes.
-  it.skip("every member-attributable screen references a lensed output / viewingMemberId (gh #86)", () => {
+  // gh #86 — was RED on tax-planning/Index (the one genuinely-unwired page); now GREEN since the fix
+  // (commit 15c08e8) wires it to fire.lensedEarners/Businesses/OtherIncome. Active regression lock.
+  it("every member-attributable screen references a lensed output / viewingMemberId (gh #86)", () => {
     const offenders = MEMBER_ATTRIBUTABLE.filter(
       (rel) => !LENS_TOKEN.test(readFileSync(join(PAGES, ...rel.split("/")), "utf8")),
     );

@@ -35,6 +35,9 @@ const WORKING = [
   "/financial-health", "/financial-health/net-worth", "/financial-health/cash-flow",
   "/financial-health/banking", "/financial-health/emergency-fund", "/financial-health/reports",
   "/fire-goals/dashboard",
+  // FIXED (commit 15c08e8, gh #86) — now lenses income + deductions same-scope. Verified on-screen:
+  // household ₹11.66L → Rohit ₹5.74L → Priya ₹1.85L.
+  "/tax-planning",
 ];
 
 // CODE-VERIFIED lens-correct, but the DEFAULT sample can't differentiate them (its single loan is
@@ -45,11 +48,9 @@ const WORKING = [
 // they do not respond on the Sharmas sample; they are NOT broken either. (gh #86 second correction.)
 //   /liabilities/overview, /liabilities/loans, /expenses/planned
 
-// VERIFIED BROKEN — by code (never consumes any lensed output; own computeTax over household.earners) AND
-// on-screen. test.fixme until the lens fix lands; MUST go green before #86 closes.
-const BROKEN = [
-  "/tax-planning",
-];
+// (empty) — tax-planning, the only screen ever genuinely broken, is FIXED (commit 15c08e8) and moved to
+// WORKING above. This list is the home for any future test.fixme'd regression.
+const BROKEN: string[] = [];
 
 async function bootstrapSample(page: Page) {
   await page.goto("/");
