@@ -21,7 +21,7 @@ description: >
 type: workflow
 allowed-tools: "Read Write Edit Grep Glob Bash"
 argument-hint: "[one-line description of the goal, optional]"
-version: "1.5.1"
+version: "1.5.2"
 ---
 
 # Goal Creator

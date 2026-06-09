@@ -160,6 +160,7 @@ what untracked items to leave alone. Branch + push target. Co-author trailer.>
 
 **Ship:**
 - [ ] <N> conventional commits pushed to `<branch>`.
+- [ ] **On success only:** merged `--no-ff` → `main`, pushed, then **self-cleaned** — worktree removed + merged branch `-D`-deleted + pruned from the primary root (§0.1.4). (DEFER/HALT keeps the worktree for resume.)
 - [ ] Any deferrals logged in `docs/goals/.run/<slug>-DEFERRED.md` with rule status + reason.
 - [ ] Progress log `docs/goals/.run/<slug>-PROGRESS.md` maintained throughout (§0.3); major events/lessons rolled into the final report + a notable lesson appended to `.claude/tasks/lessons.md` at end.
 

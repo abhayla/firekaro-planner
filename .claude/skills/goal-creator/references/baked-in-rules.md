@@ -35,6 +35,15 @@ primary worktree onto its feature branch mid-session and a stray docs commit lan
 >    the lock: `rm -f "$(git rev-parse --show-toplevel)/.goal-active.lock"`. `.goal-active.lock` is
 >    gitignored. If `git worktree` is genuinely unavailable, note it and proceed — but still NEVER run
 >    in the user's primary interactive checkout.
+> 4. **Self-cleanup ON SUCCESS ONLY (so no stale worktree/branch is left behind for the user to prune
+>    by hand):** after the branch is merged `--no-ff` → `main` AND pushed AND the lock is released, the
+>    run's very last shell step `cd`s to the **primary repo root** (so its own worktree is no longer the
+>    CWD — you cannot `git worktree remove` the worktree you are standing in) and runs:
+>    `cd <primary-root> && git worktree remove --force ../firekaro-goal-<slug> ; git branch -D <feature-branch> ; git worktree prune`.
+>    The branch is safe to `-D` because every commit is now in `main`. **On Windows, `git worktree remove`
+>    may print `Invalid argument` while it still de-registers the worktree — that is fine; the leftover
+>    empty folder is cosmetic, `git worktree prune` finalises it.** **DEFER/HALT is the opposite: do NOT
+>    remove the worktree or delete the branch** — they are needed to resume (only the lock is released).
 
 ---
 
