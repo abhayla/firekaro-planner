@@ -126,6 +126,19 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 ## §3 — Decision log (append-only, newest first)
 
 ### 2026-06-09
+- **D-2026-06-09-10 — TIERING + FILING (Abhay's call): the 9 round-2 community-signal features filed as
+  `#137`–`#145`, with a must-have override on 6.** Abhay set the tiers (his override wins, intake protocol):
+  **6 `must-have`** — `#137` tax-optimal post-FIRE withdrawal sequencing, `#138` plan-vs-actual variance
+  tracker, `#139` real-vs-nominal (today's-money) toggle, `#140` job-loss/layoff runway, `#141`
+  asset-allocation drift + rebalancing plan, `#142` exportable year-by-year cashflow table; **2
+  `good-to-have`** — `#143` Schedule-FA / foreign-asset ITR-disclosure helper (⚠️ borders tax-FILING vs the
+  planning charter — Abhay's scope call recorded in the issue), `#144` full-model data export/portability;
+  **1 `nice-to-have`** — `#145` privacy-first / no-account local-only marketed mode. **Build is EXPLICITLY
+  DEFERRED** ("don't implement, just create issues — I'll take a call later") — so although the must-have
+  registry (previously empty) now holds 6 items, the focus-lock outcome is: **filed, NOT scheduled**; no
+  autonomous build proceeds until Abhay greenlights per item (`must-have-only-focus.md`). Bodies carry the
+  honest provenance caveat (Reddit inaccessible → adjacent-source triangulation, not scraped posts). Pointer:
+  D-2026-06-09-09 (the discovery).
 - **D-2026-06-09-09 — FEATURE DISCOVERY round 2 (Abhay-instructed): community-signal mining for net-new
   features — HELD as a list, NOT filed (per Abhay's "list-for-review first" choice).** Goal: features Indian
   FIRE/PF Reddit users wish for that are neither built nor already filed. **HONEST LIMITATION (surfaced, not
