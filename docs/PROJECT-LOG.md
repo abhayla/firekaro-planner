@@ -146,8 +146,9 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
   "only child, parents own 1.5Cr"]; (7) guided "next-rupee" prioritization flowchart, India-adapted [complements
   #119 education hub; cf. the popular r/FI "FIRE Flow Chart"]; (8) encashable-leave + uncommon asset types in
   net worth [minor]. **Out-of-scope (charter):** "Digital CFO that tells you what to do next", AI MF/stock
-  screeners, trading journals/F&O tools (advice/execution). **Held as a list** per the review-then-file pattern
-  (intake protocol) — focus-lock holds, nothing scheduled. Pointer: D-09-09 (round-2), D-09-08 (round-1).
+  screeners, trading journals/F&O tools (advice/execution). **FILED `#146`–`#153`** (3 good-to-have `#146`–`#148`,
+  5 nice-to-have `#149`–`#153`) — tiers are best-judgment, Abhay's re-label wins. **Build NOT scheduled** —
+  focus-lock holds; these are backlog only. Pointer: D-09-09 (round-2), D-09-08 (round-1).
 - **D-2026-06-09-10 — TIERING + FILING (Abhay's call): the 9 round-2 community-signal features filed as
   `#137`–`#145`, with a must-have override on 6.** Abhay set the tiers (his override wins, intake protocol):
   **6 `must-have`** — `#137` tax-optimal post-FIRE withdrawal sequencing, `#138` plan-vs-actual variance
