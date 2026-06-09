@@ -126,6 +126,28 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 ## §3 — Decision log (append-only, newest first)
 
 ### 2026-06-09
+- **D-2026-06-09-11 — FEATURE DISCOVERY round 3: REAL Reddit mining (RSS path works!) → 8 net-new, HELD un-filed.**
+  **Method correction (supersedes the D-09-09 "Reddit hard-blocked" claim):** Reddit's `.json`/OAuth endpoints
+  403 without credentials, but the **RSS path works unauthenticated** — `https://www.reddit.com/r/<sub>/top/.rss`
+  and `.../search.rss?q=...` return HTTP 200 real Atom data with a browser User-Agent (via curl/Bash, not the
+  blocked WebFetch). Mined **824 unique posts** across FIREIndia, FIRE_Ind, IndiaInvestments, personalfinanceindia,
+  IndianStreetBets + global financialindependence/leanfire/fatFIRE/coastFIRE (top-year + top-all + 8 feature-wish
+  search queries each). 253 feature-wish/app-gap posts; read all. **Strong signal CONFIRMING the existing backlog**
+  (validates priority): multi-account net-worth aggregation (#88 AA), privacy-first/no-SMS tracking (#145, many
+  posts), expense/bank-statement parsing (#93), AIS reconciliation (#89), Schedule FA/RSU (#143), LTCG/loss
+  harvesting (#94, an actual "TaxHarvestLab" build), document/legacy vault + nomination (#117/#118), geographic
+  arbitrage (#108), rent-vs-buy (#116), sabbatical/mini-retirement runway (#140). **8 genuinely NET-NEW (deduped
+  vs built + #1–#145), grounded in real posts:** `good-to-have` — (1) portfolio-return-vs-NIFTY/index benchmark
+  comparison [repeated: "compare my returns to NIFTY"]; (2) prepay-vs-invest (loan part-payment vs SIP) calculator
+  [repeated]; (3) UPI transaction de-noising / smart categorization ["UPI makes my statement a grocery receipt",
+  India-specific]. `nice-to-have` — (4) manual/CSV import + manual-entry-first mode [extends #144; the
+  spreadsheet-native crowd wants to bring data IN]; (5) standalone take-home/in-hand salary calculator [funnel
+  utility, "most are broken"]; (6) expected-inheritance / ancestral-property as a future asset [India-specific,
+  "only child, parents own 1.5Cr"]; (7) guided "next-rupee" prioritization flowchart, India-adapted [complements
+  #119 education hub; cf. the popular r/FI "FIRE Flow Chart"]; (8) encashable-leave + uncommon asset types in
+  net worth [minor]. **Out-of-scope (charter):** "Digital CFO that tells you what to do next", AI MF/stock
+  screeners, trading journals/F&O tools (advice/execution). **Held as a list** per the review-then-file pattern
+  (intake protocol) — focus-lock holds, nothing scheduled. Pointer: D-09-09 (round-2), D-09-08 (round-1).
 - **D-2026-06-09-10 — TIERING + FILING (Abhay's call): the 9 round-2 community-signal features filed as
   `#137`–`#145`, with a must-have override on 6.** Abhay set the tiers (his override wins, intake protocol):
   **6 `must-have`** — `#137` tax-optimal post-FIRE withdrawal sequencing, `#138` plan-vs-actual variance
