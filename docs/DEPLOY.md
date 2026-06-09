@@ -166,6 +166,20 @@ Supabase pooler — richer than `/api/health`'s raw `SELECT 1` (it catches a mis
 `prisma generate` / a botched migration). It needs `SMOKE_TOKEN` in `server/.env`
 (`openssl rand -hex 32`); if unset it returns 500 (smoke disabled), not an error.
 
+Also confirm the **live SPA bundle hash CHANGED** (proves the new build is actually
+serving, not a stale cached one):
+```bash
+curl -s https://firekaro.com | grep -oE 'assets/index-[A-Za-z0-9_-]+\.js' | head -1
+```
+
+Tier 1.5 — **post-deploy UI verification (MANDATORY, EVERY deploy — big or small,
+`testing-strategy.md`):** drive Playwright against the LIVE site and verify the
+**unauthenticated** surface renders + functions — screenshot + ARIA snapshot + console
+of the login/splash page (the "Sign in with Google" control present + interactive; no
+NEW console errors beyond the expected unauth `401 /api/planner/me` + the
+`[boot] not authenticated` warning). Non-destructive only. A green smoke endpoint is NOT
+a substitute — a deploy can ship a broken bundle the health check never exercises.
+
 Tier 2 — on-demand (significant releases / incident verification): in a browser
 `https://firekaro.com` → bounced to `/login` → "Sign in with Google" → Google
 consent → back to the app → onboarding/dashboard. Confirm a write persists: edit a
@@ -203,7 +217,12 @@ tests + build for both trees before you ship to the VPS.
 ```bash
 ssh -i $KEY $VPS 'TOKEN=$(grep -hE "^SMOKE_TOKEN=" /var/www/firekaro/.env.production /var/www/firekaro/server/.env | head -1 | cut -d= -f2- | tr -d "\"'"'"'"); curl -s http://localhost:3100/api/health; curl -s -H "x-smoke-token: $TOKEN" http://localhost:3100/api/internal/smoke'
 curl -s -o /dev/null -w "%{http_code}\n" https://firekaro.com   # public SPA renders
+curl -s https://firekaro.com | grep -oE 'assets/index-[A-Za-z0-9_-]+\.js' | head -1  # bundle hash CHANGED?
 ```
+
+**Then Tier-1.5 post-deploy UI verification (MANDATORY every deploy — see §8):** Playwright
+the live login/splash → screenshot + ARIA + console (non-destructive). If the deploy touched an
+authed screen, also run the Tier-2 authed critical-path when a session exists, else surface the skip.
 
 ---
 

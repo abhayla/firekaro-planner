@@ -17,8 +17,9 @@ type runs; `testing.md` owns *how* tests are written (FIRST principles, flaky di
 | **E2E functional UI** | ✓ full suite (localhost:5175 + ServerAdapter→Supabase) | smoke **subset** only | — | **full regression suite** |
 | **Accessibility (axe)** | ✓ (`@axe-core/playwright`) | unauth render only | — | — |
 | **Visual regression** | ✓ (screenshot verdicts, rules 24/26) | — | — | — |
-| **Smoke / health** | — | ✓ **every deploy** (`/api/health` + token round-trip + unauth UI render) | ✓ uptime ping | — |
-| **Authenticated UI critical-path** | ✓ (dev-bypass header) | **Tier-2 on-demand** (dedicated test Google account, manually session-seeded) | — | routine full authed UI |
+| **Smoke / health** | — | ✓ **every deploy** (`/api/health` + token round-trip + bundle-hash-changed) | ✓ uptime ping | — |
+| **Post-deploy UI verification (unauth, non-destructive)** | — | ✓ **MANDATORY every deploy** (Tier-1.5: live Playwright screenshot+ARIA+console of login/splash; big or small) | — | destructive actions on prod |
+| **Authenticated UI critical-path** | ✓ (dev-bypass header) | **Tier-2 when the deploy touches an authed screen OR a session exists** (dedicated test Google account, manually session-seeded; skip surfaced verbatim if no session) | — | routine full authed UI / destructive flows |
 | **Performance — synthetic** | ✓ Lighthouse/CWV budget on the build | one-shot on public pages post-deploy | ✓ lightweight latency monitor | — |
 | **Performance — load / stress** | ✓ local/staging-like only | — | — | **load-testing prod** (self-DoS, cost, skews data) |
 | **Security — SAST / dep-scan** | ✓ (`/supply-chain-audit`, `/security-audit`) | — | passive (TLS/headers) | — |
@@ -40,18 +41,30 @@ type runs; `testing.md` owns *how* tests are written (FIRST principles, flaky di
 - **No staging environment yet.** Standing up a second VPS/preview is spend + infra (your escalation
   gate) and unjustified at solo scale. **localhost-with-ServerAdapter→Supabase IS the prod-like
   full-test env.** Revisit a real staging env when traffic grows or a second developer joins.
-- **Prod = smoke + synthetic monitoring only**, per the matrix. The two prod-smoke tiers:
+- **Prod = smoke + synthetic monitoring only**, per the matrix. **UI verification after EVERY prod
+  deploy is MANDATORY — big or small (Abhay directive, 2026-06-09): "UI verification should always be
+  done after each production deployment. It doesn't matter whether it is a small deployment or a big
+  one."** "It returned smoke 200" is NOT sufficient; a deploy can ship a broken bundle that the health
+  endpoint never exercises. The three prod-deploy verification tiers:
   - **Tier 1 (automated, every deploy, hands-off):** `GET /api/health` + a token-guarded
     `GET /api/internal/smoke` (a Prisma **read** round-trip — `user.count()` — proving the generated
     client + a real table + a query work through the pooler, richer than `/api/health`'s raw
     `SELECT 1`; guarded by `SMOKE_TOKEN`, mirroring the existing `LIFECYCLE_RUN_TOKEN` pattern, built in
-    `server/src/routes/smoke-internal.ts`) + an unauthenticated Playwright render check of the login
-    page. No Google account needed; the dev-bypass is OFF in prod so this path is deliberately auth-free.
-    A write→read→delete probe via a dedicated probe table is a documented future upgrade if the
-    read-only check proves insufficient.
-  - **Tier 2 (on-demand, significant releases / incident verification):** authenticated prod UI via the
-    Playwright runner with a `storageState` seeded by a **one-time manual Google login** of a dedicated
-    test account. Session lasts ~7 days; re-seed when it expires. Not run on every deploy.
+    `server/src/routes/smoke-internal.ts`) + confirm the live SPA bundle hash CHANGED (proves the new
+    build is actually serving, not a cached old one). No Google account needed; dev-bypass is OFF in prod.
+  - **Tier 1.5 — post-deploy UI verification (MANDATORY, EVERY deploy):** drive Playwright against the
+    LIVE site → screenshot + ARIA snapshot + console of the **unauthenticated** surface (login/splash
+    renders, the primary control — "Sign in with Google" — is present + interactive, no NEW console
+    errors beyond the expected unauth 401 on `/api/planner/me` + the `[boot] not authenticated` warning),
+    using **non-destructive interactions only** on prod (rule 32). This runs on every deploy regardless
+    of size; the unauth surface needs no session.
+  - **Tier 2 — authenticated prod UI (when the change touches authed screens OR a session is available):**
+    authenticated prod UI via the Playwright runner with a `storageState` seeded by a **one-time manual
+    Google login** of a dedicated test account (session ~7 days; re-seed when expired). When a deploy
+    changes an AUTHED screen (e.g. the #65 `/tax-planning` tax figure), the authed critical-path SHOULD
+    be verified too — if no live session is available, surface "authed prod UI verification SKIPPED —
+    needs a logged-in session" (no silent skip) so it is done as soon as a session exists. Still
+    NON-DESTRUCTIVE on prod (tab/FY/expand/dialog-open-cancel; NEVER create/edit/delete real data).
 - **No load/stress testing yet** — not warranted at current traffic (YAGNI). Add when scaling signals
   appear (sustained latency, Supabase limits).
 - **Perf:** Lighthouse/CWV budget pre-merge (`/perf-test`, `vercel:performance-optimizer`) + a
@@ -59,8 +72,10 @@ type runs; `testing.md` owns *how* tests are written (FIRST principles, flaky di
 
 ## Direct answers (the recurring questions)
 
-- **UI testing on prod?** Smoke critical-path **yes**; full regression suite **no** (→ pre-merge).
-  Authenticated UI on prod is **on-demand only**, via the dedicated test account.
+- **UI testing on prod?** **Post-deploy UI verification (unauth, non-destructive) is MANDATORY after
+  EVERY deploy — big or small** (Tier-1.5; live screenshot+ARIA+console). Full regression suite **no**
+  (→ pre-merge). **Authenticated** prod UI runs when the deploy touched an authed screen OR a session
+  is available (Tier-2, dedicated test account) — and a missing session is surfaced, never silently skipped.
 - **Performance testing on prod?** Synthetic monitoring **yes** (lightweight, read-only); load/stress
   **no** (→ local).
 - **Security testing on prod?** Passive (TLS/headers) **yes**; active pentest **no**.
@@ -80,9 +95,12 @@ type runs; `testing.md` owns *how* tests are written (FIRST principles, flaky di
   against the live `firekaro.com`.
 - MUST limit production testing to **smoke (critical-path) + synthetic monitoring**; prod answers
   "is the release healthy?", not "does everything still work?".
-- MUST keep authenticated prod UI verification **on-demand** (dedicated test Google account,
-  manually-seeded session) — never a routine every-deploy full-authed sweep, and never using a real
-  user's account or Abhay's personal account.
+- MUST run **post-deploy UI verification (Tier-1.5: unauthenticated, non-destructive — live
+  screenshot+ARIA+console) after EVERY prod deploy, big or small** (Abhay directive 2026-06-09) — a
+  green smoke endpoint is NOT sufficient. MUST run the **authenticated** critical-path (Tier-2) too when
+  the deploy touched an authed screen OR a session exists; if no live session is available, MUST surface
+  "authed prod UI verification SKIPPED — needs a logged-in session" (no silent skip), never a routine
+  every-deploy full-authed sweep, and never using a real user's or Abhay's personal account.
 - MUST NOT load-test or active-pentest production; MUST NOT stand up a staging environment at current
   scale without an explicit need (YAGNI) — localhost+Supabase is the prod-like test env.
 - MUST verify **interactive functionality** (clicks, tabs, FY switches, forms, dialogs), not just render
