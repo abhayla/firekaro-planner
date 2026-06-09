@@ -194,3 +194,20 @@ body,
   min-height: 0;
   min-width: 0;
 }
+
+/* High-contrast tooltip surface — matches chart-theme-system.md (slate-900). Wired via
+   VTooltip { contentClass: "fk-tooltip" } in plugins/vuetify.ts. Fixes #77 wash-out:
+   the bare v-tooltip inherited Vuetify's translucent default and the busy financial
+   page bled through the jargon explanation.
+   !important on background+color+opacity is REQUIRED: Vuetify's own
+   `.v-tooltip .v-overlay__content` rule sets surface-variant bg + on-surface text at
+   equal specificity and LATER source order, so a plain declaration loses (verified
+   in-browser: bg came back rgb(245,247,250), text rgb(238,238,238)). */
+.v-overlay__content.fk-tooltip {
+  background: #1e293b !important; /* slate-900 — opaque, no bleed-through */
+  color: #ffffff !important; /* contrast vs slate-900 ≈ 14.8:1 (WCAG AAA) */
+  border-radius: 8px !important; /* chart-theme borderRadius (Vuetify default 4px) */
+  padding: 12px !important; /* chart-theme padding (Vuetify default 5px 16px) */
+  opacity: 1 !important; /* override Vuetify's translucent default */
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25); /* lift off the busy page */
+}
