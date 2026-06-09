@@ -72,8 +72,8 @@ const sections: NavSection[] = [
     ],
   },
   {
-    title: "Health",
-    icon: "mdi-heart-pulse",
+    title: "Financial Health",
+    icon: "mdi-finance",
     path: "/financial-health",
     children: [
       { title: "Health Score", path: "/financial-health" },
