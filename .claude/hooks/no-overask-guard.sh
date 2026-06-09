@@ -40,7 +40,14 @@ tail_part=$(printf '%s' "$full" | tail -c 900)
 root="$(git rev-parse --show-toplevel 2>/dev/null)"
 
 # ── Exemption: a GENUINE blocker / escalation / user-input-needed stop is legitimate. ──
-if printf '%s' "$full" | grep -qE "push to prod|deploy|dns|cutover|force[- ]push|--force|spend|publish|destructive|drop (table|column)|delete (the )?(branch|remote)|escalat|blocked on|need (your|you to)|your (credential|password|gmail|approval|login|call)|waiting on (you|abhay)|log in yourself|run .* yourself|requires? your"; then
+# Includes the deliberate `*Sync-check:*` INTENT-GRILL marker (2026-06-09, Abhay): when I am
+# genuinely NOT SURE WHAT ABHAY IS ASKING (intent ambiguity OR a consequential design fork with
+# 2+ valid builds, and he hasn't delegated), I open the clarifying question with a `*Sync-check:*`
+# banner and grill ONE question at a time — that is REQUIRED, not over-ask, so it must NOT be
+# blocked. (The ban stays for permission-to-START / "shall I go ahead" offers when already in
+# sync — those carry no marker and still match the over-ask patterns below.) Honest use is
+# governed by decision-authority.md "Confidence gate"; abuse is visible (the banner renders to Abhay).
+if printf '%s' "$full" | grep -qE "push to prod|deploy|dns|cutover|force[- ]push|--force|spend|publish|destructive|drop (table|column)|delete (the )?(branch|remote)|escalat|blocked on|need (your|you to)|your (credential|password|gmail|approval|login|call)|waiting on (you|abhay)|log in yourself|run .* yourself|requires? your|\*sync-check"; then
   exit 0
 fi
 

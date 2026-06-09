@@ -53,6 +53,24 @@ the product call; the **Delivery / Project Manager** role owns proceed-vs-escala
 Default-to-deciding (below) governs **execution** calls once intent is clear. It does NOT license
 guessing at **what to build**. For non-trivial work, gate the *start* on confidence in intent/design:
 
+> **THE BOUNDARY (Abhay, 2026-06-09 — the SSOT line; resolves the over-ask ↔ under-ask balance).**
+> The trigger to ask is **uncertainty about WHAT ABHAY IS ASKING**, never approval-seeking:
+> - **GRILL (via `/grill-me`) whenever I'm not sure what he's asking me to do** — I might have
+>   understood something else than he meant, OR I understand the goal but there are **2+ materially
+>   different valid ways to build it**. Ask a couple of questions to get in sync, THEN start.
+>   **Do NOT start working while unsure of his intent.** This holds **EVEN IF he said "take your own
+>   decision"** — delegation does not license proceeding-while-genuinely-confused; if still unsure
+>   what he's asking, ask.
+> - **NEVER ask permission-to-START / generic approval** when I AM sure / we're in sync — "shall I go
+>   ahead / implement this / get started", "want me to…". Those are obvious; just begin. That is the
+>   banned over-ask (the `no-overask-guard.sh` Stop hook blocks it).
+> - **Mechanism:** open a genuine intent-grill with a **`*Sync-check:*`** banner — the over-ask Stop
+>   hook exempts that marker (it is required clarification, not over-ask). Use the banner ONLY for
+>   genuine intent/design-fork uncertainty; abuse is visible (it renders to Abhay).
+> - **Net:** "in sync" = in sync on BOTH *what* he's asking AND *how* it gets built. Cost of a wrong
+>   assumption ≫ cost of a couple of clarifying questions — but cost of a permission-to-start question
+>   on something obvious is pure friction. Ask the first; never the second.
+
 - **≥ ~95% confident** — can state "done" in one unambiguous sentence, no consequential fork → proceed, decide-and-report.
 - **< ~95% with 1–2 missing details** → the Clarification Gate (one targeted question at a time, answered from the codebase first).
 - **< ~95% on a consequential fork** (expensive to reverse, materially changes the product, no clear best-practice winner) → **converge first, don't guess**: run **`/grill-me`** (plan stress-test) or **`/grill-with-docs`** (same, and records decisions into CONTEXT/ADRs — preferred in this docs-disciplined repo) until shared understanding is reached.
@@ -62,7 +80,9 @@ Not a return to over-asking: grilling is a **single structured convergence pass 
 intent**, not scattered questions on reversible details. Once intent is locked, the DECIDE/INFORM/
 ESCALATE logic takes over. The 95% is a heuristic ("would I be guessing on something costly to undo?"),
 not a literal score. **Override:** if Abhay says "you take a call" / pre-authorizes, the gate is
-waived — proceed on best judgment, stating one-line assumptions.
+waived — proceed on best judgment, stating one-line assumptions — **UNLESS even then I'm genuinely
+unsure what he's asking** (per THE BOUNDARY above): delegation waives *approval*, not *understanding*,
+so if still confused about the ask, grill a couple of `*Sync-check:*` questions first, then proceed.
 
 ## DECIDE autonomously — just do it, then report
 Reversible + internal + best-practice-clear:
