@@ -33,7 +33,12 @@ import { epfBucketAfterTaxReturn } from "@/lib/epf-vpf";
 import { ageFromDOB } from "@/lib/age";
 import { toMonthly, toAnnual } from "@/lib/cashflow";
 import { returnBucketKey } from "@/lib/investment-traits";
-import { deriveDeductions } from "@/lib/tax-deductions";
+import {
+  deriveDeductions,
+  computeHousePropertyTax,
+  SEC_24A_DEDUCTION_RATE,
+  SEC_71_HP_LOSS_SETOFF_CAP,
+} from "@/lib/tax-deductions";
 import { DEFAULT_FLOOR_CEILING } from "@/lib/withdrawal-strategy";
 import { calculateNpsWithdrawal, postTaxAnnuityIncome } from "@/lib/nps-withdrawal";
 import { equityPercentAtYear } from "@/lib/glide-path";
@@ -49,16 +54,10 @@ import {
   blendPortfolioVolatility,
 } from "@/lib/assumption-math";
 
-/** Sec 24(a): flat 30% standard deduction on let-out rental NAV — only 70% of rent is taxable. #29 */
-export const SEC_24A_DEDUCTION_RATE = 0.3;
-
-/**
- * §71 cap on setting a house-property LOSS off against other income heads — ₹2,00,000/yr. A let-out
- * property leveraged with a large §24(b) home-loan interest can run a loss; only ₹2L of that loss
- * reduces other taxable income in the year. (The unabsorbed remainder carries forward 8 yrs under
- * §71B — OUT OF SCOPE for this single-year FIRE engine.) gh-issue #32.
- */
-export const SEC_71_HP_LOSS_SETOFF_CAP = 200000;
+// §24a / §71 house-property tax constants now live in tax-deductions.ts (the single
+// source of truth shared with /tax-planning, gh-issue #65). Re-exported here so existing
+// importers (derive.spec) keep working unchanged.
+export { SEC_24A_DEDUCTION_RATE, SEC_71_HP_LOSS_SETOFF_CAP };
 
 /**
  * Post-tax annual rental CASH for the accessible-money bridge, computed PER-LINE. A let-out
@@ -256,38 +255,13 @@ export function derive(household: Household, assumptions: Assumptions, lens: Der
     const otherExempt = scopeOtherIncome
       .filter((o) => o.isTaxExempt)
       .reduce((s, o) => s + toAnnual({ amount: o.amount, period: o.frequency }), 0);
-    // House-property tax treatment for let-out rentals (§24a + §24b + municipal taxes, §71 cap).
-    // This reduces TAXABLE income ONLY — the landlord still receives full rent as CASH (and the
-    // home-loan EMI is already a separate household expense via liabilities→recurring), so it must
-    // NOT shrink annualIncome.total / annualSavings. It is subtracted from the tax `grossIncome`
-    // below as `rentalTaxDeduction`, never from the cash total. gh-issue #29 / #32.
-    //
-    // Per let-out (taxable) rental i:
-    //   NAV_i              = max(0, grossRent_i − municipalTaxes_i)   (§23/§24: municipal taxes PAID by owner)
-    //   houseProperty_i    = NAV_i × (1 − §24a 30%) − homeLoanInterest_i  (§24b interest FULLY deductible —
-    //                        the ₹2L cap is SELF-OCCUPIED only; a let-out property has no §24b ceiling)
-    // netHP can be NEGATIVE (a leveraged rental running a loss). Aggregate across let-out rentals:
-    //   netHP    = Σ houseProperty_i
-    //   taxableHP = netHP ≥ 0 ? netHP : −min(|netHP|, 200000)   (§71 caps the house-property LOSS set-off
-    //               against other heads at ₹2,00,000/yr; the unabsorbed loss would carry forward 8 yrs —
-    //               OUT OF SCOPE for this single-year FIRE engine.)
-    // rentalTaxDeduction = (Σ grossRent_i) − taxableHP  ⇒ the amount subtracted from tax grossIncome so the
-    //   cash-basis grossIncome (which still includes full rent) collapses to the taxable house-property income.
-    const taxableRentals = scopeOtherIncome.filter((o) => o.type === "Rental" && !o.isTaxExempt);
-    const grossRentTotal = taxableRentals.reduce(
-      (s, o) => s + toAnnual({ amount: o.amount, period: o.frequency }),
-      0,
-    );
-    const netHouseProperty = taxableRentals.reduce((s, o) => {
-      const grossRent = toAnnual({ amount: o.amount, period: o.frequency });
-      const nav = Math.max(0, grossRent - (o.municipalTaxes ?? 0));
-      return s + nav * (1 - SEC_24A_DEDUCTION_RATE) - (o.homeLoanInterest ?? 0);
-    }, 0);
-    const taxableHouseProperty =
-      netHouseProperty >= 0
-        ? netHouseProperty
-        : -Math.min(Math.abs(netHouseProperty), SEC_71_HP_LOSS_SETOFF_CAP);
-    const rentalTaxDeduction = grossRentTotal - taxableHouseProperty;
+    // §24a/§24b/municipal-tax/§71 collapse of let-out rent → taxable house-property income.
+    // Reduces TAXABLE income ONLY — the landlord still receives full rent as CASH (and the home-loan
+    // EMI is a separate household expense), so rentalTaxDeduction is subtracted from the tax
+    // grossIncome below, NEVER from annualIncome.total / annualSavings (gh-issue #29 / #32). The math
+    // lives in computeHousePropertyTax — the single source of truth shared with /tax-planning so the
+    // FIRE-model tax and the tax-planning screen can never diverge (gh-issue #65).
+    const { rentalTaxDeduction } = computeHousePropertyTax(scopeOtherIncome);
     const businessShare = scopeBusinesses.reduce(
       (s, b) => s + toAnnual({ amount: b.annualProfit, period: b.frequency }) * (b.sharePercent / 100),
       0,

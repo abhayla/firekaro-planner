@@ -16,8 +16,16 @@
  * the band so surfaces can render the warning chip.
  */
 
-import type { Household, Investment, Liability, InsurancePolicy, Member } from "@/types/household";
+import type {
+  Household,
+  Investment,
+  Liability,
+  InsurancePolicy,
+  Member,
+  OtherIncomeLine,
+} from "@/types/household";
 import { ageFromDOB } from "@/lib/age";
+import { toAnnual } from "@/lib/cashflow";
 
 // ---------- Statutory limits (audit-grounded, FY 2025-26 onward) ----------
 // These are STATUTORY FACTS per R1.4 — they appear read-only on /preferences
@@ -30,6 +38,65 @@ export const LIMIT_80D_SENIOR_SELF = 50_000;
 export const LIMIT_80D_PARENTS = 25_000;
 export const LIMIT_80D_SENIOR_PARENTS = 50_000;
 export const LIMIT_SECTION_24 = 200_000;
+
+// ---------- House-property tax (let-out rentals) — §24a / §24b / §71 ----------
+// §24(a): a flat 30% standard deduction on Net Annual Value. §24(b): home-loan
+// interest is FULLY deductible on a LET-OUT property (the ₹2L ceiling is
+// self-occupied only). §71: a house-property LOSS set-off against other heads is
+// capped at ₹2,00,000/yr (the unabsorbed loss carries forward 8 yrs — out of
+// scope for this single-year engine).
+export const SEC_24A_DEDUCTION_RATE = 0.3;
+export const SEC_71_HP_LOSS_SETOFF_CAP = 200_000;
+
+export interface HousePropertyTax {
+  /** Σ annual gross rent of let-out (taxable) rentals — the CASH the landlord receives. */
+  grossRentTotal: number;
+  /** §24a/§24b/municipal-tax/§71-collapsed taxable house-property income (can be negative). */
+  taxableHouseProperty: number;
+  /** grossRentTotal − taxableHouseProperty: the amount to SUBTRACT from the cash-basis
+   * tax grossIncome so it collapses to the taxable house-property figure. Cash stays full. */
+  rentalTaxDeduction: number;
+}
+
+/**
+ * SINGLE SOURCE OF TRUTH for the rental → taxable-house-property collapse, shared
+ * by derive.ts (the FIRE-model tax) and the /tax-planning screen so the two can
+ * never show two different "annual tax" figures for the same household (gh-issue #65).
+ *
+ * Per let-out (taxable) rental i:
+ *   NAV_i           = max(0, grossRent_i − municipalTaxes_i)          (§23/§24)
+ *   houseProperty_i = NAV_i × (1 − §24a 30%) − homeLoanInterest_i     (§24b, no let-out cap)
+ *   netHP           = Σ houseProperty_i  (may be negative — a leveraged rental loss)
+ *   taxableHP       = netHP ≥ 0 ? netHP : −min(|netHP|, ₹2,00,000)    (§71 set-off cap)
+ *
+ * NOTE: this reduces TAXABLE income ONLY — the landlord still receives full rent as
+ * CASH (and the home-loan EMI is a separate household expense), so callers MUST NOT
+ * shrink cash income / savings by rentalTaxDeduction. gh-issue #29 / #32 / #65.
+ */
+export function computeHousePropertyTax(otherIncome: OtherIncomeLine[]): HousePropertyTax {
+  const taxableRentals = otherIncome.filter((o) => o.type === "Rental" && !o.isTaxExempt);
+  const grossRentTotal = taxableRentals.reduce(
+    (s, o) => s + toAnnual({ amount: o.amount, period: o.frequency }),
+    0,
+  );
+  const netHouseProperty = taxableRentals.reduce((s, o) => {
+    const grossRent = toAnnual({ amount: o.amount, period: o.frequency });
+    const nav = Math.max(0, grossRent - (o.municipalTaxes ?? 0));
+    return s + nav * (1 - SEC_24A_DEDUCTION_RATE) - (o.homeLoanInterest ?? 0);
+  }, 0);
+  const taxableHousePropertyRaw =
+    netHouseProperty >= 0
+      ? netHouseProperty
+      : -Math.min(Math.abs(netHouseProperty), SEC_71_HP_LOSS_SETOFF_CAP);
+  // Round to whole rupees (monetary-output convention) — also clears float noise like
+  // 180000 × 0.7 = 125999.99999999999.
+  const taxableHouseProperty = Math.round(taxableHousePropertyRaw);
+  return {
+    grossRentTotal: Math.round(grossRentTotal),
+    taxableHouseProperty,
+    rentalTaxDeduction: Math.round(grossRentTotal) - taxableHouseProperty,
+  };
+}
 
 export interface DeductionBreakdown {
   /** Sec 80C — EPF + PPF + ELSS + life insurance premium + tuition fees. */

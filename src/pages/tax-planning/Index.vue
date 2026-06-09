@@ -7,6 +7,7 @@ import { toAnnual } from "@/lib/cashflow";
 import { formatINRCompact, formatPercent, formatINR } from "@/lib/formatters";
 import {
   deriveDeductions,
+  computeHousePropertyTax,
   isInMarginalReliefBand,
   marginalReliefMitigations,
   LIMIT_80C,
@@ -124,6 +125,18 @@ const totalTaxable = computed(() =>
   incomeRows.value.filter((r) => r.isTaxable).reduce((s, r) => s + r.amount, 0),
 );
 
+// Let-out rent is taxed on NET house-property income (§24a 30% standard deduction +
+// §24b interest + municipal tax, §71 loss cap), NOT on gross rent. We keep totalTaxable
+// as the CASH-basis figure (drives take-home + the income bars — the landlord receives
+// full rent), and feed this §24a-collapsed base into computeTax. SAME shared helper
+// derive.ts uses, so this screen and the Cash-Flow/FIRE-model tax can never diverge (gh-issue #65).
+const rentalTaxDeduction = computed(
+  () => computeHousePropertyTax(household.data.otherIncome).rentalTaxDeduction,
+);
+const taxableIncomeForTax = computed(() =>
+  Math.max(0, totalTaxable.value - rentalTaxDeduction.value),
+);
+
 // Phase 4 Stage J — marginal-relief band detection (audit Entry #13 A13.2-4).
 // The MR band is a NEW-regime 87A rebate-cliff construct, so test it against the actual
 // new-regime taxable income (gross − standard deduction − 80CCD(2) employer NPS), which
@@ -162,7 +175,7 @@ const totalExempt = computed(() =>
 
 const oldResult = computed(() =>
   computeTax({
-    grossIncome: totalTaxable.value,
+    grossIncome: taxableIncomeForTax.value,
     regime: "OLD",
     fy: selectedFY.value,
     deductions: derivedDeductions.value.totalDeductions,
@@ -171,7 +184,7 @@ const oldResult = computed(() =>
 );
 const newResult = computed(() =>
   computeTax({
-    grossIncome: totalTaxable.value,
+    grossIncome: taxableIncomeForTax.value,
     regime: "NEW",
     fy: selectedFY.value,
     employerNpsByMember: derivedDeductions.value.employerNpsByMember,
