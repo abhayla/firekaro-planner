@@ -23,6 +23,27 @@ so the strengthening pipeline only runs on substantive prompts.
 > trivial turns (a one-line confirmation, `yes`/`go ahead`) are exempt — the banner is
 > for substantive output, not chatter.
 
+## MANDATORY OUTPUT — always SHOW the enhanced prompt (format A, Abhay 2026-06-09)
+
+The `*Enhanced:*` one-liner is NOT enough — Abhay reported he never actually sees the strengthened
+prompt and can't tell when enhancement silently didn't run. So **every response MUST make the
+enhancement VISIBLE**, in one of two shapes:
+
+- **Non-trivial prompt (enhancement ran):** after the `*Enhanced:*` banner, render a **compact
+  Enhanced-prompt block** with BOTH parts:
+  > **What changed:** <the fixes/additions made to the raw ask — 1-3 bullets or a tight sentence>
+  > **Final prompt executed:** <the exact strengthened prompt, verbatim, that I'm acting on>
+
+  Keep it compact (this is format A, NOT the full grade-card wall every turn). The grade card / full
+  step transcript is optional/on-request; the **what-changed + final-prompt block is mandatory**.
+- **Trivial / continuation prompt** (≤15 chars, `yes`/`go ahead`/`continue` — the hook skips
+  enhancement, so there's nothing to strengthen): render a **one-liner** so Abhay is never left
+  guessing — e.g. `*Enhanced: no change — ran your input as-is*`.
+
+**Skipping the Enhanced-prompt block on a non-trivial turn is a defect** (it's the #1 thing Abhay
+checks). The Stop hook's class-C telemetry logs banner/block misses to `.claude/.enhance-misses.log`
+as a backstop. This section is the SSOT for the FORMAT; stage 4.6 below produces the content.
+
 ## The unified per-prompt pipeline (0 → 6)
 
 Every substantive prompt runs ONE process. Stages 0–4.6 strengthen the prompt;

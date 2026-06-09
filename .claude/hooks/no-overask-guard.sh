@@ -59,6 +59,12 @@ fi
 if [ "${#last_text}" -ge 300 ] && ! printf '%s' "$full" | head -1 | grep -qE '^\*enhanced'; then
   printf '%s\tenhance-banner-miss (len=%s)\n' "$(jq -rn 'now|todate' 2>/dev/null || echo now)" "${#last_text}" >> "$root/.claude/.enhance-misses.log" 2>/dev/null
 fi
+# Block-miss (format A, 2026-06-09): substantive turn that HAS the banner but shows NEITHER the
+# enhanced-prompt block ("final prompt"/"what changed") NOR the trivial "ran as-is" one-liner →
+# Abhay can't see what was enhanced. Non-blocking telemetry (the behavioral fix is the rule wording).
+if [ "${#last_text}" -ge 300 ] && printf '%s' "$full" | head -1 | grep -qE '^\*enhanced' && ! printf '%s' "$full" | grep -qE "final prompt|what changed|ran (your )?input as-is|ran as-is|no change — ran|no enhancement"; then
+  printf '%s\tenhance-block-miss (len=%s)\n' "$(jq -rn 'now|todate' 2>/dev/null || echo now)" "${#last_text}" >> "$root/.claude/.enhance-misses.log" 2>/dev/null
+fi
 
 # ── A. Over-ask detection ──
 flag=""
