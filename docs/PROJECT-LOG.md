@@ -126,6 +126,25 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 ## §3 — Decision log (append-only, newest first)
 
 ### 2026-06-09
+- **D-2026-06-09-02 — TRUST-FIX TRIAGE (#64 + #65): diagnosed both honesty-coherence issues
+  read-only (FinTech), then fixed the real bug (#65) and held the labeling one (#64).** Both were
+  filed `good-to-have` with a "investigate first — bug or labeling?" gate. Ran two parallel read-only
+  FinTech traces (in-scope: verifying already-shipped features). Verdicts split:
+  - **#65 = real CORRECTNESS bug → FIXED** (commit `477b6b0`, on `main`, **not deployed**). /tax-planning
+    fed *gross* rent into `computeTax`, omitting §24(a) — over-stated tax ~₹56k (₹12.22L vs the correct
+    ₹11.66L). Root-cause fix: extracted the §24a/§24b/§71 collapse into ONE shared `computeHousePropertyTax()`
+    (`tax-deductions.ts`) consumed by BOTH `derive.ts` and the page → screens converge; behaviour-identical
+    on derive (golden master unchanged). Independently verified (FinTech: math correct, ~22.9% persona-sane;
+    Code-Quality: approve, no circular import). Why-anchored: a *wrong financial output* is Tier-0 correctness,
+    always in-scope under the must-have-only lock; it was in the Abhay-approved trust-fix bucket.
+  - **#64 = LABELING-ONLY → HELD.** No off-by-one: 56 = computed FIRE age, 47/50 = target inputs, all
+    correct, just ambiguously labeled ("55" wasn't even reproducible from Sharmas data). Pure copy work →
+    `good-to-have` → **blocked pending Abhay's explicit go** (must-have-only lock). Verdict + recommended
+    copy recorded on the issue; not built.
+  - **#85 FILED** — a *separate, pre-existing* divergence both reviewers surfaced: `derive.ts` `businessShare`
+    taxes LLP/Partnership/HUF profit-share that /tax-planning treats as exempt (§10(2A)). Same "two screens,
+    one engine, divergent base" class as #65; needs FinTech validation; `good-to-have`, blocked.
+  Pointers: #65 (closed), #64 (open, held), #85 (open, filed).
 - **D-2026-06-09-01 — PROD DEPLOY: shipped the merged member-lens stack + the #72 label fix to
   firekaro.com (Abhay-approved); smoke-gate GREEN.** Shipped local `main` HEAD `f608cf2` (carries #66/#67
   member lens, #81 member-level FIRE view, #72 Financial-Health label, + governance/hook commits) via
