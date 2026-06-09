@@ -47,7 +47,7 @@ root="$(git rev-parse --show-toplevel 2>/dev/null)"
 # blocked. (The ban stays for permission-to-START / "shall I go ahead" offers when already in
 # sync — those carry no marker and still match the over-ask patterns below.) Honest use is
 # governed by decision-authority.md "Confidence gate"; abuse is visible (the banner renders to Abhay).
-if printf '%s' "$full" | grep -qE "push to prod|deploy|dns|cutover|force[- ]push|--force|spend|publish|destructive|drop (table|column)|delete (the )?(branch|remote)|escalat|blocked on|need (your|you to)|your (credential|password|gmail|approval|login|call)|waiting on (you|abhay)|log in yourself|run .* yourself|requires? your|\*sync-check"; then
+if printf '%s' "$full" | grep -qE "push to prod|deploy|dns|cutover|force[- ]push|--force|spend|publish|destructive|drop (table|column)|delete (the )?(branch|remote)|escalat|blocked on|need (your|you to)|your (credential|password|gmail|approval|login|call)|waiting on (you|abhay)|log in yourself|run .* yourself|requires? your|sync-check"; then
   exit 0
 fi
 
