@@ -2,7 +2,7 @@
   "_meta": {
     "created": "2026-03-24T16:55:53.203553+00:00",
     "hub_repo": "abhayla/claude-best-practices",
-    "last_sync": "2026-06-09T15:30:10.704878+00:00",
+    "last_sync": "2026-06-09T15:44:20.762339+00:00",
     "version": "1.0.0"
   },
   "files": {
@@ -2037,6 +2037,102 @@
     "skills/fix-github-issue/SKILL.md": {
       "hub_hash": "sha256:d5604fc982a6de3b8549b10b9ed10f3a37d771fe48b3f3ab2e24978872b73465",
       "synced_at": "2026-06-09T15:31:21.376094+00:00"
+    },
+    "skills/reddit/SKILL.md": {
+      "hub_hash": "sha256:9356aaa4fd5d69ecb44a52fedbe6d5eae36351edbffa516d8b5bda2c5b9944da",
+      "synced_at": "2026-06-09T15:44:20.762339+00:00"
+    },
+    "skills/reddit/references/account-health-score-0-100.md": {
+      "hub_hash": "sha256:570e3b1642794d5895cdaa62fa28a707f9524494fb556aa1c8f2429c62677c1b",
+      "synced_at": "2026-06-09T15:44:20.762339+00:00"
+    },
+    "skills/reddit/references/advanced-search-operators.md": {
+      "hub_hash": "sha256:ca47ccf3b17c574428884c5c8f70d5fb5ad239573e07f01036bf9731f18a8dfc",
+      "synced_at": "2026-06-09T15:44:20.762339+00:00"
+    },
+    "skills/reddit/references/alert-criteria.md": {
+      "hub_hash": "sha256:ab9b89c38c6b47fee7a3d5048480fa260224f88e6a376988e643fc3dd13a514e",
+      "synced_at": "2026-06-09T15:44:20.762339+00:00"
+    },
+    "skills/reddit/references/content-repurposing-for-reddit.md": {
+      "hub_hash": "sha256:1419acff3c31b86c746bff9bbc92e6f283a89ec480e5e07b9c2449d461e72795",
+      "synced_at": "2026-06-09T15:44:20.762339+00:00"
+    },
+    "skills/reddit/references/engagement-actions.md": {
+      "hub_hash": "sha256:d5456f2fe66e729939669dc7372e335dc557462217d74c487f38ef6bba0dc02a",
+      "synced_at": "2026-06-09T15:44:20.762339+00:00"
+    },
+    "skills/reddit/references/karma-building-strategy.md": {
+      "hub_hash": "sha256:2f55dc42827846aa4d27068d6018600edec070c706f864f516a605c2e029a788",
+      "synced_at": "2026-06-09T15:44:20.762339+00:00"
+    },
+    "skills/reddit/references/mode-2-compose-post-comment.md": {
+      "hub_hash": "sha256:451d26b1893eb91d7b83e6905cdab93add3e146fff075be6f0051dca1f0ee28a",
+      "synced_at": "2026-06-09T15:44:20.762339+00:00"
+    },
+    "skills/reddit/references/mode-3-thread-analysis.md": {
+      "hub_hash": "sha256:98e437651564f4ce3a2b7e7ab2968c67d21c6646c60a8eec064f4bb0945e69f6",
+      "synced_at": "2026-06-09T15:44:20.762339+00:00"
+    },
+    "skills/reddit/references/mode-4-viral-potential-scoring.md": {
+      "hub_hash": "sha256:ae874d82c338f66deab6613cbc81eb88747ee9b9f06a5bc31c5b732fb925179f",
+      "synced_at": "2026-06-09T15:44:20.762339+00:00"
+    },
+    "skills/reddit/references/mode-6-post-engage.md": {
+      "hub_hash": "sha256:b60b6e26377760c51cbfd9b68e8f557686eecbb4c61dce329a88627cf9de9fe4",
+      "synced_at": "2026-06-09T15:44:20.762339+00:00"
+    },
+    "skills/reddit/references/mode-9-content-strategy-planning.md": {
+      "hub_hash": "sha256:9a98c168da353467a501fd5379c74b8fdbd0ca12bd10ffde533fb0f6f7de7e96",
+      "synced_at": "2026-06-09T15:44:20.762339+00:00"
+    },
+    "skills/reddit/references/option-d-oldredditcom-lighter-pages-easier-to-pars.md": {
+      "hub_hash": "sha256:614192d1b43b45167f8d8b3d7bc336f7c4c698724f179b07c20c5b701afe5ccc",
+      "synced_at": "2026-06-09T15:44:20.762339+00:00"
+    },
+    "skills/reddit/references/quick-reference.md": {
+      "hub_hash": "sha256:6f84061489e29b2de0dee40d64ff14e420e005c6ab9011c4f1a1a84c12e4dfed",
+      "synced_at": "2026-06-09T15:44:20.762339+00:00"
+    },
+    "skills/reddit/references/rate-limits.md": {
+      "hub_hash": "sha256:d3b1bee617ecccd9701c222d95e5530281f3ea3831bef91b7bad4636f308dd5c",
+      "synced_at": "2026-06-09T15:44:20.762339+00:00"
+    },
+    "skills/reddit/references/reddit-monitor-keyword.md": {
+      "hub_hash": "sha256:d785766813509ff7485e10af9945724ff73d21a477e162ddca64e874ed6ee6d6",
+      "synced_at": "2026-06-09T15:44:20.762339+00:00"
+    },
+    "skills/reddit/references/score-xx100-grade-x.md": {
+      "hub_hash": "sha256:e5d989f74bb053c954efa8c99f9006fe89c619ec6b4dd16c0d6fbd799889332f",
+      "synced_at": "2026-06-09T15:44:20.762339+00:00"
+    },
+    "skills/reddit/references/spam-filter-avoidance.md": {
+      "hub_hash": "sha256:cd6899763dcb7a1b51d14cf08d4e6db4250d9f76cd5a28b2204d46751f740a3f",
+      "synced_at": "2026-06-09T15:44:20.762339+00:00"
+    },
+    "skills/reddit/references/thing-id-prefixes.md": {
+      "hub_hash": "sha256:1a7c3794a525bbfada3bb32fa5964015ad75616b2c621f144cb52d2af1b4480f",
+      "synced_at": "2026-06-09T15:44:20.762339+00:00"
+    },
+    "skills/reddit/references/thread-analysis-post-title.md": {
+      "hub_hash": "sha256:973086e6b67e2caec169f078e9b84524f3bfed72c70942e50a0e08185e989e94",
+      "synced_at": "2026-06-09T15:44:20.762339+00:00"
+    },
+    "skills/twitter-x/SKILL.md": {
+      "hub_hash": "sha256:e2791dc5fd48c0e6f03f1f304eeaa8f3629bb630f420f8e34609681abaf377a3",
+      "synced_at": "2026-06-09T15:44:20.762339+00:00"
+    },
+    "skills/twitter-x/references/account-health-growth.md": {
+      "hub_hash": "sha256:336faab60c38812889d93c0e291887ea8dafdd0cf5f88b3a25a64e32fbe55d6f",
+      "synced_at": "2026-06-09T15:44:20.762339+00:00"
+    },
+    "skills/twitter-x/references/compose-tweet.md": {
+      "hub_hash": "sha256:b4986df9bb7d29b2eb8fa005bca90331c2c91704ff1685eb98fc84692b240bf3",
+      "synced_at": "2026-06-09T15:44:20.762339+00:00"
+    },
+    "skills/twitter-x/references/viral-potential-scoring.md": {
+      "hub_hash": "sha256:1039b0949fda1b972ef32b0568c1153d297bf4b5b1cd927c446b37e3e5e1b68b",
+      "synced_at": "2026-06-09T15:44:20.762339+00:00"
     }
   }
 }
