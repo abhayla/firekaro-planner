@@ -38,11 +38,14 @@ const ui = useUiStore();
 // household (byte-identical to before). Each adult files their own ITR, so a member's individual tax
 // on their own income + own deductions is the honest figure; "Joint" lines count on BOTH sides.
 const lensActive = computed(() => ui.viewingMemberId != null && !household.isSolo);
-const scopedHousehold = computed(() =>
+const scopedHousehold = computed<typeof household.data>(() =>
   lensActive.value
     ? {
         ...household.data,
-        members: fire.lensedMembers.value,
+        // earners-set (NOT lensedMembers) — matches derive.ts:295-305: deductions' 80CCD(2)/employer-NPS
+        // basis must be the same earners the income is built from, else a non-earner lens would deduct
+        // against ~zero income. For a single earner-lens the two sets are identical (FinTech-confirmed).
+        members: fire.lensedEarners.value,
         investments: fire.lensedInvestments.value,
         liabilities: fire.lensedLiabilities.value,
         insurance: fire.lensedInsurance.value,
