@@ -126,6 +126,18 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 ## §3 — Decision log (append-only, newest first)
 
 ### 2026-06-09
+- **D-2026-06-09-07 — PROD DEPLOY (Abhay-instructed): shipped the #86 tax-lens fix + member-lens verification
+  infra to https://firekaro.com.** HEAD `94417e4` (CI-green). Per `DEPLOY.md` §192: backup
+  (`firekaro-pre-deploy-20260609-133919.tar.gz`) → `git archive HEAD | tar` → `npm ci && build` →
+  `prisma:generate` + `migrate:deploy` (**"No pending migrations"** — display-only change) → `pm2 reload
+  firekaro-api` (zero-downtime). **Verified:** Tier-1 smoke (`/api/health` → prod+db connected; token
+  `/api/internal/smoke` → `user.count=3, 31ms` real Prisma read) ✓; **bundle hash CHANGED**
+  `index-CDAHCs9Y.js → index-B78CCwg3.js` (new build live, not cached) ✓; public `200` ✓; Tier-1.5 live UI
+  (login renders + "Sign in with Google" present; only the expected unauth `401 /api/planner/me` + `[boot]
+  not authenticated` console) ✓. The tax-lens fix (verified on-screen at localhost demo, same frontend code)
+  is now in the live bundle. **SKIP surfaced (not silent, per `member-landscape-verification.md` / Tier-2):**
+  authenticated prod tax-screen verification needs a logged-in session (none available in-session) — to be
+  run when a session exists. Rollback ready (backup tar above). Pointer: gh #86.
 - **D-2026-06-09-06 — FIXED (#86): tax-planning now lenses to the selected member, same-scope.** The one
   genuinely-broken screen (per D-05/06). FinTech-spec'd ("B'-fallback") → Full-Stack built → independent
   code-review (rule 29) clean on the #23 same-scope axis → on-screen verified. The screen now reads income
