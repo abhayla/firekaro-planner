@@ -25,6 +25,13 @@ import { join } from "node:path";
  * gate) — but a screen with ZERO lens reference provably cannot react, so this catches the exact
  * class that shipped. Run by `npm run test:unit`.
  *
+ * ⚠️ PROVEN ONLY A WEAK HEURISTIC (empirical on-screen sweep 2026-06-09, gh #86): token-presence
+ * ≠ re-scopes. `liabilities/Overview.vue` HAS `lensedLiabilities` yet is BROKEN on screen; and
+ * `insurance/Policies.vue` / `expenses/Recurring.vue` have NO page-level token yet DO re-scope (via
+ * child components). So this scan yields BOTH false-positives and false-negatives — the authoritative
+ * gate is the full E2E `e2e/member-lens-sweep.spec.ts` (per `member-landscape-verification.md`). The
+ * two proven-working-without-a-token screens are REMOVED from the list below to avoid false failures.
+ *
  * SCOPE (v1): only the UNAMBIGUOUSLY member-attributable screens per the shipped #66/#81 design.
  * The household-only screens (expenses/Overview, investments/Buckets) must instead render
  * WholeHouseholdBadge, and the fire-goals analytical leaves are an OPEN design fork (badge-only
@@ -47,9 +54,9 @@ const MEMBER_ATTRIBUTABLE = [
   "liabilities/Overview.vue",
   "liabilities/Loans.vue",
   "insurance/Overview.vue",
-  "insurance/Policies.vue",
+  // insurance/Policies.vue + expenses/Recurring.vue REMOVED — empirically re-scope via child
+  // components without a page-level token (gh #86 on-screen sweep 2026-06-09).
   "tax-planning/Index.vue",
-  "expenses/Recurring.vue",
   "expenses/Planned.vue",
   "financial-health/NetWorth.vue",
   "financial-health/Banking.vue",

@@ -20,33 +20,29 @@ import { test, expect, type Page } from "@playwright/test";
 
 const HYDRATED = '#app[data-hydrated="true"]';
 
-// Member-attributable routes that MUST re-scope under "Viewing as" (#66 + #81).
+// EMPIRICALLY VERIFIED ON-SCREEN 2026-06-09 (gh #86) — driving the real "Viewing as" dropdown across a
+// data-rich, member-balanced household (Sharmas: Rohit ₹25L + Priya ₹18L; investments rohit:6/priya:2/Joint:3).
+// This replaced the original STATIC classification, which was wrong on 3 of ~6 calls — proving
+// token-presence ≠ re-scopes (`liabilities/overview` HAS lensedLiabilities yet is broken;
+// `insurance/policies`/`expenses/recurring` have NO page-level token yet re-scope via child components).
+//
+// These re-scope correctly per member (verified: figures differ for ≥1 member):
 const WORKING = [
-  "/income/overview",
-  "/income/salary",
-  "/investments/overview",
-  "/investments/holdings",
-  "/liabilities/overview",
-  "/insurance/overview",
-  "/financial-health", // Health Score
-  "/financial-health/net-worth",
-  "/financial-health/cash-flow",
-  "/financial-health/banking",
-  "/financial-health/emergency-fund",
-  "/financial-health/reports",
+  "/income/overview", "/income/salary", "/income/business", "/income/other-sources",
+  "/expenses/recurring",
+  "/investments/overview", "/investments/holdings",
+  "/insurance/overview", "/insurance/policies",
+  "/financial-health", "/financial-health/net-worth", "/financial-health/cash-flow",
+  "/financial-health/banking", "/financial-health/emergency-fund", "/financial-health/reports",
+  "/fire-goals/dashboard",
 ];
 
-// Income leaves that may be empty in the sample seed (no business / no other-income) — still
-// member-attributable, but a seed with zero rows can render identically. Kept separate so a
-// genuine wiring regression on the populated screens isn't masked by a legitimately-empty one.
-const WORKING_MAY_BE_EMPTY = ["/income/business", "/income/other-sources"];
-
-// KNOWN-BROKEN (the bug, gh #86) — these ignore the lens entirely today. test.fixme until the fix lands.
+// VERIFIED BROKEN on-screen (gh #86) — show IDENTICAL figures for every member despite member-differentiated
+// data. test.fixme until the lens fix wires each; each MUST go green before #86 closes.
 const BROKEN = [
   "/tax-planning",
+  "/liabilities/overview",
   "/liabilities/loans",
-  "/insurance/policies",
-  "/expenses/recurring",
   "/expenses/planned",
 ];
 
@@ -137,15 +133,6 @@ test.describe("Viewing-as lens — real-dropdown sweep across every member-attri
       expect(responded, `${route} shows IDENTICAL figures for every member — the "Viewing as" lens is dead here`).toBe(
         true,
       );
-    });
-  }
-
-  for (const route of WORKING_MAY_BE_EMPTY) {
-    test(`lens re-scopes ${route} (skips if seed-empty)`, async ({ page }) => {
-      await bootstrapSample(page);
-      const { responded, empty } = await lensResponds(page, route);
-      test.skip(empty, `${route} has no rows in the sample seed — nothing to re-scope`);
-      expect(responded, `${route} shows IDENTICAL figures for every member — the lens is dead here`).toBe(true);
     });
   }
 

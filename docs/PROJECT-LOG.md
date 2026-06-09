@@ -126,6 +126,21 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 ## §3 — Decision log (append-only, newest first)
 
 ### 2026-06-09
+- **D-2026-06-09-05 — EMPIRICAL on-screen lens sweep (#86) OVERTURNS the static broken-list; static
+  analysis proven unreliable (vindicates the E2E mandate).** Abhay challenged my static "5 broken" list
+  ("did you review on the screen?"). Drove the REAL "Viewing as" dropdown across all 27 routes via
+  Playwright MCP on a data-rich member-balanced household (loaded the **Sharmas** seed into an isolated
+  demo server — the dev-bypass household was too sparse/0-salary to test). **VERIFIED BROKEN (4):**
+  `tax-planning`, `liabilities/overview`, `liabilities/loans`, `expenses/planned`. **Static was WRONG on 3
+  of ~6:** `insurance/policies` + `expenses/recurring` actually WORK (re-scope via child components, no
+  page-level token → static false-positive), and it MISSED `liabilities/overview` (has `lensedLiabilities`
+  but shows ₹38L/1-loan even for Priya who owns 0 → static false-negative). **Separate class — household-by-
+  design but MISSING the "Whole household" badge:** `expenses/overview`, `investments/buckets`,
+  `fire-goals/{goals,what-if,drawdown,readiness,stress-test}` (only fire-goals/dashboard shows it + individual
+  FIRE). **Key learning: token-presence ≠ re-scopes → the static `lens-coverage-invariant.spec.ts` is only a
+  weak heuristic (both false +/−); the full E2E sweep is authoritative** (exactly why Abhay mandated it,
+  D-04). Corrected: #86 (verified-findings comment), the E2E spec BROKEN/WORKING lists, the static gate
+  (removed the 2 false-positives + caveat). Not pushed (local for review). Pointer: gh #86.
 - **D-2026-06-09-04 — NEW RULE (Abhay-directed, approved): `member-landscape-verification.md` — the full
   E2E "Viewing as" sweep is the mandatory verification for any member-attributable/display change, NO
   exceptions.** Abhay: "all future review verification should be done in this heavier, full end-to-end member
