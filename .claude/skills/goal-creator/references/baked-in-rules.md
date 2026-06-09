@@ -279,6 +279,17 @@ dispatches the tester wave, then dispatches the blind-verifier wave itself with 
 paths only**. Applies to the run's OWN test runs too. Full rule:
 `.claude/rules/independent-test-verification.md`.
 
+> **Evidence-handoff gotcha (recurring — cost ~1 wasted reconciliation cycle on BOTH the #66/#67 and
+> #81 runs).** Playwright MCP writes `take_screenshot` files to the **session/primary-worktree root's
+> `.playwright-mcp/`, NOT the goal worktree** — so handing those paths straight to the blind verifier
+> makes it (correctly) dissent on a missing/incomplete evidence package that is purely a path issue,
+> never a real defect. So: (1) **copy or absolute-path the screenshots INTO the goal worktree's
+> evidence dir, and `ls`-confirm each file exists, BEFORE dispatching the blind verifier** — never hand
+> a path you haven't verified resolves; (2) **capture a COMPLETE corroborating package the first time**
+> — full-page (not cropped), dropdown/menu *open* where relevant, scrolled-to-the-asserted-element, and
+> the before/after baseline pair (e.g. consolidated vs lensed) — so the verifier can actually judge the
+> claim without a re-capture round-trip.
+
 ---
 
 ## Failure-recovery budget block (carry forward verbatim, tune the numbers per goal)
