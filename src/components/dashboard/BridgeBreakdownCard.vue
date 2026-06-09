@@ -6,10 +6,23 @@
  * shortfall, and — rendered uniformly from bridgeCoverage.assumptions[] — every
  * transparency disclosure with a one-tap "fix this field" affordance (principle 1).
  */
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import { useFireDerive } from "@/lib/useFireDerive";
 import { formatINRCompact } from "@/lib/formatters";
 import type { RouteLocationRaw } from "vue-router";
+
+// #74 + #76: one shared card, two presentations. `compact` (Dashboard) keeps the honest
+// bridge headline but drops the unlock-timeline + assumptions wall and links to Readiness;
+// `full` (Readiness, default) keeps everything, with the assumptions block collapsible.
+const props = withDefaults(defineProps<{ variant?: "full" | "compact" }>(), {
+  variant: "full",
+});
+const isCompact = computed(() => props.variant === "compact");
+
+// #74: "What we assumed" is collapsible on the full card — default COLLAPSED, with the
+// estimate count in the header so the honesty caveats stay discoverable. Local-only state
+// (YAGNI — no ui-store persistence; the count keeps it discoverable when collapsed).
+const assumptionsExpanded = ref(false);
 
 const fire = useFireDerive();
 
@@ -125,8 +138,8 @@ function fixRoute(fixField?: string): RouteLocationRaw {
       <span class="text-currency font-weight-bold text-warning">{{ formatINRCompact(locked) }}</span>
     </div>
 
-    <!-- Unlock timeline -->
-    <template v-if="bc!.unlockTimeline.length">
+    <!-- Unlock timeline (full only — dropped on the compact dashboard card) -->
+    <template v-if="!isCompact && bc!.unlockTimeline.length">
       <div class="section-label">When locked money unlocks</div>
       <v-list density="compact" class="bg-transparent pa-0 mb-2">
         <v-list-item
@@ -155,36 +168,77 @@ function fixRoute(fixField?: string): RouteLocationRaw {
       <span class="text-currency">{{ formatINRCompact(bc!.bridgeIncomeAnnual) }}</span> / yr
     </div>
 
-    <!-- Transparency: every assumption, each with a one-tap fix -->
-    <template v-if="bc!.assumptions.length">
+    <!-- #74 Transparency (full only): collapsible "What we assumed", default-collapsed.
+         The estimate COUNT stays in the header so the honesty caveats remain discoverable
+         even while the per-holding rows are tucked away. -->
+    <template v-if="!isCompact && bc!.assumptions.length">
       <v-divider class="my-3" />
-      <div class="section-label">
-        What we assumed
-        <span class="assumption-hint">— estimates you can correct</span>
-      </div>
-      <div
-        v-for="(a, i) in bc!.assumptions"
-        :key="a.id + i"
-        class="assumption-row"
-        data-testid="bridge-assumption-row"
+      <button
+        type="button"
+        class="section-label assumptions-toggle"
+        :aria-expanded="assumptionsExpanded"
+        aria-controls="bridge-assumptions-region"
+        data-testid="bridge-assumptions-toggle"
+        @click="assumptionsExpanded = !assumptionsExpanded"
       >
-        <div class="flex-grow-1">
-          <div class="text-body-2 font-weight-medium">{{ a.assumed }}</div>
-          <div class="text-caption text-medium-emphasis">{{ withPeriod(a.why) }}</div>
-          <div v-if="a.impact" class="text-caption text-medium-emphasis">{{ withPeriod(a.impact) }}</div>
+        <span>
+          What we assumed
+          <span class="assumption-hint">
+            — {{ bc!.assumptions.length }} estimate{{ bc!.assumptions.length === 1 ? "" : "s" }} you can correct
+          </span>
+        </span>
+        <v-icon
+          :icon="assumptionsExpanded ? 'mdi-chevron-up' : 'mdi-chevron-down'"
+          size="18"
+          class="assumptions-chevron"
+          aria-hidden="true"
+        />
+      </button>
+      <v-expand-transition>
+        <div v-if="assumptionsExpanded" id="bridge-assumptions-region">
+          <div
+            v-for="(a, i) in bc!.assumptions"
+            :key="a.id + i"
+            class="assumption-row"
+            data-testid="bridge-assumption-row"
+          >
+            <div class="flex-grow-1">
+              <div class="text-body-2 font-weight-medium">{{ a.assumed }}</div>
+              <div class="text-caption text-medium-emphasis">{{ withPeriod(a.why) }}</div>
+              <div v-if="a.impact" class="text-caption text-medium-emphasis">{{ withPeriod(a.impact) }}</div>
+            </div>
+            <v-btn
+              v-if="a.fixField"
+              size="x-small"
+              variant="outlined"
+              color="primary"
+              class="ml-2 flex-shrink-0"
+              :to="fixRoute(a.fixField)"
+              data-testid="bridge-assumption-fix"
+            >
+              Fix
+            </v-btn>
+          </div>
         </div>
-        <v-btn
-          v-if="a.fixField"
-          size="x-small"
-          variant="outlined"
-          color="primary"
-          class="ml-2 flex-shrink-0"
-          :to="fixRoute(a.fixField)"
-          data-testid="bridge-assumption-fix"
-        >
-          Fix
-        </v-btn>
-      </div>
+      </v-expand-transition>
+    </template>
+
+    <!-- #76 Compact (Dashboard): the per-holding wall lives on Readiness (the "can I stop?"
+         decision home). Link there so the honesty caveats stay one click away. -->
+    <template v-if="isCompact && bc!.assumptions.length">
+      <v-divider class="my-3" />
+      <v-btn
+        variant="text"
+        color="primary"
+        size="small"
+        class="px-0 text-none"
+        prepend-icon="mdi-information-outline"
+        append-icon="mdi-arrow-right"
+        :to="{ name: 'fire-readiness' }"
+        data-testid="bridge-see-assumptions-link"
+      >
+        See what we assumed on Readiness
+      </v-btn>
     </template>
   </v-card>
 </template>
@@ -212,6 +266,30 @@ function fixRoute(fixField?: string): RouteLocationRaw {
   letter-spacing: normal;
   font-weight: var(--weight-regular);
   color: var(--text-muted);
+}
+/* #74 — the "What we assumed" header is a native <button> toggle (keyboard-operable by
+   default), styled to read like the section label but with a chevron on the right. */
+.assumptions-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  background: none;
+  border: none;
+  /* .section-label already supplies the bottom margin — no extra padding, so the
+     toggle's vertical rhythm matches the other section labels. */
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+}
+.assumptions-toggle:focus-visible {
+  outline: 2px solid rgba(var(--v-theme-primary), 0.6);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+.assumptions-chevron {
+  color: var(--text-muted);
+  flex-shrink: 0;
 }
 .assumption-row {
   display: flex;
