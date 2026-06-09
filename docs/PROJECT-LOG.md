@@ -126,6 +126,26 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 ## §3 — Decision log (append-only, newest first)
 
 ### 2026-06-09
+- **D-2026-06-09-09 — FEATURE DISCOVERY round 2 (Abhay-instructed): community-signal mining for net-new
+  features — HELD as a list, NOT filed (per Abhay's "list-for-review first" choice).** Goal: features Indian
+  FIRE/PF Reddit users wish for that are neither built nor already filed. **HONEST LIMITATION (surfaced, not
+  hidden):** **Reddit is hard-blocked for the web tools** — `reddit.com`/`old.reddit.com`/`.json`/`search.json`
+  all denied to the user-agent, two Redlib mirrors 403/ECONNREFUSED, no Reddit MCP. So findings are **NOT
+  scraped Reddit posts** — they are the SAME-persona signal triangulated from accessible adjacent sources
+  (freefincal + its downloaded trackers, Zerodha Varsity, ClearTax/Tax2win/TaxGuru, moneyview, jumpp.finance)
+  + demand-proving standalone tools (QuitRunway; IT-dept 42-MNC Schedule-FA drive). Labelled as such, not
+  presented as verbatim Reddit. **9 genuinely net-new (deduped vs built + all 136 issues):** `good-to-have` —
+  (1) Schedule FA / foreign-asset ITR-disclosure helper [⚠️scope: borders tax-FILING vs planning — Abhay's
+  charter call]; (2) tax-optimal post-FIRE withdrawal sequencing (which account first); (3) plan-vs-actual
+  variance tracker (stored baseline vs actuals); (4) real-vs-nominal (today's-money) display toggle; (5)
+  job-loss/layoff runway + sabbatical scenario; (6) asset-allocation drift alert + rebalancing plan; (7)
+  full-model data export/portability; (8) exportable year-by-year cashflow projection table. `nice-to-have` —
+  (9) privacy-first / no-account "local-only" marketed mode (capability partly exists via LocalStorageAdapter;
+  the product framing is net-new). **Borderline → NOT new:** DTAA-FTC-for-LRS folds into `#134`; anonymous
+  peer FIRE-cohort comparison already = `#122`; ad-free/no-data-selling = positioning, not a feature.
+  **Not filed** — focus-lock stays in force; backlog is pull-only on per-item approval. **Open blocker (Abhay's
+  side):** verifiable Reddit-thread signal needs an authenticated path (paste thread URLs after `!`, or connect
+  a Reddit/browser MCP) — adjacent-source triangulation is the honest best-effort without it.
 - **D-2026-06-09-08 — FEATURE DISCOVERY (Abhay-instructed): web-researched the Indian PF/FIRE feature universe →
   filed 49 net-new candidate issues `#88`–`#136`.** Web research (INDmoney/ET Money/Kuvera/Scripbox/freefincal/
   theindianfirecalculator + PFRDA/EPFO/IT-dept 2025-26 rules) was **deduplicated** against FireKaro's built
