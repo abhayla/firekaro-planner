@@ -126,6 +126,26 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 ## §3 — Decision log (append-only, newest first)
 
 ### 2026-06-09
+- **D-2026-06-09-08 — FEATURE DISCOVERY (Abhay-instructed): web-researched the Indian PF/FIRE feature universe →
+  filed 49 net-new candidate issues `#88`–`#136`.** Web research (INDmoney/ET Money/Kuvera/Scripbox/freefincal/
+  theindianfirecalculator + PFRDA/EPFO/IT-dept 2025-26 rules) was **deduplicated** against FireKaro's built
+  features (SGB/REIT/International/gold/EPF/VPF/NPS/ESOP/bridge/lever-engine/decumulation/member-lens all
+  already shipped) and the 35 open issues (Form16+CAS `#43`, analytics `#44`, retention `#45`, etc.). The
+  remaining net-new were filed **one issue per feature** at Abhay's explicit instruction, grouped C1–C8:
+  C1 import/automation (`#88`–`#93`), C2 tax (`#94`–`#101`), C3 instruments (`#102`–`#107`), C4 FIRE depth
+  (`#108`–`#110`), C5 insurance/readiness (`#111`–`#114`), C6 goals/engagement/trust (`#115`–`#124`), C7 India
+  nuances (`#125`–`#130`), C8 adjacent-persona Tier-3 (`#131`–`#136`). **Tiering (goal-anchored, rule 30):
+  22 `good-to-have` + 27 `nice-to-have`; 0 must-have** (the must-have core is already shipped — calling any
+  net-new feature must-have would be feature-completeness bias). C8 (HUF/NRI/farmer/joint-family) labelled
+  `nice-to-have` because they serve a DIFFERENT persona than the locked salaried wedge → explicitly deferred.
+  **Out-of-scope (NOT filed, recorded here):** direct MF/stock/US-equity investing, AI/product-recommendation
+  advisor, human-CFP connect, micro-savings round-ups — all violate the *decision-support-not-advice /
+  no-execution* charter. **OPEN FORK (Abhay's call, recorded in `#88`):** does *"no bank connections"* forbid
+  read-only Account-Aggregator/statement ingestion too, or only transactional/execution links? My read =
+  read-only consent ingestion is planning-side + in-scope; needs Abhay's charter lock before the C1 cluster is
+  built. **Nothing is scheduled to build** — focus-lock (`must-have-only-focus.md`) stays in force; these are a
+  queryable backlog, pulled only on per-item approval. Filed via `gh issue create` (the create-github-issue
+  skill is test-failure-specific; its preflight+dedup+signature *process* was applied to feature intake).
 - **D-2026-06-09-07 — PROD DEPLOY (Abhay-instructed): shipped the #86 tax-lens fix + member-lens verification
   infra to https://firekaro.com.** HEAD `94417e4` (CI-green). Per `DEPLOY.md` §192: backup
   (`firekaro-pre-deploy-20260609-133919.tar.gz`) → `git archive HEAD | tar` → `npm ci && build` →
