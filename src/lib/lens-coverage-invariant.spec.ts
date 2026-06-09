@@ -52,12 +52,11 @@ const MEMBER_ATTRIBUTABLE = [
   "investments/Overview.vue",
   "investments/Holdings.vue",
   "liabilities/Overview.vue",
-  "liabilities/Loans.vue",
   "insurance/Overview.vue",
-  // insurance/Policies.vue + expenses/Recurring.vue REMOVED — empirically re-scope via child
-  // components without a page-level token (gh #86 on-screen sweep 2026-06-09).
+  // REMOVED (re-scope via child FORM components, no page-level token — gh #86): insurance/Policies.vue,
+  // expenses/Recurring.vue, liabilities/Loans.vue (LoanForm reads lensedLiabilities), expenses/Planned.vue
+  // (PlannedFutureForm reads lensedPlannedExpenses). The ONLY truly-unwired page is tax-planning/Index.vue.
   "tax-planning/Index.vue",
-  "expenses/Planned.vue",
   "financial-health/NetWorth.vue",
   "financial-health/Banking.vue",
   "financial-health/CashFlow.vue",

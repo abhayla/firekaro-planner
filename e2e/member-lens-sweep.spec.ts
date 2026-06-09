@@ -37,13 +37,18 @@ const WORKING = [
   "/fire-goals/dashboard",
 ];
 
-// VERIFIED BROKEN on-screen (gh #86) — show IDENTICAL figures for every member despite member-differentiated
-// data. test.fixme until the lens fix wires each; each MUST go green before #86 closes.
+// CODE-VERIFIED lens-correct, but the DEFAULT sample can't differentiate them (its single loan is
+// `isSharedWithSpouse` and its planned items are `Household`-owned → they correctly show for EVERY member).
+// `liabilities/Overview.vue` + `LoanForm.vue` consume `fire.lensedLiabilities`; `PlannedFutureForm.vue`
+// consumes `fire.lensedPlannedExpenses`. Asserting these on-screen needs an OWNER-EXCLUSIVE fixture (a loan
+// / planned item owned by ONE member, not Joint/shared/Household) — TODO. They are NOT in WORKING because
+// they do not respond on the Sharmas sample; they are NOT broken either. (gh #86 second correction.)
+//   /liabilities/overview, /liabilities/loans, /expenses/planned
+
+// VERIFIED BROKEN — by code (never consumes any lensed output; own computeTax over household.earners) AND
+// on-screen. test.fixme until the lens fix lands; MUST go green before #86 closes.
 const BROKEN = [
   "/tax-planning",
-  "/liabilities/overview",
-  "/liabilities/loans",
-  "/expenses/planned",
 ];
 
 async function bootstrapSample(page: Page) {
