@@ -177,32 +177,54 @@ runs.
 
 ## Redeploy (subsequent releases)
 
+> **The VPS `/var/www/firekaro` is NOT a git checkout** (no `.git`) — it's a `git archive | tar`
+> extraction of a tracked-files snapshot (the repo is private; no clone/`git pull` on the box). So the
+> redeploy ships from your **local** clone via git-archive over SSH. Verified working 2026-06-09 with
+> the key `~/.ssh/firekaro_v6_vps` (root@72.61.240.224). `.env.production`, `server/.env`,
+> `node_modules`, and `dist` are gitignored ⇒ NOT shipped ⇒ prod secrets/build are preserved.
+
 ```bash
-cd /var/www/firekaro && git pull
-npm ci && npm run build                        # frontend → dist/
-cd server && npm ci && npm run prisma:migrate:deploy
-pm2 reload firekaro-api                          # zero-downtime backend reload
+# from your LOCAL clone, on the commit you want live (main, CI-green):
+KEY=~/.ssh/firekaro_v6_vps; VPS=root@72.61.240.224
+# 1. backup current prod code (rollback safety — the box has no .git):
+ssh -i $KEY $VPS 'cd /var/www && tar czf firekaro-pre-deploy-$(date +%Y%m%d-%H%M%S).tar.gz --exclude=node_modules --exclude=dist.bak firekaro'
+# 2. ship tracked files (overwrites tracked; preserves gitignored .env/node_modules/dist):
+git archive --format=tar HEAD | ssh -i $KEY $VPS 'tar -x -C /var/www/firekaro'
+# 3. install + build + regenerate Prisma client (needed on any schema change) + zero-downtime reload:
+ssh -i $KEY $VPS 'set -e; cd /var/www/firekaro && npm ci && npm run build \
+  && cd server && npm ci && npm run prisma:generate \
+  && npm run prisma:migrate:deploy && pm2 reload firekaro-api'
 ```
 
 CI (`.github/workflows/ci.yml`) gates every push/PR to main on type-check + unit
-tests + build for both trees before you pull to the VPS.
+tests + build for both trees before you ship to the VPS.
+
+**Smoke gate after every redeploy (DEPLOY.md §8 / Tier-1):**
+```bash
+ssh -i $KEY $VPS 'TOKEN=$(grep -hE "^SMOKE_TOKEN=" /var/www/firekaro/.env.production /var/www/firekaro/server/.env | head -1 | cut -d= -f2- | tr -d "\"'"'"'"); curl -s http://localhost:3100/api/health; curl -s -H "x-smoke-token: $TOKEN" http://localhost:3100/api/internal/smoke'
+curl -s -o /dev/null -w "%{http_code}\n" https://firekaro.com   # public SPA renders
+```
 
 ---
 
 ## Rollback
 
+The box has **no `.git`**, so rollback = restore the pre-deploy backup tar (step 1 above), then
+rebuild + reload:
 ```bash
-cd /var/www/firekaro && git checkout <last-good-sha>
-npm ci && npm run build && cd server && npm ci && pm2 reload firekaro-api
+KEY=~/.ssh/firekaro_v6_vps; VPS=root@72.61.240.224
+ssh -i $KEY $VPS 'cd /var/www && tar xzf firekaro-pre-deploy-<TS>.tar.gz \
+  && cd firekaro && npm ci && npm run build && cd server && npm ci && pm2 reload firekaro-api'
 ```
 Migrations: Prisma migrate has no auto-down — restore from a Supabase point-in-time
 backup if a migration must be reverted. Take a backup before a schema-changing deploy.
 
 ---
 
-## Open blocker (as of 2026-06-01)
+## Access (verified 2026-06-09)
 
-The automated execution of §0–§7 from this Claude session is **blocked**: no
-Hostinger MCP is connected in-session and no VPS SSH credentials are available.
-Unblock by reconnecting the Hostinger MCP (`/mcp`) or providing SSH access; the
-steps above are otherwise ready to run.
+Deploy is runnable from a local clone over SSH — key **`~/.ssh/firekaro_v6_vps`** → `root@72.61.240.224`
+(VPS hostname `srv1707492`; app at `/var/www/firekaro`, PM2 process `firekaro-api`, Node 22). The
+Hostinger MCP (when connected) is managed-hosting + VM-lifecycle only — it does NOT do SSH command-exec
+for this self-managed VPS, so the deploy uses the SSH key above, not the MCP. (Supersedes the prior
+"no SSH credentials" blocker note.)

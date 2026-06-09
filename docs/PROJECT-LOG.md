@@ -125,6 +125,20 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 
 ## §3 — Decision log (append-only, newest first)
 
+### 2026-06-09
+- **D-2026-06-09-01 — PROD DEPLOY: shipped the merged member-lens stack + the #72 label fix to
+  firekaro.com (Abhay-approved); smoke-gate GREEN.** Shipped local `main` HEAD `f608cf2` (carries #66/#67
+  member lens, #81 member-level FIRE view, #72 Financial-Health label, + governance/hook commits) via
+  `git archive | ssh | tar` (the box has NO `.git`) → `npm ci` + `npm run build` + `prisma generate` +
+  `pm2 reload firekaro-api`. **Backup taken first** (`firekaro-pre-deploy-20260609-082211.tar.gz`).
+  **Smoke (Tier-1) all green:** health 200 (VPS+public), DB round-trip `user.count=3` 200, public SPA 200
+  serving fresh bundle `assets/index-HF1EayzF.js`, no post-reload errors. **Correction:** SSH WAS available
+  (`~/.ssh/firekaro_v6_vps` → root@72.61.240.224) — I'd wrongly claimed "no SSH" from a stale DEPLOY.md note;
+  Abhay caught it. Fixed DEPLOY.md (real git-archive|tar redeploy + rollback-from-backup + Access section;
+  removed the stale "no SSH"/`git pull` text). **Trust-fix bundle:** #72 shipped; **#69/#64/#65 deferred** to
+  focused pieces (not "cheap"); **stickiness #44/#45 paused** pending Abhay's go. Tier-2 authed UI verification
+  of the member lens is on-demand (needs Abhay's session). Pointers: #66/#67/#81/#72 (all closed/merged).
+
 ### 2026-06-08
 - **D-2026-06-08-22 — BUILT + SHIPPED: member-level financial view (#81), via the `/goal` autonomous run of
   the D-2026-06-08-21 contract.** Merged `--no-ff` → `main` (`01f0866`, **Closes #81**), pushed; branch
