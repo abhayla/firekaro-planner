@@ -236,8 +236,10 @@ today (persisted via `household-diff`/`household-repo`, NOT yet feeding the head
 Pure modules in `src/lib/` with colocated `*.spec.ts`: `fire-math.ts`, `tax.ts` + `tax-deductions.ts`
 + `tax-cliff.ts`, `amortization.ts`, `withdrawal-strategy.ts`, `glide-path.ts`, `coast-fire.ts`,
 `cashflow.ts`, `epf-vpf.ts`, `nps-withdrawal.ts`, `esop-tax.ts`, `freedom-score.ts`, `adequacy.ts`,
+`retirement-goal.ts` (Retirement-card age/year coherence — derives both from the same FIRE source so they correspond, #33),
 `stress-test.ts`, `monte-carlo.ts` (#18 — FIRE date as a confidence distribution, not a point),
 `investment-traits.ts`, `derived-records.ts`, `nudge-engine.ts`,
+`business-legal-kinds.ts` (shared `BUSINESS_LEGAL_KINDS` label lookup for the business/other-income forms — Pvt-Ltd/LLP/Partnership/HUF/etc.),
 `lifecycle-digest.ts` (the `derive()`-grounded "since you were away" delta engine — the Tier-1
 stickiness digest card on the dashboard), `expense-history.ts`, `member-horizon.ts`, `age.ts`, and
 the **#15 accessible-money bridge** layer
