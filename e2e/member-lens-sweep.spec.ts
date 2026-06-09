@@ -1,0 +1,161 @@
+import { test, expect, type Page } from "@playwright/test";
+
+/**
+ * "Viewing as <member>" lens E2E sweep — the REAL-BROWSER substance gate (gh #86).
+ *
+ * Companion to the static `src/lib/lens-coverage-invariant.spec.ts` (which checks a screen
+ * *references* a lensed output). This drives the ACTUAL AppBar dropdown across every
+ * member-attributable route and asserts the on-screen ₹ figures genuinely RE-SCOPE per member —
+ * exactly the prod symptom Abhay reported ("the dropdown does nothing on the tax / expenses screens").
+ *
+ * WHY THIS EXISTS (verification post-mortem, 2026-06-09): #66/#81 were verified only at the
+ * kernel/composable layer + a manual spot-check of the section Overviews, then generalised to the
+ * DoD screen-list. No test drove the real dropdown across the leaves. This sweep closes that hole.
+ *
+ * Seed-robust assertion: a CORRECTLY-wired member-attributable screen shows a DIFFERENT rendering
+ * for at least ONE adult vs "Whole household" (that adult owns a strict subset). A DEAD screen shows
+ * IDENTICAL figures for every selection → fails. We iterate all adults and require ≥1 to differ, so
+ * the test does not depend on which specific member owns what in the sample seed.
+ */
+
+const HYDRATED = '#app[data-hydrated="true"]';
+
+// Member-attributable routes that MUST re-scope under "Viewing as" (#66 + #81).
+const WORKING = [
+  "/income/overview",
+  "/income/salary",
+  "/investments/overview",
+  "/investments/holdings",
+  "/liabilities/overview",
+  "/insurance/overview",
+  "/financial-health", // Health Score
+  "/financial-health/net-worth",
+  "/financial-health/cash-flow",
+  "/financial-health/banking",
+  "/financial-health/emergency-fund",
+  "/financial-health/reports",
+];
+
+// Income leaves that may be empty in the sample seed (no business / no other-income) — still
+// member-attributable, but a seed with zero rows can render identically. Kept separate so a
+// genuine wiring regression on the populated screens isn't masked by a legitimately-empty one.
+const WORKING_MAY_BE_EMPTY = ["/income/business", "/income/other-sources"];
+
+// KNOWN-BROKEN (the bug, gh #86) — these ignore the lens entirely today. test.fixme until the fix lands.
+const BROKEN = [
+  "/tax-planning",
+  "/liabilities/loans",
+  "/insurance/policies",
+  "/expenses/recurring",
+  "/expenses/planned",
+];
+
+async function bootstrapSample(page: Page) {
+  await page.goto("/");
+  await page.evaluate(() => {
+    try {
+      window.localStorage.clear();
+    } catch {
+      /* ignore */
+    }
+  });
+  await page.reload();
+  // Wait for the splash to actually render before clicking (mirrors the working 01-splash spec —
+  // clicking before the hero paints is the bootstrap flake). 30s tolerates a cold Vite dev server
+  // compiling the route on first request. NOTE: this sweep needs DEMO mode (LocalStorageAdapter) —
+  // a server-adapter dev server (.env.local VITE_USE_SERVER_ADAPTER=on) has no splash/sample flow.
+  await expect(page.getByRole("heading", { level: 1, name: "FIREKaro" })).toBeVisible({ timeout: 30000 });
+  await expect(page.getByText("Explore with sample data")).toBeVisible({ timeout: 10000 });
+  await page.getByRole("button", { name: /Try the sample/i }).click();
+  await expect(page).toHaveURL(/\/fire-goals\/dashboard/);
+  await page.waitForSelector(HYDRATED, { timeout: 30000 });
+}
+
+/** The "Viewing as" v-select is the one with the unique mdi-eye prepend icon. */
+function viewingSelect(page: Page) {
+  return page.locator(".v-select").filter({ has: page.locator(".mdi-eye") });
+}
+
+/** Open the dropdown and return the option labels (the first is always "Whole household"). */
+async function memberOptionLabels(page: Page): Promise<string[]> {
+  await viewingSelect(page).click();
+  await page.waitForTimeout(300); // Vuetify menu open
+  const opts = page.locator('.v-overlay-container [role="option"]');
+  await opts.first().waitFor({ state: "visible", timeout: 5000 });
+  const labels = await opts.allInnerTexts();
+  await page.keyboard.press("Escape"); // close without selecting
+  await page.waitForTimeout(150);
+  return labels.map((l) => l.trim()).filter(Boolean);
+}
+
+async function selectViewing(page: Page, label: string) {
+  await viewingSelect(page).click();
+  await page.waitForTimeout(300);
+  await page.getByRole("option", { name: label, exact: true }).click();
+  await page.waitForTimeout(400); // reactive re-scope (no reload) — let derived computeds settle
+}
+
+/** Normalised set of ₹ figures rendered in the main content region (excludes the AppBar). */
+async function captureFigures(page: Page): Promise<string> {
+  const text = await page.locator(".v-main").innerText();
+  const tokens = text.match(/₹\s*[\d,]+(?:\.\d+)?\s*(?:Cr|L|K)?/g) ?? [];
+  return tokens.map((t) => t.replace(/\s+/g, " ").trim()).sort().join("|");
+}
+
+/** Core check: at least one adult selection differs from "Whole household". */
+async function lensResponds(page: Page, route: string): Promise<{ responded: boolean; household: string; empty: boolean }> {
+  await page.goto(route, { waitUntil: "networkidle" });
+  await page.waitForSelector(HYDRATED, { timeout: 30000 });
+
+  const labels = await memberOptionLabels(page);
+  expect(labels[0], `the "Viewing as" dropdown must render with ≥2 adults on the sample seed`).toMatch(
+    /whole household/i,
+  );
+  const members = labels.slice(1);
+  expect(members.length, "sample seed must have ≥1 adult besides Whole household").toBeGreaterThan(0);
+
+  await selectViewing(page, labels[0]); // baseline = Whole household
+  const household = await captureFigures(page);
+
+  let responded = false;
+  for (const m of members) {
+    await selectViewing(page, m);
+    if ((await captureFigures(page)) !== household) {
+      responded = true;
+      break;
+    }
+  }
+  return { responded, household, empty: household === "" };
+}
+
+test.describe("Viewing-as lens — real-dropdown sweep across every member-attributable route (#86)", () => {
+  for (const route of WORKING) {
+    test(`lens re-scopes ${route}`, async ({ page }) => {
+      await bootstrapSample(page);
+      const { responded, empty } = await lensResponds(page, route);
+      expect(empty, `${route} rendered no ₹ figures — cannot assert the lens (check the seed/route)`).toBe(false);
+      expect(responded, `${route} shows IDENTICAL figures for every member — the "Viewing as" lens is dead here`).toBe(
+        true,
+      );
+    });
+  }
+
+  for (const route of WORKING_MAY_BE_EMPTY) {
+    test(`lens re-scopes ${route} (skips if seed-empty)`, async ({ page }) => {
+      await bootstrapSample(page);
+      const { responded, empty } = await lensResponds(page, route);
+      test.skip(empty, `${route} has no rows in the sample seed — nothing to re-scope`);
+      expect(responded, `${route} shows IDENTICAL figures for every member — the lens is dead here`).toBe(true);
+    });
+  }
+
+  for (const route of BROKEN) {
+    // gh #86 — these screens ignore "Viewing as" today (read household.data directly). Un-fixme as the
+    // member-lens fix wires each one; each MUST go green before #86 closes.
+    test.fixme(`lens re-scopes ${route} (gh #86 — currently DEAD)`, async ({ page }) => {
+      await bootstrapSample(page);
+      const { responded } = await lensResponds(page, route);
+      expect(responded, `${route} must re-scope under "Viewing as"`).toBe(true);
+    });
+  }
+});

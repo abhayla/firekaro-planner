@@ -88,6 +88,9 @@ type runs; `testing.md` owns *how* tests are written (FIRST principles, flaky di
 - `engineering-roles.md` — **DevOps/Release** owns the prod smoke + tiers + rollback trigger; **QA** owns
   the pre-merge pyramid + which layer a test belongs in.
 - `docs/DEPLOY.md` §8 (prod smoke commands) + §Rollback (the rollback trigger) — the runbook wiring.
+- `member-landscape-verification.md` — the MANDATE (no exceptions) that any member-attributable / display
+  change is verified with the FULL E2E "Viewing as" sweep (`e2e/member-lens-sweep.spec.ts`) + the static
+  coverage scan, never a subset/Overview/kernel-only check. This file places that sweep as **pre-merge E2E**.
 
 ## CRITICAL RULES
 

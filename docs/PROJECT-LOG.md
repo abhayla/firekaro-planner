@@ -126,6 +126,42 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 ## §3 — Decision log (append-only, newest first)
 
 ### 2026-06-09
+- **D-2026-06-09-04 — NEW RULE (Abhay-directed, approved): `member-landscape-verification.md` — the full
+  E2E "Viewing as" sweep is the mandatory verification for any member-attributable/display change, NO
+  exceptions.** Abhay: "all future review verification should be done in this heavier, full end-to-end member
+  landscape — no exceptions." Encodes the lesson from the #86 verification miss: kernel/composable tests +
+  section-Overview spot-checks are necessary-but-NOT-sufficient and may never be the SOLE verification of the
+  lens; the real-dropdown-across-every-route sweep is required. Two instruments: `src/lib/lens-coverage-invariant.spec.ts`
+  (static "is it wired" — in `npm run test:unit`) + `e2e/member-lens-sweep.spec.ts` (real-browser "does it
+  re-scope"; demo mode; the 5 broken routes are `test.fixme(#86)` until wired). Boundary = the SCREEN CLASS
+  (member-attributable/cross-cutting/display), not diff size; pure backend/docs are out of scope (not
+  "exceptions"). Cross-ref `testing-strategy.md` (placed as pre-merge E2E) + rules 24/26/32/33; no duplication.
+  **E2E live-run note:** the sweep is structurally validated (parses, runs, fixme/skip correct) but could not be
+  executed green locally this session — the local dev env is locked to server-adapter mode (`.env.local`
+  `VITE_USE_SERVER_ADAPTER=on`, no demo splash) + Vite cold-start exceeded the splash wait; it runs in CI/demo
+  (`npm run test:e2e`). The static scan IS proven (RED on the 5 dead screens → quarantined). Pointer: gh #86.
+- **D-2026-06-09-03 — Member "Viewing as" lens dead on tax + leaf screens → filed gh #86 (`bug`,
+  `must-have`) + built the root-cause VERIFICATION FIX first (Abhay-directed).** Abhay reported (prod) the
+  "Viewing as" filter does nothing on the tax screen + expenses overview; full per-screen audit confirmed
+  the lens reaches the section **Overviews** but is **dead on 5 member-attributable leaves** (tax-planning/Index,
+  liabilities/Loans, insurance/Policies, expenses/Recurring, expenses/Planned) — while financial-health/* (#81 P3)
+  correctly lens. **Root cause of the bug:** (1) two-sources-of-truth — `useFireDerive().annualTax` IS lensed but
+  `tax-planning/Index.vue` never imports `useFireDerive` (runs its own `computeTax` over `household.earners`); (2)
+  leaf screens read `household.data` directly. **Root cause of the VERIFICATION MISS (the priority — Abhay: fix
+  the process before re-implementing, else it recurs):** every #66/#81 lens spec runs at the KERNEL/COMPOSABLE
+  layer (asserts `derive()`/`useFireDerive()` PRODUCE lensed outputs) — ZERO test asserts a `*.vue` SCREEN
+  CONSUMES one; no member-lens E2E; the manual Rule-24/32 sweep exercised Overviews + generalized to the prose
+  DoD screen-list; Rule 33 is structurally blind to a coverage hole (re-checks captured evidence, not
+  never-captured screens). **Process fix landed:** `src/lib/lens-coverage-invariant.spec.ts` — a static scan
+  enumerating every member-attributable screen, asserting each references a lensed output (mirrors
+  `storage-invariant.spec.ts`; the missing screen-consumption rung — can't be "generalized from a subset" again).
+  Proven RED on exactly the 5 dead screens, then quarantined `it.skip` (gh #86) so the suite is green; the lens
+  fix un-skips it. **Tiered must-have** (the lens was re-tiered must-have D-2026-06-08-05; it's non-functional on
+  its core claimed screens → the feature doesn't genuinely work). **Open sub-decision (Abhay):** fire-goals
+  analytical leaves + expenses/Overview = household-only-+badge (recommended) vs individual re-scope. **Open
+  governance proposal (needs Abhay approval, rule 5):** add a rule — "a cross-cutting/lens feature's acceptance
+  MUST be an enumerated per-surface machine gate, not a prose screen-list; kernel-output tests ≠ screen-consumption
+  coverage." NOT implemented (the lens fix is gated on Abhay's go). Pointer: gh #86; extends #66/#81.
 - **D-2026-06-09-02 — TRUST-FIX TRIAGE (#64 + #65): diagnosed both honesty-coherence issues
   read-only (FinTech), then fixed the real bug (#65) and held the labeling one (#64).** Both were
   filed `good-to-have` with a "investigate first — bug or labeling?" gate. Ran two parallel read-only
