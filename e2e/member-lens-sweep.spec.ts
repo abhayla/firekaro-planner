@@ -18,7 +18,12 @@ import { test, expect, type Page } from "@playwright/test";
  * the test does not depend on which specific member owns what in the sample seed.
  */
 
-const HYDRATED = '#app[data-hydrated="true"]';
+// Post-hydration ready signal. This extracted repo has NO `#app[data-hydrated]` attribute (that was
+// a retired-monorepo pattern that never shipped here — the old selector silently timed out at 30s on
+// every route, so this sweep could never actually run). The real universal signal is the AppBar
+// "Viewing as" select painting — it's present on every member-attributable sidebar route once the
+// app shell has mounted, and every test needs it anyway.
+const HYDRATED = '.v-select:has(.mdi-eye)';
 
 // EMPIRICALLY VERIFIED ON-SCREEN 2026-06-09 (gh #86) — driving the real "Viewing as" dropdown across a
 // data-rich, member-balanced household (Sharmas: Rohit ₹25L + Priya ₹18L; investments rohit:6/priya:2/Joint:3).
@@ -32,7 +37,13 @@ const WORKING = [
   "/expenses/recurring",
   "/investments/overview", "/investments/holdings",
   "/insurance/overview", "/insurance/policies",
-  "/financial-health", "/financial-health/net-worth", "/financial-health/cash-flow",
+  // NB: the BARE /financial-health route is the Health SCORE page — it renders 0-100 scores
+  // ("67 / 100", "25 / 25"), NOT ₹ figures, so the ₹-token `lensResponds` heuristic cannot assert
+  // it (it correctly re-scopes — the header shows "Viewing <member>'s own finances" — but with
+  // scores, not ₹). Its ₹-bearing SUB-routes below carry the ₹ lens assertions. (Excluded from the
+  // ₹-sweep 2026-06-10 after the hydration-signal fix let the sweep actually run and surfaced that
+  // the bare score route was mis-listed.)
+  "/financial-health/net-worth", "/financial-health/cash-flow",
   "/financial-health/banking", "/financial-health/emergency-fund", "/financial-health/reports",
   "/fire-goals/dashboard",
   // FIXED (commit 15c08e8, gh #86) — now lenses income + deductions same-scope. Verified on-screen:
@@ -71,6 +82,20 @@ async function bootstrapSample(page: Page) {
   await page.getByRole("button", { name: /Try the sample/i }).click();
   await expect(page).toHaveURL(/\/fire-goals\/dashboard/);
   await page.waitForSelector(HYDRATED, { timeout: 30000 });
+  // Dismiss the demo tour — its `.tour-overlay` intercepts pointer events on first dashboard entry
+  // (documented in ui-verification.md), which otherwise blocks the "Viewing as" dropdown click on the
+  // dashboard + financial-health routes. "Skip tour" sets the persistent tour-dismissed flag so it
+  // never re-pops for the rest of the sweep.
+  await dismissTour(page);
+}
+
+/** Dismiss the demo-tour overlay if present (idempotent — no-op when already dismissed). */
+async function dismissTour(page: Page) {
+  const skip = page.getByRole("button", { name: /skip tour/i });
+  if (await skip.isVisible().catch(() => false)) {
+    await skip.click().catch(() => {});
+    await page.waitForTimeout(200);
+  }
 }
 
 /** The "Viewing as" v-select is the one with the unique mdi-eye prepend icon. */
@@ -108,6 +133,7 @@ async function captureFigures(page: Page): Promise<string> {
 async function lensResponds(page: Page, route: string): Promise<{ responded: boolean; household: string; empty: boolean }> {
   await page.goto(route, { waitUntil: "networkidle" });
   await page.waitForSelector(HYDRATED, { timeout: 30000 });
+  await dismissTour(page); // defensive — the tour can re-pop on a dashboard re-visit within the sweep
 
   const labels = await memberOptionLabels(page);
   expect(labels[0], `the "Viewing as" dropdown must render with ≥2 adults on the sample seed`).toMatch(

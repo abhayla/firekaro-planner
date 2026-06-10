@@ -60,6 +60,30 @@ describe("#138 computePlanVariance — decomposed, honest delta", () => {
     expect(v.attribution.goalpost).toBeLessThan(0);
   });
 
+  it("detects ANY assumption change as a goalpost (not just SWR) — equity return, inflation, variant", () => {
+    const { household, assumptions } = setup();
+    const baseline = captureBaselineFrom(household, assumptions, LENS, eighteenMonthsAgo);
+    // Three DIFFERENT assumption fields, each must register as a goalpost change (proves the
+    // decomposition reads the whole DECOMP_KEYS set, not a hardcoded swrOverride).
+    for (const change of [
+      { equityReturn: assumptions.equityReturn + 0.02 },
+      { inflation: assumptions.inflation + 0.01 },
+      { fatMultiplier: assumptions.fatMultiplier + 0.1 },
+    ]) {
+      const key = Object.keys(change)[0];
+      const v = computePlanVariance({
+        baseline,
+        household,
+        currentAssumptions: { ...assumptions, ...change },
+        lens: LENS,
+        nowMs: NOW,
+      });
+      expect(v.assumptionsChanged, `${key} must be detected`).toBe(true);
+      expect(v.changedAssumptionKeys, `${key} must be listed`).toContain(key);
+      expect(v.attribution.progress, `${key}: still no fake progress`).toBe(0);
+    }
+  });
+
   it("CPI-REBASES the rupee delta: flat nominal net worth over 18 months reads as a REAL decline", () => {
     const { household, assumptions } = setup();
     // Baseline net worth equals today's (flat nominal), captured 18 months ago.
