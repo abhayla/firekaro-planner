@@ -126,6 +126,21 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 ## §3 — Decision log (append-only, newest first)
 
 ### 2026-06-10
+- **D-2026-06-10-04 — SECURITY FIX (Abhay-approved): enabled Supabase RLS deny-all on all 25 prod tables —
+  closes the 2 CRITICAL advisor warnings.** Triggered by the Supabase Security Advisor email
+  (`rls_disabled_in_public` + `sensitive_columns_exposed` on `zymbhuwuguzeueslwhyz`): the anon-keyed PostgREST
+  Data API could read/write/delete every table (PAN/salary/family) with RLS off — no second layer. Fixed
+  per the long-standing handoff **B1** (now RESOLVED). DBA→Security role. Ran `ENABLE ROW LEVEL SECURITY` on
+  all 25 `public` tables via the `postgres` `DATABASE_URL` (session pooler, `connection_limit=1`). **Safety
+  gate FIRST** (abort-if-unsafe): confirmed the role is `postgres` = superuser/bypassrls AND owner of all 25
+  tables → RLS-exempt (table owners bypass RLS without FORCE) → the app is NOT locked out. **Verified:**
+  25/25 `rowsecurity=true`; the script's `prisma.user.count()=3` read works through RLS; and the **LIVE prod
+  app** smoke is green post-change (`/api/internal/smoke` `user.count=3, 37ms`, `/api/health` prod+db,
+  public 200) — proving the deployed app reads fine while the anon/`authenticated` Data-API roles now get
+  deny-all (subject to RLS, no policies). Reversible (`DISABLE ROW LEVEL SECURITY`). The old B1 note
+  "enabling RLS breaks the app" was WRONG for this app (it uses the owner/bypassrls `postgres` role + no
+  anon-key path). Caveat: anon REST path not black-box-tested (no anon key in-session) — mechanism is sound;
+  the advisor will clear on its next scan. The throwaway `enable-rls.mjs` was deleted.
 - **D-2026-06-10-03 — TIER-2 AUTHED PROD VERIFICATION: PASSED (both deploy gaps closed).** Abhay logged in
   on the LIVE site (dedicated session) so the authed path could be checked. **Google "browser may not be
   secure" automation-block hit + solved** (per app-login learnings): bundled Chromium is detected → relaunched
