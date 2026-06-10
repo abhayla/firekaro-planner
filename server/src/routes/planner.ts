@@ -16,8 +16,8 @@ import { diffHousehold } from "../lib/household-diff";
  * StorageAdapter.get/set(key) 1:1. NOT granular REST. userId comes from the
  * authenticated session (c.get('userId')), NEVER from the request body.
  *
- * 7 paths: household, assumptions, scenarios, features, ui, expense-history
- * (GET+PUT each) + DELETE /all + GET /me. The household PUT runs the
+ * 8 paths: household, assumptions, scenarios, features, ui, expense-history,
+ * plan-baseline (GET+PUT each) + DELETE /all + GET /me. The household PUT runs the
  * server-side diff inside one transaction (household-repo + household-diff).
  */
 
@@ -73,6 +73,20 @@ const expenseSnapshotSchema = z.object({
   netWorth: z.number().optional(),
 });
 const expenseHistoryBodySchema = z.array(expenseSnapshotSchema);
+
+// #138 — the locked plan baseline (a dedicated entity; SRP, NOT an ExpenseSnapshot extension).
+// Stored as a JSON blob inside the userUiPrefs.prefs row under the `planBaseline` key — NO new
+// Prisma table / migration (the lifecycleSnapshot precedent), so it never touches the shared schema.
+const planBaselineSchema = z.object({
+  capturedAt: z.string(),
+  fireNumber: z.number(),
+  fireAge: z.number(),
+  yearsToFire: z.number(),
+  netWorth: z.number(),
+  monthlyContribution: z.number(),
+  annualExpenses: z.number(),
+  assumptions: assumptionsSchema, // a copy of the assumptions in force at lock time
+});
 
 // ---------- ownerId refinement (the "Joint" sentinel; NO FK) ----------
 
@@ -324,17 +338,71 @@ app.put("/ui", async (c) => {
   if (!parsed.success) {
     return apiError(c, `Invalid ui prefs: ${parsed.error.message}`, 422, ErrorCode.VALIDATION_ERROR);
   }
-  const data = { prefs: parsed.data as Prisma.InputJsonValue };
   try {
-    const saved = await prisma.userUiPrefs.upsert({
-      where: { userId },
-      create: { userId, ...data },
-      update: data,
-    });
+    // MERGE, not wholesale replace: the prefs blob ALSO carries the #138 `planBaseline` sub-key
+    // (written by the dedicated /plan-baseline endpoint). A wholesale replace from the ui store —
+    // which doesn't know about planBaseline — would silently strip it. Overlay the incoming ui
+    // fields onto the existing prefs so a co-resident sub-blob survives. The read-modify-write runs
+    // in a SERIALIZABLE transaction so a concurrent /plan-baseline write to the same row can't
+    // lost-update (the ServerAdapter flushes keys independently — code-reviewer H2).
+    const saved = await prisma.$transaction(
+      async (tx) => {
+        const existing = await tx.userUiPrefs.findUnique({ where: { userId } });
+        const existingPrefs = (existing?.prefs as Record<string, unknown> | null) ?? {};
+        const merged = { ...existingPrefs, ...parsed.data } as Prisma.InputJsonValue;
+        return tx.userUiPrefs.upsert({ where: { userId }, create: { userId, prefs: merged }, update: { prefs: merged } });
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
     return apiSuccess(c, { updatedAt: saved.updatedAt });
   } catch (err) {
     logger.error({ err, userId }, "PUT /planner/ui failed");
     return apiError(c, "Failed to persist ui prefs", 500, ErrorCode.INTERNAL_ERROR);
+  }
+});
+
+// ============================ plan-baseline (#138) ============================
+
+app.get("/plan-baseline", async (c) => {
+  const userId = c.get("userId");
+  try {
+    const row = await prisma.userUiPrefs.findUnique({ where: { userId } });
+    const prefs = (row?.prefs as Record<string, unknown> | null) ?? {};
+    return apiSuccess(c, prefs.planBaseline ?? null);
+  } catch (err) {
+    logger.error({ err, userId }, "GET /planner/plan-baseline failed");
+    return apiError(c, "Failed to read plan baseline", 500, ErrorCode.INTERNAL_ERROR);
+  }
+});
+
+app.put("/plan-baseline", async (c) => {
+  const userId = c.get("userId");
+  let body: unknown;
+  try {
+    body = await c.req.json();
+  } catch {
+    return apiError(c, "Invalid JSON body", 400, ErrorCode.VALIDATION_ERROR);
+  }
+  const parsed = planBaselineSchema.safeParse(body);
+  if (!parsed.success) {
+    return apiError(c, `Invalid plan baseline: ${parsed.error.message}`, 422, ErrorCode.VALIDATION_ERROR);
+  }
+  try {
+    // Read-modify-write the prefs blob so the ui sub-fields (isFamilyView/currentFY/…) survive.
+    // SERIALIZABLE so a concurrent /ui write to the same row can't lost-update the baseline (H2).
+    const saved = await prisma.$transaction(
+      async (tx) => {
+        const existing = await tx.userUiPrefs.findUnique({ where: { userId } });
+        const existingPrefs = (existing?.prefs as Record<string, unknown> | null) ?? {};
+        const merged = { ...existingPrefs, planBaseline: parsed.data } as Prisma.InputJsonValue;
+        return tx.userUiPrefs.upsert({ where: { userId }, create: { userId, prefs: merged }, update: { prefs: merged } });
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
+    return apiSuccess(c, { updatedAt: saved.updatedAt });
+  } catch (err) {
+    logger.error({ err, userId }, "PUT /planner/plan-baseline failed");
+    return apiError(c, "Failed to persist plan baseline", 500, ErrorCode.INTERNAL_ERROR);
   }
 });
 

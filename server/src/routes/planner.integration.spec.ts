@@ -251,4 +251,62 @@ dlive("/api/planner integration (live DB — Supabase firekaro-planner)", () => 
     const body: any = await (await app.request("/api/planner/expense-history", { headers: H })).json();
     expect(body.data, "expense-history snapshots round-trip deep-equal").toEqual(snapshots);
   });
+
+  // ===================== #138 plan-baseline (dedicated entity, ui-prefs blob) =====================
+
+  // A COMPLETE Assumptions object (what the frontend's a.values actually sends) — including the
+  // two fields assumptionsSchema defaults (householdSplitPercent, householdSavingsStepUpPercent),
+  // so the round-trip is exact and the assumptions copy is provably preserved verbatim.
+  const sampleAssumptions = {
+    inflation: 0.06, equityReturn: 0.12, debtReturn: 0.07, realEstateReturn: 0.06, goldReturn: 0.07,
+    npsReturn: 0.1, ppfReturn: 0.071, epfReturn: 0.0825, internationalReturn: 0.1, reitReturn: 0.08,
+    cryptoReturn: 0, healthcareInflation: 0.14, educationInflation: 0.09, housingInflation: 0.06,
+    inflationWeights: { general: 60, healthcare: 20, education: 10, housing: 10 },
+    leanMultiplier: 0.6, fatMultiplier: 1.5, withdrawalRule: "Constant",
+    householdSplitPercent: 50, householdSavingsStepUpPercent: 0,
+  };
+  const sampleBaseline = {
+    capturedAt: "2026-06-10T00:00:00.000Z",
+    fireNumber: 105500000, fireAge: 56, yearsToFire: 25.58, netWorth: 11000000,
+    monthlyContribution: 160000, annualExpenses: 2076000,
+    assumptions: sampleAssumptions,
+  };
+
+  it("PUT+GET /plan-baseline round-trips the full shape INCLUDING the assumptions copy", async () => {
+    const put = await app.request("/api/planner/plan-baseline", { method: "PUT", headers: H, body: JSON.stringify(sampleBaseline) });
+    expect(put.status).toBe(200);
+    const body: any = await (await app.request("/api/planner/plan-baseline", { headers: H })).json();
+    expect(body.success).toBe(true);
+    expect(body.data, "plan-baseline round-trips deep-equal incl. assumptions copy").toEqual(sampleBaseline);
+    // The assumptions copy is the load-bearing field for honest decomposition — assert it explicitly.
+    expect(body.data.assumptions.swrOverride === undefined || body.data.assumptions.swrOverride === null).toBe(true);
+    expect(body.data.assumptions.equityReturn).toBe(0.12);
+  });
+
+  it("plan-baseline and ui prefs CO-RESIDE in the blob without clobbering each other", async () => {
+    // Write a ui pref, then the baseline, then a second ui pref — the baseline must survive, and
+    // the ui fields must survive a baseline write (the merge-safe read-modify-write contract).
+    await app.request("/api/planner/ui", { method: "PUT", headers: H, body: JSON.stringify({ isFamilyView: true, currentFY: "2025-26" }) });
+    await app.request("/api/planner/plan-baseline", { method: "PUT", headers: H, body: JSON.stringify(sampleBaseline) });
+    await app.request("/api/planner/ui", { method: "PUT", headers: H, body: JSON.stringify({ isFamilyView: false, currentFY: "2025-26" }) });
+
+    const ui: any = await (await app.request("/api/planner/ui", { headers: H })).json();
+    const baseline: any = await (await app.request("/api/planner/plan-baseline", { headers: H })).json();
+    expect(ui.data.isFamilyView, "later ui write took effect").toBe(false);
+    expect(baseline.data, "the baseline survived the two ui writes").not.toBeNull();
+    expect(baseline.data.fireNumber).toBe(105500000);
+  });
+
+  it("GET /plan-baseline rejects an unauthenticated request (401)", async () => {
+    const res = await app.request("/api/planner/plan-baseline"); // no dev-bypass header
+    expect(res.status).toBe(401);
+  });
+
+  it("PUT /plan-baseline rejects a malformed payload 422 (missing the assumptions copy)", async () => {
+    const res = await app.request("/api/planner/plan-baseline", {
+      method: "PUT", headers: H,
+      body: JSON.stringify({ capturedAt: "2026-06-10T00:00:00.000Z", fireNumber: 1, fireAge: 50, yearsToFire: 10, netWorth: 1, monthlyContribution: 1, annualExpenses: 1 }),
+    });
+    expect(res.status).toBe(422);
+  });
 });
