@@ -126,6 +126,17 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 ## §3 — Decision log (append-only, newest first)
 
 ### 2026-06-10
+- **D-2026-06-10-07 — Deployed `ffac86d` (salary % inputs, D-2026-06-10-06) to prod; ALL post-deploy
+  tiers + rule-33 blind verification PASSED.** Runbook redeploy (backup `firekaro-pre-deploy-20260610-162129`
+  → git-archive ship → build → pm2 reload; no migrations). Tier-1: health+smoke green (DB 41ms), bundle
+  `B0tsCBuV→D3DbQ_qR`. Tier-1.5: login renders, console = expected unauth 401 + boot warning only,
+  **Sign-in click-through verified** (redirects to accounts.google.com). Tier-2 (authed test account):
+  Edit-salary dialog serves the new % fields + law hints; existing record derives 0% for absent fields (no
+  resurrection); **sector flip 0→14→0 verified live, cancelled (no prod writes)**. Blind verifier CONCURRED
+  (independently proved the feature in the served lazy chunk `Salary-D6YbIaol.js`); its coverage dissents
+  (console-as-artifact, sign-in functionality, sector-default live proof) were closed in a follow-up pass.
+  Known residual: non-zero %-derivation not demonstrable on prod without a write — verified pre-merge
+  (local server-adapter round-trip: stored ₹22.5L/₹2.25L → derived 50/10).
 - **D-2026-06-10-06 — Salary form: Basic + employer NPS become PERCENTAGE inputs with LAW-grounded,
   sector-aware defaults (Abhay's screenshot feedback; FinTech-reconciled).** The Edit-salary dialog now
   asks Basic as **% of CTC** (fresh-entry default **50%** — the Code on Wages wage floor, codes in force
