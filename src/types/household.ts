@@ -26,14 +26,16 @@ export const memberSalarySchema = z.object({
   hikePercent: z.number().min(0).max(25),
   vpfTopUpPercent: z.number().min(0).max(100).optional(),
   // Employer's annual NPS contribution (₹). Deductible under Sec 80CCD(2) in BOTH
-  // tax regimes (the one Chapter VI-A deduction the new regime keeps). Entered as the
-  // actual employer contribution from the salary slip / Form 16 — we do not derive it
-  // (the statutory 10%/14%-of-basic cap is the employer's concern; we lack a basic-salary
-  // field to enforce it). gh-issue #2 findings #1/#2.
+  // tax regimes (the one Chapter VI-A deduction the new regime keeps). The salary form
+  // collects this as a % of basic (sector-aware default: govt 14 / private 0 —
+  // salary-percent.ts) and persists the computed ₹; 0 persists as ABSENT; the engine
+  // consumes the amount, never a %. gh-issue #2 findings #1/#2.
   employerNpsAnnual: z.number().min(0).optional(),
   // Basic salary (Basic + DA) per year. Used ONLY to cap the 80CCD(2) deduction at the
-  // statutory ceiling (10% of basic old regime / 14% new). Optional — when absent the
-  // employer-NPS figure is trusted uncapped (we don't derive basic from CTC). gh-issue #3.
+  // statutory ceiling (10% of basic old regime / 14% new). The salary form collects this
+  // as a % of CTC (fresh-entry default 50 — salary-percent.ts) and persists the computed ₹;
+  // 0% persists as ABSENT. Optional — when absent the employer-NPS figure is trusted
+  // uncapped and gratuity/EPS fall back to their conservative estimates. gh-issue #3.
   basicAnnual: z.number().min(0).optional(),
   // Employer sector — GOVERNMENT employees get the 14%-of-basic 80CCD(2) ceiling under the
   // OLD regime too (private = 10% old / 14% new). Optional; absent ⇒ "private" (conservative

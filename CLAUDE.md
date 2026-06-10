@@ -243,6 +243,7 @@ Pure modules in `src/lib/` with colocated `*.spec.ts`: `fire-math.ts`, `tax.ts` 
 `stress-test.ts`, `monte-carlo.ts` (#18 — FIRE date as a confidence distribution, not a point),
 `investment-traits.ts`, `derived-records.ts`, `nudge-engine.ts`,
 `business-legal-kinds.ts` (shared `BUSINESS_LEGAL_KINDS` label lookup for the business/other-income forms — Pvt-Ltd/LLP/Partnership/HUF/etc.),
+`salary-percent.ts` (the salary-form % ⇄ ₹ bridge: Basic as % of CTC + employer NPS as % of basic, law-grounded fresh-entry defaults — Code-on-Wages 50% floor; sector-aware NPS govt 14 / private 0; existing records never resurrect defaults),
 `lifecycle-digest.ts` (the `derive()`-grounded "since you were away" delta engine — the Tier-1
 stickiness digest card on the dashboard), `expense-history.ts`, `member-horizon.ts`, `age.ts`,
 `fire-milestone-copy.ts` (Coast/Barista card copy gated on a real FIRE target existing — the honest

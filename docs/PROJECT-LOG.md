@@ -126,6 +126,20 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 ## §3 — Decision log (append-only, newest first)
 
 ### 2026-06-10
+- **D-2026-06-10-06 — Salary form: Basic + employer NPS become PERCENTAGE inputs with LAW-grounded,
+  sector-aware defaults (Abhay's screenshot feedback; FinTech-reconciled).** The Edit-salary dialog now
+  asks Basic as **% of CTC** (fresh-entry default **50%** — the Code on Wages wage floor, codes in force
+  21 Nov 2025) and employer NPS as **% of basic** (default **govt 14%** — statutory mandatory — / **private
+  0%**), converting to ₹ on save; the persisted `MemberSalary` ₹ model and the tax engine are unchanged.
+  **Deviation from Abhay's literal "default 14%":** the rule-29 FinTech pass graded flat-14 a **Tier-0
+  optimistic default** (corporate NPS is minority opt-in; flat-14 fabricates ≈₹98K/yr tax benefit at ₹45L
+  CTC for non-NPS private users) — sector-aware implemented instead, ceiling kept discoverable in the hint;
+  Abhay can flip to flat-14 with one word. Code review caught + fixed a BLOCKER in the first cut: defaults
+  now prefill **only for brand-new entries**; existing records derive %s from stored ₹ (absent → 0%, never
+  resurrected), and 0-amounts persist as ABSENT so gratuity/EPS honesty disclosures keep rendering. New
+  module `src/lib/salary-percent.ts` (+19-test spec); member-lens sweep 16/16; 1186 unit tests green.
+  Deferred to issues: Sec 17(2)(vii) ₹7.5L employer-retirals perquisite gap; scalar `computeTax` sector
+  drift (form preview + tax-planning vs `derive()`).
 - **D-2026-06-10-05 — Abhay's manual prod verification of #138/#139/#140: 2 reports triaged, 1 issue filed
   (#155, good-to-have), 1 copy rename shipped.** (a) **"Re-lock not working"** → root-caused as a UX
   feedback gap, NOT a functional bug: full lock→variance→re-lock→reset cycle reproduced green in demo, and
