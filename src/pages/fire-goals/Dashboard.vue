@@ -12,6 +12,7 @@ import { isEmergencyFundEligible } from "@/lib/investment-traits";
 import FireHero from "@/components/dashboard/FireHero.vue";
 import LifecycleDigestCard from "@/components/dashboard/LifecycleDigestCard.vue";
 import BridgeBreakdownCard from "@/components/dashboard/BridgeBreakdownCard.vue";
+import RunwayCard from "@/components/dashboard/RunwayCard.vue";
 import AccelerationCard from "@/components/dashboard/AccelerationCard.vue";
 import IndividualFireCard from "@/components/dashboard/IndividualFireCard.vue";
 import FireProjectionChart from "@/components/dashboard/FireProjectionChart.vue";
@@ -277,6 +278,12 @@ onMounted(() => {
            verdict + spendable/locked bar + bridge-income, and links to Readiness for the full
            unlock-timeline + "what we assumed" detail. Self-hides for a fully-liquid household. -->
       <BridgeBreakdownCard variant="compact" />
+
+      <!-- #140 — job-loss / layoff runway: months the household could survive with ZERO income
+           from POST-TAX liquid savings against the FULL obligation burn (living + EMI + premiums).
+           Optionality/safety framing, placed right after the bridge (early-FIRE liquidity) since
+           both answer "is my money actually reachable when I need it?" -->
+      <RunwayCard />
 
       <!-- #48 obj-2 — "your biggest achievable wins": ranked accelerators (years sooner) for THIS
            household, the risk-notch with a confidence range, + a live save-more what-if. The
