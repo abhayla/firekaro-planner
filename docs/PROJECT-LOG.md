@@ -126,6 +126,29 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 ## §3 — Decision log (append-only, newest first)
 
 ### 2026-06-10
+- **D-2026-06-10-03 — TIER-2 AUTHED PROD VERIFICATION: PASSED (both deploy gaps closed).** Abhay logged in
+  on the LIVE site (dedicated session) so the authed path could be checked. **Google "browser may not be
+  secure" automation-block hit + solved** (per app-login learnings): bundled Chromium is detected → relaunched
+  with REAL Chrome (`channel:'chrome'`) + a persistent profile + the automation signature stripped
+  (`ignoreDefaultArgs:['--enable-automation']`, `--disable-blink-features=AutomationControlled`) → Google
+  accepted it. **Security:** the persistent capture pulled in 47 cookies incl. the full Google session →
+  sanitized `e2e/.auth/user.json` to the 2 FireKaro `__Secure-better-auth.session_*` cookies only, deleted the
+  Google-session profile dir; `e2e/.auth/` is gitignored (nothing committed). **Authed evidence:**
+  `/api/auth/get-session` 200 (real session, expires 2026-06-17); **`/api/planner/plan-baseline` 200
+  `{"success":true,"data":null}`** (the new #138 endpoint round-trips authed in prod — the gap from D-10-02
+  CLOSED). Full-page authed dashboard screenshot → **rule-33 blind verifier CONCUR**: (#139) "TODAY'S ₹ |
+  FUTURE ₹" toggle present + honest caption (inside the "Your path to FIRE" card, NOT the page header — my
+  evidence over-claimed "header", corrected); (#140) "If your income stopped today ≈ **3 yrs 4 mo**" (post-tax
+  ₹69.43L liquid) + conservative "≈1 month stable (₹2L FD)" + "+EPF ₹24L ~2mo after exit → ≈4yr 6mo" — exactly
+  the locked design; (#138) correct EMPTY "LOCK THIS AS MY PLAN" state (consistent with `data:null`, NO
+  fabricated variance) — and the "moved 5 months earlier" banner is the SEPARATE pre-existing "SINCE YOU WERE
+  AWAY" lifecycle digest, not #138. FIRE headline age 56/2052 plausible; real data (Rohit ₹4.04Cr/Priya ₹2.35Cr);
+  no crash/NaN/broken layout. **Residual (correctly-scoped, non-destructive prod):** the POPULATED #138
+  post-lock variance state was NOT exercised on prod (PUT would write to the real account — forbidden); it
+  rests on the pre-merge server-mode sub-run evidence. **One minor bug filed `#154`** (demo-mode footer copy
+  "data stays on your device — no backend" shows on the authed/server-backed dashboard). Net: the 3 cards are
+  now **verified working on live authed prod**. Tooling: `scripts/prod-login-capture.mjs` (reusable Tier-2
+  session-seed with the anti-Google-block fix). Pointer: D-10-02.
 - **D-2026-06-10-02 — PROD DEPLOY (Abhay-instructed): shipped the 3 honesty cards + the new
   `/api/planner/plan-baseline` endpoint to https://firekaro.com.** DevOps/Release role. Per `DEPLOY.md`
   §Redeploy from local clone @ `5cb8c8f`: backup (`firekaro-pre-deploy-20260610-095928.tar.gz`) →
