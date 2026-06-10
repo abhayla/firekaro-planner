@@ -3,7 +3,6 @@ import { computed, onMounted } from "vue";
 import { useHouseholdStore } from "@/stores/household";
 import { useFeaturesStore } from "@/stores/features";
 import { useFireDerive } from "@/lib/useFireDerive";
-import { runStressScenarios } from "@/lib/stress-test";
 import { formatINRCompact, formatPercent } from "@/lib/formatters";
 import { lifeCoverAdequacy, healthCoverAdequacy } from "@/lib/adequacy";
 import { computeFreedomScore } from "@/lib/freedom-score";
@@ -147,37 +146,8 @@ const planningHorizonYears = computed(() =>
   Math.max(0, fire.planToAge.value - fire.targetRetirementAge.value),
 );
 
-// A36.1/A36.2 — estate-readiness chip + red-flag. A high-asset household with a
-// barely-started estate checklist is the highest-severity gap. Estate exposure
-// is TOTAL assets (the home you bequeath counts), not the FIRE corpus which
-// excludes the primary residence.
-const ESTATE_TOTAL = 7;
-const totalEstateAssets = computed(() =>
-  household.data.investments.reduce((s, i) => s + i.value, 0),
-);
-const estateComplete = computed(
-  () => (household.data.estateChecklist ?? []).filter((e) => e.completed).length,
-);
-const estateRedFlag = computed(
-  () => totalEstateAssets.value > 10_000_000 && estateComplete.value < 4,
-);
-
-// A27.3 — stress-test red-flag chip: "Plan fails X of 10" → /fire-goals/stress-test.
-// Shown only when the stress-test feature is enabled (else the route redirects).
-const stressEnabled = computed(() => features.isEnabled("fire.stressTest"));
-// gh #39 sibling: with no FIRE target (zero expenses) the stress test is meaningless —
-// runStressScenarios on ₹0 reports scenarios as "survivable" (0 ≥ 0), so a brand-new
-// zero-data user falsely sees "plan survives 9 of 10". Gate the chip on a real plan.
-const hasFireTarget = computed(() => fire.fireNumber.value > 0);
-const stressSummary = computed(() =>
-  runStressScenarios({
-    annualExpenses: fire.annualExpensesToday.value,
-    swr: fire.effectiveSWR.value,
-    expectedReturn: fire.blendedReturn.value,
-    totalCorpus: fire.totalCorpus.value,
-    annualIncomeTotal: fire.annualIncome.value.total,
-  }).summary,
-);
+// A36 estate-readiness + A27.3 stress-test red-flags moved OUT of the header chips into
+// the severity-coded suggestions (NudgeStack synthetic entries — Option-D decision 8).
 
 // P3 (A30.1/A30.3): enrich the current month's snapshot with the live FIRE
 // number + target year so the trajectory chart has a real point. Idempotent
@@ -232,33 +202,6 @@ onMounted(() => {
         <v-chip size="small" variant="tonal" color="primary" prepend-icon="mdi-timer-sand">
           Planning horizon: {{ planningHorizonYears }} yrs
           (retire @{{ fire.targetRetirementAge.value }} → plan-to {{ fire.planToAge.value }})
-        </v-chip>
-        <v-chip
-          size="small"
-          variant="tonal"
-          :color="estateRedFlag ? 'error' : estateComplete === ESTATE_TOTAL ? 'success' : 'warning'"
-          :prepend-icon="estateRedFlag ? 'mdi-alert' : 'mdi-file-document-check-outline'"
-          :to="'/estate-planning'"
-          data-testid="estate-chip"
-        >
-          Estate: {{ estateComplete }} of {{ ESTATE_TOTAL }} complete
-          <template v-if="estateRedFlag">&nbsp;· corpus &gt; ₹1 Cr needs a will</template>
-        </v-chip>
-        <v-chip
-          v-if="stressEnabled && hasFireTarget"
-          size="small"
-          variant="tonal"
-          :color="stressSummary.failed === 0 ? 'success' : stressSummary.failed >= 4 ? 'error' : 'warning'"
-          :prepend-icon="stressSummary.failed === 0 ? 'mdi-shield-check' : 'mdi-shield-alert'"
-          :to="'/fire-goals/stress-test'"
-          data-testid="stress-chip"
-        >
-          <template v-if="stressSummary.failed === 0">
-            Stress test: plan survives all {{ stressSummary.total }}
-          </template>
-          <template v-else>
-            Plan fails {{ stressSummary.failed }} of {{ stressSummary.total }} stress scenarios
-          </template>
         </v-chip>
       </div>
 

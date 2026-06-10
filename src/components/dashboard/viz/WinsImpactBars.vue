@@ -17,8 +17,8 @@ import { computed } from "vue";
 /** Discriminated union — a market win WITHOUT a range is unrepresentable (it must never
  *  render as a deterministic gain; that would invert the §3.5 honesty contract). */
 export type WinBar =
-  | { label: string; kind: "sure"; deltaYears: number }
-  | { label: string; kind: "market"; range: [number, number] };
+  | { label: string; note?: string; kind: "sure"; deltaYears: number }
+  | { label: string; note?: string; kind: "market"; range: [number, number] };
 
 const props = defineProps<{ wins: WinBar[] }>();
 
@@ -64,6 +64,7 @@ const rows = computed(() =>
       const [lo, hi] = w.range;
       return {
         label: w.label,
+        note: w.note,
         kind: "market" as const,
         left: toPct(Math.min(lo, hi)),
         width: Math.max(2, Math.abs(toPct(hi) - toPct(lo))),
@@ -73,6 +74,7 @@ const rows = computed(() =>
     const d = w.deltaYears;
     return {
       label: w.label,
+      note: w.note,
       kind: "sure" as const,
       left: toPct(Math.min(0, d)),
       width: Math.max(2, Math.abs(toPct(d) - toPct(0))),
@@ -88,7 +90,10 @@ const rows = computed(() =>
        nodes ARE the accessible content; the decorative track SVGs are aria-hidden. -->
   <div v-if="rows.length" class="wins-bars">
     <div v-for="(rw, i) in rows" :key="i" class="wins-bars__row" data-testid="win-row">
-      <span class="wins-bars__label">{{ rw.label }}</span>
+      <span class="wins-bars__label">
+        {{ rw.label }}
+        <span v-if="rw.note" class="wins-bars__note">{{ rw.note }}</span>
+      </span>
       <svg viewBox="0 0 100 16" preserveAspectRatio="none" class="wins-bars__track" aria-hidden="true">
         <defs v-if="i === 0">
           <pattern :id="patternId" width="6" height="16" patternUnits="userSpaceOnUse">
@@ -138,6 +143,11 @@ const rows = computed(() =>
 }
 .wins-bars__label {
   color: var(--text-primary, #1e293b);
+}
+.wins-bars__note {
+  display: block;
+  font-size: 11px;
+  color: var(--text-muted, #64748b);
 }
 .wins-bars__track {
   width: 100%;

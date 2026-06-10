@@ -2,24 +2,35 @@
 /**
  * #138 — Plan-vs-actual variance card. Lock a plan baseline, then see the HONEST delta since:
  * the FIRE-date move DECOMPOSED into progress (corpus grew) / reality (expenses changed) / goalpost
- * (you changed an assumption). The card NEVER sells an assumption tweak as "progress" — when
- * assumptions changed it says so prominently. Rupee deltas are CPI-rebased to today's money.
+ * (you changed an assumption) — rendered as the Option-D waterfall. The card NEVER sells an
+ * assumption tweak as "progress" — when assumptions changed it says so prominently, and when the
+ * attribution drivers are all-zero (the sign-mismatch guard) the waterfall renders NO bars: the
+ * exact headline + the goalpost alert stand un-attributed. Rupee deltas are CPI-rebased to today.
+ *
+ * Option-D split of controls: the HERO hosts the one canonical "Lock this as my plan" CTA (no
+ * baseline); THIS card hosts Re-lock once locked (#155: with a transient ✓ acknowledgement).
  */
-import { computed } from "vue";
+import { computed, ref, onBeforeUnmount } from "vue";
 import { useHouseholdStore } from "@/stores/household";
 import { useAssumptionsStore } from "@/stores/assumptions";
 import { useUiStore } from "@/stores/ui";
 import { usePlanBaseline } from "@/composables/usePlanBaseline";
 import { computePlanVariance } from "@/lib/plan-variance";
 import { formatINRCompact } from "@/lib/formatters";
+import PlanVarianceWaterfall from "@/components/dashboard/viz/PlanVarianceWaterfall.vue";
 
 const h = useHouseholdStore();
 const a = useAssumptionsStore();
 const ui = useUiStore();
 const { baseline, lockBaseline } = usePlanBaseline();
 
+// A persisted Infinity yearsToFire JSON-round-trips to null and would fabricate a finite
+// claim ((null − current)×12 → "N mo behind"). An unusable baseline renders the empty state
+// (re-lock from the hero once the plan is projectable) — never a fabricated verdict.
+const baselineUsable = computed(() => !!baseline.value && Number.isFinite(baseline.value.yearsToFire));
+
 const variance = computed(() => {
-  if (!baseline.value) return null;
+  if (!baseline.value || !baselineUsable.value) return null;
   return computePlanVariance({
     baseline: baseline.value,
     household: h.data,
@@ -30,7 +41,9 @@ const variance = computed(() => {
 });
 
 // "4 months earlier" / "6 months later" / "on track". Positive = earlier (ahead of plan).
-function monthsPhrase(m: number): { text: string; tone: "ahead" | "behind" | "flat" } {
+// Non-finite delta (current plan unprojectable) makes NO numeric claim (the H1 honesty class).
+function monthsPhrase(m: number): { text: string; tone: "ahead" | "behind" | "flat" | "unknown" } {
+  if (!Number.isFinite(m)) return { text: "not comparable right now — the current plan has no projectable date", tone: "unknown" };
   const months = Math.round(m);
   if (months === 0) return { text: "right on your plan", tone: "flat" };
   const mag = Math.abs(months);
@@ -42,26 +55,44 @@ function monthsPhrase(m: number): { text: string; tone: "ahead" | "behind" | "fl
 
 const headline = computed(() => (variance.value ? monthsPhrase(variance.value.fireDateDeltaMonths) : null));
 
-// Attribution lines — only the drivers that actually moved (rounded to a whole month).
-const drivers = computed(() => {
+// Waterfall inputs — rounded whole-month drivers (the viz renders nothing when all-zero).
+const wf = computed(() => {
   const v = variance.value;
-  if (!v) return [];
-  const line = (label: string, months: number) => {
-    const r = Math.round(months);
-    if (r === 0) return null;
-    const sign = r > 0 ? "+" : "−";
-    return { label, text: `${sign}${Math.abs(r)} mo`, positive: r > 0 };
+  if (!v) return null;
+  return {
+    progress: v.attribution.progress,
+    reality: v.attribution.reality,
+    goalpost: v.attribution.goalpost,
+    net: Number.isFinite(v.fireDateDeltaMonths) ? v.fireDateDeltaMonths : 0,
   };
-  return [
-    line("corpus growth", v.attribution.progress),
-    line("expense changes", v.attribution.reality),
-    line("assumption changes", v.attribution.goalpost),
-  ].filter((x): x is { label: string; text: string; positive: boolean } => x !== null);
 });
 
-const lockedOn = computed(() =>
-  baseline.value ? new Date(baseline.value.capturedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "",
-);
+// #155 — transient re-lock acknowledgement: the button flips to "✓ Re-locked" for ~2s so the
+// click visibly DID something even when the variance state doesn't change (it usually resets
+// to "right on your plan", which looks identical if you were already on plan).
+const relockAck = ref(false);
+let ackTimer: ReturnType<typeof setTimeout> | null = null;
+function relock(): void {
+  lockBaseline();
+  relockAck.value = true;
+  if (ackTimer) clearTimeout(ackTimer);
+  ackTimer = setTimeout(() => (relockAck.value = false), 2000);
+}
+onBeforeUnmount(() => {
+  if (ackTimer) clearTimeout(ackTimer);
+});
+
+// #155 — when the baseline was captured TODAY, the date alone ("10 Jun 2026") reads as a
+// no-op after a re-lock; include the time of day.
+const lockedOn = computed(() => {
+  if (!baseline.value) return "";
+  const d = new Date(baseline.value.capturedAt);
+  const datePart = d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+  const today = new Date();
+  const isToday =
+    d.getFullYear() === today.getFullYear() && d.getMonth() === today.getMonth() && d.getDate() === today.getDate();
+  return isToday ? `${datePart}, ${d.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" })}` : datePart;
+});
 
 // Friendly labels for the changed assumption keys (raw store keys like "swrOverride" are jargon).
 const ASSUMPTION_LABELS: Record<string, string> = {
@@ -90,7 +121,7 @@ const changedAssumptionLabels = computed(() =>
 </script>
 
 <template>
-  <!-- Has a baseline → the variance view -->
+  <!-- Has a usable baseline → the variance view -->
   <v-card v-if="variance && headline" variant="outlined" class="pa-4 mt-4" data-testid="plan-variance-card">
     <div class="d-flex align-center justify-space-between ga-2 mb-2 flex-wrap">
       <div class="d-flex align-center ga-2">
@@ -99,12 +130,13 @@ const changedAssumptionLabels = computed(() =>
       </div>
       <v-btn
         size="x-small"
-        variant="outlined"
-        prepend-icon="mdi-lock-reset"
-        data-testid="plan-variance-relock"
-        @click="lockBaseline"
+        :variant="relockAck ? 'tonal' : 'outlined'"
+        :color="relockAck ? 'success' : undefined"
+        :prepend-icon="relockAck ? 'mdi-check' : 'mdi-lock-reset'"
+        :data-testid="relockAck ? 'plan-variance-relock-ack' : 'plan-variance-relock'"
+        @click="relock"
       >
-        Re-lock
+        {{ relockAck ? "Re-locked" : "Re-lock" }}
       </v-btn>
     </div>
 
@@ -114,24 +146,29 @@ const changedAssumptionLabels = computed(() =>
       data-testid="plan-variance-headline"
     >
       <template v-if="headline.tone === 'flat'">Your FIRE date is {{ headline.text }}</template>
+      <template v-else-if="headline.tone === 'unknown'">Your FIRE date is {{ headline.text }}</template>
       <template v-else>
         Your FIRE date is {{ headline.text }}
         <span class="text-body-2 text-medium-emphasis font-weight-regular">than when you locked this plan</span>
       </template>
     </div>
 
-    <div v-if="drivers.length" class="d-flex flex-wrap ga-2 mb-1" data-testid="plan-variance-drivers">
-      <v-chip
-        v-for="d in drivers"
-        :key="d.label"
-        size="small"
-        variant="tonal"
-        :color="d.positive ? 'success' : 'error'"
-      >
-        {{ d.text }} {{ d.label }}
-      </v-chip>
-    </div>
-    <p v-if="drivers.length" class="text-caption text-medium-emphasis mb-2">
+    <!-- Option-D waterfall — the drivers as columns. Renders NOTHING when attribution is
+         all-zero (the honest un-attributed state; the alert below explains a goalpost move). -->
+    <PlanVarianceWaterfall
+      v-if="wf"
+      :progress-months="wf.progress"
+      :reality-months="wf.reality"
+      :goalpost-months="wf.goalpost"
+      :net-months="wf.net"
+      data-testid="plan-variance-drivers"
+    />
+    <!-- Caption gate mirrors the viz's own finite-clamp render gate exactly — never a
+         caption pointing at a chart that (honestly) refused to draw. -->
+    <p
+      v-if="wf && [wf.progress, wf.reality, wf.goalpost].some((x) => Number.isFinite(x) && Math.round(x) !== 0)"
+      class="text-caption text-medium-emphasis mb-2"
+    >
       What moved your date (the parts add up to the move above).
     </p>
 
@@ -161,23 +198,14 @@ const changedAssumptionLabels = computed(() =>
     </div>
   </v-card>
 
-  <!-- No baseline yet → the lock CTA -->
+  <!-- No (usable) baseline → explainer; the ONE canonical lock CTA lives in the hero above. -->
   <v-card v-else variant="outlined" class="pa-4 mt-4 text-center" data-testid="plan-variance-empty">
     <v-icon icon="mdi-target" size="40" color="grey-lighten-1" />
     <div class="text-subtitle-2 mt-2">Track yourself against your plan</div>
-    <p class="text-caption text-medium-emphasis mb-3">
-      Lock today's FIRE picture as your starting point. Later you'll see — honestly — how much of any
-      change is real progress vs higher expenses vs you changing your assumptions.
+    <p class="text-caption text-medium-emphasis mb-1">
+      Lock today's FIRE picture as your starting point — the <strong>Lock this as my plan</strong>
+      button sits in the verdict panel above. Later you'll see — honestly — how much of any change is
+      real progress vs higher expenses vs you changing your assumptions.
     </p>
-    <v-btn
-      color="primary"
-      variant="flat"
-      size="small"
-      prepend-icon="mdi-lock-check"
-      data-testid="plan-variance-lock"
-      @click="lockBaseline"
-    >
-      Lock this as my plan
-    </v-btn>
   </v-card>
 </template>
