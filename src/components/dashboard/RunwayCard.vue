@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * #140 — Job-loss / layoff runway card. "If your income stopped today, how many months could you
+ * #140 — Job-loss / layoff runway card. "If you stop working today or get fired — how many months could you
  * cover your FULL obligations from liquid savings?" Honest by construction: the numerator is the
  * POST-TAX net of liquidating each liquid holding (selling equity/crypto owes real tax), and the
  * burn is the full living + EMI + insurance-premium obligation (those don't pause at a layoff).
@@ -61,7 +61,7 @@ function fmtMonths(m: number): string {
   <v-card v-if="show" variant="outlined" class="pa-4 mt-4" data-testid="runway-card">
     <div class="d-flex align-center ga-2 mb-1">
       <v-icon icon="mdi-parachute-outline" color="primary" />
-      <h3 class="text-subtitle-1 font-weight-bold">If your income stopped today</h3>
+      <h3 class="text-subtitle-1 font-weight-bold">If you stop working today or get fired</h3>
     </div>
     <p class="text-body-2 text-medium-emphasis mb-3">
       How long your liquid savings could cover your full obligations — living costs, EMIs and
