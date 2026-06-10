@@ -59,7 +59,7 @@ const showCard = computed(
   <v-card
     v-if="showCard"
     variant="outlined"
-    class="family-layer-card mb-4"
+    class="family-layer-card"
     data-testid="family-layer-card"
   >
     <v-card-title class="d-flex align-center" style="gap: 8px">

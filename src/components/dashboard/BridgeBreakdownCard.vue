@@ -10,6 +10,7 @@ import { computed, ref } from "vue";
 import { useFireDerive } from "@/lib/useFireDerive";
 import { formatINRCompact } from "@/lib/formatters";
 import type { RouteLocationRaw } from "vue-router";
+import BridgeUnlockTimeline from "@/components/dashboard/viz/BridgeUnlockTimeline.vue";
 
 // #74 + #76: one shared card, two presentations. `compact` (Dashboard) keeps the honest
 // bridge headline but drops the unlock-timeline + assumptions wall and links to Readiness;
@@ -54,6 +55,14 @@ const reachablePct = computed(() =>
 // so this never disagrees with the headline math by a rounding year.
 const corpusOnlyAge = computed(() => bc.value?.corpusOnlyFireAge ?? null);
 
+// Option-D unlock-timeline viz inputs. The dominant "locked till" age = the earliest unlock
+// event (EPF/PPF/NPS converge on 60 for the urban-salaried accumulator); default 60 when the
+// timeline is empty but locked money exists.
+const lockedUntilAge = computed(() => {
+  const ages = (bc.value?.unlockTimeline ?? []).map((u) => u.age).filter((a): a is number => Number.isFinite(a));
+  return ages.length ? Math.min(...ages) : 60;
+});
+
 const shortfallYears = computed(() => bc.value?.shortfallYears ?? 0);
 
 // Map an AssumptionNote.fixField to the screen where the user edits it.
@@ -78,7 +87,7 @@ function fixRoute(fixField?: string): RouteLocationRaw {
   <v-card
     v-if="show"
     variant="outlined"
-    class="bridge-card pa-5 mb-4"
+    class="bridge-card pa-5"
     data-testid="bridge-breakdown-card"
   >
     <div class="d-flex align-center mb-3">
@@ -99,7 +108,7 @@ function fixRoute(fixField?: string): RouteLocationRaw {
       v-if="!bc!.covered"
       type="warning"
       variant="tonal"
-      density="comfortable"
+      density="compact"
       class="mb-4"
       data-testid="bridge-shortfall-alert"
     >
@@ -112,30 +121,24 @@ function fixRoute(fixField?: string): RouteLocationRaw {
       v-else
       type="success"
       variant="tonal"
-      density="comfortable"
+      density="compact"
       class="mb-4"
     >
       Your corpus stays liquid enough through retirement — locked savings unlock before your liquid
       runway runs out.
     </v-alert>
 
-    <!-- Reachable vs locked -->
-    <div class="mb-2 d-flex justify-space-between text-caption text-medium-emphasis">
-      <span>Spendable at the FIRE age</span>
-      <span>Locked / illiquid</span>
-    </div>
-    <v-progress-linear
-      :model-value="reachablePct"
-      height="18"
-      rounded
-      color="success"
-      bg-color="warning"
-      class="mb-1"
-      :aria-label="`${reachablePct}% of the retirement corpus is spendable at the FIRE age`"
-    />
-    <div class="d-flex justify-space-between mb-4">
-      <span class="text-currency font-weight-bold text-success">{{ formatINRCompact(reachable) }}</span>
-      <span class="text-currency font-weight-bold text-warning">{{ formatINRCompact(locked) }}</span>
+    <!-- Reachable vs locked — Option-D unlock-timeline bar (amounts live in the segment
+         labels; the SVG's own role="img" aria-label carries the accessible name). -->
+    <div class="mb-4">
+      <BridgeUnlockTimeline
+        :spendable="reachable"
+        :locked="locked"
+        :bridge-income-per-year="bc!.bridgeIncomeAnnual"
+        :fire-age="bc!.effectiveFireAge ?? null"
+        :locked-until-age="lockedUntilAge"
+        data-testid="bridge-unlock-viz"
+      />
     </div>
 
     <!-- Unlock timeline (full only — dropped on the compact dashboard card) -->

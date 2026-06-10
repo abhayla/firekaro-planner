@@ -20,6 +20,7 @@ import { calculateCoastFire, calculateBaristaFire, realReturnForCoast } from "@/
 import { formatINRCompact } from "@/lib/formatters";
 import { coastFireBlurb, baristaFireBlurb } from "@/lib/fire-milestone-copy";
 import CoastTrajectoryChart from "@/components/charts/CoastTrajectoryChart.vue";
+import MilestoneLadder, { type LadderMilestone } from "@/components/dashboard/viz/MilestoneLadder.vue";
 
 const household = useHouseholdStore();
 const assumptions = useAssumptionsStore();
@@ -90,6 +91,19 @@ const currentCorpus = computed(() => fire.totalCorpus.value);
 // a brand-new zero-data user is falsely shown "Reached". Gate on a real target.
 const hasFireTarget = computed(() => fire.fireNumber.value > 0);
 
+// Option-D ladder (contract §3.6): Lean / Regular / Fat pins with amounts + ages on one rail.
+// Ages come from the projection crossovers (Lean/Fat — relocated here from the old hero chips)
+// and the CANONICAL kernel-owned householdFireAge (Regular — never a re-derived copy; the
+// #33/#65 cross-screen-coherence class). null age → the pin renders without one.
+const regularAge = computed(() => fire.householdFireAge.value ?? null);
+const ladderMilestones = computed<LadderMilestone[]>(() => [
+  // Lean's pin green mirrors the chart palette's debt-green (chartColors), Regular = success,
+  // Fat = primary — the mockup's pin colors.
+  { label: "Lean", amount: variants.value.lean, age: fire.crossovers.value.lean.age ?? null, color: "#7cb342" },
+  { label: "Regular", amount: variants.value.regular, age: regularAge.value, color: "rgb(var(--v-theme-success))" },
+  { label: "Fat", amount: variants.value.fat, age: fire.crossovers.value.fat.age ?? null, color: "rgb(var(--v-theme-primary))" },
+]);
+
 const coastProgress = computed(() => {
   if (!hasFireTarget.value) return 0;
   if (coast.value.coastCorpus <= 0) return 0;
@@ -104,11 +118,25 @@ const baristaProgress = computed(() => {
 </script>
 
 <template>
-  <v-card variant="outlined" class="fire-milestones-card mb-4" data-testid="fire-milestones-card">
+  <v-card variant="outlined" class="fire-milestones-card" data-testid="fire-milestones-card">
     <v-card-title>FIRE milestones</v-card-title>
     <v-card-text>
-      <!-- Variant chips -->
-      <div class="variant-grid mb-4">
+      <!-- Option-D ladder: where the current corpus sits vs Lean / Regular / Fat (amounts +
+           ages on the rail). Only meaningful with a real FIRE target — the zero-data state
+           keeps the honest ₹0 variant chips below instead (gh #39 class). -->
+      <template v-if="hasFireTarget">
+        <MilestoneLadder
+          :corpus-now="currentCorpus"
+          :milestones="ladderMilestones"
+          class="mb-1"
+          data-testid="milestone-ladder"
+        />
+        <div class="text-caption text-medium-emphasis mb-4">
+          Lean = {{ leanPctLabel }} · Regular = your full FIRE target · Fat = {{ fatPctLabel }}
+        </div>
+      </template>
+      <!-- Variant chips (zero-data fallback — the ladder carries these figures once a target exists) -->
+      <div v-else class="variant-grid mb-4">
         <div class="variant-chip">
           <div class="variant-label">Lean FIRE</div>
           <div class="variant-value">{{ formatINRCompact(variants.lean) }}</div>

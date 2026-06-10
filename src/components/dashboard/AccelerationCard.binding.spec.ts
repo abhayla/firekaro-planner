@@ -26,12 +26,17 @@ describe("AccelerationCard template-binding honesty lock (gh-48, rule 31)", () =
     );
   });
 
-  it("the scalar per-lever 'N years sooner' figure + band are gated OFF when the bridge binds", () => {
-    // Under bridgeBinding the scalar deltas overstate the liquidity-gated date, so they must be hidden.
-    expect(src, "per-lever impact column must be gated on !bridgeBinding").toMatch(
-      /v-if="!bridgeBinding"[^>]*class="accel-row__impact"/,
+  it("the scalar per-lever impact bars (incl. the band range) are gated OFF when the bridge binds", () => {
+    // Under bridgeBinding the scalar deltas overstate the liquidity-gated date, so the Option-D
+    // impact bars (which encode the deltas + the risk-notch range) must be hidden — only the
+    // plain ranked list (labels, no figures) renders alongside the caveat.
+    expect(src, "WinsImpactBars must be gated on !bridgeBinding").toMatch(
+      /<WinsImpactBars\s+v-if="!bridgeBinding"/,
     );
-    expect(src, "band range must be gated on !bridgeBinding").toMatch(/lever\.band\s*&&\s*!bridgeBinding/);
+    // The band must reach the template ONLY through the winBars mapping (rendered inside the
+    // gated WinsImpactBars) — no separate, ungated band line may exist in the template.
+    const template = src.slice(src.indexOf("<template>"));
+    expect(template, "no direct lever.band rendering outside the gated bars").not.toContain("lever.band");
   });
 
   it("renders the honest bridge-limited caveat when the bridge is the binding constraint", () => {

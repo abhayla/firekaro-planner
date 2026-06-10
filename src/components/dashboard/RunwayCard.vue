@@ -13,6 +13,7 @@ import { computeRunway } from "@/lib/runway";
 import { accessibilityClass } from "@/lib/investment-traits";
 import { toMonthly } from "@/lib/cashflow";
 import { formatINRCompact } from "@/lib/formatters";
+import RunwayGauge from "@/components/dashboard/viz/RunwayGauge.vue";
 
 const household = useHouseholdStore();
 const fire = useFireDerive();
@@ -46,6 +47,14 @@ const hasEsop = computed(() =>
   household.data.investments.some((i) => i.type === "ESOP" && accessibilityClass(i) === "liquid"),
 );
 
+// Gauge zone mapping — the CARD owns the thresholds (contract §3.3): ≥12mo ok, 6–12 warn, <6 bad.
+const zone = computed<"ok" | "warn" | "bad">(() => {
+  const m = runway.value.runwayMonths;
+  if (m >= 12) return "ok";
+  if (m >= 6) return "warn";
+  return "bad";
+});
+
 // "≈ 16 months" with a parenthetical year breakdown once it's ≥ a year.
 function fmtMonths(m: number): string {
   const months = Math.max(0, Math.round(m));
@@ -58,7 +67,7 @@ function fmtMonths(m: number): string {
 </script>
 
 <template>
-  <v-card v-if="show" variant="outlined" class="pa-4 mt-4" data-testid="runway-card">
+  <v-card v-if="show" variant="outlined" class="pa-4" data-testid="runway-card">
     <div class="d-flex align-center ga-2 mb-1">
       <v-icon icon="mdi-parachute-outline" color="primary" />
       <h3 class="text-subtitle-1 font-weight-bold">If you stop working today or get fired</h3>
@@ -69,28 +78,24 @@ function fmtMonths(m: number): string {
       keep after selling.
     </p>
 
-    <div class="d-flex flex-wrap ga-6 mb-3">
-      <div>
-        <div class="text-h4 font-weight-bold text-currency" data-testid="runway-headline">
-          ≈ {{ fmtMonths(runway.runwayMonths) }}
-        </div>
-        <div class="text-caption text-medium-emphasis">
-          on ≈ {{ formatINRCompact(runway.liquidNet) }} liquid (post-tax)
-        </div>
+    <!-- Option-D: the gauge IS the headline; the legend (right of the gauge per the mockup)
+         keeps every figure the prose version showed. -->
+    <div class="d-flex flex-wrap align-center ga-6 mb-3">
+      <RunwayGauge
+        :months="runway.runwayMonths"
+        :conservative-months="runway.runwayMonthsConservative"
+        :zone="zone"
+        data-testid="runway-headline"
+      />
+      <div class="text-caption runway-legend">
+        <span class="text-currency">{{ formatINRCompact(runway.liquidNet) }}</span> liquid (post-tax) ÷
+        <span class="text-currency">{{ formatINRCompact(runway.monthlyBurn) }}/mo</span> burn (living + EMIs + premiums)<br />
+        <span data-testid="runway-conservative">
+          <v-icon icon="mdi-square" size="10" color="grey-darken-1" /> stable-only:
+          <strong>≈ {{ fmtMonths(runway.runwayMonthsConservative) }}</strong>
+          ({{ formatINRCompact(runway.liquidNetConservative) }} FD)
+        </span>
       </div>
-      <div>
-        <div class="text-h6 font-weight-bold text-currency" data-testid="runway-conservative">
-          ≈ {{ fmtMonths(runway.runwayMonthsConservative) }}
-        </div>
-        <div class="text-caption text-medium-emphasis">
-          in stable assets only ({{ formatINRCompact(runway.liquidNetConservative) }} FD)
-        </div>
-      </div>
-    </div>
-
-    <div class="text-caption text-medium-emphasis mb-2">
-      Burn assumed: <strong>{{ formatINRCompact(runway.monthlyBurn) }}/mo</strong> (living + EMIs +
-      premiums)
     </div>
 
     <v-alert
@@ -121,7 +126,7 @@ function fmtMonths(m: number): string {
     </div>
   </v-card>
 
-  <v-card v-else variant="outlined" class="pa-4 mt-4 text-center" data-testid="runway-card-empty">
+  <v-card v-else variant="outlined" class="pa-4 text-center" data-testid="runway-card-empty">
     <v-icon icon="mdi-parachute-outline" size="40" color="grey-lighten-1" />
     <div class="text-subtitle-2 mt-2">No liquid runway to show yet</div>
     <div class="text-caption text-medium-emphasis">
@@ -129,3 +134,12 @@ function fmtMonths(m: number): string {
     </div>
   </v-card>
 </template>
+
+<style scoped>
+.runway-legend {
+  color: var(--text-secondary);
+  line-height: 1.9;
+  min-width: 240px;
+  flex: 1;
+}
+</style>

@@ -11,6 +11,7 @@
 import { ref, computed } from "vue";
 import { useAcceleration } from "@/composables/useAcceleration";
 import { formatINRCompact } from "@/lib/formatters";
+import WinsImpactBars, { type WinBar } from "@/components/dashboard/viz/WinsImpactBars.vue";
 
 const accel = useAcceleration();
 
@@ -44,6 +45,25 @@ function soonerLabel(yearsSaved: number): string {
   return `≈ ${yearsLabel(yearsSaved)} sooner`;
 }
 
+// Option-D: ranked levers as impact bars from a common zero axis (viz/WinsImpactBars).
+// Deterministic levers → solid success bar; the variance-bearing risk-notch → the striped
+// [worst, best] range (both bounds labeled — the honesty device). ONLY rendered when the
+// bridge is NOT the binding constraint: under bridgeBinding the scalar deltas overstate the
+// liquidity-gated date (rule 31), so the plain ranked list + caveat render instead.
+const winBars = computed<WinBar[]>(() =>
+  reachableLevers.value.map((lever): WinBar => {
+    if (lever.band) {
+      return {
+        label: lever.label,
+        note: lever.note,
+        kind: "market",
+        range: [baselineYears.value - lever.band.p90Years, baselineYears.value - lever.band.p10Years],
+      };
+    }
+    return { label: lever.label, note: lever.note, kind: "sure", deltaYears: lever.deltaYears };
+  }),
+);
+
 // --- Save-more sensitivity (ephemeral component state — NOT persisted) ---
 const SAVE_MORE_STEP = 5000;
 // A sane ceiling for the stepper: a notch above the current monthly contribution, min ₹50k.
@@ -59,7 +79,7 @@ const saveMoreImpact = computed(() => accel.saveMoreImpact(extraMonthly.value));
   <v-card
     v-if="show"
     variant="outlined"
-    class="accel-card pa-5 mb-4"
+    class="accel-card pa-5"
     data-testid="acceleration-card"
   >
     <div class="d-flex align-center mb-3">
@@ -90,40 +110,26 @@ const saveMoreImpact = computed(() => accel.saveMoreImpact(extraMonthly.value));
       (see the bridge breakdown above) is what actually moves your date.
     </v-alert>
 
-    <!-- Ranked levers -->
+    <!-- Ranked levers — Option-D impact bars when the scalar deltas are honest to show.
+         The "N years sooner" figures are corpus-model estimates; the bars are hidden when the
+         bridge is the binding constraint (they would overstate the real, liquidity-gated
+         saving — rule 31), leaving the plain ranked list + the caveat above. -->
     <template v-if="reachableLevers.length">
-      <div
-        v-for="(lever, i) in reachableLevers"
-        :key="lever.key"
-        class="accel-row"
-        :data-testid="`accel-lever-${lever.key}`"
-      >
-        <div class="accel-row__rank">{{ i + 1 }}</div>
-        <div class="flex-grow-1">
-          <div class="text-body-1 font-weight-medium">{{ lever.label }}</div>
-          <div class="text-caption text-medium-emphasis">{{ lever.note }}</div>
-
-          <!-- Variance-bearing lever: show the honest confidence RANGE, never a bare point. Suppressed
-               when the bridge binds — the scalar range would overstate the liquidity-gated date. -->
-          <div
-            v-if="lever.band && !bridgeBinding"
-            class="text-caption accel-row__range"
-            :data-testid="`accel-band-${lever.key}`"
-          >
-            <v-icon icon="mdi-chart-bell-curve" size="13" class="mr-1" />
-            Market-dependent — likely
-            {{ soonerLabel(baselineYears - lever.band.p90Years) }}
-            to {{ soonerLabel(baselineYears - lever.band.p10Years) }}
-            across good and bad markets
+      <WinsImpactBars v-if="!bridgeBinding" :wins="winBars" data-testid="accel-impact-bars" />
+      <template v-else>
+        <div
+          v-for="(lever, i) in reachableLevers"
+          :key="lever.key"
+          class="accel-row"
+          :data-testid="`accel-lever-${lever.key}`"
+        >
+          <div class="accel-row__rank">{{ i + 1 }}</div>
+          <div class="flex-grow-1">
+            <div class="text-body-1 font-weight-medium">{{ lever.label }}</div>
+            <div class="text-caption text-medium-emphasis">{{ lever.note }}</div>
           </div>
         </div>
-        <!-- The "N years sooner" figure is a corpus-model estimate; hidden when the bridge is the binding
-             constraint (it would overstate the real, liquidity-gated saving — rule 31). -->
-        <div v-if="!bridgeBinding" class="accel-row__impact" :data-testid="`accel-impact-${lever.key}`">
-          <div class="accel-row__impact-value">{{ soonerLabel(lever.deltaYears) }}</div>
-          <div v-if="lever.band" class="text-caption text-medium-emphasis">expected</div>
-        </div>
-      </div>
+      </template>
     </template>
 
     <!-- Honest on-track / not-yet-applicable state -->
@@ -204,20 +210,6 @@ const saveMoreImpact = computed(() => accel.saveMoreImpact(extraMonthly.value));
   display: flex;
   align-items: center;
   justify-content: center;
-}
-.accel-row__range {
-  color: var(--text-muted);
-  margin-top: 2px;
-}
-.accel-row__impact {
-  flex-shrink: 0;
-  text-align: right;
-  min-width: 96px;
-}
-.accel-row__impact-value {
-  font-weight: var(--weight-bold);
-  color: rgb(var(--v-theme-success));
-  font-variant-numeric: tabular-nums;
 }
 .section-label {
   font-size: 11px;

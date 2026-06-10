@@ -3,14 +3,12 @@ import { computed, onMounted } from "vue";
 import { useHouseholdStore } from "@/stores/household";
 import { useFeaturesStore } from "@/stores/features";
 import { useFireDerive } from "@/lib/useFireDerive";
-import { runStressScenarios } from "@/lib/stress-test";
 import { formatINRCompact, formatPercent } from "@/lib/formatters";
 import { lifeCoverAdequacy, healthCoverAdequacy } from "@/lib/adequacy";
 import { computeFreedomScore } from "@/lib/freedom-score";
 import { toMonthly } from "@/lib/cashflow";
 import { isEmergencyFundEligible } from "@/lib/investment-traits";
 import FireHero from "@/components/dashboard/FireHero.vue";
-import LifecycleDigestCard from "@/components/dashboard/LifecycleDigestCard.vue";
 import BridgeBreakdownCard from "@/components/dashboard/BridgeBreakdownCard.vue";
 import RunwayCard from "@/components/dashboard/RunwayCard.vue";
 import PlanVarianceCard from "@/components/dashboard/PlanVarianceCard.vue";
@@ -147,37 +145,8 @@ const planningHorizonYears = computed(() =>
   Math.max(0, fire.planToAge.value - fire.targetRetirementAge.value),
 );
 
-// A36.1/A36.2 — estate-readiness chip + red-flag. A high-asset household with a
-// barely-started estate checklist is the highest-severity gap. Estate exposure
-// is TOTAL assets (the home you bequeath counts), not the FIRE corpus which
-// excludes the primary residence.
-const ESTATE_TOTAL = 7;
-const totalEstateAssets = computed(() =>
-  household.data.investments.reduce((s, i) => s + i.value, 0),
-);
-const estateComplete = computed(
-  () => (household.data.estateChecklist ?? []).filter((e) => e.completed).length,
-);
-const estateRedFlag = computed(
-  () => totalEstateAssets.value > 10_000_000 && estateComplete.value < 4,
-);
-
-// A27.3 — stress-test red-flag chip: "Plan fails X of 10" → /fire-goals/stress-test.
-// Shown only when the stress-test feature is enabled (else the route redirects).
-const stressEnabled = computed(() => features.isEnabled("fire.stressTest"));
-// gh #39 sibling: with no FIRE target (zero expenses) the stress test is meaningless —
-// runStressScenarios on ₹0 reports scenarios as "survivable" (0 ≥ 0), so a brand-new
-// zero-data user falsely sees "plan survives 9 of 10". Gate the chip on a real plan.
-const hasFireTarget = computed(() => fire.fireNumber.value > 0);
-const stressSummary = computed(() =>
-  runStressScenarios({
-    annualExpenses: fire.annualExpensesToday.value,
-    swr: fire.effectiveSWR.value,
-    expectedReturn: fire.blendedReturn.value,
-    totalCorpus: fire.totalCorpus.value,
-    annualIncomeTotal: fire.annualIncome.value.total,
-  }).summary,
-);
+// A36 estate-readiness + A27.3 stress-test red-flags moved OUT of the header chips into
+// the severity-coded suggestions (NudgeStack synthetic entries — Option-D decision 8).
 
 // P3 (A30.1/A30.3): enrich the current month's snapshot with the live FIRE
 // number + target year so the trajectory chart has a real point. Idempotent
@@ -233,81 +202,73 @@ onMounted(() => {
           Planning horizon: {{ planningHorizonYears }} yrs
           (retire @{{ fire.targetRetirementAge.value }} → plan-to {{ fire.planToAge.value }})
         </v-chip>
-        <v-chip
-          size="small"
-          variant="tonal"
-          :color="estateRedFlag ? 'error' : estateComplete === ESTATE_TOTAL ? 'success' : 'warning'"
-          :prepend-icon="estateRedFlag ? 'mdi-alert' : 'mdi-file-document-check-outline'"
-          :to="'/estate-planning'"
-          data-testid="estate-chip"
-        >
-          Estate: {{ estateComplete }} of {{ ESTATE_TOTAL }} complete
-          <template v-if="estateRedFlag">&nbsp;· corpus &gt; ₹1 Cr needs a will</template>
-        </v-chip>
-        <v-chip
-          v-if="stressEnabled && hasFireTarget"
-          size="small"
-          variant="tonal"
-          :color="stressSummary.failed === 0 ? 'success' : stressSummary.failed >= 4 ? 'error' : 'warning'"
-          :prepend-icon="stressSummary.failed === 0 ? 'mdi-shield-check' : 'mdi-shield-alert'"
-          :to="'/fire-goals/stress-test'"
-          data-testid="stress-chip"
-        >
-          <template v-if="stressSummary.failed === 0">
-            Stress test: plan survives all {{ stressSummary.total }}
-          </template>
-          <template v-else>
-            Plan fails {{ stressSummary.failed }} of {{ stressSummary.total }} stress scenarios
-          </template>
-        </v-chip>
       </div>
 
-      <!-- Tier-1 stickiness: "Since you were away" lifecycle digest — diffs the
-           live derive() headline against the persisted baseline and surfaces the
-           meaningful change FIRE-date-first. Self-hides when nothing meaningful
-           changed (or no baseline yet). Deep-link target for the WhatsApp nudge. -->
-      <LifecycleDigestCard />
-
+      <!-- Option-D verdict hero: big age + confidence range + since-you-were-away delta
+           (LifecycleDigestCard's diff, folded into the hero subline — the card is no longer
+           mounted here; the hero carries the ?digest=open deep-link anchor) + the 3-slot
+           KPI strip (vs-plan / corpus progress / biggest win). -->
       <FireHero />
 
-      <!-- #81 Phase 2 — household (primary) vs each adult's standalone personal FIRE + the gap,
-           with the honesty caveat. Placed right under the headline so the household number is
-           never confused with a rosier individual figure. -->
-      <IndividualFireCard class="mt-4" />
+      <!-- Honesty pair: is my money actually reachable when I need it? -->
+      <v-row dense>
+        <!-- #15 — accessible-money bridge (compact, #74/#76): honest verdict + the unlock
+             timeline; links to Readiness for the full per-holding detail. Self-hides for a
+             fully-liquid household. -->
+        <v-col cols="12" md="6">
+          <BridgeBreakdownCard variant="compact" class="h-100" />
+        </v-col>
+        <!-- #140 — layoff runway gauge: months of FULL obligations covered from post-tax
+             liquid savings with zero income. -->
+        <v-col cols="12" md="6">
+          <RunwayCard class="h-100" />
+        </v-col>
+      </v-row>
 
-      <!-- #15 — accessible-money bridge (compact on the dashboard, #74/#76): keeps the honest
-           verdict + spendable/locked bar + bridge-income, and links to Readiness for the full
-           unlock-timeline + "what we assumed" detail. Self-hides for a fully-liquid household. -->
-      <BridgeBreakdownCard variant="compact" />
+      <!-- Accountability pair: am I tracking my plan, and what's my biggest move? -->
+      <v-row dense>
+        <!-- #138 — plan-vs-actual variance waterfall (progress / reality / goalpost). -->
+        <v-col cols="12" md="6">
+          <PlanVarianceCard class="h-100" />
+        </v-col>
+        <!-- #48 obj-2 — ranked accelerator impact bars + the save-more what-if. -->
+        <v-col cols="12" md="6">
+          <AccelerationCard class="h-100" />
+        </v-col>
+      </v-row>
 
-      <!-- #140 — job-loss / layoff runway: months the household could survive with ZERO income
-           from POST-TAX liquid savings against the FULL obligation burn (living + EMI + premiums).
-           Optionality/safety framing, placed right after the bridge (early-FIRE liquidity) since
-           both answer "is my money actually reachable when I need it?" -->
-      <RunwayCard />
+      <!-- Milestone ladder: where the corpus sits vs Lean / Regular / Fat (+ Coast/Barista). -->
+      <v-row dense>
+        <v-col cols="12">
+          <FireMilestonesCard />
+        </v-col>
+      </v-row>
 
-      <!-- #138 — plan-vs-actual variance: lock a baseline, then see the HONEST delta since,
-           decomposed into progress (corpus) / reality (expenses) / goalpost (assumption changes).
-           Placed after the runway so the "am I tracking my plan?" accountability sits with the
-           other honesty surfaces, before the accelerators. -->
-      <PlanVarianceCard />
+      <v-row dense>
+        <!-- #81 Phase 2 — household (primary) vs each adult's personal FIRE + the gap. -->
+        <v-col cols="12" md="6">
+          <IndividualFireCard class="h-100" />
+        </v-col>
+        <v-col cols="12" md="6">
+          <AssetAllocationDonut class="h-100" />
+        </v-col>
+      </v-row>
 
-      <!-- #48 obj-2 — "your biggest achievable wins": ranked accelerators (years sooner) for THIS
-           household, the risk-notch with a confidence range, + a live save-more what-if. The
-           get-there-faster surface, placed number → honesty(bridge) → how-to-accelerate → nudges. -->
-      <AccelerationCard />
-
-      <!-- Phase 4 Stage I — audit-mandated dashboard additions -->
-      <NudgeStack />
-      <FireMilestonesCard />
-      <FamilyLayerCard />
+      <!-- Family layer (sandwich-gen commitments) — self-hides without commitments; kept
+           full-width (the Iyers tour anchors .family-layer-card). -->
+      <v-row dense>
+        <v-col cols="12">
+          <FamilyLayerCard />
+        </v-col>
+      </v-row>
 
       <v-row dense>
         <v-col cols="12" md="8">
           <FireProjectionChart />
         </v-col>
+        <!-- Severity-coded suggestions (incl. the relocated estate + stress entries). -->
         <v-col cols="12" md="4">
-          <AssetAllocationDonut />
+          <NudgeStack />
         </v-col>
       </v-row>
 

@@ -25,9 +25,9 @@ export const TOUR_STEPS: Partial<Record<SeedName, TourStepDef[]>> = {
     },
     {
       target: ".fire-hero .stat-block",
-      title: "Savings rate · take-home · return",
+      title: "Savings · take-home · return",
       copy:
-        "These stat blocks summarise the levers that drive your FIRE date. The What-If sandbox lets you see exactly how a tighter budget or higher SIP moves the timeline.",
+        "These stats (with your savings rate up in the corpus-progress slot) summarise the levers that drive your FIRE date. The What-If sandbox lets you see exactly how a tighter budget or higher SIP moves the timeline.",
       placement: "bottom",
     },
     {
