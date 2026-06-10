@@ -125,6 +125,25 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 
 ## §3 — Decision log (append-only, newest first)
 
+### 2026-06-10
+- **D-2026-06-10-01 — SHIPPED 3 must-have dashboard honesty cards (#139 #140 #138).** One `/goal` run
+  (contract `docs/goals/2026-06-10-dashboard-honesty-cards.md`), merged `--no-ff` → `main` (`14f0dfd`,
+  pushed) + final report `069fe3f`. **What:** (#139) real today's-₹ vs nominal projection toggle —
+  display-layer deflation at general CPI, crossover-year provably preserved; (#140) job-loss / layoff
+  runway — post-tax-net liquid ÷ full-obligation burn, conservative FD floor, market-linked disclosure,
+  EPF-after-2mo, vested-ESOP only; (#138) plan-vs-actual variance — dedicated `planBaseline` entity
+  (`GET/PUT /api/planner/plan-baseline`, no new table; ADR-0005) + decomposed progress/reality/goalpost
+  delta that never sells an assumption change as progress (sign-guarded, CPI-rebased). **Why (goal-anchored):**
+  all three deepen Tier-0 **honesty** (objectives 1 + 3) for the LOCKED accumulator — in-scope under the
+  MUST-HAVE focus lock (all three carry `must-have`). **Verification:** type-check both trees + unit
+  (root 1167 · server 165 incl. live Supabase integration) + build; member-lens sweep 16/16 (repaired a
+  pre-existing broken `#app[data-hydrated]` wait that meant the sweep had never actually run); a11y 0
+  critical/serious; per-stage independent code-review + FinTech + blind-verifier (3 HIGH honesty defects
+  caught + fixed: #140 volatile-undercount, #138 normalization sign-flip + lost-update race); mutation
+  pass on the new modules. **NEXT (Abhay-gated):** prod deploy so `/api/planner/plan-baseline` reaches
+  production (cards work in demo without it). Artifacts: issues #139/#140/#138 (closed), ADR-0005, final
+  report `docs/goals/2026-06-10-dashboard-honesty-cards-FINAL-REPORT.md`, lessons in `.claude/tasks/lessons.md`.
+
 ### 2026-06-09
 - **D-2026-06-09-11 — FEATURE DISCOVERY round 3: REAL Reddit mining (RSS path works!) → 8 net-new, HELD un-filed.**
   **Method correction (supersedes the D-09-09 "Reddit hard-blocked" claim):** Reddit's `.json`/OAuth endpoints
