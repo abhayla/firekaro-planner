@@ -151,9 +151,12 @@ Prisma scripts hitting Supabase while the dev server holds connections MUST appe
   (gitignored — never commit). 24-table schema in `server/prisma/schema.prisma`, derived 1:1 from
   the frontend's Zod model (`src/types/household.ts` + `assumptions.ts`).
 - **Document endpoints** `GET`+`PUT /api/planner/{household,assumptions,scenarios,features,ui,
-  expense-history}` + `DELETE /api/planner/all` + `GET /api/planner/me` — mirror the
+  expense-history,plan-baseline}` + `DELETE /api/planner/all` + `GET /api/planner/me` — mirror the
   `StorageAdapter.get/set(key)` 1:1. NOT granular REST. `userId` from the authenticated session
-  only, never the body. `apiSuccess`/`apiError` envelope.
+  only, never the body. `apiSuccess`/`apiError` envelope. `plan-baseline` (#138) is stored as a
+  `planBaseline` sub-key inside the same `userUiPrefs.prefs` JSON row the `ui` document uses — the
+  `ui` PUT MERGES the blob in a SERIALIZABLE transaction (never wholesale-replaces) so it cannot
+  strip a concurrent plan-baseline write.
 - **Household diff engine** (`server/src/lib/household-diff.ts`): a pure function that maps an
   incoming `Household` to per-table insert/update/delete; `PUT /household` applies it in ONE Prisma
   `$transaction`. Auto-flow recurring rows upsert by `(userId, sourceRefId)`; `"Joint"` ownerId is
@@ -252,7 +255,11 @@ The later-lifecycle + stickiness layers (the 5 objectives, `docs/v6-fire-planner
 also live here: `fire-confidence-band.ts` (obj-1 honesty — FIRE date as a band), `contribution-schedule.ts`
 (ADR-0004 temporal contributions), `lever-catalog.ts` + `lever-bands.ts` + `lever-impact.ts` (obj-2
 "get there faster" — per-lever FIRE-date-delta ranking, #48), `readiness.ts` (obj-3 "is it safe to
-stop?"), `decumulation.ts` (obj-4 post-FIRE guardrails), and the **member model + app-wide lens** layer
+stop?"), `decumulation.ts` (obj-4 post-FIRE guardrails), the **dashboard honesty cards** trio —
+`plan-variance.ts` (#138 plan-vs-actual variance against the persisted `plan-baseline` document),
+`runway.ts` (#140 layoff/income-shock runway), and the #139 real-vs-nominal toggle
+(`deflateProjectionPoints` in `useFireDerive.ts` — DISPLAY-layer deflation of the projection into
+today's purchasing power; chart-owned, never changes the kernel) — and the **member model + app-wide lens** layer
 `member-earning.ts` + `member-draft.ts` + `member-horizon.ts` (`Member.role` is DERIVED from income, not
 stored; the orthogonal "View as &lt;member&gt;" lens screens member-attributable values app-wide while
 keeping household-solvency ratios coherent — #66/#67, see `docs/goals/2026-06-08-member-model-coherence-and-app-wide-lens.md`).
