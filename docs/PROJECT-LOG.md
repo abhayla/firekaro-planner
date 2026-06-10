@@ -126,6 +126,24 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 ## §3 — Decision log (append-only, newest first)
 
 ### 2026-06-10
+- **D-2026-06-10-02 — PROD DEPLOY (Abhay-instructed): shipped the 3 honesty cards + the new
+  `/api/planner/plan-baseline` endpoint to https://firekaro.com.** DevOps/Release role. Per `DEPLOY.md`
+  §Redeploy from local clone @ `5cb8c8f`: backup (`firekaro-pre-deploy-20260610-095928.tar.gz`) →
+  `git archive | ssh tar` → `npm ci && build` (both trees) → `prisma:generate` + `migrate:deploy`
+  (**"No pending migrations"** — #138 rides the existing `userUiPrefs` blob, ADR-0005, no new table) →
+  `pm2 reload firekaro-api` (zero-downtime). **Tier-1 smoke ✓:** `/api/health` prod+db-connected;
+  token `/api/internal/smoke` `user.count=3, 40ms` (real Prisma read); public 200; **bundle hash CHANGED**
+  `index-B78CCwg3.js → index-B0tsCBuV.js` (new build live); `/api/planner/plan-baseline` 401 (route mounted,
+  not 404). **Tier-1.5 live UI ✓:** login renders + "Sign in with Google" present; console clean of all-but
+  the expected unauth `401 /api/planner/me` + `[boot]` warning (the warning fires from the NEW bundle).
+  **Rule-33 blind re-verify (separate context-blind agent, raw evidence incl. the screenshot): CONCUR
+  (qualified)** — all 6 infra checks PASS. **TWO honest Tier-2 gaps surfaced (not hidden):** (1) the authed
+  `/api/planner/plan-baseline` round-trip and (2) the **3 dashboard cards rendering with real prod data** are
+  BOTH unverified in prod — `DEV_BYPASS_AUTH=false` + no logged-in Google session in-session (the cards work
+  in demo/localStorage; prod authed-path needs a session). So **"deploy healthy" = infra/unauth-surface sound,
+  NOT "the new cards are verified working in prod."** Rollback ready (backup tar). **NEXT (Abhay-gated):**
+  Tier-2 authed prod check (login the dedicated test account `abhayfaircent@gmail.com` → verify the 3 cards +
+  the plan-baseline lock/round-trip) when a session is seeded. Pointers: #138/#139/#140 (closed), D-10-01.
 - **D-2026-06-10-01 — SHIPPED 3 must-have dashboard honesty cards (#139 #140 #138).** One `/goal` run
   (contract `docs/goals/2026-06-10-dashboard-honesty-cards.md`), merged `--no-ff` → `main` (`14f0dfd`,
   pushed) + final report `069fe3f`. **What:** (#139) real today's-₹ vs nominal projection toggle —
