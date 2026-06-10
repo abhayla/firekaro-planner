@@ -289,7 +289,7 @@ JetBrains Mono (numerics). Vuetify config `src/plugins/vuetify.ts`. Shared incom
 
 5 personas in `src/seeds/`: **Sharmas** (default), **Iyers**, **Mehtas**, **Mauryas** (single-income
 mid-40s, full-spread portfolio — the `/verify-ui` headed verification fixture), **Empty** (wizard).
-`sharmas` loads via `seed-persona.ts` (no `sharmas.ts`); the rest have their own `<name>.ts`. Last
+`sharmas` loads via `src/lib/seed-persona.ts` (no `sharmas.ts`); the rest have their own `<name>.ts`. Last
 choice persists under `firekaro-mvp:active-seed`.
 
 ## Engineering role router
