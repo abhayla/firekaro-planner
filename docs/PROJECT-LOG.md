@@ -126,6 +126,18 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 ## §3 — Decision log (append-only, newest first)
 
 ### 2026-06-10
+- **D-2026-06-10-11 — PROD DEPLOY (Abhay-approved): Option-D dashboard + runway rename live on
+  firekaro.com.** Standard `DEPLOY.md` redeploy from `main` `b57c253` (backup tar
+  `firekaro-pre-deploy-20260610-232031` → git-archive ship → build → prisma no-op (frontend-only, no
+  pending migrations) → pm2 reload). **All three verification tiers green, rule-33 blind-verified
+  (concur ×3, 0.86):** Tier-1 health+smoke (`user.count=3`, 36ms) + bundle hash CHANGED
+  `D3DbQ_qR→Bldil8Gc`; Tier-1.5 unauth login renders/functions, console = only the 2 expected unauth
+  messages; Tier-2 authed (test acct `abhayfaircent`) — Option-D hero + KPI strip + gauge + renamed
+  runway heading + #139 toggle all live, ZERO console errors. **Triage note:** the hero's "Lock this
+  as my plan" CTA on the test account looked like a lost-baseline bug but is CORRECT — the baseline
+  belongs to `abhayinfosys` (server GET verified returning that account's data:null correctly; DB blob
+  intact). Blind-verifier coverage notes (fold into the next deploy checklist): exercise the
+  sign-in control, capture raw authed console dump, timestamp the pre-deploy bundle-hash capture.
 - **D-2026-06-10-10 — Option-D FIRE-dashboard redesign SHIPPED to `main` (merge `a828811`; closes #155).
   Deploy awaits Abhay.** The /goal run executed the full contract in a dedicated worktree: 4 stage
   commits (`f3e46b6` verdict lib + hero, `8db05be` five SVG viz primitives, `543a6d3` card conversions
