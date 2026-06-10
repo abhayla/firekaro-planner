@@ -126,6 +126,19 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 ## §3 — Decision log (append-only, newest first)
 
 ### 2026-06-10
+- **D-2026-06-10-10 — Option-D FIRE-dashboard redesign SHIPPED to `main` (merge `a828811`; closes #155).
+  Deploy awaits Abhay.** The /goal run executed the full contract in a dedicated worktree: 4 stage
+  commits (`f3e46b6` verdict lib + hero, `8db05be` five SVG viz primitives, `543a6d3` card conversions
+  + #155 re-lock ack, `d9b3763` assembly + SCREEN-STANDARD v1.2). All gates green: 1,222 frontend +
+  165 server tests, member-lens sweep 16/16, e2e 72-passed (the 2 sidebar-accordion failures are
+  PRE-EXISTING on main → filed **#159**; unrelated), a11y sweep green, 3 adversarial reviews + 2
+  rule-33 blind verifications (every HIGH/blocker fixed in-run: fabricated-claim finite guards,
+  zero-corpus ladder-fill honesty, bridge-label overlap → legend). **Honest deviation:** measured page
+  height 4,485px vs the contract's ≤2,600px target — unreachable without deleting mandated honesty
+  content (the no-deletion guardrail dominates); the real wins are the instant 5-sec verdict + first
+  viz at 551px (was ~3,000). Pre-existing lens observation filed **#160** (Investments tile mixes
+  household value with member-lensed count). Phase-2 propagation of the viz language to
+  Readiness/Decumulation/Stress-test/Goals remains open (SCREEN-STANDARD v1.2 names the primitives).
 - **D-2026-06-10-09 — FIRE-dashboard redesign decided: Option D (C-hero + A-KPI-strip + B-visual-body),
   dashboard-first scope, /goal execution.** Abhay flagged the dashboard as data-rich but confusing (no
   hierarchy, no graphics, no 5-sec answer; 4,487px text wall, first chart ~3,000px down). Grill-me
