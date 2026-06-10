@@ -5,6 +5,53 @@ import { useUiStore } from "@/stores/ui";
 import { derive } from "@/lib/derive";
 import { runMonteCarloFire, INDIA_EQUITY_ANNUAL_RETURNS } from "@/lib/monte-carlo";
 import { isEmergencyFundEligible } from "@/lib/investment-traits";
+import type { ProjectionPoint } from "@/lib/fire-math";
+import { DEFAULT_ASSUMPTIONS } from "@/types/assumptions";
+
+/**
+ * #139 — DISPLAY-LAYER deflation of the FIRE projection into today's purchasing power.
+ *
+ * Pure (no store/DOM), exported so the honest-direction invariants are unit-tested
+ * directly. The kernel (`derive.ts` / `fire-math.ts`) is UNTOUCHED — this only
+ * re-scales the already-emitted, already-rounded projection points for display.
+ *
+ * When `real` is false the input is returned byte-identical (the toggle-OFF path can
+ * never alter a plotted ₹). When true, EVERY ₹ field (corpus + the three FIRE targets
+ * + the inflated-expense line + any withdrawal) is divided by `(1 + inflation)^yearIndex`
+ * where `yearIndex = point.year − year0` and `year0` = the projection's first year (the
+ * SAME origin the kernel uses).
+ *
+ * Deflator MUST be GENERAL CPI (`assumptions.inflation` ≈6%), NEVER the 4-bucket
+ * `householdInflation` (~7.9%) — re-using the healthcare-weighted basket here re-creates
+ * the #20 "FIRE-at-115" bug (FinTech-validated 2026-06-03). Because the kernel already
+ * inflated the targets at the same general CPI, dividing both corpus and targets by one
+ * shared factor PRESERVES the crossover year — a real-terms view never moves the FIRE date.
+ */
+export function deflateProjectionPoints(
+  points: ProjectionPoint[],
+  inflation: number,
+  real: boolean,
+): ProjectionPoint[] {
+  if (!real) return points;
+  const inf = Number.isFinite(inflation) ? inflation : DEFAULT_ASSUMPTIONS.inflation;
+  const year0 = points.length ? points[0].year : new Date().getFullYear();
+  const deflate = (v: number, f: number): number => {
+    const r = v / f;
+    return Number.isFinite(r) ? Math.round(r) : v;
+  };
+  return points.map((p) => {
+    const f = Math.pow(1 + inf, p.year - year0);
+    return {
+      ...p,
+      corpus: deflate(p.corpus, f),
+      targetForRegular: deflate(p.targetForRegular, f),
+      targetForLean: deflate(p.targetForLean, f),
+      targetForFat: deflate(p.targetForFat, f),
+      inflatedAnnualExpenses: deflate(p.inflatedAnnualExpenses, f),
+      ...(p.withdrawal !== undefined ? { withdrawal: deflate(p.withdrawal, f) } : {}),
+    };
+  });
+}
 
 /**
  * Single source of truth for all FIRE dashboard math — now a thin Pinia-aware
@@ -196,6 +243,12 @@ export function useFireDerive() {
     yearsToLean: computed(() => d.value.yearsToLean),
     yearsToFat: computed(() => d.value.yearsToFat),
     projection: computed(() => d.value.projection),
+    // #139 — chart-owned real/nominal toggle. The chart passes its local `showRealTerms`
+    // ref; OFF returns the projection byte-identical, ON returns today's-₹ values. Deflator
+    // is live GENERAL CPI (`a.values.inflation`), never householdInflation (#20). Crossover
+    // markers still read `crossovers` (unchanged) — deflation provably preserves the year.
+    deflateProjection: (real: boolean): ProjectionPoint[] =>
+      deflateProjectionPoints(d.value.projection, a.values.inflation, real),
     crossovers: computed(() => d.value.crossovers),
     progressPercent: computed(() => d.value.progressPercent),
     fyTax: computed(() => d.value.fyTax),
