@@ -167,3 +167,12 @@ Per the process-improvement item 5 (measure the process). The pattern is decisiv
 - **Risk-disclosure classifications must enumerate the FULL set for the persona's real holdings.**
   "Market-linked" that omits equity MF/International/REIT understates risk for the SIP-driven salaried
   accumulator (optimistic Tier-0). FinTech caught it post-build; the volatile badge jumped 43%→92%.
+  (Folded into `src/lib/investment-traits.ts` risk-disclosure note 2026-06-10.)
+- **Tier-2 prod OAuth: headed-alone doesn't beat Google's automation block — use REAL Chrome + stripped
+  flags + sanitize.** `firekaro.com` Google sign-in rejected headed *bundled* Chromium ("browser may not
+  be secure"). Fix: `channel:'chrome'` + `launchPersistentContext` + `ignoreDefaultArgs:['--enable-automation']`
+  + `--disable-blink-features=AutomationControlled` (tool `scripts/prod-login-capture.mjs`, run via the
+  PowerShell tool so it's visible). Then SANITIZE the storageState — the persistent capture pulled 47
+  cookies incl. the full Google session; keep only the app `__Secure-better-auth.session_*` cookies + delete
+  the profile dir. **Gate-gap:** none deterministic; folded into `app-login/references/learnings.md` +
+  `DEPLOY.md` Tier-2.

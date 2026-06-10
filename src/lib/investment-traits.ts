@@ -114,6 +114,13 @@ export interface ReturnAssumptions {
  *              NPS partial, EPF on certain triggers).
  *  - illiquid: long horizon to convert without significant penalty
  *              (RealEstate, ESOP unvested, PPF first 7 years, NPS pre-60).
+ *
+ * RISK-DISCLOSURE NOTE (2026-06-10): when classifying "market-linked / volatile" for a RISK
+ * disclosure (e.g. runway.ts's volatile-asset badge), enumerate the FULL set the LOCKED
+ * salaried-accumulator persona actually holds — Stocks + MutualFunds + International + REIT +
+ * Crypto + vested ESOP. The persona is SIP/MF-driven, NOT direct-equity: a partial set (e.g.
+ * crypto+direct-equity only) understates risk = optimistic Tier-0 (FinTech caught it post-build;
+ * badge jumped 43%->92%).
  */
 export function liquidity(inv: Investment): Liquidity {
   switch (inv.type) {

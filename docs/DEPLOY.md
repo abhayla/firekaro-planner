@@ -224,6 +224,15 @@ curl -s https://firekaro.com | grep -oE 'assets/index-[A-Za-z0-9_-]+\.js' | head
 the live login/splash → screenshot + ARIA + console (non-destructive). If the deploy touched an
 authed screen, also run the Tier-2 authed critical-path when a session exists, else surface the skip.
 
+**Tier-2 authed session seed (when an authed prod check is needed):** `node scripts/prod-login-capture.mjs`
+— run via the **PowerShell** tool so the window is VISIBLE (the Bash tool is sandboxed/invisible). It opens
+prod `/login` in **REAL Chrome with the automation signature stripped** (`channel:'chrome'` +
+`ignoreDefaultArgs:['--enable-automation']` + `--disable-blink-features=AutomationControlled`), which defeats
+Google's "this browser may not be secure" block that headed *bundled* Chromium trips. Abhay types the
+password (never seen/stored); the script captures ONLY the FireKaro session cookie to gitignored
+`e2e/.auth/user.json` (the ~47 Google cookies the persistent profile pulls in are sanitized off disk + the
+profile dir deleted). Verified 2026-06-10 (`plan-baseline` authed round-trip + the 3 honesty cards).
+
 ---
 
 ## Rollback

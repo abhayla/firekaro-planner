@@ -33,6 +33,11 @@ substance proof. **Verifying the lens / a member-attributable screen requires BO
   the AppBar "Viewing as" control; or ANY member-attributable / cross-cutting / display screen.
 - MUST treat kernel/composable tests, section-Overview spot-checks, and a single-screen manual toggle as
   **necessary-but-NOT-sufficient** — they may NEVER be the SOLE verification of member-lens behavior.
+- MUST, when the sweep "won't run" (times out uniformly on every route), first verify the **SWEEP ITSELF
+  is not broken** before concluding the change is blocked. This sweep was once **"green by never running"**
+  (it waited on `#app[data-hydrated="true"]`, a signal this extracted repo never ships → it timed out 30s on
+  every route and verified NOTHING; repaired 2026-06-10 to wait on `.v-select:has(.mdi-eye)` + dismiss the
+  `.tour-overlay`). A uniformly-timing-out mandatory gate is a **broken gate, not a green one**.
 - MUST keep the sweep's route list **enumerated and complete** — when a new member-attributable screen
   is added, add it to `e2e/member-lens-sweep.spec.ts` **and** the static-scan list in the same change.
   A "we only checked the screens we changed" verification is exactly the miss this rule forbids.

@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/@stryker-mutator/core/schema/stryker-schema.json",
-  "_comment": "A7.6 mutation testing — proves the honesty-critical kernel math is actually PROTECTED by its specs (coverage % is a lie; a killed mutant is the real proof). Scoped to the pure calc modules for a tractable run; derive.ts (huge, dependency-dense) is exercised indirectly via these + the property/golden-master locks.",
+  "_comment": "A7.6 mutation testing — proves the honesty-critical kernel math is actually PROTECTED by its specs (coverage % is a lie; a killed mutant is the real proof). Scoped to the pure calc modules for a tractable run; derive.ts (huge, dependency-dense) is exercised indirectly via these + the property/golden-master locks. RUN SEQUENTIALLY — never concurrently with `npm run test:unit`: the mutation sandbox setup transiently skews vitest file discovery (observed 1166->1129 phantom counts, 2026-06-10).",
   "testRunner": "vitest",
   "mutate": [
     "src/lib/fire-math.ts",
