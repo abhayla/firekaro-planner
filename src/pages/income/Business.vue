@@ -3,7 +3,7 @@ import { computed, nextTick, ref } from "vue";
 import { useHouseholdStore } from "@/stores/household";
 import { useFireDerive } from "@/lib/useFireDerive";
 import { formatINRCompact } from "@/lib/formatters";
-import { toAnnual } from "@/lib/cashflow";
+import { buildBusinessKindColumns, businessPersonalShare } from "@/lib/business-legal-kinds";
 import { buildDonutSegments } from "@/lib/donut";
 import type { Business, BusinessLegalKind, Period } from "@/types/household";
 import LeafPageHeader from "@/components/income-layout/LeafPageHeader.vue";
@@ -38,9 +38,9 @@ const KIND_LIST = (Object.keys(KIND_META) as BusinessLegalKind[]).map((k) => ({ 
 
 // ───── derived data ─────
 
-function personalShare(b: Business): number {
-  return toAnnual({ amount: b.annualProfit, period: b.frequency }) * (b.sharePercent / 100);
-}
+// #158: share math + the browse-column builder live in the pure lib module so the
+// reachability invariant (every active business has a visible card) is spec-locked.
+const personalShare = businessPersonalShare;
 function ownerLabelFor(id: string): string {
   return household.members.find((m) => m.id === id)?.name || id || "—";
 }
@@ -79,10 +79,20 @@ const largestBusiness = computed(() =>
     : null,
 );
 
+interface KindColumn { kind: BusinessLegalKind; meta: KindMeta; total: number; entries: Business[]; }
+// #158: columns include every kind with ≥1 ACTIVE ENTRY (not only kinds with money) so a
+// ₹0-profit business stays visible/editable/deletable instead of becoming an orphan the
+// KPI tiles count but no list renders. The donut/ranked composition below intentionally
+// keeps the money>0 predicate — those are share-of-money charts.
+const kindColumns = computed<KindColumn[]>(() =>
+  buildBusinessKindColumns(activeBusinesses.value).map((c) => ({ ...c, meta: KIND_META[c.kind] })),
+);
+const kindsWithEntries = computed<BusinessLegalKind[]>(() => kindColumns.value.map((c) => c.kind));
+
 const kpis = computed<KpiTile[]>(() => {
   const tiles: KpiTile[] = [
     { eyebrow: "Your share · per year", value: formatINRCompact(totalShare.value), accent: true },
-    { eyebrow: "Active", value: String(activeBusinesses.value.length), meta: `${kindsWithMoney.value.length} ${kindsWithMoney.value.length === 1 ? "kind" : "kinds"}` },
+    { eyebrow: "Active", value: String(activeBusinesses.value.length), meta: `${kindsWithEntries.value.length} ${kindsWithEntries.value.length === 1 ? "kind" : "kinds"}` },
     { eyebrow: "Passive entities", value: String(passiveBusinesses.value.length), meta: "label-only" },
   ];
   if (largestBusiness.value) {
@@ -110,18 +120,8 @@ const rankedBars = computed<RankedBar[]>(() =>
   })),
 );
 
-interface KindColumn { kind: BusinessLegalKind; meta: KindMeta; total: number; entries: Business[]; }
-const kindColumns = computed<KindColumn[]>(() =>
-  kindsWithMoney.value.map((k) => ({
-    kind: k,
-    meta: KIND_META[k],
-    total: byKind.value[k],
-    entries: activeBusinesses.value.filter((b) => b.legalKind === k).sort((a, b) => personalShare(b) - personalShare(a)),
-  })),
-);
-
 const unusedKindChips = computed<AddTypeChip[]>(() =>
-  KIND_LIST.filter((k) => !kindsWithMoney.value.includes(k.value)).map((k) => ({
+  KIND_LIST.filter((k) => !kindsWithEntries.value.includes(k.value)).map((k) => ({
     value: k.value, label: k.meta.short, icon: k.meta.icon, color: k.meta.color,
   })),
 );
