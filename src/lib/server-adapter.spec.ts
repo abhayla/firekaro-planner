@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, beforeAll, vi } from "vitest";
-import { ServerAdapter } from "./server-adapter";
+import { ServerAdapter, SERVER_KEYS } from "./server-adapter";
 
 // vitest env is 'node' — polyfill localStorage for the local-fallback path
 // (same in-memory shim as storage-adapter.spec.ts).
@@ -82,7 +82,7 @@ describe("ServerAdapter — write-behind cache (mocked fetch, no DB/network)", (
     ]);
   });
 
-  it("hydrateAll fills the cache from 6 concurrent GETs", async () => {
+  it("hydrateAll fills the cache from one concurrent GET per SERVER_KEYS entry", async () => {
     const byKey: Record<string, unknown> = {
       household: { name: "Sharma" },
       assumptions: { inflation: 0.06 },
@@ -90,6 +90,7 @@ describe("ServerAdapter — write-behind cache (mocked fetch, no DB/network)", (
       features: { flags: {}, wizardCompleted: true },
       ui: { currentFY: "2026-27" },
       "expense-history": [{ period: "2026-05" }],
+      "plan-baseline": { fireNumber: 105500000 },
     };
     const fetchImpl = vi.fn(async (url: string | URL | Request, _init?: RequestInit) => {
       const key = String(url).split("/api/planner/")[1];
@@ -99,10 +100,12 @@ describe("ServerAdapter — write-behind cache (mocked fetch, no DB/network)", (
 
     await a.hydrateAll();
 
-    expect(fetchImpl).toHaveBeenCalledTimes(6);
+    // One GET per server-backed key (SERVER_KEYS) — grows automatically as keys are added (#138).
+    expect(fetchImpl).toHaveBeenCalledTimes(SERVER_KEYS.size);
     expect(a.get("household")).toEqual({ name: "Sharma" });
     expect(a.get("ui")).toEqual({ currentFY: "2026-27" });
     expect(a.get("expense-history")).toEqual([{ period: "2026-05" }]);
+    expect(a.get("plan-baseline")).toEqual({ fireNumber: 105500000 });
   });
 
   it("hydrateAll rejects when a GET fails (the main.ts fallback trigger)", async () => {
