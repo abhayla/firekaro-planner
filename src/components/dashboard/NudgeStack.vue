@@ -183,7 +183,7 @@ function colorFor(s: NudgeSeverity): string {
 </script>
 
 <template>
-  <v-card v-if="entries.length > 0" variant="outlined" class="nudge-stack pa-4 mb-4" data-testid="nudge-stack">
+  <v-card v-if="entries.length > 0" variant="outlined" class="nudge-stack pa-4" data-testid="nudge-stack">
     <h3 class="text-subtitle-2 font-weight-bold mb-2">Suggestions for you</h3>
     <div
       v-for="n in entries"
@@ -196,7 +196,7 @@ function colorFor(s: NudgeSeverity): string {
         <!-- Severity is color-only on the dot — name it for screen readers (WCAG 1.4.1). -->
         <span class="d-sr-only">{{ n.severity === "alert" ? "Critical: " : n.severity === "warning" ? "Warning: " : "Info: " }}</span>
         <span class="text-body-2 font-weight-bold">{{ n.title }}</span>
-        <span class="text-body-2 text-medium-emphasis"> — {{ n.body }}</span>
+        <span class="text-caption text-medium-emphasis"> — {{ n.body }}</span>
         <v-progress-linear
           v-if="n.progress != null"
           :model-value="n.progress"
@@ -213,14 +213,14 @@ function colorFor(s: NudgeSeverity): string {
           <v-btn
             :to="n.ctaTarget"
             variant="text"
-            size="small"
+            size="x-small"
             :color="colorFor(n.severity)"
             class="px-0 text-none"
-            density="comfortable"
+            density="compact"
             :data-testid="n.testid"
           >
             {{ n.ctaLabel }}
-            <v-icon icon="mdi-arrow-right" class="ml-1" size="small" />
+            <v-icon icon="mdi-arrow-right" class="ml-1" size="x-small" />
           </v-btn>
         </div>
       </div>
@@ -244,8 +244,9 @@ function colorFor(s: NudgeSeverity): string {
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  padding: 8px 0;
+  padding: 6px 0;
   border-bottom: 1px solid var(--border-subtle);
+  line-height: 1.35;
 }
 .suggestion-row:last-child {
   border-bottom: none;

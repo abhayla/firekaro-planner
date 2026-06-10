@@ -28,7 +28,6 @@ const props = withDefaults(
 );
 
 const W = 600;
-const BAR_Y = 18;
 const BAR_H = 24;
 const MIN_FRAC = 0.14; // readability clamp — labels carry the exact amounts
 
@@ -99,51 +98,68 @@ const ariaLabel = computed(
 </script>
 
 <template>
-  <svg :viewBox="`0 0 ${W} 72`" width="100%" role="img" :aria-label="ariaLabel" class="bridge-tl">
-    <rect
-      v-for="(s, i) in segments"
-      :key="i"
-      :x="s.x"
-      :y="BAR_Y"
-      :width="Math.max(0, s.w - 2)"
-      :height="BAR_H"
-      rx="6"
-      :style="{ fill: s.color }"
-      data-testid="bridge-tl-segment"
-    />
-    <text
-      v-for="(s, i) in segments"
-      :key="`l${i}`"
-      :x="s.x + 8"
-      :y="BAR_Y + BAR_H / 2 + 4"
-      class="bridge-tl__seg-label"
-    >
-      {{ s.label }}
-    </text>
-    <text
-      v-for="(a, i) in axis"
-      :key="`a${i}`"
-      :x="a.x"
-      y="62"
-      :text-anchor="a.anchor"
-      class="bridge-tl__axis"
-      data-testid="bridge-tl-axis"
-    >
-      {{ a.text }}
-    </text>
-  </svg>
+  <div role="img" :aria-label="ariaLabel" class="bridge-tl">
+    <!-- Labels live in the legend BELOW the bar, never inside the segments — in-bar text
+         overlaps its neighbours whenever a clamped segment is narrower than its label
+         (rule-33 blind-verifier catch, 2026-06-10). The bar keeps the gestalt; the legend
+         carries the truth. -->
+    <svg :viewBox="`0 0 ${W} 48`" width="100%" aria-hidden="true">
+      <rect
+        v-for="(s, i) in segments"
+        :key="i"
+        :x="s.x"
+        :y="2"
+        :width="Math.max(0, s.w - 2)"
+        :height="BAR_H"
+        rx="6"
+        :style="{ fill: s.color }"
+        data-testid="bridge-tl-segment"
+      />
+      <text
+        v-for="(a, i) in axis"
+        :key="`a${i}`"
+        :x="a.x"
+        y="42"
+        :text-anchor="a.anchor"
+        class="bridge-tl__axis"
+        data-testid="bridge-tl-axis"
+      >
+        {{ a.text }}
+      </text>
+    </svg>
+    <div class="bridge-tl__legend">
+      <span v-for="(s, i) in segments" :key="`k${i}`" class="bridge-tl__key">
+        <span class="bridge-tl__swatch" :style="{ background: s.color }" aria-hidden="true" />
+        {{ s.label }}
+      </span>
+    </div>
+  </div>
 </template>
 
 <style scoped>
-.bridge-tl__seg-label {
-  font-family: var(--font-display, Inter, sans-serif);
-  font-size: 11px;
-  font-weight: 600;
-  fill: #fff;
-}
 .bridge-tl__axis {
   font-family: var(--font-display, Inter, sans-serif);
   font-size: 10px;
   fill: var(--text-muted, #64748b);
+}
+.bridge-tl__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--text-secondary, #475569);
+}
+.bridge-tl__key {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+.bridge-tl__swatch {
+  width: 9px;
+  height: 9px;
+  border-radius: 3px;
+  flex-shrink: 0;
 }
 </style>

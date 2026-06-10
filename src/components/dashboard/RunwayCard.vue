@@ -67,7 +67,7 @@ function fmtMonths(m: number): string {
 </script>
 
 <template>
-  <v-card v-if="show" variant="outlined" class="pa-4 mt-4" data-testid="runway-card">
+  <v-card v-if="show" variant="outlined" class="pa-4" data-testid="runway-card">
     <div class="d-flex align-center ga-2 mb-1">
       <v-icon icon="mdi-parachute-outline" color="primary" />
       <h3 class="text-subtitle-1 font-weight-bold">If you stop working today or get fired</h3>
@@ -126,7 +126,7 @@ function fmtMonths(m: number): string {
     </div>
   </v-card>
 
-  <v-card v-else variant="outlined" class="pa-4 mt-4 text-center" data-testid="runway-card-empty">
+  <v-card v-else variant="outlined" class="pa-4 text-center" data-testid="runway-card-empty">
     <v-icon icon="mdi-parachute-outline" size="40" color="grey-lighten-1" />
     <div class="text-subtitle-2 mt-2">No liquid runway to show yet</div>
     <div class="text-caption text-medium-emphasis">

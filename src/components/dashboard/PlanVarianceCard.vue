@@ -122,7 +122,7 @@ const changedAssumptionLabels = computed(() =>
 
 <template>
   <!-- Has a usable baseline → the variance view -->
-  <v-card v-if="variance && headline" variant="outlined" class="pa-4 mt-4" data-testid="plan-variance-card">
+  <v-card v-if="variance && headline" variant="outlined" class="pa-4" data-testid="plan-variance-card">
     <div class="d-flex align-center justify-space-between ga-2 mb-2 flex-wrap">
       <div class="d-flex align-center ga-2">
         <v-icon icon="mdi-target" color="primary" />
@@ -199,7 +199,7 @@ const changedAssumptionLabels = computed(() =>
   </v-card>
 
   <!-- No (usable) baseline → explainer; the ONE canonical lock CTA lives in the hero above. -->
-  <v-card v-else variant="outlined" class="pa-4 mt-4 text-center" data-testid="plan-variance-empty">
+  <v-card v-else variant="outlined" class="pa-4 text-center" data-testid="plan-variance-empty">
     <v-icon icon="mdi-target" size="40" color="grey-lighten-1" />
     <div class="text-subtitle-2 mt-2">Track yourself against your plan</div>
     <p class="text-caption text-medium-emphasis mb-1">

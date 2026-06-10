@@ -9,7 +9,6 @@ import { computeFreedomScore } from "@/lib/freedom-score";
 import { toMonthly } from "@/lib/cashflow";
 import { isEmergencyFundEligible } from "@/lib/investment-traits";
 import FireHero from "@/components/dashboard/FireHero.vue";
-import LifecycleDigestCard from "@/components/dashboard/LifecycleDigestCard.vue";
 import BridgeBreakdownCard from "@/components/dashboard/BridgeBreakdownCard.vue";
 import RunwayCard from "@/components/dashboard/RunwayCard.vue";
 import PlanVarianceCard from "@/components/dashboard/PlanVarianceCard.vue";
@@ -205,52 +204,71 @@ onMounted(() => {
         </v-chip>
       </div>
 
-      <!-- Tier-1 stickiness: "Since you were away" lifecycle digest — diffs the
-           live derive() headline against the persisted baseline and surfaces the
-           meaningful change FIRE-date-first. Self-hides when nothing meaningful
-           changed (or no baseline yet). Deep-link target for the WhatsApp nudge. -->
-      <LifecycleDigestCard />
-
+      <!-- Option-D verdict hero: big age + confidence range + since-you-were-away delta
+           (LifecycleDigestCard's diff, folded into the hero subline — the card is no longer
+           mounted here; the hero carries the ?digest=open deep-link anchor) + the 3-slot
+           KPI strip (vs-plan / corpus progress / biggest win). -->
       <FireHero />
 
-      <!-- #81 Phase 2 — household (primary) vs each adult's standalone personal FIRE + the gap,
-           with the honesty caveat. Placed right under the headline so the household number is
-           never confused with a rosier individual figure. -->
-      <IndividualFireCard class="mt-4" />
+      <!-- Honesty pair: is my money actually reachable when I need it? -->
+      <v-row dense>
+        <!-- #15 — accessible-money bridge (compact, #74/#76): honest verdict + the unlock
+             timeline; links to Readiness for the full per-holding detail. Self-hides for a
+             fully-liquid household. -->
+        <v-col cols="12" md="6">
+          <BridgeBreakdownCard variant="compact" class="h-100" />
+        </v-col>
+        <!-- #140 — layoff runway gauge: months of FULL obligations covered from post-tax
+             liquid savings with zero income. -->
+        <v-col cols="12" md="6">
+          <RunwayCard class="h-100" />
+        </v-col>
+      </v-row>
 
-      <!-- #15 — accessible-money bridge (compact on the dashboard, #74/#76): keeps the honest
-           verdict + spendable/locked bar + bridge-income, and links to Readiness for the full
-           unlock-timeline + "what we assumed" detail. Self-hides for a fully-liquid household. -->
-      <BridgeBreakdownCard variant="compact" />
+      <!-- Accountability pair: am I tracking my plan, and what's my biggest move? -->
+      <v-row dense>
+        <!-- #138 — plan-vs-actual variance waterfall (progress / reality / goalpost). -->
+        <v-col cols="12" md="6">
+          <PlanVarianceCard class="h-100" />
+        </v-col>
+        <!-- #48 obj-2 — ranked accelerator impact bars + the save-more what-if. -->
+        <v-col cols="12" md="6">
+          <AccelerationCard class="h-100" />
+        </v-col>
+      </v-row>
 
-      <!-- #140 — job-loss / layoff runway: months the household could survive with ZERO income
-           from POST-TAX liquid savings against the FULL obligation burn (living + EMI + premiums).
-           Optionality/safety framing, placed right after the bridge (early-FIRE liquidity) since
-           both answer "is my money actually reachable when I need it?" -->
-      <RunwayCard />
+      <!-- Milestone ladder: where the corpus sits vs Lean / Regular / Fat (+ Coast/Barista). -->
+      <v-row dense>
+        <v-col cols="12">
+          <FireMilestonesCard />
+        </v-col>
+      </v-row>
 
-      <!-- #138 — plan-vs-actual variance: lock a baseline, then see the HONEST delta since,
-           decomposed into progress (corpus) / reality (expenses) / goalpost (assumption changes).
-           Placed after the runway so the "am I tracking my plan?" accountability sits with the
-           other honesty surfaces, before the accelerators. -->
-      <PlanVarianceCard />
+      <v-row dense>
+        <!-- #81 Phase 2 — household (primary) vs each adult's personal FIRE + the gap. -->
+        <v-col cols="12" md="6">
+          <IndividualFireCard class="h-100" />
+        </v-col>
+        <v-col cols="12" md="6">
+          <AssetAllocationDonut class="h-100" />
+        </v-col>
+      </v-row>
 
-      <!-- #48 obj-2 — "your biggest achievable wins": ranked accelerators (years sooner) for THIS
-           household, the risk-notch with a confidence range, + a live save-more what-if. The
-           get-there-faster surface, placed number → honesty(bridge) → how-to-accelerate → nudges. -->
-      <AccelerationCard />
-
-      <!-- Phase 4 Stage I — audit-mandated dashboard additions -->
-      <NudgeStack />
-      <FireMilestonesCard />
-      <FamilyLayerCard />
+      <!-- Family layer (sandwich-gen commitments) — self-hides without commitments; kept
+           full-width (the Iyers tour anchors .family-layer-card). -->
+      <v-row dense>
+        <v-col cols="12">
+          <FamilyLayerCard />
+        </v-col>
+      </v-row>
 
       <v-row dense>
         <v-col cols="12" md="8">
           <FireProjectionChart />
         </v-col>
+        <!-- Severity-coded suggestions (incl. the relocated estate + stress entries). -->
         <v-col cols="12" md="4">
-          <AssetAllocationDonut />
+          <NudgeStack />
         </v-col>
       </v-row>
 

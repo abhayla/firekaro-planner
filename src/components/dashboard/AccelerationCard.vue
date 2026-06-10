@@ -79,7 +79,7 @@ const saveMoreImpact = computed(() => accel.saveMoreImpact(extraMonthly.value));
   <v-card
     v-if="show"
     variant="outlined"
-    class="accel-card pa-5 mb-4"
+    class="accel-card pa-5"
     data-testid="acceleration-card"
   >
     <div class="d-flex align-center mb-3">

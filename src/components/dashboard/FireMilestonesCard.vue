@@ -118,7 +118,7 @@ const baristaProgress = computed(() => {
 </script>
 
 <template>
-  <v-card variant="outlined" class="fire-milestones-card mb-4" data-testid="fire-milestones-card">
+  <v-card variant="outlined" class="fire-milestones-card" data-testid="fire-milestones-card">
     <v-card-title>FIRE milestones</v-card-title>
     <v-card-text>
       <!-- Option-D ladder: where the current corpus sits vs Lean / Regular / Fat (amounts +

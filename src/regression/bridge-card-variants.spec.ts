@@ -37,7 +37,9 @@ describe("#76 — one component, parameterized by a `variant` prop (default full
   });
 
   it("Dashboard host passes variant=\"compact\"", () => {
-    expect(dashboard).toMatch(/<BridgeBreakdownCard\s+variant="compact"\s*\/>/);
+    // Option-D: the host also passes a layout class (h-100 inside the paired grid row) —
+    // the lock cares that the COMPACT variant is requested, whatever other attrs ride along.
+    expect(dashboard).toMatch(/<BridgeBreakdownCard\s+variant="compact"[^>]*\/>/);
   });
 
   it("Readiness host stays the default (full) — NO variant prop passed", () => {

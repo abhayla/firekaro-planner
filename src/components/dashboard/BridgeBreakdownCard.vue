@@ -87,7 +87,7 @@ function fixRoute(fixField?: string): RouteLocationRaw {
   <v-card
     v-if="show"
     variant="outlined"
-    class="bridge-card pa-5 mb-4"
+    class="bridge-card pa-5"
     data-testid="bridge-breakdown-card"
   >
     <div class="d-flex align-center mb-3">
@@ -108,7 +108,7 @@ function fixRoute(fixField?: string): RouteLocationRaw {
       v-if="!bc!.covered"
       type="warning"
       variant="tonal"
-      density="comfortable"
+      density="compact"
       class="mb-4"
       data-testid="bridge-shortfall-alert"
     >
@@ -121,7 +121,7 @@ function fixRoute(fixField?: string): RouteLocationRaw {
       v-else
       type="success"
       variant="tonal"
-      density="comfortable"
+      density="compact"
       class="mb-4"
     >
       Your corpus stays liquid enough through retirement — locked savings unlock before your liquid

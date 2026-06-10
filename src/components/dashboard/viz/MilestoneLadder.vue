@@ -40,15 +40,21 @@ const xFor = (amount: number) => {
   return Math.min(0.94, Math.max(0.06, frac)) * W;
 };
 
+// Label x is clamped further inboard than the pin so wide centered text (e.g. "You · ₹1.10 Cr"
+// near the left edge) never clips out of the viewBox (rule-33 blind-verifier catch).
+const labelXFor = (pinX: number) => Math.min(Math.max(pinX, 78), W - 78);
+
 const pins = computed(() => [
   {
     x: xFor(props.corpusNow),
+    labelX: labelXFor(xFor(props.corpusNow)),
     color: "rgb(var(--v-theme-fire-orange))",
     amountText: `You · ${formatINRCompact(props.corpusNow)}`,
     subText: "today",
   },
   ...props.milestones.map((m) => ({
     x: xFor(m.amount),
+    labelX: labelXFor(xFor(m.amount)),
     color: m.color,
     amountText: formatINRCompact(m.amount),
     subText: m.age != null ? `${m.label} · ${m.age}` : m.label,
@@ -66,13 +72,14 @@ const ariaLabel = computed(
 </script>
 
 <template>
-  <svg :viewBox="`0 0 ${W} 96`" width="100%" role="img" :aria-label="ariaLabel" class="ladder">
+  <!-- max-width caps the proportional SVG growth on full-width hosts. -->
+  <svg :viewBox="`0 0 ${W} 96`" width="100%" style="max-width: 920px" role="img" :aria-label="ariaLabel" class="ladder">
     <rect x="0" :y="RAIL_Y" :width="W" :height="RAIL_H" rx="5" class="ladder__rail" />
     <rect x="0" :y="RAIL_Y" :width="fillW" :height="RAIL_H" rx="5" class="ladder__fill" data-testid="ladder-fill" />
     <template v-for="(p, i) in pins" :key="i">
-      <text :x="p.x" :y="RAIL_Y - 26" text-anchor="middle" class="ladder__amount">{{ p.amountText }}</text>
+      <text :x="p.labelX" :y="RAIL_Y - 26" text-anchor="middle" class="ladder__amount">{{ p.amountText }}</text>
       <circle :cx="p.x" :cy="RAIL_Y + RAIL_H / 2" r="7" :style="{ fill: p.color }" class="ladder__pin" data-testid="ladder-pin" />
-      <text :x="p.x" :y="RAIL_Y + 32" text-anchor="middle" class="ladder__sub">{{ p.subText }}</text>
+      <text :x="p.labelX" :y="RAIL_Y + 32" text-anchor="middle" class="ladder__sub">{{ p.subText }}</text>
     </template>
   </svg>
 </template>

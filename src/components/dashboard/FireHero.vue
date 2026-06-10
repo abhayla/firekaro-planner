@@ -13,7 +13,8 @@
  * confidence band (#18) non-removable; bridge-gated headline subline (#15); the
  * household-primary headline (#22/#66) — same useFireDerive fields as before.
  */
-import { computed, onMounted } from "vue";
+import { computed, onMounted, ref } from "vue";
+import { useRoute } from "vue-router";
 import { useFireDerive } from "@/lib/useFireDerive";
 import { useHouseholdStore } from "@/stores/household";
 import { useAssumptionsStore } from "@/stores/assumptions";
@@ -82,8 +83,18 @@ const bridgeSubline = computed(() => {
 });
 
 // ---- "Since you were away" delta (folded in from LifecycleDigestCard, same logic) ----
+// The hero is also the WhatsApp lifecycle nudge's deep-link landing (?digest=open +
+// the #lifecycle-digest anchor) now that the standalone card is off this page.
+const route = useRoute();
+// v-card template ref resolves to the component instance — unwrap $el for the DOM node.
+const heroEl = ref<{ $el?: HTMLElement } | null>(null);
 const digest = useLifecycleDigest();
-onMounted(() => digest.ensureBaseline());
+onMounted(() => {
+  digest.ensureBaseline();
+  if (route.query.digest === "open") {
+    heroEl.value?.$el?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+});
 const deltaClass = computed(() => (digest.accentColor.value === "success" ? "text-success" : "text-warning"));
 
 // ---- KPI slot 1: Vs your plan (plan-variance #138) ----
@@ -156,7 +167,14 @@ function yearsLabel(years: number): string {
 </script>
 
 <template>
-  <v-card variant="outlined" class="fire-hero pa-5 mb-4" :class="toneClass" data-testid="fire-hero">
+  <v-card
+    id="lifecycle-digest"
+    ref="heroEl"
+    variant="outlined"
+    class="fire-hero pa-5 mb-4"
+    :class="toneClass"
+    data-testid="fire-hero"
+  >
     <!-- Verdict block -->
     <div class="text-center">
       <template v-if="achieved">

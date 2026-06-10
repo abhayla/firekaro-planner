@@ -78,7 +78,8 @@ const ariaLabel = computed(() => {
 </script>
 
 <template>
-  <svg v-if="hasBars" :viewBox="`0 0 ${W} ${H}`" width="100%" role="img" :aria-label="ariaLabel" class="pv-wf">
+  <!-- max-width caps the proportional SVG growth in wide hosts (the viewBox keeps the aspect). -->
+  <svg v-if="hasBars" :viewBox="`0 0 ${W} ${H}`" width="100%" style="max-width: 500px" role="img" :aria-label="ariaLabel" class="pv-wf">
     <template v-for="c in columns" :key="c.name">
       <rect
         :x="c.x"
