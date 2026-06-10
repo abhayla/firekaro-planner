@@ -244,7 +244,9 @@ Pure modules in `src/lib/` with colocated `*.spec.ts`: `fire-math.ts`, `tax.ts` 
 `investment-traits.ts`, `derived-records.ts`, `nudge-engine.ts`,
 `business-legal-kinds.ts` (shared `BUSINESS_LEGAL_KINDS` label lookup for the business/other-income forms — Pvt-Ltd/LLP/Partnership/HUF/etc.),
 `lifecycle-digest.ts` (the `derive()`-grounded "since you were away" delta engine — the Tier-1
-stickiness digest card on the dashboard), `expense-history.ts`, `member-horizon.ts`, `age.ts`, and
+stickiness digest card on the dashboard), `expense-history.ts`, `member-horizon.ts`, `age.ts`,
+`fire-milestone-copy.ts` (Coast/Barista card copy gated on a real FIRE target existing — the honest
+"add your data" fallback for zero-data users, #39), and
 the **#15 accessible-money bridge** layer
 (`accessibility.ts`, `liquidation-tax.ts`, `eps-pension.ts`, `gratuity.ts`, `bridge.ts` — see the
 dedicated note below). Research-grounded math: 4-bucket inflation, per-instrument returns,
@@ -262,7 +264,11 @@ stop?"), `decumulation.ts` (obj-4 post-FIRE guardrails), the **dashboard honesty
 today's purchasing power; chart-owned, never changes the kernel) — and the **member model + app-wide lens** layer
 `member-earning.ts` + `member-draft.ts` + `member-horizon.ts` (`Member.role` is DERIVED from income, not
 stored; the orthogonal "View as &lt;member&gt;" lens screens member-attributable values app-wide while
-keeping household-solvency ratios coherent — #66/#67, see `docs/goals/2026-06-08-member-model-coherence-and-app-wide-lens.md`).
+keeping household-solvency ratios coherent — #66/#67, see `docs/goals/2026-06-08-member-model-coherence-and-app-wide-lens.md`)
+plus its #81 member-level FIRE pair: `expense-attribution.ts` (the ONE canonical ring/lens expense
+attributor — "Household"/"Dependents" sentinels are deliberately distinct from the asset "Joint"
+sentinel) and `individual-fire.ts` (one adult's standalone FIRE as a "mini-household": attributed
+corpus/expenses/per-individual tax; household stays the primary + invariant headline).
 
 **Accessible-money bridge (honesty layer, #13/#14/#15 — `derive()` consumes it):** corpus ≥ FIRE
 number does NOT mean retire-ready — locked money (PPF maturing at 60, NPS forced into an annuity on
