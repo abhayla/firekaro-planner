@@ -9,9 +9,9 @@
  *               flush (PUT /api/planner/{key}). A keystroke storm coalesces to ONE
  *               PUT after the last edit. A failed flush is re-queued on a capped
  *               exponential backoff (never dropped — gh #37), reset by a fresh set().
- *   - the ONE async seam is hydrateAll() (6 concurrent GETs), awaited at boot.
+ *   - the ONE async seam is hydrateAll() (one concurrent GET per SERVER_KEYS entry), awaited at boot.
  *
- * Only the 6 server-backed entityKeys go over the wire. Client-only prefs
+ * Only the server-backed entityKeys (SERVER_KEYS) go over the wire. Client-only prefs
  * (active-seed, tour-dismissed, …) fall through to a userId-scoped
  * LocalStorageAdapter so they still persist locally.
  *
@@ -21,7 +21,7 @@
 
 import { type StorageAdapter, LocalStorageAdapter } from "@/lib/storage-adapter";
 
-/** The 6 entityKeys persisted to the backend (mirror the 6 /api/planner paths). */
+/** The entityKeys persisted to the backend (mirror the /api/planner paths). */
 export const SERVER_KEYS: ReadonlySet<string> = new Set([
   "household",
   "assumptions",
@@ -29,6 +29,9 @@ export const SERVER_KEYS: ReadonlySet<string> = new Set([
   "features",
   "ui",
   "expense-history",
+  // #138 — the locked plan baseline (a JSON blob; server stores it in the userUiPrefs.prefs
+  // blob, no new table). hydrateAll GETs it on boot like the others.
+  "plan-baseline",
 ]);
 
 const DEFAULT_DEBOUNCE_MS = 1500;

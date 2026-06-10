@@ -28,8 +28,10 @@ import { loadIyersSeed } from "@/seeds/iyers";
 import { loadMauryasSeed } from "@/seeds/mauryas";
 import { derive } from "@/lib/derive";
 import { isEarningMember } from "@/lib/member-earning";
-import { useFireDerive } from "@/lib/useFireDerive";
+import { useFireDerive, deflateProjectionPoints } from "@/lib/useFireDerive";
 import { calculateYearsToTarget } from "@/lib/fire-math";
+import { computeRunway } from "@/lib/runway";
+import { toMonthly } from "@/lib/cashflow";
 import { buildContributionResolver } from "@/lib/contribution-schedule";
 import { runMonteCarloFire } from "@/lib/monte-carlo";
 import { captureSnapshot, milestoneBandFor } from "@/lib/lifecycle-digest";
@@ -124,6 +126,66 @@ describe("headline plausibility — DEFAULT product lens (#22 foolproof gate)", 
         mc.p50Years,
         `${ctx} — tapered p50 ${mc.p50Years.toFixed(1)} ≥ scalar p50 ${mcScalar.p50Years.toFixed(1)} (de-risking)`,
       ).toBeGreaterThanOrEqual(mcScalar.p50Years);
+    });
+
+    it(`${persona.name}: #139 real-terms projection is sane on the default lens (deflated, smaller, crossover unmoved)`, () => {
+      const h = useHouseholdStore();
+      const a = useAssumptionsStore();
+      persona.load(h, a);
+      const k = derive(h.data, a.values, DEFAULT_PRODUCT_LENS);
+      const nominal = k.projection;
+      const real = deflateProjectionPoints(nominal, a.values.inflation, true);
+      const last = nominal.length - 1;
+      const ctx = `${persona.name} #139`;
+
+      // Today's-₹ corpus must be positive, finite, and STRICTLY smaller than nominal far out
+      // (the whole point — ₹Cr in 2050 buys far less today). No NaN/∞/negative reaching a user.
+      expect(Number.isFinite(real[last].corpus), `${ctx} — real corpus finite`).toBe(true);
+      expect(real[last].corpus, `${ctx} — real corpus > 0`).toBeGreaterThan(0);
+      expect(real[last].corpus, `${ctx} — real corpus < nominal`).toBeLessThan(nominal[last].corpus);
+      // The deflator MUST be exactly general CPI applied over the horizon — assert the real value
+      // equals nominal ÷ (1+inflation)^lastIndex (within ₹ rounding). This catches an over-aggressive
+      // deflator (the #20 householdInflation basket) WITHOUT a horizon-dependent false floor: a young
+      // accumulator with a 51-60yr horizon legitimately deflates below a fixed 0.05 ratio, yet the
+      // deflation is still correct (code-reviewer MEDIUM, 2026-06-10).
+      const expectedReal = Math.round(
+        nominal[last].corpus / Math.pow(1 + a.values.inflation, nominal.length - 1),
+      );
+      expect(real[last].corpus, `${ctx} — real corpus == nominal deflated at general CPI`).toBe(expectedReal);
+
+      // Honesty invariant: deflating BOTH series by one shared factor must NOT move the FIRE date.
+      const cross = (pts: typeof nominal) => pts.find((p) => p.corpus >= p.targetForRegular)?.year ?? null;
+      expect(cross(real), `${ctx} — real crossover year unmoved`).toBe(cross(nominal));
+    });
+
+    it(`${persona.name}: #140 layoff runway is sane on the default lens (post-tax, conservative ≤ headline)`, () => {
+      const h = useHouseholdStore();
+      const a = useAssumptionsStore();
+      persona.load(h, a);
+      const k = derive(h.data, a.values, DEFAULT_PRODUCT_LENS);
+      const burn =
+        h.data.expenses.avgMonthly +
+        h.data.expenses.recurring.reduce((s, r) => s + toMonthly({ amount: r.amount, period: r.frequency }), 0);
+      const r = computeRunway({
+        investments: h.data.investments,
+        monthlyBurn: burn,
+        marginalRate: k.householdMarginalRate,
+      });
+      const ctx = `${persona.name} #140 runway=${r.runwayMonths.toFixed(1)}mo liquidNet=${r.liquidNet}`;
+
+      // No NaN/∞/negative months reaching a user.
+      expect(Number.isFinite(r.runwayMonths), `${ctx} — finite`).toBe(true);
+      expect(r.runwayMonths, `${ctx} — runway >= 0`).toBeGreaterThanOrEqual(0);
+      // A layoff runway over ~50 years (600 mo) for an accumulator with a salary would be absurd.
+      expect(r.runwayMonths, `${ctx} — runway < 600 months (sane)`).toBeLessThan(600);
+      // Honest invariants on the default lens: conservative floor ≤ headline; net never exceeds gross.
+      expect(r.runwayMonthsConservative, `${ctx} — conservative ≤ headline`).toBeLessThanOrEqual(r.runwayMonths);
+      const grossLiquid = h.data.investments
+        .filter((i) => ["Stocks", "MutualFunds", "FD", "Gold", "Crypto", "International", "REIT", "ESOP"].includes(i.type))
+        .reduce((s, i) => s + i.value, 0);
+      expect(r.liquidNet, `${ctx} — post-tax net ≤ gross liquid`).toBeLessThanOrEqual(grossLiquid);
+      expect(r.volatilePortion, `${ctx} — volatile share 0..1`).toBeGreaterThanOrEqual(0);
+      expect(r.volatilePortion).toBeLessThanOrEqual(1);
     });
 
     it(`${persona.name}: the default lens is BYTE-IDENTICAL to family view on FIRE adequacy`, () => {
