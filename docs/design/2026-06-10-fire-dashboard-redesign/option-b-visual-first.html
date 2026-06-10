@@ -1,0 +1,137 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Option B — Visual-First</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{--orange:#f97316;--green:#16a34a;--red:#dc2626;--amber:#d97706;--blue:#1976d2;--ink:#1e293b;--muted:#64748b;--line:#e2e8f0;--bg:#f8fafc}
+*{box-sizing:border-box;margin:0}body{font-family:Inter,sans-serif;background:var(--bg);color:var(--ink);padding:24px;max-width:1180px;margin:auto}
+.mono{font-family:'JetBrains Mono',monospace;font-variant-numeric:tabular-nums}
+.card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:20px;margin-bottom:14px}
+h1{font-size:22px;margin-bottom:4px}.sub{color:var(--muted);font-size:13px;margin-bottom:18px}
+h3{font-size:14px;font-weight:700;margin-bottom:12px}
+.tag{position:fixed;top:8px;right:12px;background:var(--ink);color:#fff;font-size:12px;padding:4px 10px;border-radius:8px}
+.ok{color:var(--green)}.warn{color:var(--amber)}.bad{color:var(--red)}.mut{color:var(--muted)}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.hero{background:linear-gradient(135deg,#fff7ed,#fff);border-color:#fed7aa}
+.hero .big{font-size:38px;font-weight:800}.hero .band{font-size:12px;color:var(--muted)}
+/* bridge timeline */
+.tl{position:relative;height:64px;margin-top:8px}
+.tl .seg{position:absolute;top:18px;height:22px;border-radius:6px;font-size:11px;color:#fff;font-weight:600;display:flex;align-items:center;padding-left:8px}
+.tl .axis{position:absolute;top:46px;width:100%;display:flex;justify-content:space-between;font-size:10px;color:var(--muted)}
+/* gauge */
+.gaugewrap{display:flex;gap:24px;align-items:center}
+.legend{font-size:12px;color:var(--muted);line-height:1.7}
+/* waterfall */
+.wf{display:flex;align-items:flex-end;gap:18px;height:120px;padding:0 8px}
+.wf .col{flex:1;text-align:center;font-size:11px;color:var(--muted)}
+.wf .bar{border-radius:6px 6px 0 0;margin:0 auto;width:46px}
+/* wins bars */
+.win{display:grid;grid-template-columns:170px 1fr 110px;gap:10px;align-items:center;font-size:13px;margin-bottom:12px}
+.win .track{height:16px;background:#f1f5f9;border-radius:8px;position:relative;overflow:hidden}
+.win .fill{position:absolute;height:100%;border-radius:8px}
+/* milestones ladder */
+.ladder{position:relative;height:90px;margin-top:6px}
+.ladder .rail{position:absolute;top:40px;left:0;right:0;height:8px;background:#f1f5f9;border-radius:6px}
+.ladder .fillrail{position:absolute;top:40px;left:0;width:10%;height:8px;background:var(--orange);border-radius:6px}
+.ladder .ms{position:absolute;top:0;text-align:center;font-size:11px;transform:translateX(-50%)}
+.ladder .ms .pin{width:14px;height:14px;border-radius:99px;border:3px solid #fff;box-shadow:0 0 0 1px var(--line);margin:32px auto 6px}
+</style></head><body>
+<div class="tag">OPTION B — VISUAL-FIRST (everything stays, as a graphic)</div>
+<h1>FIRE Dashboard</h1><div class="sub">Same content as today — every card converted from text to a visual encoding.</div>
+
+<div class="card hero">
+  <h3>🔥 You'll FIRE at age <span class="big">55</span> <span class="mut">(in 24y 1m, by 2051)</span></h3>
+  <svg viewBox="0 0 1100 70" width="100%">
+    <rect x="0" y="28" width="1100" height="12" rx="6" fill="#f1f5f9"/>
+    <rect x="240" y="28" width="560" height="12" rx="6" fill="#fed7aa"/>
+    <rect x="515" y="22" width="6" height="24" rx="3" fill="#f97316"/>
+    <text x="518" y="14" text-anchor="middle" font-size="12" font-weight="700" font-family="Inter">age 55</text>
+    <text x="240" y="60" font-size="11" fill="#64748b" font-family="Inter">48 (good markets)</text>
+    <text x="800" y="60" text-anchor="end" font-size="11" fill="#64748b" font-family="Inter">62 (bad markets)</text>
+    <text x="0" y="60" font-size="11" fill="#94a3b8" font-family="Inter">today · age 31</text>
+  </svg>
+  <div style="display:flex;gap:28px;margin-top:10px" class="mono">
+    <span>₹1.10 Cr <span class="mut" style="font-size:11px">now · 10% of FIRE</span></span>
+    <span>₹10.55 Cr <span class="mut" style="font-size:11px">target</span></span>
+    <span>48.1% <span class="mut" style="font-size:11px">savings rate</span></span>
+    <span>3.25% <span class="mut" style="font-size:11px">SWR</span></span>
+  </div>
+</div>
+
+<div class="row2">
+<div class="card">
+  <h3>Accessible-money bridge — when your money unlocks</h3>
+  <div class="tl">
+    <div class="seg" style="left:0;width:62%;background:#16a34a">Spendable at FIRE · ₹9.20 Cr</div>
+    <div class="seg" style="left:63%;width:14%;background:#d97706">Locked till 60 · ₹57.54 L</div>
+    <div class="seg" style="left:78%;width:22%;background:#1976d2">Bridge income ₹2.71 L/yr</div>
+    <div class="axis"><span>FIRE @55</span><span>58</span><span>60 (EPF/PPF/NPS unlock)</span><span>65</span></div>
+  </div>
+  <div class="mut" style="font-size:12px;margin-top:6px">✓ Liquid runway covers your bridge years — no unlock-gap penalty on your FIRE age.</div>
+</div>
+<div class="card">
+  <h3>If you stop working today or get fired</h3>
+  <div class="gaugewrap">
+    <svg viewBox="0 0 180 110" width="190">
+      <path d="M15,100 A75,75 0 0 1 165,100" fill="none" stroke="#f1f5f9" stroke-width="18" stroke-linecap="round"/>
+      <path d="M15,100 A75,75 0 0 1 122,35" fill="none" stroke="#d97706" stroke-width="18" stroke-linecap="round"/>
+      <text x="90" y="78" text-anchor="middle" font-size="22" font-weight="800" font-family="JetBrains Mono">3y 4m</text>
+      <text x="90" y="96" text-anchor="middle" font-size="10" fill="#64748b" font-family="Inter">full-burn runway</text>
+    </svg>
+    <div class="legend">
+      ₹69.43 L liquid (post-tax) ÷ ₹1.73 L/mo burn<br>
+      <b class="bad">▮</b> stable-only: <b>1 month</b> (₹2 L FD)<br>
+      <b class="warn">▮</b> 92% market-linked — shorter in a crash<br>
+      <b class="mut">▮</b> + EPF ₹24 L after ~2 mo → <b>4y 6m</b>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="row2">
+<div class="card">
+  <h3>Vs your locked plan — what moved your date</h3>
+  <div class="wf">
+    <div class="col"><div class="bar" style="height:64px;background:#16a34a"></div>+4 mo<br>corpus growth</div>
+    <div class="col"><div class="bar" style="height:30px;background:#dc2626"></div>−2 mo<br>expense changes</div>
+    <div class="col"><div class="bar" style="height:18px;background:#94a3b8"></div>+1 mo<br>assumptions</div>
+    <div class="col"><div class="bar" style="height:50px;background:#f97316"></div><b>= 3 mo earlier</b><br>net vs plan</div>
+  </div>
+  <div class="mut" style="font-size:11px;margin-top:8px">(illustrative bars — currently you are exactly on plan, locked 10 Jun 2026)</div>
+</div>
+<div class="card">
+  <h3>Your biggest achievable wins — years sooner</h3>
+  <div class="win"><span>Trim spending 10%</span><div class="track"><div class="fill" style="left:30%;width:55%;background:#16a34a"></div></div><b class="ok mono">+2.3 yrs</b></div>
+  <div class="win"><span>Invest +₹10K/mo</span><div class="track"><div class="fill" style="left:30%;width:18%;background:#16a34a"></div></div><b class="ok mono">+9 mo</b></div>
+  <div class="win"><span>Risk notch 50→60%</span><div class="track"><div class="fill" style="left:8%;width:78%;background:repeating-linear-gradient(90deg,#fbbf24,#fbbf24 6px,#fde68a 6px,#fde68a 12px)"></div></div><b class="warn mono">−6.5…+8.4y</b></div>
+  <div class="mut" style="font-size:11px">Bar = impact range; striped = market-dependent (not guaranteed).</div>
+</div>
+</div>
+
+<div class="card">
+  <h3>FIRE milestones — where ₹1.10 Cr sits on the ladder</h3>
+  <div class="ladder">
+    <div class="rail"></div><div class="fillrail"></div>
+    <div class="ms" style="left:10%"><b class="mono">You · ₹1.10 Cr</b><div class="pin" style="background:#f97316"></div>today</div>
+    <div class="ms" style="left:58%"><b class="mono">₹7.99 Cr</b><div class="pin" style="background:#7cb342"></div>Lean · age 42</div>
+    <div class="ms" style="left:76%"><b class="mono">₹10.55 Cr</b><div class="pin" style="background:#16a34a"></div>Regular · 55</div>
+    <div class="ms" style="left:94%"><b class="mono">₹13.74 Cr</b><div class="pin" style="background:#1976d2"></div>Fat · 58</div>
+  </div>
+</div>
+
+<div class="row2">
+<div class="card"><h3>Your path to FIRE</h3>
+  <svg viewBox="0 0 600 170" width="100%">
+    <path d="M0,160 C150,150 280,125 380,92 C470,62 540,34 600,15" stroke="#f97316" stroke-width="3" fill="none"/>
+    <path d="M0,160 C150,152 300,138 600,100 L600,170 L0,170Z" fill="rgba(249,115,22,.08)"/>
+    <line x1="0" y1="32" x2="600" y2="32" stroke="#16a34a" stroke-dasharray="6 4"/>
+    <text x="8" y="26" font-size="11" fill="#16a34a" font-family="Inter">target ₹10.55 Cr</text>
+  </svg>
+</div>
+<div class="card"><h3>Suggestions — severity-coded</h3>
+  <div style="font-size:13px;line-height:2">
+    <span class="bad">●</span> Emergency fund: <b>1.2 / 6 months</b> <span class="mono mut">[▮▮░░░░░░░░]</span><br>
+    <span class="warn">●</span> Home-loan co-borrower → 2× ₹2L Sec-24 deduction<br>
+    <span class="warn">●</span> International exposure: <b>0%</b> of guidance 15–25% <span class="mono mut">[░░░░░░░░░░]</span>
+  </div>
+</div>
+</div>
+</body></html>

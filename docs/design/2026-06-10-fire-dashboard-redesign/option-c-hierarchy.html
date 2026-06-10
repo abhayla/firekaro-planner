@@ -1,0 +1,99 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Option C — Hierarchy-Only</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{--orange:#f97316;--green:#16a34a;--red:#dc2626;--amber:#d97706;--ink:#1e293b;--muted:#64748b;--line:#e2e8f0;--bg:#f8fafc}
+*{box-sizing:border-box;margin:0}body{font-family:Inter,sans-serif;background:var(--bg);color:var(--ink);padding:24px;max-width:1180px;margin:auto}
+.mono{font-family:'JetBrains Mono',monospace;font-variant-numeric:tabular-nums}
+.card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:18px;margin-bottom:12px}
+h1{font-size:22px;margin-bottom:4px}.sub{color:var(--muted);font-size:13px;margin-bottom:16px}
+h3{font-size:14px;font-weight:700;margin-bottom:8px}
+.tag{position:fixed;top:8px;right:12px;background:var(--ink);color:#fff;font-size:12px;padding:4px 10px;border-radius:8px}
+.ok{color:var(--green)}.warn{color:var(--amber)}.bad{color:var(--red)}.mut{color:var(--muted)}
+/* enlarged hero */
+.hero{background:linear-gradient(135deg,#f0fdf4,#fff);border:2px solid #bbf7d0;border-radius:20px;padding:28px;text-align:center;margin-bottom:12px}
+.hero .age{font-size:64px;font-weight:800;line-height:1}.hero .when{font-size:15px;color:var(--muted)}
+.hero .stats{display:flex;justify-content:center;gap:36px;margin-top:14px;font-size:14px}
+/* alert strip */
+.alerts{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px}
+.alert{border-radius:12px;padding:12px 14px;font-size:13px;font-weight:600;display:flex;gap:8px;align-items:center}
+.alert.red{background:#fef2f2;border:1px solid #fecaca;color:#b91c1c}
+.alert.amb{background:#fffbeb;border:1px solid #fde68a;color:#92400e}
+.row{display:grid;grid-template-columns:2fr 1fr;gap:12px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.small{font-size:12.5px;color:var(--muted);line-height:1.55}
+.kv{font-size:13px;line-height:1.9}
+.kv b{font-weight:700}
+</style></head><body>
+<div class="tag">OPTION C — HIERARCHY-ONLY (reorder + emphasis, same cards)</div>
+<h1>FIRE Dashboard</h1><div class="sub">No structural change — the existing cards, re-weighted and re-ordered.</div>
+
+<!-- 1. Hero enlarged + verdict colored -->
+<div class="hero">
+  <div class="mut" style="font-size:13px;letter-spacing:.05em;font-weight:600">YOU'LL FIRE AT AGE</div>
+  <div class="age">55</div>
+  <div class="when">in 24y 1m (2051) · most likely 48–62 · moved <b class="ok">1.5 yrs earlier</b> since you were away</div>
+  <div class="stats mono">
+    <span><b>₹1.10 Cr</b> <span class="mut">now</span></span>
+    <span><b>₹10.55 Cr</b> <span class="mut">target</span></span>
+    <span><b>48.1%</b> <span class="mut">savings rate</span></span>
+    <span><b>3.25%</b> <span class="mut">SWR</span></span>
+  </div>
+</div>
+
+<!-- 2. Alerts promoted from chips to a real strip -->
+<div class="alerts">
+  <div class="alert red">⚠ Emergency fund covers 1.2 of 6 months</div>
+  <div class="alert amb">⚠ Estate: 0 of 7 complete — corpus &gt; ₹1 Cr needs a will</div>
+  <div class="alert amb">⚠ No international exposure (guidance 15–25%)</div>
+</div>
+
+<!-- 3. Charts promoted to position 3 -->
+<div class="row">
+  <div class="card"><h3>Your path to FIRE</h3>
+    <svg viewBox="0 0 620 180" width="100%">
+      <path d="M0,170 C150,160 280,132 380,98 C470,66 550,36 620,16" stroke="#f97316" stroke-width="3" fill="none"/>
+      <path d="M0,170 C150,162 300,148 620,106 L620,180 L0,180Z" fill="rgba(249,115,22,.08)"/>
+      <line x1="0" y1="34" x2="620" y2="34" stroke="#16a34a" stroke-dasharray="6 4"/>
+      <text x="8" y="28" font-size="11" fill="#16a34a" font-family="Inter">FIRE target ₹10.55 Cr</text>
+    </svg>
+  </div>
+  <div class="card"><h3>Asset allocation</h3>
+    <svg viewBox="0 0 150 150" width="62%" style="display:block;margin:auto">
+      <circle r="50" cx="75" cy="75" fill="none" stroke="#1976d2" stroke-width="24" stroke-dasharray="157 314" transform="rotate(-90 75 75)"/>
+      <circle r="50" cx="75" cy="75" fill="none" stroke="#7cb342" stroke-width="24" stroke-dasharray="78 314" stroke-dashoffset="-157" transform="rotate(-90 75 75)"/>
+      <circle r="50" cx="75" cy="75" fill="none" stroke="#ffc107" stroke-width="24" stroke-dasharray="47 314" stroke-dashoffset="-235" transform="rotate(-90 75 75)"/>
+      <circle r="50" cx="75" cy="75" fill="none" stroke="#00acc1" stroke-width="24" stroke-dasharray="32 314" stroke-dashoffset="-282" transform="rotate(-90 75 75)"/>
+      <text x="75" y="73" text-anchor="middle" font-size="13" font-weight="700" font-family="JetBrains Mono">₹2.05 Cr</text>
+      <text x="75" y="88" text-anchor="middle" font-size="8.5" fill="#64748b" font-family="Inter">invested + cash</text>
+    </svg>
+  </div>
+</div>
+
+<!-- 4. The same text cards, demoted + two-column to halve the scroll -->
+<div class="grid2">
+  <div class="card"><h3><span class="ok">✓</span> Accessible-money bridge</h3>
+    <div class="kv mono">Spendable at FIRE <b>₹9.20 Cr</b> · Locked <b>₹57.54 L</b></div>
+    <div class="small">Liquid runway covers your bridge years. Bridge income ₹2.71 L/yr (rental + EPS + NPS, post-tax).</div></div>
+  <div class="card"><h3><span class="warn">●</span> If you stop working today or get fired</h3>
+    <div class="kv mono">≈ <b>3 yrs 4 mo</b> on ₹69.43 L liquid · stable-only <b>1 mo</b></div>
+    <div class="small">Burn ₹1.73 L/mo (living + EMIs + premiums). 92% market-linked. + EPF ₹24 L → ≈ 4 yrs 6 mo.</div></div>
+  <div class="card"><h3><span class="ok">✓</span> Vs your locked plan</h3>
+    <div class="kv">Your FIRE date is <b>right on your plan</b></div>
+    <div class="small">In today's ₹, net worth essentially unchanged since you locked on 10 Jun 2026.</div></div>
+  <div class="card"><h3>⚡ Your biggest achievable wins</h3>
+    <div class="kv">Trim spending 10% → <b class="ok">2.3 yrs sooner</b> · +₹10K/mo → <b class="ok">9 mo</b></div>
+    <div class="small">Risk notch 50→60%: market-dependent, ≈ 6.5 yrs later to 8.4 yrs sooner.</div></div>
+  <div class="card"><h3>FIRE milestones</h3>
+    <div class="kv mono">Lean <b>₹7.99 Cr</b> (42) · Regular <b>₹10.55 Cr</b> (55) · Fat <b>₹13.74 Cr</b> (58)</div></div>
+  <div class="card"><h3>Household vs individual FIRE</h3>
+    <div class="kv mono">Household <b>₹10.55 Cr</b> · A: ₹4.04 Cr · M: ₹2.35 Cr</div>
+    <div class="small">Household is the primary, honest number.</div></div>
+</div>
+
+<div class="card" style="margin-top:0"><h3>Sections at a glance</h3>
+  <div class="kv mono" style="display:flex;gap:26px;flex-wrap:wrap">
+    <span>Income <b>₹51.70 L/yr</b></span><span>Expenses <b>₹1.73 L/mo</b></span><span>Investments <b>₹1.10 Cr</b></span>
+    <span>Liabilities <b>₹38.00 L</b></span><span>Insurance <b>Adequate</b></span><span>Tax <b>22.8%</b></span><span>Health <b>66/100</b></span>
+  </div>
+</div>
+</body></html>

@@ -1,0 +1,109 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Option A — Layered Pyramid</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{--orange:#f97316;--green:#16a34a;--red:#dc2626;--amber:#d97706;--blue:#1976d2;--ink:#1e293b;--muted:#64748b;--line:#e2e8f0;--bg:#f8fafc}
+*{box-sizing:border-box;margin:0}body{font-family:Inter,sans-serif;background:var(--bg);color:var(--ink);padding:24px;max-width:1180px;margin:auto}
+.mono{font-family:'JetBrains Mono',monospace;font-variant-numeric:tabular-nums}
+.card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:20px;margin-bottom:14px}
+h1{font-size:22px;margin-bottom:4px}.sub{color:var(--muted);font-size:13px;margin-bottom:18px}
+.tag{position:fixed;top:8px;right:12px;background:var(--ink);color:#fff;font-size:12px;padding:4px 10px;border-radius:8px}
+/* VERDICT BAND */
+.band{display:grid;grid-template-columns:1.4fr 1fr 1fr 1.1fr;gap:0;background:linear-gradient(135deg,#fff7ed,#fff);border:1px solid #fed7aa;border-radius:16px;padding:22px 24px;align-items:center;margin-bottom:14px}
+.band .kpi{padding:0 18px;border-left:1px solid var(--line)}.band .kpi:first-child{border:none;padding-left:0}
+.k-label{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.k-big{font-size:34px;font-weight:800;line-height:1.1}.k-sub{font-size:12px;color:var(--muted);margin-top:2px}
+.ok{color:var(--green)}.warn{color:var(--amber)}.bad{color:var(--red)}
+.bar{height:10px;background:#f1f5f9;border-radius:6px;overflow:hidden;margin:8px 0 4px}
+.bar i{display:block;height:100%;width:10%;background:linear-gradient(90deg,var(--orange),#fb923c)}
+.chiprow{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+.chip{font-size:12px;font-weight:600;padding:5px 12px;border-radius:99px;border:1px solid var(--line);background:#fff;color:var(--muted)}
+.chip.alert{background:#fef2f2;border-color:#fecaca;color:var(--red)}
+/* charts row */
+.row{display:grid;grid-template-columns:2fr 1fr;gap:14px}
+.chart-title{font-weight:700;font-size:14px;margin-bottom:10px}
+/* verdict list */
+details{border:1px solid var(--line);border-radius:12px;background:#fff;margin-bottom:8px}
+summary{display:flex;align-items:center;gap:12px;padding:13px 16px;cursor:pointer;font-size:14px;list-style:none}
+summary::-webkit-details-marker{display:none}
+.dot{width:10px;height:10px;border-radius:99px;flex:none}.dot.g{background:var(--green)}.dot.a{background:var(--amber)}.dot.r{background:var(--red)}
+summary b{font-weight:600}.verdict{margin-left:auto;font-size:13px;color:var(--muted)}.chev{color:#cbd5e1;font-size:12px}
+details .body{padding:0 16px 14px 38px;font-size:13px;color:var(--muted);line-height:1.5}
+.eyebrow{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:18px 0 10px}
+.tiles{display:grid;grid-template-columns:repeat(7,1fr);gap:10px}
+.tile{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px;font-size:11px;color:var(--muted)}
+.tile b{display:block;font-size:14px;color:var(--ink);margin-top:2px}
+</style></head><body>
+<div class="tag">OPTION A — LAYERED PYRAMID</div>
+<h1>FIRE Dashboard</h1><div class="sub">Your whole FIRE picture at a glance.</div>
+
+<!-- LAYER 1: the 5-second verdict band -->
+<div class="band">
+  <div class="kpi">
+    <div class="k-label">You'll FIRE at</div>
+    <div class="k-big">55 <span style="font-size:16px;font-weight:600;color:var(--muted)">in 24y 1m · 2051</span></div>
+    <div class="k-sub">most likely 48–62 allowing for markets</div>
+  </div>
+  <div class="kpi">
+    <div class="k-label">Vs your plan</div>
+    <div class="k-big ok" style="font-size:24px">✓ On track</div>
+    <div class="k-sub">moved 1.5 yrs earlier since lock</div>
+  </div>
+  <div class="kpi">
+    <div class="k-label">Corpus progress</div>
+    <div class="mono" style="font-size:17px;font-weight:700">₹1.10 Cr <span style="color:var(--muted);font-weight:500">/ ₹10.55 Cr</span></div>
+    <div class="bar"><i></i></div><div class="k-sub">10% of target · saving 48.1%</div>
+  </div>
+  <div class="kpi">
+    <div class="k-label">Biggest win available</div>
+    <div style="font-size:15px;font-weight:700">Trim spending 10% <span class="ok">→ 2.3 yrs sooner</span></div>
+    <div class="k-sub">2 more wins below ↓</div>
+  </div>
+</div>
+
+<!-- attention strip: only what needs action -->
+<div class="chiprow">
+  <span class="chip alert">⚠ Emergency fund covers 1.2 of 6 months</span>
+  <span class="chip alert">⚠ Estate: 0 of 7 · corpus &gt; ₹1 Cr needs a will</span>
+  <span class="chip">Horizon 43 yrs · plan-to 90</span>
+</div>
+
+<!-- LAYER 2: the visuals -->
+<div class="row">
+  <div class="card"><div class="chart-title">Your path to FIRE <span style="color:var(--muted);font-weight:500;font-size:12px">· Today's ₹ | Future ₹</span></div>
+    <svg viewBox="0 0 600 200" width="100%">
+      <path d="M0,190 C150,180 280,150 380,110 C470,75 540,40 600,18" stroke="#f97316" stroke-width="3" fill="none"/>
+      <path d="M0,190 C150,182 300,165 600,120 L600,200 L0,200Z" fill="rgba(249,115,22,.08)"/>
+      <line x1="0" y1="38" x2="600" y2="38" stroke="#16a34a" stroke-dasharray="6 4"/>
+      <text x="8" y="32" font-size="11" fill="#16a34a" font-family="Inter">FIRE target ₹10.55 Cr</text>
+      <circle cx="430" cy="86" r="4" fill="#f97316"/><text x="438" y="82" font-size="11" fill="#64748b" font-family="Inter">age 55</text>
+    </svg>
+  </div>
+  <div class="card"><div class="chart-title">How your assets are allocated</div>
+    <svg viewBox="0 0 160 160" width="68%" style="display:block;margin:auto">
+      <circle r="55" cx="80" cy="80" fill="none" stroke="#1976d2" stroke-width="26" stroke-dasharray="172 345" transform="rotate(-90 80 80)"/>
+      <circle r="55" cx="80" cy="80" fill="none" stroke="#7cb342" stroke-dasharray="86 345" stroke-dashoffset="-172" stroke-width="26" transform="rotate(-90 80 80)"/>
+      <circle r="55" cx="80" cy="80" fill="none" stroke="#ffc107" stroke-dasharray="52 345" stroke-dashoffset="-258" stroke-width="26" transform="rotate(-90 80 80)"/>
+      <circle r="55" cx="80" cy="80" fill="none" stroke="#00acc1" stroke-dasharray="35 345" stroke-dashoffset="-310" stroke-width="26" transform="rotate(-90 80 80)"/>
+      <text x="80" y="78" text-anchor="middle" font-size="15" font-weight="700" font-family="JetBrains Mono">₹2.05 Cr</text>
+      <text x="80" y="94" text-anchor="middle" font-size="9" fill="#64748b" font-family="Inter">invested + cash</text>
+    </svg>
+  </div>
+</div>
+
+<!-- LAYER 3: every honesty card collapsed to a one-line verdict -->
+<div class="eyebrow">The honest detail — tap any line to expand</div>
+<details><summary><span class="dot g"></span><b>Accessible-money bridge</b> <span class="verdict">Liquid runway covers your early years ✓ · ₹9.20 Cr spendable at FIRE, ₹57.54 L locked</span><span class="chev">▼</span></summary><div class="body">Bridge income (rental + EPS + NPS pension, post-tax): ₹2.71 L/yr. Full unlock timeline on the Readiness screen.</div></details>
+<details><summary><span class="dot a"></span><b>If you stop working today or get fired</b> <span class="verdict">≈ 3 yrs 4 mo on liquid savings · only 1 month in stable assets</span><span class="chev">▼</span></summary><div class="body">On ₹69.43 L liquid (post-tax) at ₹1.73 L/mo full burn. 92% is market-linked — could be shorter in a crash. + EPF ₹24 L lands ~2 months after exit → ≈ 4 yrs 6 mo total.</div></details>
+<details><summary><span class="dot g"></span><b>Vs your locked plan</b> <span class="verdict">Right on your plan · locked 10 Jun 2026</span><span class="chev">▼</span></summary><div class="body">In today's ₹, your net worth is essentially unchanged since you locked.</div></details>
+<details><summary><span class="dot g"></span><b>Your biggest achievable wins</b> <span class="verdict">Trim 10% → 2.3 yrs · +₹10K/mo → 9 mo · risk notch → wide range</span><span class="chev">▼</span></summary><div class="body">Trim ₹17.3K/mo of spending ≈ 2.3 yrs sooner. Invest ₹10K more/mo ≈ 9 mo sooner. Equity 50→60%: market-dependent, ≈ 6.5 yrs later to 8.4 yrs sooner.</div></details>
+<details><summary><span class="dot r"></span><b>Suggestions for you</b> <span class="verdict">3 nudges · 1 urgent (emergency fund)</span><span class="chev">▼</span></summary><div class="body">Emergency fund covers 1.2 of 6 months. Home-loan co-borrower could double the ₹2L Sec-24 deduction. No international exposure (guidance: 15–25%).</div></details>
+<details><summary><span class="dot g"></span><b>FIRE milestones</b> <span class="verdict">Lean ₹7.99 Cr (age 42) · Regular ₹10.55 Cr (55) · Fat ₹13.74 Cr (58)</span><span class="chev">▼</span></summary><div class="body">Coast and Barista crossover detail + the milestone ladder.</div></details>
+
+<!-- LAYER 4: sections -->
+<div class="eyebrow">Sections at a glance</div>
+<div class="tiles">
+  <div class="tile">Income<b class="mono">₹51.70 L/yr</b></div><div class="tile">Expenses<b class="mono">₹1.73 L/mo</b></div>
+  <div class="tile">Investments<b class="mono">₹1.10 Cr</b></div><div class="tile">Liabilities<b class="mono">₹38.00 L</b></div>
+  <div class="tile">Insurance<b>Adequate</b></div><div class="tile">Tax<b class="mono">22.8%</b></div><div class="tile">Health<b class="mono">66/100</b></div>
+</div>
+</body></html>

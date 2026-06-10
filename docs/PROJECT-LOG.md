@@ -126,6 +126,19 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 ## §3 — Decision log (append-only, newest first)
 
 ### 2026-06-10
+- **D-2026-06-10-09 — FIRE-dashboard redesign decided: Option D (C-hero + A-KPI-strip + B-visual-body),
+  dashboard-first scope, /goal execution.** Abhay flagged the dashboard as data-rich but confusing (no
+  hierarchy, no graphics, no 5-sec answer; 4,487px text wall, first chart ~3,000px down). Grill-me
+  session compared 3 high-fidelity mockups built on the live Sharma figures
+  (`docs/design/2026-06-10-fire-dashboard-redesign/` — committed as the design SSOT); Abhay merged his
+  picks into **Option D**: C's big verdict hero (FIRE age + 48–62 band + since-away delta) carrying A's
+  3 KPI slots (vs-plan · corpus progress bar · biggest win), with B's visual encodings replacing text
+  cards (bridge unlock-timeline, runway gauge, variance waterfall, wins impact-bars, milestone ladder,
+  severity-coded suggestions). Scope: dashboard Phase 1; propagate to other FIRE screens later
+  (SCREEN-STANDARD governance). Honesty surfaces are NON-REMOVABLE (relocate, never delete); no math
+  changes; no new deps (hand-built SVG per chart-theme rule); #155 re-lock ack folds in as a bug-fix.
+  Goal contract authored (goal-creator): `docs/goals/2026-06-10-fire-dashboard-redesign-option-d.md`
+  (uncommitted — Abhay's call); Abhay runs `/goal` himself.
 - **D-2026-06-10-08 — Abhay's "deleted PIFS still shows" prod report: root-caused as the zero-profit
   orphan bug, filed #158 (`bug`+`good-to-have`).** Prod-aware triage (read-only DB + PM2 logs): no
   delete-PUT ever reached the server — the row was EDITED to ₹0 profit (11:37Z), after which
