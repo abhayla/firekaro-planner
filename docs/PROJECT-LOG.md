@@ -126,6 +126,19 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 ## §3 — Decision log (append-only, newest first)
 
 ### 2026-06-10
+- **D-2026-06-10-05 — Abhay's manual prod verification of #138/#139/#140: 2 reports triaged, 1 issue filed
+  (#155, good-to-have), 1 copy rename shipped.** (a) **"Re-lock not working"** → root-caused as a UX
+  feedback gap, NOT a functional bug: full lock→variance→re-lock→reset cycle reproduced green in demo, and
+  a read-only prod-DB check confirmed his `planBaseline` persisted (`capturedAt 09:13:59Z`) — the button
+  works but its success state is pixel-identical to its prior state (no snackbar infra app-wide, `lockedOn`
+  is day-granular). Filed **#155** (`bug`+`good-to-have`; sibling audit: class contained to this one
+  action). (b) **"FIRE target over time blank"** → NOT a bug: his account has exactly **1** monthly
+  snapshot (`expense_snapshots` count=1); the FireTrajectoryChart honestly renders its empty state until
+  a 2nd monthly point accrues (July) — by design (A30.3, real-data-only). (c) **Runway-card heading
+  renamed** at Abhay's direction to "If you stop working today or get fired" (`c61acc9`, gate + screenshot
+  verified; on main, NOT yet deployed). Also during repro: confirmed the attribution-chips absence on a
+  returns-only assumption change is the DESIGNED sign-mismatch fallback in `plan-variance.ts` (drivers 0,
+  goalpost alert still shown), not a defect.
 - **D-2026-06-10-04 — SECURITY FIX (Abhay-approved): enabled Supabase RLS deny-all on all 25 prod tables —
   closes the 2 CRITICAL advisor warnings.** Triggered by the Supabase Security Advisor email
   (`rls_disabled_in_public` + `sensitive_columns_exposed` on `zymbhuwuguzeueslwhyz`): the anon-keyed PostgREST
