@@ -150,3 +150,20 @@ Per the process-improvement item 5 (measure the process). The pattern is decisiv
 **Root cause:** a static-source assertion that pins an element open-tag with a literal closing `>` implicitly forbids ANY future attribute on that element. The regex over-specifies — it locks the attribute SET, not the attribute PRESENCE it actually cares about.
 **Fix/Pattern (GENERIC):** in static template-source specs, terminate an open-tag assertion with an attribute-boundary class, not a literal `>` — e.g. `/<div v-if="assumptionsExpanded"[\s>]/` (a space OR the close). Assert the presence of the attribute(s) you care about; never the absence of all others. This keeps the lock meaningful while letting additive, review-driven attributes (a11y, data-testid) land without a spurious red.
 **Gate-gap:** none deterministic — this is a spec-authoring habit. The cost was one self-inflicted red caught immediately on re-run (cheap). Candidate one-liner for the regression-spec precedent note in `vuetify-conventions.md`: "source-assertion open-tag matches end with `[\s>]`, not a literal `>`." Status: fixed in-spec; prose note is a proposal.
+
+## 2026-06-10 — Dashboard honesty cards (/goal #139/#140/#138)
+
+- **A "mandatory gate that won't run" may be a BROKEN gate, not a blocker.** The member-lens E2E
+  sweep waited for `#app[data-hydrated="true"]` — a hydration signal that never shipped in this
+  extracted repo — so it timed out 30s on every route and had been "green by never running." Before
+  assuming a mandatory verification is environment-blocked, confirm the gate itself actually exercises
+  anything. Fix: real ready signal (`.v-select:has(.mdi-eye)`) + dismiss the `.tour-overlay` (it
+  intercepts the dropdown click on the dashboard — the documented `ui-verification.md` gotcha).
+- **Rule 25 (persistence signal), not the visual transition, catches "looks-saved-but-isn't."** A new
+  composable used `getAdapter()` (null in DEMO mode) → the card flipped to its saved view but wrote
+  nothing to localStorage. The store seam is `makeAdapter(getAuthProvider())`, not `getAdapter()`.
+- **Don't run stryker + the unit suite concurrently** — the mutation sandbox setup transiently skews
+  vitest file discovery (1166→1129 phantom count). Run them sequentially.
+- **Risk-disclosure classifications must enumerate the FULL set for the persona's real holdings.**
+  "Market-linked" that omits equity MF/International/REIT understates risk for the SIP-driven salaried
+  accumulator (optimistic Tier-0). FinTech caught it post-build; the volatile badge jumped 43%→92%.
