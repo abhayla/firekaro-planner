@@ -126,6 +126,18 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 ## §3 — Decision log (append-only, newest first)
 
 ### 2026-06-10
+- **D-2026-06-10-08 — Abhay's "deleted PIFS still shows" prod report: root-caused as the zero-profit
+  orphan bug, filed #158 (`bug`+`good-to-have`).** Prod-aware triage (read-only DB + PM2 logs): no
+  delete-PUT ever reached the server — the row was EDITED to ₹0 profit (11:37Z), after which
+  `Business.vue`'s browse columns (gated on `kindsWithMoney` > 0) stopped rendering it while the KPI
+  tiles ("Active: 1", "Largest ₹0/yr") still counted it → invisible, undeletable orphan. The suspected
+  classes (diff-engine delete, transaction-expiry 500, write-behind flush loss) were each investigated
+  and RULED OUT (server logs show zero 500s; repo delete path verified sound). Tiering: good-to-have —
+  CRUD works outside this edge and a workaround exists (add a same-kind moneyed row to re-render the
+  column, then delete both); Abhay's override wins. Sibling audit: OtherSources has the same predicate
+  split but is UI-guarded (amount>0 enforced) — latent, noted in #158; investments + passive-business
+  grid safe. Also triaged: PIFS-as-PvtLtd modeling analysis (profit routing/legal-kind + retained-earnings
+  asset gap) delivered in-session, discuss-mode — NOT filed pending Abhay's "file it" (extends #85).
 - **D-2026-06-10-07 — Deployed `ffac86d` (salary % inputs, D-2026-06-10-06) to prod; ALL post-deploy
   tiers + rule-33 blind verification PASSED.** Runbook redeploy (backup `firekaro-pre-deploy-20260610-162129`
   → git-archive ship → build → pm2 reload; no migrations). Tier-1: health+smoke green (DB 41ms), bundle
