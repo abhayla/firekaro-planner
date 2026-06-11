@@ -14,6 +14,7 @@ import { apiSuccess, apiError, ErrorCode } from "./lib/api-utils";
 import { prisma } from "./lib/prisma";
 import { requestId } from "./middleware/request-id";
 import { rateLimit } from "./middleware/rate-limit";
+import { notifyOwner } from "./lib/owner-notify";
 import plannerRoutes from "./routes/planner";
 import whatsappWebhookRoutes from "./routes/whatsapp-webhook";
 import commsConsentRoutes from "./routes/comms-consent-route";
@@ -47,6 +48,12 @@ app.use("*", cors({ origin: allowedOrigins, credentials: true }));
 app.onError((err, c) => {
   const traceId = c.get("traceId");
   logger.error({ err, traceId, path: c.req.path }, "Unhandled error");
+  // Owner alert (fire-and-forget; deduped per path so a hot loop pages once / 30 min).
+  notifyOwner("P1", "Unhandled 5xx error", {
+    type: "error",
+    body: `${c.req.method} ${c.req.path} — ${String(err instanceof Error ? err.message : err).slice(0, 300)}`,
+    dedupeKey: `5xx:${c.req.path}`,
+  });
   return apiError(c, "Internal server error", 500, ErrorCode.INTERNAL_ERROR);
 });
 
@@ -69,6 +76,13 @@ app.get("/api/health", async (c) => {
   } catch {
     health.status = "degraded";
     health.database = "disconnected";
+    // P0: the DB is unreachable — every write is failing. Deduped so the
+    // monitor polling /api/health pages once, not on every probe.
+    notifyOwner("P0", "Database unreachable", {
+      type: "error",
+      body: "GET /api/health — prisma SELECT 1 failed (pool exhausted or DB down)",
+      dedupeKey: "db-unreachable",
+    });
   }
   if (health.status !== "ok") {
     // eslint-disable-next-line no-restricted-syntax -- 503 is outside apiError's status union and the health payload must ride in `data` (not the error envelope) so probes get the detail.

@@ -4,6 +4,7 @@ import { firekaroUserToZohoLead } from "./zoho-lead-mapping";
 import { alreadySent } from "./comms-repo";
 import { triggerWelcome } from "./whatsapp-triggers";
 import { logger } from "./logger";
+import { notifyOwner } from "./owner-notify";
 
 /**
  * Signup side-effects: when a new FireKaro user is created (Better Auth
@@ -83,6 +84,16 @@ export async function onUserCreated(
   depsOverride: Partial<SignupDeps> = {},
 ): Promise<void> {
   const deps = { ...defaultDeps(), ...depsOverride };
+
+  // Owner joy-ping: a real new user signed up (the early-stage signal worth
+  // watching per-event). Fire-and-forget; unique dedupeKey so every signup pings.
+  // DPDP: the email (PII) is only included when NOTIFIER_OWNER_PII=true — by
+  // default the alert carries no user PII across the service boundary.
+  notifyOwner("P1", "New FireKaro signup", {
+    type: "signup",
+    body: process.env.NOTIFIER_OWNER_PII === "true" ? (user.email ?? user.name ?? "(no email)") : "A new user signed up.",
+    dedupeKey: `signup:${user.id}`,
+  });
 
   try {
     await deps.createDefaultConsent(user.id);
