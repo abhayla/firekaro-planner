@@ -20,7 +20,7 @@ triggers:
 allowed-tools: "Read Grep Glob Skill Agent"
 argument-hint: "[prompt text to enhance or 'score' to evaluate reliability]"
 type: workflow
-version: "3.4.0"
+version: "3.5.0"
 ---
 
 # Prompt Auto-Enhance — Strengthening, Step Transcript, Final Preview, Resource CRUD
@@ -337,6 +337,20 @@ new requirements added beyond what the user implied. Verify before presenting.
 - For MISSING_STRUCTURE diagnoses, wrap distinct sections in XML tags
 - Long context above the query, constraints near the task definition
 
+## STEP 3.6: Re-Grade the Strengthened Prompt (added 2026-06-11)
+
+Re-score the strengthened prompt on the SAME rubric and weights as STEP 0.
+This is the proof-of-lift: the pipeline's contract is "enhance to a higher
+number, then run it" (Abhay), not "rewrite and hope".
+
+- Render the lift as `Overall: <before> → <after> (Grade <X> → <Y>)` — it
+  appears in the Step 4 grade card and the Step 4.5 transcript.
+- **Self-check gate:** if the re-grade does NOT raise the overall score, the
+  rewrite failed — return to STEP 2 and re-map fixes (max 2 retries, then
+  surface the failure honestly instead of presenting a non-improving rewrite).
+- Grade-A originals (role-only addition) typically move a few tenths via the
+  Role dimension — that small lift is expected and sufficient.
+
 ## STEP 4: Show Grade Card + Changes Applied
 
 Step 4 is **metadata only** — grade card with per-dimension scores and a
@@ -411,6 +425,7 @@ Pipeline Transcript:
   Step 3 — Rewrite:        <N> changes applied; word count <before> → <after> (Δ <delta>)
                            Guardrail 2 (Intent Preservation): PASS|FAIL[, reason]
                            Guardrail 3 (Over-Constraint): clean | <N> constraints added
+  Step 3.6 — Re-Grade:     Overall <before> → <after> (Grade <X> → <Y>) — lift confirmed|FAILED
   Clarification Gate:      <N> questions asked, <resolved|in-progress>
 ```
 
