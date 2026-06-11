@@ -208,6 +208,10 @@ on, it resolves the session (`GET /api/planner/me`), constructs `ServerAuthProvi
 every store `hydrate()` + router guard reads a warm cache **synchronously**. If the flag is off or the
 backend is unreachable, it falls back to `LocalStorageAdapter`. **The 6 stores + `expense-history.ts`
 + `router/index.ts` are UNCHANGED by the swap** (the non-negotiable spine).
+**Demo-only affordances MUST be gated on `isServerMode()`** (`src/lib/runtime-mode.ts` — the ONE
+"are we in server/prod mode?" check): the seed switcher, "Explore with sample data", the product
+tour, and the command-palette seed actions all gate on it so they can never overwrite a real user's
+account (gh #36). Any NEW demo-only affordance gets the same gate — never an inline `import.meta.env` check.
 
 ### Storage invariant (CI-enforced)
 **Zero direct `localStorage.*` calls anywhere in `src/` outside `storage-adapter.ts`** — enforced by
