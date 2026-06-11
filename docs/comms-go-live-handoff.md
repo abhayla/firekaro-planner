@@ -171,14 +171,19 @@ Abhay messaged **@AbhayApps_bot** → chatId `315101961` captured via getUpdates
 Notifier's default instant channel. *(Gotcha logged: PS5.1 `Set-Content -Encoding utf8` writes a BOM
 that breaks `process.loadEnvFile` on the first line — rewrite env files BOM-free.)*
 
-### E2. Email channel — ⛔ needs your pick (gmail-autosend skill CANNOT serve a 24/7 service)
-The global gmail-autosend flow = Claude creates a Gmail DRAFT + your Apps Script sends it — it only
-works inside Claude sessions, not from the Notifier service. Pick one:
-- **(a) Gmail app password (recommended, ~2 min):** myaccount.google.com → Security → 2-Step
-  Verification → App passwords → "Notifier" → paste here. SMTP adapter is built + unit-tested.
-- **(b) Apps Script web-app:** I draft a token-guarded `doPost` → `GmailApp.sendEmail` snippet; you
-  paste + deploy it in the Apps Script editor; Notifier POSTs to its URL. No password, but a manual
-  deploy by you.
+### E2. Email channel — ⛔ one paste+deploy by you (Abhay picked: Apps Script reuse, 2026-06-11)
+Everything is built (`7941e96`): the add-on snippet is **`Notifier/appsscript/notifier-email-webapp.gs`**
+(creates a send-to-self DRAFT with a conformant `[FW-…:…]` subject; your EXISTING `autoSendDrafts`
+trigger sends + labels it — gmail-autosend.gs is NOT modified). The webapp transport + token are wired
+in Notifier (token in `Notifier/.env` `NOTIFIER_GMAIL_WEBAPP_TOKEN`, embedded in the snippet). Your 3
+steps (~3 min, needs your Google login — why I can't do it):
+1. Open script.google.com → the **Gmail-Autosend** project → Files **+** → Script → name it
+   `notifier-email-webapp` → paste the snippet file's contents → Save.
+2. Deploy → **New deployment** → type **Web app** → Execute as: **Me** · Access: **Anyone with the
+   link** → Deploy (authorize when prompted).
+3. Paste the **Web app URL** (`https://script.google.com/macros/s/…/exec`) here → I wire it into
+   `config.yaml`, enable the email channel, and live-verify (draft created → auto-sent ≤5 min →
+   Gmail receipt confirmed).
 
 ### E3. `notifier_owner_alert` template — ⏳ Meta review (no action; submitted 2026-06-11,
 waTemplateId `1585582266465108`). On approval I switch `Notifier/config.yaml` from the interim
