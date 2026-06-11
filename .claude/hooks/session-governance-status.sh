@@ -41,5 +41,9 @@ if [ -f "$ml" ] && command -v jq >/dev/null; then
   newest=$(tail -1 "$ml" | cut -f2)
   echo "ENHANCE_MISSES_7D=$recent  (total: $(grep -c . "$ml"); newest: ${newest:-none})"
   [ "$recent" -gt 5 ] && echo "ENHANCE_MISSES_ALERT=miss-rate-high — review .claude/.enhance-misses.log + tighten the failing class"
+else
+  # Explicit zero: "silent because clean" is indistinguishable from "summary
+  # not wired" (found 2026-06-11 when the absent-log case emitted nothing).
+  echo "ENHANCE_MISSES_7D=0  (log absent — no misses since 2026-06-11 telemetry fix)"
 fi
 exit 0
