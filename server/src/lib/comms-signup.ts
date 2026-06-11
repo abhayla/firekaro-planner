@@ -87,9 +87,11 @@ export async function onUserCreated(
 
   // Owner joy-ping: a real new user signed up (the early-stage signal worth
   // watching per-event). Fire-and-forget; unique dedupeKey so every signup pings.
+  // DPDP: the email (PII) is only included when NOTIFIER_OWNER_PII=true — by
+  // default the alert carries no user PII across the service boundary.
   notifyOwner("P1", "New FireKaro signup", {
     type: "signup",
-    body: user.email ?? user.name ?? user.id,
+    body: process.env.NOTIFIER_OWNER_PII === "true" ? (user.email ?? user.name ?? "(no email)") : "A new user signed up.",
     dedupeKey: `signup:${user.id}`,
   });
 

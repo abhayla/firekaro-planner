@@ -51,7 +51,7 @@ app.onError((err, c) => {
   // Owner alert (fire-and-forget; deduped per path so a hot loop pages once / 30 min).
   notifyOwner("P1", "Unhandled 5xx error", {
     type: "error",
-    body: `${c.req.method} ${c.req.path} — ${err instanceof Error ? err.message : String(err)}`,
+    body: `${c.req.method} ${c.req.path} — ${String(err instanceof Error ? err.message : err).slice(0, 300)}`,
     dedupeKey: `5xx:${c.req.path}`,
   });
   return apiError(c, "Internal server error", 500, ErrorCode.INTERNAL_ERROR);
