@@ -171,7 +171,18 @@ Abhay messaged **@AbhayApps_bot** → chatId `315101961` captured via getUpdates
 Notifier's default instant channel. *(Gotcha logged: PS5.1 `Set-Content -Encoding utf8` writes a BOM
 that breaks `process.loadEnvFile` on the first line — rewrite env files BOM-free.)*
 
-### E2. Email channel — ⛔ one paste+deploy by you (Abhay picked: Apps Script reuse, 2026-06-11)
+### E2. Email channel  ✅ DONE (2026-06-11) — Apps Script web-app, deployed by Claude via browser automation
+Claude drove the whole Apps Script deploy in a real Chrome window (Abhay only logged into Google):
+created the `notifier-email-webapp` script file in the EXISTING Gmail-Autosend project (clipboard
+paste — gmail-autosend.gs untouched), deployed it as a Web app (Execute as Me · access Anyone), and
+captured the URL. Full 3-channel pipeline verify GREEN (telegram message_id=14, whatsapp DELIVERED,
+email draft created → the existing `autoSendDrafts` trigger sends + labels `FW-FireKaro/Alert` ≤5 min).
+The Google-session browser profile was deleted after use (never committed). Web app URL +
+`NOTIFIER_GMAIL_WEBAPP_TOKEN` live in `Notifier/.env`. *(Gotchas logged: Apps Script returns 401 if a
+web app deploys with access "Only myself" — must be "Anyone"; Monaco mangles synthetic-typed code →
+paste via clipboard; the deploy dialog access dropdown sits below the fold → scroll the inner panel.)*
+
+### E2-historical. (the manual fallback, now superseded by the automation above)
 Everything is built (`7941e96`): the add-on snippet is **`Notifier/appsscript/notifier-email-webapp.gs`**
 (creates a send-to-self DRAFT with a conformant `[FW-…:…]` subject; your EXISTING `autoSendDrafts`
 trigger sends + labels it — gmail-autosend.gs is NOT modified). The webapp transport + token are wired
