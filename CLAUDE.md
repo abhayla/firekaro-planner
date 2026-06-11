@@ -259,7 +259,9 @@ also live here: `fire-confidence-band.ts` (obj-1 honesty — FIRE date as a band
 (ADR-0004 temporal contributions), `lever-catalog.ts` + `lever-bands.ts` + `lever-impact.ts` (obj-2
 "get there faster" — per-lever FIRE-date-delta ranking, #48), `readiness.ts` (obj-3 "is it safe to
 stop?"), `decumulation.ts` (obj-4 post-FIRE guardrails), the **dashboard honesty cards** trio —
-`plan-variance.ts` (#138 plan-vs-actual variance against the persisted `plan-baseline` document),
+`plan-variance.ts` (#138 plan-vs-actual variance against the persisted `plan-baseline` document)
++ its `dashboard-verdict.ts` consumer (#155 Option-D hero verdict-tone resolver — no-baseline/NaN
+makes NO claim, ±Infinity does),
 `runway.ts` (#140 layoff/income-shock runway), and the #139 real-vs-nominal toggle
 (`deflateProjectionPoints` in `useFireDerive.ts` — DISPLAY-layer deflation of the projection into
 today's purchasing power; chart-owned, never changes the kernel) — and the **member model + app-wide lens** layer
