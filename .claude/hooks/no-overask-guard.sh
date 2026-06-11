@@ -65,6 +65,13 @@ fi
 if [ "${#last_text}" -ge 300 ] && printf '%s' "$full" | head -1 | grep -qE '^\*enhanced' && ! printf '%s' "$full" | grep -qE "final prompt|what changed|ran (your )?input as-is|ran as-is|no change — ran|no enhancement"; then
   printf '%s\tenhance-block-miss (len=%s)\n' "$(jq -rn 'now|todate' 2>/dev/null || echo now)" "${#last_text}" >> "$root/.claude/.enhance-misses.log" 2>/dev/null
 fi
+# Role-miss (R1 persona, 2026-06-11): a final-prompt block whose text lacks "act as" — the R1 role
+# line is missing from the strengthened prompt (SKILL.md Role Selection Guide: mandatory when Role
+# dim < 7). Limitation (v1, telemetry-only): Grade-A / role-sufficient prompts may legitimately lack
+# it, so this LOGS, never blocks — escalate to a block only if the log shows it stays frequent.
+if [ "${#last_text}" -ge 300 ] && printf '%s' "$full" | grep -qE "final (strengthened )?prompt" && ! printf '%s' "$full" | grep -qE "act as"; then
+  printf '%s\trole-miss (len=%s)\n' "$(jq -rn 'now|todate' 2>/dev/null || echo now)" "${#last_text}" >> "$root/.claude/.enhance-misses.log" 2>/dev/null
+fi
 
 # ── A. Over-ask detection ──
 flag=""

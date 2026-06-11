@@ -20,7 +20,7 @@ triggers:
 allowed-tools: "Read Grep Glob Skill Agent"
 argument-hint: "[prompt text to enhance or 'score' to evaluate reliability]"
 type: workflow
-version: "3.2.0"
+version: "3.3.0"
 ---
 
 # Prompt Auto-Enhance — Strengthening, Step Transcript, Final Preview, Resource CRUD
@@ -72,7 +72,7 @@ Triggered by words like "write", "draft", "compose", "rewrite", "tone",
 | Grade | Range | Action |
 |-------|-------|--------|
 | A | 8.0-10.0 | Skip strengthening — prompt is strong |
-| B | 6.0-7.9 | Targeted fix — compact mode (1-2 fixes only) |
+| B | 6.0-7.9 | Targeted fix — compact mode (1-2 fixes + the cap-exempt role fix when Role dim < 7) |
 | C | 4.0-5.9 | Full pipeline — diagnose all weak dimensions |
 | D | 3.0-3.9 | Full pipeline with heavy warning to user |
 | F | 1.0-2.9 | Suggested rewrite with caveats — original may be unsalvageable |
@@ -114,7 +114,7 @@ weakness found — a prompt may have multiple.
 | **MISSING_CONTEXT** | Critical | Prompt assumes knowledge not provided (file paths, prior decisions, domain terms) | Add explicit context: which files, which module, what prior state |
 | **CONFLICTING_CONSTRAINTS** | High | Prompt asks for contradictory things ("make it fast and thorough") | Identify the conflict, prioritize one, note the tradeoff |
 | **OVER_SCOPED** | High | Asks for too many things at once; would require 5+ files changed | Break into sequential focused prompts, suggest ordering |
-| **UNDER_CONSTRAINED** | Medium | Vague where specificity is needed. Apply the measurability test: "Can a reviewer objectively verify this constraint was followed?" (see `references/constraint-engineering.md`) | Add measurable constraints. Replace vague terms ("be concise" -> "under 100 words", "be thorough" -> "cover all N checklist items") |
+| **UNDER_CONSTRAINED** | Medium | Vague where specificity is needed. Apply the measurability test: "Can a reviewer objectively verify this constraint was followed?" (see `references/constraint-engineering.md`) | Add measurable constraints. Replace vague terms ("be concise" -> "under 100 words", "be thorough" -> "cover all N checklist items"). **When the measurable value is user-owned** (a target, tolerance, or acceptance number only the user can set — e.g. "more accurate" → accurate against WHAT, to WHAT tolerance), defer it to the Clarification Gate exactly like MISSING_CONTEXT — never invent the number (Guardrail 2) and never leave the vague term standing |
 | **MISSING_OUTPUT_SPEC** | Medium | No indication of what the result should look like | Add a locked output template with named sections, explicit order, numeric length bounds (see `references/format-locking.md`) |
 | **AMBIGUOUS_SCOPE** | Medium | Unclear which files, modules, or layers are in scope | Add explicit scope boundaries ("only in src/api/", "just the tests") |
 | **IMPLICIT_ASSUMPTIONS** | Low | Prompt relies on assumptions that may not hold (env setup, dependencies, prior steps) | Make assumptions explicit or add verification steps |
@@ -140,6 +140,15 @@ role as the first line, before context. Use the imperative form
 (`Act as a …`) — Anthropic's prompting docs document this as the
 strongest persona pattern for Claude 4.x.
 
+**R1 ≠ R2 — the conflation that caused real misses (2026-06-11):** the
+`Role: <name> — <why>` line rendered at STEP 4.7 is the **R2 operating
+engineering role** (`engineering-roles.md`) and does NOT satisfy this
+policy. R1 is the persona INSIDE the strengthened prompt text — the
+Final-prompt block (STEP 4.6) MUST open with `Act as …` whenever
+Role & Framing < 7, even when an R2 `Role:` line is also rendered in
+the same response. Rendering the R2 line while leaving the prompt text
+roleless is the exact defect this paragraph exists to prevent.
+
 Detect the task class from the prompt's main verb + nearest object,
 then pick the role from the table. If no row matches, fall back to
 the **template** at the bottom.
@@ -155,9 +164,9 @@ the **template** at the bottom.
 | **Specialized synthesis — system design** | design, architect + (system / service / pipeline / scale / distributed) | "Act as a staff engineer designing for the stated scale and failure modes. Call out trade-offs, rejected alternatives, and the failure cases your design does NOT handle." |
 | **Specialized synthesis — API design** | design, define + (API / endpoint / schema / contract / interface) | "Act as an API designer optimizing for backwards compatibility, naming consistency, and a clean error surface. Surface every breaking change risk explicitly." |
 | **Specialized synthesis — data modeling** | design, model + (schema / table / DB / migration / index) | "Act as a database engineer who optimizes schemas for the stated query pattern, write throughput, and migration safety. Call out N+1 and lock contention risks up front." |
-| **Tone-sensitive — onboarding/UX** | write, draft + (onboarding / welcome / first-time / activation) | "Act as a B2B onboarding copywriter who writes for first-time non-technical users — warm + professional, second-person, no jargon, scannable structure." |
+| **Tone-sensitive — onboarding/UX** | write, draft + (onboarding / welcome / first-time / activation) | "Act as an onboarding copywriter who writes for first-time non-technical users — warm + professional, second-person, no jargon, scannable structure." |
 | **Tone-sensitive — error/UX strings** | write, draft + (error / warning / banner / toast / empty state) | "Act as a UX writer specializing in error messages — clear about what went wrong, actionable about what to do next, never blames the user, max 1 sentence." |
-| **Tone-sensitive — marketing copy** | write, draft + (landing / hero / pitch / launch / announcement) | "Act as a B2B marketing copywriter focused on benefit-led messaging that respects technical readers' intelligence — no hype, no buzzwords." |
+| **Tone-sensitive — marketing copy** | write, draft + (landing / hero / pitch / launch / announcement) | "Act as a marketing copywriter focused on benefit-led messaging that respects the reader's intelligence — no hype, no buzzwords." |
 | **Tone-sensitive — developer docs** | write, draft + (docs / README / guide / how-to / tutorial) | "Act as a technical writer specializing in developer documentation — accuracy first, scannable structure, copy-pasteable examples, every claim verified against current code." |
 | **Advisory / decision support** | should we, recommend, compare, trade-off, evaluate options | "Act as a senior engineer who gives opinionated, source-cited recommendations grounded in stated constraints. Name a default position with reasoning, not a multiple-choice menu." |
 | **Translation / adaptation** | rewrite for X audience, port from Y to Z, simplify, expand | "Act as a translator who preserves the source's intent and structure while replacing tone/idiom for the target audience. Flag every place where literal translation breaks meaning." |
@@ -194,6 +203,11 @@ delete-flag lifecycle.
   missing (concerns, focus area).
 - If the user's prompt explicitly contradicts a default role (e.g.,
   "be casual" against a formal-default class), the user wins.
+- **Adapt the audience qualifier to the documented product persona**
+  (CLAUDE.md / the product plan): B2B vs B2C, technical vs non-technical.
+  Never ship a default qualifier that contradicts the persona — a wrong
+  audience frame is worse than no role at all (found 2026-06-11: the
+  table's old "B2B" defaults contradicted FireKaro's locked B2C persona).
 
 #### XML Tag Reference
 
@@ -279,6 +293,11 @@ Apply all fixes to produce a strengthened version.
 
 - Maximum **5 non-Critical fixes** per rewrite
 - Critical severity fixes are never capped — apply all of them
+- The **MISSING_ROLE fix is likewise cap-exempt** (treated like Critical): whenever
+  Role & Framing < 7, the `Act as …` line is added — including in Grade-B compact
+  mode, whose 1-2-fix budget applies to the OTHER fixes. Rationale: roleless-but-
+  otherwise-decent prompts land exactly in compact mode, which previously starved
+  the role fix out (observed in production sessions, 2026-06-11).
 - Grade D: full pipeline runs but show a heavy warning
 - Grade F: present a suggested rewrite with caveats (original may need rethinking)
 
@@ -345,6 +364,14 @@ Changes Applied (4):
   [3] UNDER_CONSTRAINED (Medium)  → replace vague phrase with measurable target
   [4] MISSING_OUTPUT_SPEC (Medium)→ add deliverable triple
   Pruning: removed "please" (Cat A — politeness filler)
+```
+
+**Grade D warning line (locked format, 2026-06-11):** when the prompt graded D,
+render this line ABOVE the grade card — the "heavy warning" is this exact string,
+not an improvised paraphrase:
+```
+⚠ Grade D (<score>/10): this prompt needed heavy reconstruction — review the
+Final Prompt block before relying on the execution.
 ```
 
 Step 4 deliberately does NOT show the original or strengthened prompt
@@ -418,6 +445,14 @@ For Grade A (no changes — original IS the final prompt):
 
 ────────────────────────────────────────────
 ```
+
+**OVER_SCOPED rendering (2026-06-11):** when Step 3 split the prompt into
+sequential focused sub-prompts, the Final block contains the **numbered
+sequence** — each sub-prompt opens with its OWN task-class R1 role (a split
+under one generic role re-creates the role-miss inside every sub-task) —
+followed by a one-line ordering rationale. STEP 5 executes the sub-prompts
+in the stated order **in the same turn** (build-don't-narrate), unless the
+user picks a subset.
 
 The skill does not pause for approval here — execution proceeds to STEP 5
 in the same response. Showing the final prompt is for transparency, not

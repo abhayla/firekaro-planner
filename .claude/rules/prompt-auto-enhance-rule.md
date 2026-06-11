@@ -36,6 +36,9 @@ enhancement VISIBLE**, in one of two shapes:
 
   Keep it compact (this is format A, NOT the full grade-card wall every turn). The grade card / full
   step transcript is optional/on-request; the **what-changed + final-prompt block is mandatory**.
+  **The Final-prompt block MUST open with the R1 `Act as …` persona whenever Role & Framing scored
+  < 7** (SKILL.md "Role Selection Guide") — the separate `Role: <name>` line (R2, stage 4.7) never
+  substitutes for it. A roleless final prompt next to an R2 line is a defect (`role-miss` telemetry).
 - **Trivial / continuation prompt** (≤15 chars, `yes`/`go ahead`/`continue` — the hook skips
   enhancement, so there's nothing to strengthen): render a **one-liner** so Abhay is never left
   guessing — e.g. `*Enhanced: no change — ran your input as-is*`.
@@ -60,8 +63,12 @@ detailed in its SSOT rule — pointer pattern, no duplication (`configuration-ss
 | **5.5 Verify** | The hierarchical verification EDGE: T0 ("CEO") reproduces the doer's gate + routes output to an INDEPENDENT reviewer (BOTH API + UI), before commit. Fires on the OUTPUT's blast radius — **even on "yes"/continuation turns the hook skipped** (so this stage is NOT conditional on 4.7 having fired). "Trivial" = blast radius, not diff size. | `operating-model.md` |
 | **6 Git** | Only if the turn produced committable changes: stage → secret-scan → commit → (branch/merge) → push via `git-manager-agent` + `.githooks/pre-commit`. The git gate (type-check+tests) is the final mechanical SUBSET of 5.5. | `decision-authority.md` → "Git authority" |
 
-**Verbosity (chosen 2026-06-01): FULL.** Render the grade card + step transcript +
-final strengthened prompt on **every** non-trivial prompt — not a lean one-liner.
+**Verbosity (reconciled 2026-06-11; supersedes the 2026-06-01 "FULL" choice):
+format A is the default.** Every non-trivial prompt renders the compact
+what-changed + final-prompt block per MANDATORY OUTPUT above; the full grade
+card + step transcript render on request, on explicit `/prompt-auto-enhance`
+invocations, and in test/audit runs. (The old FULL paragraph contradicted the
+newer format-A directive — Abhay 2026-06-09 — which wins as the later SSOT.)
 Stage 6 is conditional (skip on Q&A / read-only turns).
 
 ## Tier 1 — Always (every prompt that reaches this rule)
