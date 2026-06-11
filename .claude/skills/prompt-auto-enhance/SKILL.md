@@ -20,7 +20,7 @@ triggers:
 allowed-tools: "Read Grep Glob Skill Agent"
 argument-hint: "[prompt text to enhance or 'score' to evaluate reliability]"
 type: workflow
-version: "3.3.0"
+version: "3.4.0"
 ---
 
 # Prompt Auto-Enhance — Strengthening, Step Transcript, Final Preview, Resource CRUD
@@ -71,11 +71,15 @@ Triggered by words like "write", "draft", "compose", "rewrite", "tone",
 
 | Grade | Range | Action |
 |-------|-------|--------|
-| A | 8.0-10.0 | Skip strengthening — prompt is strong |
-| B | 6.0-7.9 | Targeted fix — compact mode (1-2 fixes + the cap-exempt role fix when Role dim < 7) |
-| C | 4.0-5.9 | Full pipeline — diagnose all weak dimensions |
-| D | 3.0-3.9 | Full pipeline with heavy warning to user |
-| F | 1.0-2.9 | Suggested rewrite with caveats — original may be unsalvageable |
+| A | ≥ 8.0 | Skip strengthening — prompt is strong. Sole exception: the cap-exempt role fix still applies when Role dim < 7 (a role line never changes intent — Guardrail 2-safe; keeps the rule's MANDATORY-OUTPUT role contract grade-independent) |
+| B | [6.0, 8.0) | Targeted fix — compact mode (1-2 fixes + the cap-exempt role fix when Role dim < 7) |
+| C | [4.0, 6.0) | Full pipeline — diagnose all weak dimensions |
+| D | [3.0, 4.0) | Full pipeline with heavy warning to user |
+| F | < 3.0 | Suggested rewrite with caveats — original may be unsalvageable |
+
+Bands are half-open intervals (fixed 2026-06-11): the old "6.0-7.9"-style
+ranges left holes (a weighted score of 2.95 or 7.95 mapped to NO grade).
+Every score in [1.0, 10.0] now maps to exactly one grade.
 
 **Floor rules (precedence — first match wins):**
 
@@ -194,6 +198,12 @@ delete-flag lifecycle.
 **Rules for role selection:**
 
 - Always **one role**, not a list of options.
+- **Tie-break when 2+ rows match (added 2026-06-11):** pick the row matching
+  the prompt's PRIMARY deliverable — the outcome the user would accept as
+  "done" — not the means mentioned along the way ("add indexes to make
+  queries faster" → faster queries is the deliverable, indexes the means →
+  perf row, not data modeling). If two deliverables are genuinely co-primary,
+  that is an OVER_SCOPED signal: split, and give each sub-prompt its own role.
 - Always **task-class appropriate** — generic "AI assistant" framing
   is never the answer when Role < 7.
 - Position the role as the **first line** of the strengthened prompt,
@@ -437,9 +447,21 @@ is intentionally avoided.
 ────────────────────────────────────────────────────
 ```
 
-For Grade A (no changes — original IS the final prompt):
+For Grade A with Role dim ≥ 7 (no changes — original IS the final prompt):
 ```
 ─── Final Prompt (unchanged from original) ───
+
+<original prompt verbatim>
+
+────────────────────────────────────────────
+```
+
+For Grade A with Role dim < 7 (the sole Grade-A change — role line prepended,
+body untouched):
+```
+─── Final Prompt (role added; otherwise unchanged) ───
+
+Act as …
 
 <original prompt verbatim>
 
@@ -551,7 +573,7 @@ Most filtering happens at the hook layer. Within the skill, additional skips:
 
 | Condition | Action |
 |-----------|--------|
-| Grade A (8.0+) | Skip strengthening; still show transcript + final prompt |
+| Grade A (8.0+) | Skip strengthening (except the cap-exempt role fix when Role dim < 7); still show transcript + final prompt |
 | User says "do exactly this" or quotes a specific command | Skip strengthening; still show transcript + final prompt |
 | Pure knowledge question (not an action request) | Skip strengthening; just answer |
 | Action-oriented question ("how should I test this?") | Strengthen before answering |
@@ -779,7 +801,7 @@ the signals are clear.
 
 These are the load-bearing contracts. The rest of the skill is procedure.
 
-- Run STEP 0 (Quick Grade) before any diagnosis, and skip diagnosis entirely for Grade A
+- Run STEP 0 (Quick Grade) before any diagnosis, and skip diagnosis for Grade A — with ONE exception: the cap-exempt MISSING_ROLE fix applies at every grade, A included, whenever Role dim < 7
 - Gather Tier 1 context before responding to any prompt — without it, responses risk duplicating existing patterns or contradicting CLAUDE.md
 - Show the grade card, step transcript, and final prompt every time strengthening activates — silent changes erode trust
 - Include the strengthening count in the `*Enhanced:*` indicator when fixes are applied
