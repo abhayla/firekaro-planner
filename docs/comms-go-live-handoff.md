@@ -164,11 +164,12 @@ These recur on every relevant change; the *current* concrete instances are A1/A4
 
 ## E. Notifier (the cross-project owner-alert gateway, built 2026-06-11 — repo `abhayla/Notifier`)
 
-### E1. Telegram chat ID — ⛔ needs you (~30 seconds)
-The bot is **@AbhayApps_bot** (token in `Notifier/.env`; getMe verified). As of 2026-06-11 14:05 the
-bot has received ZERO messages (your earlier "hi" reached a different chat — no webhook is set, so it
-wasn't swallowed). **Open exactly @AbhayApps_bot and send "hi"** → I grab the chat ID, enable the
-telegram channel, and live-verify it end-to-end.
+### E1. Telegram chat ID  ✅ DONE (2026-06-11)
+Abhay messaged **@AbhayApps_bot** → chatId `315101961` captured via getUpdates, channel enabled in
+`Notifier/config.yaml` (P0: telegram+whatsapp; P1: telegram), and **live-verified end-to-end**
+(telegram `message_id=12` delivered + whatsapp `DELIVERED` in the same P0 fan-out). Telegram is now
+Notifier's default instant channel. *(Gotcha logged: PS5.1 `Set-Content -Encoding utf8` writes a BOM
+that breaks `process.loadEnvFile` on the first line — rewrite env files BOM-free.)*
 
 ### E2. Email channel — ⛔ needs your pick (gmail-autosend skill CANNOT serve a 24/7 service)
 The global gmail-autosend flow = Claude creates a Gmail DRAFT + your Apps Script sends it — it only
