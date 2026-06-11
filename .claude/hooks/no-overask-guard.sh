@@ -32,10 +32,24 @@ command -v jq >/dev/null || exit 0
 tp=$(printf '%s' "$input" | jq -r '.transcript_path // ""')
 if [ -z "$tp" ] || [ ! -f "$tp" ]; then exit 0; fi
 
-last_text=$(jq -r 'select(.type=="assistant") | .message.content[]? | select(.type=="text") | .text' "$tp" 2>/dev/null | tail -1)
+# Aggregate ALL assistant text of the FINAL turn — everything after the last REAL
+# user prompt. Tool-result entries are type "user" too and must NOT split the turn.
+# WHY (2026-06-11): the old `tail -1` analyzed only the LAST text block, but the
+# *Enhanced:* banner lives on the FIRST block of a multi-block (tool-using) turn —
+# 58 of 59 logged banner-misses in 7 days were this false positive, drowning real
+# signal. Per-turn aggregation restores telemetry precision.
+last_text=$(jq -r '
+  if .type=="user" and ((.message.content|type)=="string" or ([.message.content[]?|.type]|index("tool_result")|not))
+  then "@@TURN@@"
+  elif .type=="assistant"
+  then ((.message.content[]? | select(.type=="text") | .text) + "\n")
+  else empty end' "$tp" 2>/dev/null | awk 'BEGIN{RS="@@TURN@@"} END{printf "%s", $0}')
 [ -z "$last_text" ] && exit 0
 
-full=$(printf '%s' "$last_text" | tr '[:upper:]' '[:lower:]')
+# Drop leading blank lines: the turn-aggregate starts with the newline that
+# followed the @@TURN@@ sentinel; head -1 on a blank line would re-create the
+# banner false-positive this rewrite exists to kill.
+full=$(printf '%s' "$last_text" | tr '[:upper:]' '[:lower:]' | sed -e '/./,$!d')
 tail_part=$(printf '%s' "$full" | tail -c 900)
 root="$(git rev-parse --show-toplevel 2>/dev/null)"
 

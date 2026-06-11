@@ -20,7 +20,7 @@ triggers:
 allowed-tools: "Read Grep Glob Skill Agent"
 argument-hint: "[prompt text to enhance or 'score' to evaluate reliability]"
 type: workflow
-version: "3.5.0"
+version: "3.6.0"
 ---
 
 # Prompt Auto-Enhance — Strengthening, Step Transcript, Final Preview, Resource CRUD
@@ -44,6 +44,34 @@ Skipped at the hook layer for:
 - Known continuation phrases ("yes", "ok", "continue", "now do …", "also …", etc.)
 
 Adapted from community pattern by @heyrimsha (source: x.com/heyrimsha/status/2035995286150234480).
+
+## STEP 0-pre: Transcription Normalization (added 2026-06-11, runs BEFORE grading)
+
+Abhay's prompts are frequently voice-dictated; transcription artifacts bit twice
+on 2026-06-11 alone ("brown tortoise enhancement" → prompt-auto-enhance,
+"this grant" → this prompt). Normalize BEFORE grading so STEP 0 scores the
+intended prompt, not the transcription noise.
+
+**Detect:** filler tokens ("uh", "um"), stutters/repeats ("the the the",
+"how are how are"), mid-sentence restarts ("you had... you need to..."), and
+**phonetic mishears** — a noun phrase that is nonsense in context but
+phonetically resembles a repo/conversation term.
+
+**Act:**
+1. Strip fillers/stutters/restarts silently (they carry no meaning).
+2. For each phonetic mishear, render a visible mapping line so the
+   interpretation is auditable:
+   `heard: "<verbatim>" → read as: "<term>" (<phonetic|context> match)`
+3. **Load-bearing test:** if the misheard word changes WHAT gets built (two
+   plausible readings diverge materially), do NOT guess — route it to the
+   Clarification Gate with a `*Sync-check:*` banner. If one reading is the
+   only sensible one in context, proceed on it with the mapping shown.
+4. STEP 0 grades the NORMALIZED text; STEP 4.6 still shows the user's
+   ORIGINAL verbatim (the mapping lines bridge the two).
+5. **Render placement (locked, 2026-06-11):** full mode → the mapping lines
+   sit BETWEEN the Original and Final blocks in STEP 4.6; compact/format-A
+   mode → they are the first line(s) of "What changed:". Never omitted when
+   a mishear was resolved — an invisible reinterpretation is a guess.
 
 ## STEP 0: Quick Grade
 
@@ -104,6 +132,15 @@ Every score in [1.0, 10.0] now maps to exactly one grade.
 
 Diagnose only categories mapped from dimensions scoring < 7 — skip categories
 whose parent dimension already scores 7+.
+
+**Evidence-override lane (added 2026-06-11):** a CONCRETE flaw inside a
+dimension scoring ≥ 7 MAY still be fixed, under strict conditions: (a) the
+diagnosis quotes the exact offending fragment; (b) the fix counts against the
+5-cap; (c) it is labeled `[evidence-override]` in Changes Applied. This closes
+the gap where a strong prompt carries one real defect (a wrong domain fact, a
+contradictory clause) that the dimension gate would otherwise make unfixable —
+found 2026-06-11 when an ambiguous term in an Intent-7 prompt had no legal fix.
+No quote → no override; "could be better" never qualifies.
 
 ## STEP 1: Diagnose Prompt Weaknesses
 
@@ -350,6 +387,23 @@ number, then run it" (Abhay), not "rewrite and hope".
   surface the failure honestly instead of presenting a non-improving rewrite).
 - Grade-A originals (role-only addition) typically move a few tenths via the
   Role dimension — that small lift is expected and sufficient.
+
+**Blind re-grade sampling (added 2026-06-11, anti self-grading bias):** the
+re-grade is scored by the same model that wrote the rewrite — structurally
+motivated to show lift (the rule-33 author-verifies-own-work blind spot).
+Deterministic audit triggers — blind re-grade fires when ANY of:
+- the claimed lift is ≥ 3.0 points (big claims get audited), OR
+- the turn is part of an explicit test/audit campaign, OR
+- the user asks for it.
+
+**Mechanism:** dispatch a context-blind agent whose prompt contains ONLY the
+original prompt text, the strengthened prompt text, and the rubric path
+(`references/grading-rubric.md`) — no pipeline narrative, no self-graded
+scores, no expected answer. The agent scores both on the rubric and returns
+the two overalls. If `|blind_after − self_after| > 1.5`, log
+`regrade-divergence` to `.claude/.enhance-misses.log` and REPORT the blind
+score alongside the self-score (the blind number wins the rendered lift).
+Cost note: fires only on the triggers above, never per-turn.
 
 ## STEP 4: Show Grade Card + Changes Applied
 

@@ -28,4 +28,18 @@ echo "GIT_UNCOMMITTED=$(git -C "$root" status --porcelain 2>/dev/null | grep -c 
 echo "ROLE_FINTECH_AUTODISPATCH=src/lib/*.ts|src/types/assumptions.ts"
 echo "ROLE_CODEQUALITY=required-after-any-build(rule-29-independent-pass)"
 echo "ROLE_ROUTER=.claude/rules/engineering-roles.md  (state Role:<name> each turn)"
+
+# Enhance-misses telemetry loop (2026-06-11): the prompt-enhance pipeline logs
+# banner/block/role misses + regrade divergences to .enhance-misses.log, but a
+# write-only log is governance theater — surface a 7-day summary every session
+# so drift is SEEN. ISO timestamps sort lexicographically, so a string compare
+# against the 7-day cutoff works.
+ml="$root/.claude/.enhance-misses.log"
+if [ -f "$ml" ] && command -v jq >/dev/null; then
+  cutoff=$(jq -rn 'now-604800|todate')
+  recent=$(awk -v c="$cutoff" '$1 >= c' "$ml" | grep -c .)
+  newest=$(tail -1 "$ml" | cut -f2)
+  echo "ENHANCE_MISSES_7D=$recent  (total: $(grep -c . "$ml"); newest: ${newest:-none})"
+  [ "$recent" -gt 5 ] && echo "ENHANCE_MISSES_ALERT=miss-rate-high — review .claude/.enhance-misses.log + tighten the failing class"
+fi
 exit 0
