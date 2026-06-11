@@ -181,6 +181,12 @@ Prisma scripts hitting Supabase while the dev server holds connections MUST appe
   Tier-1 post-deploy health probe (richer than `/api/health`'s raw `SELECT 1`). Mounted OUTSIDE
   `authMiddleware`, like the lifecycle scheduler. Placement: `.claude/rules/testing-strategy.md`;
   runbook: `docs/DEPLOY.md` §8.
+- **Owner-alert detectors** (`server/src/lib/owner-notify.ts`): fire-and-forget `notifyOwner(severity,
+  title, opts)` POSTs to the external **Notifier gateway** (separate repo `abhayla/Notifier`, PM2 on the
+  same VPS) — wired at signup (`comms-signup.ts`), unhandled 5xx + DB-down (`index.ts`), and boot-env
+  issues (`validate-env.ts`). Non-breaking by construction: silent no-op when `NOTIFIER_URL`/`NOTIFIER_KEY`
+  are unset (dev/CI), 2s timeout, never awaited in the request path, never throws. Payloads are DPDP-safe
+  (no user PII).
 - The `.claude/rules/` for **Hono / Prisma / api-envelope / api-response-unwrapping / dev-bypass-auth
   / structured-logging** apply to `server/` (it IS Hono + Prisma + Better Auth).
 
