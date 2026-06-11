@@ -209,11 +209,22 @@ which was untouched — 16h uptime preserved). Shipped via `git archive | ssh ta
 telegram message_id=15, whatsapp DELIVERED, email draft created). Redeploy = re-ship tar + `pm2 reload
 notifier`. Rollback = `pm2 delete notifier` (zero impact on firekaro-api).
 
-### E4b. FireKaro detector wiring — the remaining piece (modifies the LIVE product)
-The approved owner-alert catalog (Tier 1-5, session 2026-06-11) still needs `notify()` call sites wired
-into FireKaro's detector events (PM2 crash hook, DB-pool errors, 5xx spike, auth brute-force, signup,
-activation, lifecycle-send failures, deploy-green) + a FireKaro prod redeploy. This edits the
-customer-facing revenue app, so it's higher blast-radius than E4a — sequenced as its own careful change.
+### E4b. FireKaro detector wiring (first batch)  ✅ DONE + DEPLOYED to prod (2026-06-11, Abhay-authorized)
+`server/src/lib/owner-notify.ts` (`notifyOwner` — fire-and-forget, no-op when env unset, 2s timeout,
+never throws → cannot break/slow FireKaro) wired into 3 detectors: **5xx** (`onError` → P1, deduped
+per path), **DB-down** (`/api/health` catch → P0, deduped), **signup** (`onUserCreated` → P1 per user;
+email gated behind `NOTIFIER_OWNER_PII`, default off — DPDP). Independent review = 0 HIGH; 2 MED
+hardening fixes applied (PII-off-by-default, 5xx body truncated). Merged `898b9ba` → main; deployed to
+prod (backup → ship → `NOTIFIER_URL`/`NOTIFIER_KEY` added to VPS `server/.env` → build → pm2 reload).
+**Verified live:** health ok + smoke `user.count=3` + the deploy-green ping reached Telegram
+(`message_id=16`) — the FireKaro→Notifier prod path is proven. Public site renders (login + Google
+button, no console errors); bundle hash unchanged (server-only). Owner detectors are LIVE.
+
+### E4c. Remaining detectors + external monitors (next, when you want)
+Still to wire (expand the first batch): activation (first FIRE number), lifecycle WhatsApp-send
+failures, auth brute-force / rate-limit storms. AND **external uptime + cron-watchdog** (Better Stack /
+healthchecks.io) — the "whole VPS down" alert Notifier structurally can't self-report; needs your free
+account signup (1-2 logins).
 
 ## What I'll do the moment each unblocks
 - A1 → exchange code, store `ZOHO_*`, verify a real lead upsert (to a test source).

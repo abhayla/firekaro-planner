@@ -126,6 +126,16 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 ## §3 — Decision log (append-only, newest first)
 
 ### 2026-06-11
+- **D-2026-06-11-02 — Notifier DEPLOYED to prod + FireKaro owner-detectors (batch 1) LIVE.** Notifier
+  runs on the Hostinger VPS as PM2 `notifier` (isolated from `firekaro-api`; all 3 channels —
+  Telegram/WhatsApp/email-via-Apps-Script — verified from the box). FireKaro now calls `notifyOwner()`
+  at 3 detectors (5xx, DB-down, signup) via a fire-and-forget client that can't break the app;
+  independent-reviewed (0 HIGH, 2 MED fixed: DPDP PII-off-by-default + truncated 5xx body), merged
+  `898b9ba`, deployed (health+smoke green, deploy-green ping reached Telegram msg-16, site renders).
+  Goal-anchored note: owner-alerts are OPS/infra (protect the live app + help Abhay), not a user-facing
+  product feature — the bigger goal lever (retention/stickiness) remains focus-locked pending Abhay.
+  The Apps Script web-app + the VPS deploy were both done by Claude driving the browser / SSH (Abhay
+  only logged into Google). `TODO(5W):` register Notifier as shared Financial-pillar infra.
 - **D-2026-06-11-01 — Owner-notification system: catalog approved + built as the SEPARATE generic
   project `Notifier` (`D:\Abhay\VibeCoding\Notifier`, github.com/abhayla/Notifier).** Research-grounded
   owner-alert catalog for FireKaro (Tier 1 real-time page / Tier 2 same-day / Tier 3 signup-activation
