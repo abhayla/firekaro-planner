@@ -165,14 +165,19 @@ These recur on every relevant change; the *current* concrete instances are A1/A4
 ## E. Notifier (the cross-project owner-alert gateway, built 2026-06-11 — repo `abhayla/Notifier`)
 
 ### E1. Telegram chat ID — ⛔ needs you (~30 seconds)
-The bot exists (token provided 2026-06-11, in `Notifier/.env`). **Send any message ("hi") to the bot
-in your Telegram app** → I run `npm run telegram:chat-id`, fill `TELEGRAM_CHAT_ID_OPS`, enable the
-telegram channel in `Notifier/config.yaml`, and live-verify the channel end-to-end.
+The bot is **@AbhayApps_bot** (token in `Notifier/.env`; getMe verified). As of 2026-06-11 14:05 the
+bot has received ZERO messages (your earlier "hi" reached a different chat — no webhook is set, so it
+wasn't swallowed). **Open exactly @AbhayApps_bot and send "hi"** → I grab the chat ID, enable the
+telegram channel, and live-verify it end-to-end.
 
-### E2. Gmail app password (email channel) — ⛔ needs you (~2 minutes)
-myaccount.google.com → Security → 2-Step Verification → App passwords → create "Notifier" → paste it
-here. I set `SMTP_USER/SMTP_PASS`, enable the email channel, live-verify (send + Gmail receipt check).
-Until then the SMTP adapter is unit-tested only.
+### E2. Email channel — ⛔ needs your pick (gmail-autosend skill CANNOT serve a 24/7 service)
+The global gmail-autosend flow = Claude creates a Gmail DRAFT + your Apps Script sends it — it only
+works inside Claude sessions, not from the Notifier service. Pick one:
+- **(a) Gmail app password (recommended, ~2 min):** myaccount.google.com → Security → 2-Step
+  Verification → App passwords → "Notifier" → paste here. SMTP adapter is built + unit-tested.
+- **(b) Apps Script web-app:** I draft a token-guarded `doPost` → `GmailApp.sendEmail` snippet; you
+  paste + deploy it in the Apps Script editor; Notifier POSTs to its URL. No password, but a manual
+  deploy by you.
 
 ### E3. `notifier_owner_alert` template — ⏳ Meta review (no action; submitted 2026-06-11,
 waTemplateId `1585582266465108`). On approval I switch `Notifier/config.yaml` from the interim
