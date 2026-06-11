@@ -200,9 +200,20 @@ steps (~3 min, needs your Google login — why I can't do it):
 waTemplateId `1585582266465108`). On approval I switch `Notifier/config.yaml` from the interim
 `firekaro_welcome_2026_06_03` to the real template and re-verify delivery.
 
-### E4. FireKaro detector wiring + VPS deploy of Notifier — gated (focus lock + deploy gate)
-The approved owner-alert catalog (Tier 1-5, session 2026-06-11) gets wired into FireKaro
-(`notify()` call sites) and Notifier gets a PM2 process on the VPS — both await your go.
+### E4a. Notifier VPS deploy  ✅ DONE (2026-06-11, Abhay-authorized)
+Notifier runs on the Hostinger VPS as PM2 process `notifier` (id 1, alongside `firekaro-api` id 0,
+which was untouched — 16h uptime preserved). Shipped via `git archive | ssh tar` to `/root/notifier`,
+`npm ci`, `.env` + `config.yaml` scp'd (chmod 600), `pm2 start npm --name notifier -- run start`,
+`pm2 save`. Localhost-bound :3300 (not publicly exposed — admin UI via SSH tunnel
+`ssh -L 3300:127.0.0.1:3300`). **All 3 channels verified FROM THE VPS** (`npm run verify:channels`:
+telegram message_id=15, whatsapp DELIVERED, email draft created). Redeploy = re-ship tar + `pm2 reload
+notifier`. Rollback = `pm2 delete notifier` (zero impact on firekaro-api).
+
+### E4b. FireKaro detector wiring — the remaining piece (modifies the LIVE product)
+The approved owner-alert catalog (Tier 1-5, session 2026-06-11) still needs `notify()` call sites wired
+into FireKaro's detector events (PM2 crash hook, DB-pool errors, 5xx spike, auth brute-force, signup,
+activation, lifecycle-send failures, deploy-green) + a FireKaro prod redeploy. This edits the
+customer-facing revenue app, so it's higher blast-radius than E4a — sequenced as its own careful change.
 
 ## What I'll do the moment each unblocks
 - A1 → exchange code, store `ZOHO_*`, verify a real lead upsert (to a test source).
