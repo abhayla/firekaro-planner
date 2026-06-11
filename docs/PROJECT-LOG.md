@@ -125,6 +125,18 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 
 ## §3 — Decision log (append-only, newest first)
 
+### 2026-06-11
+- **D-2026-06-11-01 — Owner-notification system: catalog approved + built as the SEPARATE generic
+  project `Notifier` (`D:\Abhay\VibeCoding\Notifier`, github.com/abhayla/Notifier).** Research-grounded
+  owner-alert catalog for FireKaro (Tier 1 real-time page / Tier 2 same-day / Tier 3 signup-activation
+  joy-pings / Tier 4-5 daily-weekly digests — full list in the 2026-06-11 session) is FireKaro's
+  detector backlog; the *dispatch* layer was grilled (gateway-service vs library → **gateway**, Abhay
+  approved) and generalized for all apps (IPODhan, AlgoChanakya — which Abhay is consolidating onto the
+  Hostinger VPS). Channels are pure config: Telegram bot / WhatsApp-Wati (fail-closed allowlist,
+  terminal-status verify) / SMTP email / digest queue. FireKaro-side wiring (calling `/notify` from the
+  detector events) is a FOLLOW-UP, gated by the focus lock + deploy gate. `TODO(5W):` register Notifier
+  as a shared Financial-pillar infra asset in the PROJECT-MAP.
+
 ### 2026-06-10
 - **D-2026-06-10-11 — PROD DEPLOY (Abhay-approved): Option-D dashboard + runway rename live on
   firekaro.com.** Standard `DEPLOY.md` redeploy from `main` `b57c253` (backup tar

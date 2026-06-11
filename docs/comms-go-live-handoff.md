@@ -162,6 +162,26 @@ These recur on every relevant change; the *current* concrete instances are A1/A4
 - **Deploy / spend / publish-externally = one-line escalation, then your go** (`decision-authority.md`). I keep all non-gated work moving in parallel meanwhile.
 - **5Wealths-portfolio writes = yours (L-042)** — I log `TODO(5W):` in-repo; I cannot write into `D:\…\5Wealths\`. You carry them across in a 5W session (open: retire old firekaro.com Next.js app; B1 RLS posture; B3 CRM-source ratification).
 
+## E. Notifier (the cross-project owner-alert gateway, built 2026-06-11 — repo `abhayla/Notifier`)
+
+### E1. Telegram chat ID — ⛔ needs you (~30 seconds)
+The bot exists (token provided 2026-06-11, in `Notifier/.env`). **Send any message ("hi") to the bot
+in your Telegram app** → I run `npm run telegram:chat-id`, fill `TELEGRAM_CHAT_ID_OPS`, enable the
+telegram channel in `Notifier/config.yaml`, and live-verify the channel end-to-end.
+
+### E2. Gmail app password (email channel) — ⛔ needs you (~2 minutes)
+myaccount.google.com → Security → 2-Step Verification → App passwords → create "Notifier" → paste it
+here. I set `SMTP_USER/SMTP_PASS`, enable the email channel, live-verify (send + Gmail receipt check).
+Until then the SMTP adapter is unit-tested only.
+
+### E3. `notifier_owner_alert` template — ⏳ Meta review (no action; submitted 2026-06-11,
+waTemplateId `1585582266465108`). On approval I switch `Notifier/config.yaml` from the interim
+`firekaro_welcome_2026_06_03` to the real template and re-verify delivery.
+
+### E4. FireKaro detector wiring + VPS deploy of Notifier — gated (focus lock + deploy gate)
+The approved owner-alert catalog (Tier 1-5, session 2026-06-11) gets wired into FireKaro
+(`notify()` call sites) and Notifier gets a PM2 process on the VPS — both await your go.
+
 ## What I'll do the moment each unblocks
 - A1 → exchange code, store `ZOHO_*`, verify a real lead upsert (to a test source).
 - A3 → wire `COMMS_TEMPLATE_*`, run `/wati-send-and-verify-delivery` per template to your number.
