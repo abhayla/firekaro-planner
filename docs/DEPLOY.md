@@ -220,6 +220,18 @@ curl -s -o /dev/null -w "%{http_code}\n" https://firekaro.com   # public SPA ren
 curl -s https://firekaro.com | grep -oE 'assets/index-[A-Za-z0-9_-]+\.js' | head -1  # bundle hash CHANGED?
 ```
 
+**Deploy-green owner ping (after smoke passes) — also proves the FireKaro→Notifier wire:**
+```bash
+# Reads FireKaro's own NOTIFIER_KEY from server/.env; sends a P1 "deploy green" to Telegram.
+ssh -i $KEY $VPS 'cd /var/www/firekaro/server && set -a; . ./.env; set +a; \
+  curl -s -X POST "$NOTIFIER_URL/notify" -H "Content-Type: application/json" -H "X-Api-Key: $NOTIFIER_KEY" \
+  -d "{\"project\":\"firekaro\",\"severity\":\"P1\",\"type\":\"deploy\",\"title\":\"Deploy succeeded — smoke green\",\"dedupeKey\":\"deploy:$(date +%s)\"}"'
+```
+The owner-alert detectors (signup, 5xx, DB-down) require `NOTIFIER_URL=http://127.0.0.1:3300` +
+`NOTIFIER_KEY=<firekaro project key>` in the VPS `server/.env` (the Notifier service runs as PM2
+`notifier` on the same box). If those are unset, `notifyOwner` is a silent no-op — FireKaro is
+unaffected. See `server/src/lib/owner-notify.ts` + `github.com/abhayla/Notifier`.
+
 **Then Tier-1.5 post-deploy UI verification (MANDATORY every deploy — see §8):** Playwright
 the live login/splash → screenshot + ARIA + console (non-destructive). If the deploy touched an
 authed screen, also run the Tier-2 authed critical-path when a session exists, else surface the skip.

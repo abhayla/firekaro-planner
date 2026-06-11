@@ -61,4 +61,9 @@ export function validateEnv(): void {
       "SMOKE_TOKEN not set — GET /api/internal/smoke will return 500 (post-deploy smoke disabled)",
     );
   }
+  if (isProduction && (!process.env.NOTIFIER_URL || !process.env.NOTIFIER_KEY)) {
+    logger.warn(
+      "NOTIFIER_URL / NOTIFIER_KEY not set — owner alerts (signup, 5xx, DB-down) are disabled (notifyOwner is a no-op)",
+    );
+  }
 }
