@@ -126,6 +126,26 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 ## §3 — Decision log (append-only, newest first)
 
 ### 2026-06-13
+- **D-2026-06-13-02 — REVERSE #81's hero-invariance: the FIRE headline SHOULD lens per member.** While
+  verifying D-2026-06-13-01 on prod, Abhay clarified his actual intent: when "View as &lt;member&gt;" is
+  selected, the **big FIRE headline (age + number) should show THAT member's individual FIRE** (Priya →
+  her ₹2.35Cr/age44, Rohit → his ₹4.04Cr; "Whole household" → the combined ₹10.55Cr/age55). This **reverses**
+  the D-2026-06-08-19/20/22 (#81) decision that deliberately froze the headline to the household number
+  (the #22/#23 guardrail). **Why the reversal is defensible:** when a user EXPLICITLY picks "View as Priya"
+  they are asking for Priya's individual picture; the household number is one dropdown-click away + stays the
+  labelled default, so the individual headline isn't misread as "the family can stop" — provided the caveat
+  stays. The honesty core is PRESERVED differently: the individual number must remain the PROPER per-member
+  "mini-household" FIRE (`individual-fire.ts` — attributed corpus/expenses/per-member SWR, already non-absurd
+  with the reachability cap), NEVER the absurd household-target÷1-member #22 bug. Confirmed via `AskUserQuestion`
+  2026-06-13 ("Lens it to that member"). **Open design forks the build must lock** (the hero has household-only
+  sub-parts): what the Monte-Carlo confidence band, the plan-variance / biggest-win KPI strip, and the
+  projection chart show under a member lens (lens per-member — needs per-member MC/projection, larger — vs.
+  hide-under-lens vs. keep-household-labelled). **Guardrail tests must be REWRITTEN, not deleted** —
+  `derive.spec.ts` / `headline-plausibility.spec.ts` currently lock `fireNumber`/`householdFireAge` INVARIANT
+  to member selection; the new invariant = headline lenses to the proper individual FIRE, household stays
+  combined, the absurd ÷1 result never occurs. Scope = flagship `FireHero.vue` + the honesty guardrail →
+  goal-contracted build with FinTech validation. Supersedes the #81 hero-invariance clause; #81's
+  individual-FIRE *card* + same-scope rule stay.
 - **D-2026-06-13-01 — Prod deploy of `d7f11aa` (member-lens dashboard section-card fix).** Abhay reported on
   prod that switching the AppBar "View as &lt;member&gt;" lens didn't refresh the dashboard. Root-caused (after
   a faithful 2-earner reproduction in demo + server-adapter + the production build) to the Investments/
