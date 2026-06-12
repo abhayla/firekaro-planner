@@ -151,8 +151,16 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
   caveat naming the exclusions (children/shared-split + healthcare reserve + bridge check — FinTech Q7);
   Whole-household byte-identical (spec-locked); guardrail tests rewritten (default-byte-identical ·
   member-sourced · sane-age · magnitude · unreachable→null); 1235 unit + 17/17 member-lens-sweep green.
-  Prod deploy + Tier-2 prod re-verify pending (Abhay's gate). FinTech follow-up filed: individual-fire
-  omits the healthcare reservation + bridge gate (optimistic vs household methodology) — see the issue.
+  FinTech follow-up filed (#162): individual-fire omits the healthcare reservation + bridge gate
+  (optimistic vs household methodology) — interim-mitigated by the caveat naming the omissions, full
+  option-A math deferred. **DEPLOYED to prod + Tier-2 verified (`093a339`, bundle `BYJmfDLG`, 2026-06-13):**
+  Abhay authorized the deploy; supervisor-reproduced the gates (type-check 0, 1235 green) then redeployed
+  the VPS (frontend-only, pre-deploy backup `firekaro-pre-deploy-20260613-015241.tar.gz`); Tier-1 smoke
+  green (health ok, smoke user.count=3, bundle `D1wUdHhT`→`BYJmfDLG`); **Tier-2 headed prod re-verify on
+  `abhayfaircent`: FIRE headline lenses per member LIVE — Whole-household age 56 (₹10.55Cr, band shown) vs
+  Priya 44 (₹2.35Cr) vs Rohit 44 (₹4.04Cr), caveat renders, band hides under lens; blind-verifier (rule
+  33) CONCURRED on the raw screenshots.** Both members rounding to age 44 is a legitimate coincidence
+  (years/dates differ: 14y11m→2041 vs 14y3m→2040; numbers differ) — per-member sourcing spec-locked.
 - **D-2026-06-13-01 — Prod deploy of `d7f11aa` (member-lens dashboard section-card fix).** Abhay reported on
   prod that switching the AppBar "View as &lt;member&gt;" lens didn't refresh the dashboard. Root-caused (after
   a faithful 2-earner reproduction in demo + server-adapter + the production build) to the Investments/
