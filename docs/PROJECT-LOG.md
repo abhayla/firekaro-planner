@@ -125,6 +125,28 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 
 ## §3 — Decision log (append-only, newest first)
 
+### 2026-06-12
+- **D-2026-06-12-01 — Notifier becomes the portfolio-wide monitoring standard; healthchecks.io retired;
+  distributed via the hub.** Abhay asked how a deployed project knows to wire Notifier, how Claude/a repo
+  knows a project's prod-deploy + Notifier-link status, and why fuel-prices is still told to use
+  healthchecks.io now that Notifier exists — and that the answer be uniform across ALL projects.
+  **Decision (he delegated: "go with your recommendation"), 3 forks locked:** (1) build a **missed-heartbeat
+  watchdog** into Notifier so it replaces healthchecks.io/UptimeRobot/external pingers; (2) prod-status
+  knowability is **dual-source** — each repo's CLAUDE.md "Production & monitoring" block (the read-layer a
+  Claude session consults) + **Notifier's admin config/heartbeat state as the authoritative live
+  "linked & alive" registry**; (3) **promote** FireKaro's `server/src/lib/owner-notify.ts` into the
+  **claude-best-practices hub** as a `notifier-integration` rule + portable helper (TS+Py) + a standard
+  CLAUDE.md block, distributed via `update-practices`/`synthesize-project`. **Goal-anchored:** this serves
+  the portfolio's owner-observability (5W-PRINCIPLES — productized, scale-from-day-1, automate) and removes
+  per-project monitoring-tool sprawl; it is infra-standardization (decidable), not a kill/promote/pricing
+  call. **Artifacts (authored this session, NOT yet run/committed):** three independently-runnable `/goal`
+  contracts staged in `docs/goals/` — `2026-06-12-notifier-hub-pattern.md` (→ hub),
+  `2026-06-12-notifier-heartbeat-watchdog.md` (→ Notifier), `2026-06-12-notifier-rollout-fuel-prices.md`
+  (→ fuel-prices, repeatable per consumer). The build runs in those repos (not firekaro-planner); the live
+  WhatsApp/Telegram delivery test + fuel-prices prod secret/redeploy are Abhay-gated (spend/outward/prod).
+  `TODO(5W):` if Abhay wants this recorded as a formal **portfolio monitoring standard** (it touches every
+  Financial-pillar project), capture it in `5Wealths\` — this repo only stages the engineering contracts.
+
 ### 2026-06-11
 - **D-2026-06-11-02 — Notifier DEPLOYED to prod + FireKaro owner-detectors (batch 1) LIVE.** Notifier
   runs on the Hostinger VPS as PM2 `notifier` (isolated from `firekaro-api`; all 3 channels —
