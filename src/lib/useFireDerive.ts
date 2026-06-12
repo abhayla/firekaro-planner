@@ -54,6 +54,26 @@ export function deflateProjectionPoints(
 }
 
 /**
+ * D-2026-06-13-02 — the normalized shape FireHero's headline consumes (member-lensed
+ * individual FIRE when "Viewing as <member>", today's household values otherwise).
+ */
+export interface HeroHeadline {
+  isMember: boolean;
+  memberName: string | null;
+  /** Rendered big age — null = the honest "—" path (unreachable / no DOB), never a sentinel. */
+  fireAge: number | null;
+  /** May be Infinity when unreachable — consumers MUST gate rendering on `reachable`. */
+  yearsToFire: number;
+  fireNumber: number;
+  corpusForProgress: number;
+  fireTargetForProgress: number;
+  progressPercent: number;
+  annualSavings: number;
+  monthlyTakeHome: number;
+  reachable: boolean;
+}
+
+/**
  * Single source of truth for all FIRE dashboard math — now a thin Pinia-aware
  * wrapper (Stage-T0 B-1). It reads the household + assumptions stores + the UI
  * lens, calls the pure {@link derive} kernel once, and re-exposes every field
@@ -156,9 +176,11 @@ export function useFireDerive() {
           ? Math.round((surplus / annualTakeHome) * 100)
           : 0
         : k.savingsRate,
+      // The ONE member FIRE-progress formula — heroHeadline reads this too (cross-screen
+      // coherence: FireHero and Financial-Health must never derive the same % twice).
       fireProgressPercent: adult
-        ? adult.individualFireNumber > 0
-          ? Math.min(100, Math.round((adult.attributableCorpus / adult.individualFireNumber) * 100))
+        ? adult.individualFireNumber > 0 && Number.isFinite(adult.attributableCorpus)
+          ? Math.min(100, Math.max(0, Math.round((adult.attributableCorpus / adult.individualFireNumber) * 100)))
           : 0
         : k.progressPercent,
       lifeCover,
@@ -167,9 +189,57 @@ export function useFireDerive() {
     };
   });
 
+  // D-2026-06-13-02 — the ONE selector behind the FireHero headline (reverses the #81
+  // hero-invariance per PROJECT-LOG). PURE SELECTION over already-computed kernel values —
+  // no FIRE math here. Branches on the "Viewing as" lens:
+  //   - Whole household (viewingMemberId null, or a stale id): EXACTLY today's household
+  //     fields, byte-identical — the persona's default view is unchanged (#22/#23 guardrail).
+  //   - Member selected: that adult's honest mini-household FIRE from individualFireByMember
+  //     (attributed corpus/expenses, per-member SWR, the reachability cap intact). An
+  //     unreachable individual FIRE yields fireAge null — the hero renders the honest "—",
+  //     never a sentinel/absurd age (rule 31 / fire-confidence-band discipline).
+  const heroHeadline = computed<HeroHeadline>(() => {
+    const k = d.value;
+    const r = k.individualFireByMember.find((m) => m.memberId === ui.viewingMemberId) ?? null;
+    if (!r) {
+      return {
+        isMember: false,
+        memberName: null,
+        // householdFireAge is null when unreachable; guard the no-DOB NaN edge to null too.
+        fireAge: k.householdFireAge != null && Number.isFinite(k.householdFireAge) ? k.householdFireAge : null,
+        yearsToFire: k.yearsToRegular,
+        fireNumber: k.fireNumber,
+        corpusForProgress: k.totalCorpus,
+        fireTargetForProgress: k.fireNumber,
+        progressPercent: k.progressPercent,
+        annualSavings: k.annualSavings,
+        monthlyTakeHome: k.monthlyTakeHome,
+        reachable: Number.isFinite(k.yearsToRegular),
+      };
+    }
+    const mf = memberFinancials.value;
+    const reachable = Number.isFinite(r.yearsToIndividualFire);
+    return {
+      isMember: true,
+      memberName: r.name,
+      fireAge: reachable && Number.isFinite(r.individualFireAge) ? r.individualFireAge : null,
+      yearsToFire: r.yearsToIndividualFire,
+      fireNumber: r.individualFireNumber,
+      corpusForProgress: r.attributableCorpus,
+      fireTargetForProgress: r.individualFireNumber,
+      // The one canonical member progress formula lives in memberFinancials (same lens id).
+      progressPercent: mf.fireProgressPercent,
+      annualSavings: mf.surplus,
+      monthlyTakeHome: mf.monthlyTakeHome,
+      reachable,
+    };
+  });
+
   return {
     // #81 Phase 3 — the centralized same-scope Financial-Health resolver (member or household).
     memberFinancials,
+    // D-2026-06-13-02 — the member-lensed FireHero headline selector (see above).
+    heroHeadline,
     applyMemberLens: computed(() => d.value.applyMemberLens),
     lensedMembers: computed(() => d.value.lensedMembers),
     lensedEarners: computed(() => d.value.lensedEarners),

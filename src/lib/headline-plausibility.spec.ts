@@ -22,6 +22,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { setActivePinia, createPinia } from "pinia";
 import { useHouseholdStore } from "@/stores/household";
 import { useAssumptionsStore } from "@/stores/assumptions";
+import { useUiStore } from "@/stores/ui";
 import { loadSeedPersona } from "@/lib/seed-persona";
 import { loadMehtasSeed } from "@/seeds/mehtas";
 import { loadIyersSeed } from "@/seeds/iyers";
@@ -432,6 +433,163 @@ describe("acceleration card plausibility — never more optimistic than the head
       ).toBeGreaterThanOrEqual(accel.baselineYears.value - 0.01);
     });
   }
+});
+
+// D-2026-06-13-02 — the FIRE hero LENSES to the selected member's individual FIRE (reverses the
+// #81 hero-invariance). heroHeadline is the ONE selector FireHero consumes; these locks are the
+// rule-31 sane-bounds gate for the new behavior:
+//   (a) DEFAULT lens (viewingMemberId:null) → byte-identical to the household fields (the #22/#23
+//       protection on the persona's default view is preserved);
+//   (b) a selected member's headline SOURCES from individualFireByMember (the honest mini-household
+//       FIRE — never the absurd household-target ÷ 1 #22 bug);
+//   (c) a rendered lensed FIRE age is DOMAIN-SANE (≥ the member's current age, ≤ their planToAge);
+//   (d) an unreachable individual FIRE yields fireAge null (the honest "—"), never a sentinel.
+describe("member-lensed FIRE headline (heroHeadline) — D-2026-06-13-02 locks", () => {
+  beforeEach(() => setActivePinia(createPinia()));
+
+  for (const persona of PERSONAS) {
+    it(`${persona.name}: (a) default-lens heroHeadline is BYTE-IDENTICAL to the household fields`, () => {
+      const h = useHouseholdStore();
+      const a = useAssumptionsStore();
+      persona.load(h, a);
+      const fire = useFireDerive();
+      const hh = fire.heroHeadline.value;
+      expect(hh.isMember).toBe(false);
+      expect(hh.memberName).toBeNull();
+      expect(hh.fireAge).toBe(fire.householdFireAge.value);
+      expect(hh.yearsToFire).toBe(fire.yearsToRegular.value);
+      expect(hh.fireNumber).toBe(fire.fireNumber.value);
+      expect(hh.corpusForProgress).toBe(fire.totalCorpus.value);
+      expect(hh.fireTargetForProgress).toBe(fire.fireNumber.value);
+      expect(hh.progressPercent).toBe(fire.progressPercent.value);
+      expect(hh.annualSavings).toBe(fire.annualSavings.value);
+      expect(hh.monthlyTakeHome).toBe(fire.monthlyTakeHome.value);
+      expect(hh.reachable).toBe(Number.isFinite(fire.yearsToRegular.value));
+    });
+
+    it(`${persona.name}: (b)(c) member heroHeadline sources from individualFireByMember + sane age + household kernel invariant`, () => {
+      const h = useHouseholdStore();
+      const a = useAssumptionsStore();
+      const ui = useUiStore();
+      persona.load(h, a);
+      const fire = useFireDerive();
+      const householdFireNumber = fire.fireNumber.value;
+      const householdYears = fire.yearsToRegular.value;
+      const adults = fire.individualFireByMember.value;
+      expect(adults.length).toBeGreaterThan(0);
+      for (const r of adults) {
+        ui.viewingMemberId = r.memberId;
+        const hh = fire.heroHeadline.value;
+        const ctx = `${persona.name}/${r.memberId}: heroFireAge=${hh.fireAge} fireNo=${hh.fireNumber}`;
+        expect(hh.isMember, ctx).toBe(true);
+        expect(hh.memberName, ctx).toBe(r.name);
+        // (b) sourced from the honest mini-household FIRE — never household ÷ 1.
+        expect(hh.fireNumber, `${ctx} — number == individualFireNumber`).toBe(r.individualFireNumber);
+        expect(hh.corpusForProgress, ctx).toBe(r.attributableCorpus);
+        expect(hh.fireTargetForProgress, ctx).toBe(r.individualFireNumber);
+        expect(hh.yearsToFire, `${ctx} — years sourced from yearsToIndividualFire`).toBe(r.yearsToIndividualFire);
+        // The stats line is the SAME mini-household's savings (memberFinancials.surplus is
+        // algebraically attributableAnnualSavings) — a rewiring to household values goes RED here.
+        expect(hh.annualSavings, `${ctx} — savings == the member's attributable savings`).toBe(
+          r.attributableAnnualSavings,
+        );
+        // Magnitude lock (FinTech): target ≈ expenses ÷ SWR, so the ratio must sit in the
+        // 1/SWR band for SWR 2.5–8%. A 100× SWR-unit bug or a double-applied split passes the
+        // bare bounds above but trips this.
+        expect(
+          r.individualFireNumber / r.attributableAnnualExpenses,
+          `${ctx} — fireNumber/expenses within the 1/SWR band`,
+        ).toBeGreaterThanOrEqual(12.5);
+        expect(r.individualFireNumber / r.attributableAnnualExpenses, ctx).toBeLessThanOrEqual(40);
+        const memberPlanTo = h.data.members.find((m) => m.id === r.memberId)?.planToAge ?? 90;
+        if (Number.isFinite(r.yearsToIndividualFire)) {
+          expect(hh.reachable, ctx).toBe(true);
+          expect(hh.fireAge, `${ctx} — age == individualFireAge`).toBe(r.individualFireAge);
+          // (c) domain-sane: within the member's own working life — the #22 age-81 class can never render.
+          expect(hh.fireAge!, `${ctx} — age ≥ member's current age`).toBeGreaterThanOrEqual(r.anchorAge);
+          expect(hh.fireAge!, `${ctx} — age ≤ member's planToAge`).toBeLessThanOrEqual(memberPlanTo);
+        } else {
+          // (d) honest "—" — never a sentinel/absurd number.
+          expect(hh.reachable, ctx).toBe(false);
+          expect(hh.fireAge, `${ctx} — unreachable renders null`).toBeNull();
+        }
+        expect(hh.progressPercent, ctx).toBeGreaterThanOrEqual(0);
+        expect(hh.progressPercent, ctx).toBeLessThanOrEqual(100);
+        // The household KERNEL stays invariant while lensed (the #22/#23 guardrail, unchanged).
+        expect(fire.fireNumber.value, `${ctx} — household fireNumber invariant`).toBe(householdFireNumber);
+        expect(fire.yearsToRegular.value, `${ctx} — household years invariant`).toBe(householdYears);
+      }
+      ui.viewingMemberId = null;
+    });
+  }
+
+  it("a stale viewingMemberId falls back to the household branch (never crashes)", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    const ui = useUiStore();
+    loadSeedPersona(h, a);
+    const fire = useFireDerive();
+    ui.viewingMemberId = "no-such-member-id";
+    const hh = fire.heroHeadline.value;
+    expect(hh.isMember).toBe(false);
+    expect(hh.fireNumber).toBe(fire.fireNumber.value);
+    expect(hh.fireAge).toBe(fire.householdFireAge.value);
+  });
+
+  it("an over-funded member's progress clamps to 100 (boundary — deleting the clamp goes RED)", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    const ui = useUiStore();
+    h.addMember({
+      id: "rich", name: "Rich", dateOfBirth: "1980-01-01", role: "ADULT",
+      targetRetirementAge: 50, planToAge: 90, city: "Metro", health: "Healthy",
+      riskAppetite: "Moderate", marital: "Married", employmentStatus: "Employed",
+      salary: { annualCTC: 2_000_000 },
+    } as never);
+    h.addMember({
+      id: "spouse", name: "Spouse", dateOfBirth: "1982-01-01", role: "ADULT",
+      targetRetirementAge: 50, planToAge: 90, city: "Metro", health: "Healthy",
+      riskAppetite: "Moderate", marital: "Married", employmentStatus: "Employed",
+      salary: { annualCTC: 1_000_000 },
+    } as never);
+    h.data.expenses.avgMonthly = 30_000;
+    // A corpus far beyond the small individual target → raw ratio ≫ 100%.
+    h.addInvestment({ name: "Windfall", type: "Stocks", value: 100_000_000, ownerId: "rich" } as never);
+    const fire = useFireDerive();
+    ui.viewingMemberId = "rich";
+    const hh = fire.heroHeadline.value;
+    expect(hh.isMember).toBe(true);
+    expect(hh.corpusForProgress).toBeGreaterThan(hh.fireTargetForProgress);
+    expect(hh.progressPercent, "over-funded member clamps to exactly 100").toBe(100);
+  });
+
+  it("(d) an adult whose individual FIRE is unreachable gets fireAge null — the honest '—' path", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    const ui = useUiStore();
+    // Two adults: an earner + a zero-income adult who still carries a split of the shared costs.
+    // The non-earner's target is > 0 with zero savings → years = Infinity → honest null age.
+    h.addMember({
+      id: "earner", name: "Earner", dateOfBirth: "1990-01-01", role: "ADULT",
+      targetRetirementAge: 50, planToAge: 90, city: "Metro", health: "Healthy",
+      riskAppetite: "Moderate", marital: "Married", employmentStatus: "Employed",
+      salary: { annualCTC: 3_000_000 },
+    } as never);
+    h.addMember({
+      id: "nonearner", name: "NonEarner", dateOfBirth: "1992-01-01", role: "ADULT",
+      targetRetirementAge: 50, planToAge: 90, city: "Metro", health: "Healthy",
+      riskAppetite: "Moderate", marital: "Married", employmentStatus: "Homemaker",
+    } as never);
+    h.data.expenses.avgMonthly = 100_000;
+    const fire = useFireDerive();
+    ui.viewingMemberId = "nonearner";
+    const hh = fire.heroHeadline.value;
+    expect(hh.isMember).toBe(true);
+    expect(hh.fireNumber, "shared split gives a real positive target").toBeGreaterThan(0);
+    expect(hh.reachable, "zero income → unreachable").toBe(false);
+    expect(hh.fireAge, "unreachable must render the honest null, never a sentinel age").toBeNull();
+    expect(Number.isFinite(hh.yearsToFire)).toBe(false);
+  });
 });
 
 // #81 Phase 2 — the standalone individual FIRE per adult is a SECONDARY view; it must be

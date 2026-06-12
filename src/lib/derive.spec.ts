@@ -260,6 +260,29 @@ describe("derive() — pure kernel", () => {
     }
   });
 
+  // D-2026-06-13-02: the hero now LENSES to individualFireByMember — this locks the SOURCE is the
+  // proper mini-household number (strictly below the household target, finite-or-honest age), so the
+  // lensed headline can never be the absurd household-target ÷ 1 #22 class.
+  it("D-2026-06-13-02: individualFireByMember gives a proper mini-household number per adult (hero headline source)", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    loadSeedPersona(h, a); // Sharmas: 2 adults
+    const k = derive(h.data, a.values, { isFamilyView: false, viewingMemberId: null, currentFY: "2025-26" });
+    expect(k.individualFireByMember.length).toBeGreaterThanOrEqual(2);
+    for (const r of k.individualFireByMember) {
+      const ctx = `member=${r.memberId} fireNo=${r.individualFireNumber} age=${r.individualFireAge}`;
+      // One adult's slice is STRICTLY below the whole-household target (never household ÷ 1).
+      expect(r.individualFireNumber, `${ctx} — individual < household target`).toBeLessThan(k.fireNumber);
+      expect(r.individualFireNumber, `${ctx} — positive`).toBeGreaterThan(0);
+      // The age is finite-and-sane OR the honest Infinity sentinel — never a finite absurd age.
+      if (Number.isFinite(r.individualFireAge)) {
+        const planTo = h.data.members.find((m) => m.id === r.memberId)?.planToAge ?? 90;
+        expect(r.individualFireAge, `${ctx} — within the member's horizon`).toBeLessThanOrEqual(planTo);
+        expect(r.individualFireAge, `${ctx} — never before today`).toBeGreaterThanOrEqual(r.anchorAge);
+      }
+    }
+  });
+
   it("member-lens cards: lensedTotalCorpus/Liabilities re-scope WITH their count (display twin), while the FIRE corpus stays household", () => {
     // Root cause this locks (prod bug — the dashboard Investments/Liabilities card showed a HOUSEHOLD
     // value beside a PER-MEMBER count → the value never refreshed under "Viewing as <member>"). The

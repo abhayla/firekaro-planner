@@ -18,7 +18,6 @@ import FireProjectionChart from "@/components/dashboard/FireProjectionChart.vue"
 import AssetAllocationDonut from "@/components/dashboard/AssetAllocationDonut.vue";
 import SectionCard from "@/components/dashboard/SectionCard.vue";
 import LeafPageHeader from "@/components/income-layout/LeafPageHeader.vue";
-import WholeHouseholdBadge from "@/components/shared/WholeHouseholdBadge.vue";
 import FamilyLayerCard from "@/components/dashboard/FamilyLayerCard.vue";
 import FireMilestonesCard from "@/components/dashboard/FireMilestonesCard.vue";
 import NudgeStack from "@/components/dashboard/NudgeStack.vue";
@@ -31,6 +30,12 @@ const household = useHouseholdStore();
 const features = useFeaturesStore();
 features.hydrate();
 const fire = useFireDerive();
+// D-2026-06-13-02 option B: the whole-household-only analytics (projection chart, milestone
+// ladder) hide under a member lens — the hero carries the member headline + caveat instead.
+// Driven by heroHeadline.isMember (not a raw viewingMemberId null-check) so a STALE persisted
+// member id — which the selector falls back to household for — can't hide the household
+// analytics under a household headline.
+const memberLensActive = computed(() => fire.heroHeadline.value.isMember);
 
 const incomeHeadline = computed(() => formatINRCompact(fire.annualIncome.value.total) + " / yr");
 const incomeSub = computed(
@@ -198,9 +203,9 @@ onMounted(() => {
 
       <!-- P5 (A5.x / A36) — horizon + estate-readiness chips beside the hero. -->
       <div class="d-flex flex-wrap ga-2 mb-2">
-        <!-- gh #66: the FIRE headline is a whole-household figure (the #22/#23 honesty guardrail) —
-             the badge makes explicit it does NOT change when viewing a single member. -->
-        <WholeHouseholdBadge />
+        <!-- D-2026-06-13-02: the WholeHouseholdBadge was REMOVED here — the FIRE headline now
+             LENSES to the selected member, so a "does not change when you view X" badge would be
+             actively false on this screen. The hero's member caveat carries the household anchor. -->
         <v-chip size="small" variant="tonal" color="primary" prepend-icon="mdi-timer-sand">
           Planning horizon: {{ planningHorizonYears }} yrs
           (retire @{{ fire.targetRetirementAge.value }} → plan-to {{ fire.planToAge.value }})
@@ -240,8 +245,9 @@ onMounted(() => {
         </v-col>
       </v-row>
 
-      <!-- Milestone ladder: where the corpus sits vs Lean / Regular / Fat (+ Coast/Barista). -->
-      <v-row dense>
+      <!-- Milestone ladder: where the corpus sits vs Lean / Regular / Fat (+ Coast/Barista).
+           Whole-household-only — hidden under a member lens (D-2026-06-13-02 option B). -->
+      <v-row v-if="!memberLensActive" dense>
         <v-col cols="12">
           <FireMilestonesCard />
         </v-col>
@@ -266,11 +272,12 @@ onMounted(() => {
       </v-row>
 
       <v-row dense>
-        <v-col cols="12" md="8">
+        <!-- Whole-household-only projection — hidden under a member lens (option B). -->
+        <v-col v-if="!memberLensActive" cols="12" md="8">
           <FireProjectionChart />
         </v-col>
         <!-- Severity-coded suggestions (incl. the relocated estate + stress entries). -->
-        <v-col cols="12" md="4">
+        <v-col cols="12" :md="memberLensActive ? 12 : 4">
           <NudgeStack />
         </v-col>
       </v-row>

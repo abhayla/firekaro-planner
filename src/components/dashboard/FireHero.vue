@@ -35,20 +35,39 @@ const a = useAssumptionsStore();
 const ui = useUiStore();
 
 // ---- Headline (age + when) ----
+// D-2026-06-13-02: the headline reads the ONE member-lensed selector. On the default
+// "Whole household" view hh carries exactly today's household fields (byte-identical);
+// under "Viewing as <member>" it carries that adult's honest individual FIRE (option B —
+// the household-only sub-parts below are hidden and the member caveat renders instead).
+const hh = computed(() => fire.heroHeadline.value);
 
-const finiteYears = computed(() => Number.isFinite(fire.yearsToRegular.value));
-const achieved = computed(() => finiteYears.value && fire.yearsToRegular.value <= 0);
-const fireYear = computed(() => new Date().getFullYear() + Math.ceil(fire.yearsToRegular.value || 0));
-const fireAge = computed(() => {
-  if (!Number.isFinite(fire.anchorAge.value)) return null;
-  return fire.anchorAge.value + Math.ceil(fire.yearsToRegular.value || 0);
-});
+const finiteYears = computed(() => Number.isFinite(hh.value.yearsToFire));
+// "Achieved" is a household-plan verdict — under a member lens the headline renders the
+// member's age (their current age when already covered), not the household congratulation.
+const achieved = computed(() => !hh.value.isMember && finiteYears.value && hh.value.yearsToFire <= 0);
+// Member year uses ROUND so it stays coherent with individualFireAge (= round(anchor + raw),
+// integer anchor) — pairing a ceil'd year with a rounded age drifts by 1 for fractional years
+// (the #33 round-vs-ceil class). Household keeps ceil (byte-identical with householdFireAge).
+const fireYear = computed(() =>
+  hh.value.isMember
+    ? new Date().getFullYear() + Math.round(hh.value.yearsToFire || 0)
+    : new Date().getFullYear() + Math.ceil(hh.value.yearsToFire || 0),
+);
+const fireAge = computed(() => hh.value.fireAge);
+// Member savings rate for the corpus-KPI sub — same-scope with the member headline
+// (the household savingsRate beside an individual target would mix scopes).
+const savingsRateDisplay = computed(() =>
+  hh.value.isMember ? fire.memberFinancials.value.savingsRatePercent : fire.savingsRate.value,
+);
 
 // ---- #18 Monte Carlo confidence band (NON-REMOVABLE honesty surface) ----
 // Compact range in the subline (mockup: "most likely 48–62 allowing for markets");
 // the full history-informed disclosure stays one hover away in the tooltip. The
 // never-reached sentinel is never rendered as a literal age (fire-confidence-band rule).
 const band = computed<{ offChart: boolean; text: string } | null>(() => {
+  // The MC band models the HOUSEHOLD plan — hidden under a member lens (option B). The
+  // early return also keeps the lazy Monte Carlo from running while lensed.
+  if (hh.value.isMember) return null;
   if (!finiteYears.value || fire.yearsToRegular.value <= 0) return null;
   const mc = fire.monteCarlo.value;
   if (!mc || !Number.isFinite(mc.p10Years) || !Number.isFinite(mc.p90Years)) return null;
@@ -77,6 +96,8 @@ const fullBandCopy = computed(() =>
 // #15 bridge: when the liquid-runway bridge pushes the headline FIRE age later than the
 // corpus-only adequacy age, surface BOTH so the honest headline doesn't hide it.
 const bridgeSubline = computed(() => {
+  // Household-only (the bridge models the household's locked money) — hidden under a member lens.
+  if (hh.value.isMember) return null;
   const bc = fire.bridgeCoverage.value;
   if (!bc || bc.covered) return null;
   return `Corpus target is reached at age ${bc.corpusOnlyFireAge} — but locked savings (PPF / NPS / pre-tax) keep your money from being fully spendable then, so sustainable FIRE is age ${bc.effectiveFireAge}.`;
@@ -122,8 +143,12 @@ const heroTone = computed(() => {
     fireDateDeltaMonths: d != null && Number.isFinite(d) ? d : null,
   });
 });
-// Tint class — neutral whenever there is no finite date to make a verdict about.
-const toneClass = computed(() => (finiteYears.value ? `fire-hero--${heroTone.value}` : "fire-hero--no-baseline"));
+// Tint class — neutral whenever there is no finite date to make a verdict about, AND under a
+// member lens (the verdict tones depend on the household plan-variance, hidden while lensed).
+const toneClass = computed(() => {
+  if (hh.value.isMember) return "fire-hero--no-baseline";
+  return finiteYears.value ? `fire-hero--${heroTone.value}` : "fire-hero--no-baseline";
+});
 
 const lockedOn = computed(() =>
   baseline.value
@@ -184,17 +209,33 @@ function yearsLabel(years: number): string {
         </div>
       </template>
       <template v-else-if="!finiteYears">
-        <div class="fire-hero__eyebrow">You'll FIRE at age</div>
+        <div class="fire-hero__eyebrow">
+          {{ hh.isMember ? `${hh.memberName}'s individual FIRE — you'll FIRE at age` : "You'll FIRE at age" }}
+        </div>
         <div class="fire-hero__age fire-hero__age--text" data-testid="fire-hero-age">—</div>
-        <div class="fire-hero__when">Increase income or savings to project a FIRE date.</div>
+        <div class="fire-hero__when">
+          {{
+            hh.isMember
+              ? `${hh.memberName}'s individual FIRE is not within their working life at current savings.`
+              : "Increase income or savings to project a FIRE date."
+          }}
+        </div>
       </template>
       <template v-else>
-        <div class="fire-hero__eyebrow">{{ fireAge != null ? "You'll FIRE at age" : "You'll FIRE in" }}</div>
+        <div class="fire-hero__eyebrow">
+          {{
+            hh.isMember
+              ? `${hh.memberName}'s individual FIRE — you'll FIRE at age`
+              : fireAge != null
+                ? "You'll FIRE at age"
+                : "You'll FIRE in"
+          }}
+        </div>
         <div class="fire-hero__age" data-testid="fire-hero-age">
-          {{ fireAge ?? formatYearsMonths(fire.yearsToRegular.value) }}
+          {{ fireAge ?? formatYearsMonths(hh.yearsToFire) }}
         </div>
         <div class="fire-hero__when">
-          in <b>{{ formatYearsMonths(fire.yearsToRegular.value) }}</b> ({{ fireYear }})
+          in <b>{{ formatYearsMonths(hh.yearsToFire) }}</b> ({{ fireYear }})
           <template v-if="band">
             <span class="fire-hero__sep">·</span>
             <span data-testid="fire-hero-confidence-subline">
@@ -210,7 +251,7 @@ function yearsLabel(years: number): string {
               </v-tooltip>
             </span>
           </template>
-          <template v-if="digest.heroDeltaText.value">
+          <template v-if="!hh.isMember && digest.heroDeltaText.value">
             <span class="fire-hero__sep">·</span>
             <span :class="deltaClass" data-testid="hero-digest-delta">{{ digest.heroDeltaText.value }}</span>
             <button
@@ -230,11 +271,31 @@ function yearsLabel(years: number): string {
         <v-icon icon="mdi-lock-clock" size="16" color="warning" class="mr-1" />
         {{ bridgeSubline }}
       </p>
+
+      <!-- D-2026-06-13-02 member caveat — the honesty anchor under the lens: names what the
+           individual view excludes (children + shared split, AND the healthcare reserve +
+           locked-money bridge check the household plan carries — FinTech Q7) and keeps the
+           household figure one glance away. -->
+      <p v-if="hh.isMember" class="fire-hero__subline" data-testid="fire-hero-member-caveat">
+        This is <b>{{ hh.memberName }}'s individual</b> FIRE — it funds only their own lifestyle
+        (excludes the children + their split of shared costs) and skips the healthcare reserve and
+        locked-money bridge check the household plan includes.
+        <template v-if="fire.householdFireAge.value != null">
+          The <b>whole household</b> can stop at <b>age {{ fire.householdFireAge.value }}</b>
+          ({{ formatINRCompact(fire.fireNumber.value) }}).
+        </template>
+        <template v-else>
+          The <b>whole household</b> target is {{ formatINRCompact(fire.fireNumber.value) }}.
+        </template>
+        Switch to <b>Whole household</b> above for your full plan.
+      </p>
     </div>
 
-    <!-- KPI strip (3 slots, hairline-separated; stacks < md) -->
-    <div class="kpi-strip mt-4" data-testid="hero-kpi-strip">
-      <div class="kpi">
+    <!-- KPI strip (3 slots, hairline-separated; stacks < md). Under a member lens the
+         household-only "Vs your plan" + "Biggest win" slots are hidden (option B) — only the
+         lensed corpus-progress slot remains. -->
+    <div class="kpi-strip mt-4" :class="{ 'kpi-strip--single': hh.isMember }" data-testid="hero-kpi-strip">
+      <div v-if="!hh.isMember" class="kpi">
         <div class="kpi__label">Vs your plan</div>
         <template v-if="planSlot">
           <div class="kpi__value" :class="planSlot.cls" data-testid="hero-kpi-plan">{{ planSlot.value }}</div>
@@ -265,29 +326,29 @@ function yearsLabel(years: number): string {
       <div class="kpi">
         <div class="kpi__label">Corpus progress</div>
         <div class="kpi__value text-currency" data-testid="hero-kpi-corpus">
-          {{ formatINRCompact(fire.totalCorpus.value) }}
-          <span class="kpi__target">/ {{ formatINRCompact(fire.fireNumber.value) }}
+          {{ formatINRCompact(hh.corpusForProgress) }}
+          <span class="kpi__target">/ {{ formatINRCompact(hh.fireTargetForProgress) }}
             <InfoTip term="fire-number"><span class="d-sr-only">target</span></InfoTip>
           </span>
         </div>
         <div class="progress-wrap my-1">
           <v-progress-linear
-            :model-value="fire.progressPercent.value"
+            :model-value="hh.progressPercent"
             height="9"
             rounded
             color="fire-orange"
             bg-color="surface-variant"
-            :aria-label="`FIRE progress: ${fire.progressPercent.value}% of target corpus reached`"
+            :aria-label="`FIRE progress: ${hh.progressPercent}% of target corpus reached`"
           />
         </div>
         <div class="kpi__sub">
-          {{ fire.progressPercent.value }}% of target ·
-          <InfoTip term="savings-rate">saving</InfoTip>&nbsp;{{ fire.savingsRate.value }}% ·
-          <InfoTip term="swr">SWR</InfoTip>&nbsp;{{ (fire.effectiveSWR.value * 100).toFixed(2) }}%
+          {{ hh.progressPercent }}% of target ·
+          <InfoTip term="savings-rate">saving</InfoTip>&nbsp;{{ savingsRateDisplay }}%<template v-if="!hh.isMember"> ·
+          <InfoTip term="swr">SWR</InfoTip>&nbsp;{{ (fire.effectiveSWR.value * 100).toFixed(2) }}%</template>
         </div>
       </div>
 
-      <div v-if="showWinSlot" class="kpi">
+      <div v-if="!hh.isMember && showWinSlot" class="kpi">
         <div class="kpi__label">Biggest win available</div>
         <template v-if="bridgeBinding">
           <div class="kpi__value" data-testid="hero-kpi-win">Close your bridge gap first</div>
@@ -310,11 +371,11 @@ function yearsLabel(years: number): string {
     <div class="fire-hero__stats d-flex flex-wrap justify-center ga-6 mt-3">
       <div class="stat-block">
         <span class="stat-block__label">Annual savings</span>
-        <span class="stat-block__value text-currency">{{ formatINRCompact(fire.annualSavings.value) }}</span>
+        <span class="stat-block__value text-currency">{{ formatINRCompact(hh.annualSavings) }}</span>
       </div>
       <div class="stat-block">
         <span class="stat-block__label">Monthly take-home</span>
-        <span class="stat-block__value text-currency">{{ formatINRCompact(fire.monthlyTakeHome.value) }}</span>
+        <span class="stat-block__value text-currency">{{ formatINRCompact(hh.monthlyTakeHome) }}</span>
       </div>
       <div class="stat-block">
         <span class="stat-block__label">Blended return (assumed)</span>
@@ -400,6 +461,10 @@ function yearsLabel(years: number): string {
   border-top: 1px solid var(--border-subtle);
   padding-top: var(--space-3);
   text-align: left;
+}
+/* Member lens: only the corpus-progress slot remains (option B) — let it span full width. */
+.kpi-strip--single {
+  grid-template-columns: 1fr;
 }
 .kpi {
   padding: 0 var(--space-4);
