@@ -204,10 +204,11 @@ same frontend with a swapped adapter. Every persisted entity is owned by a `user
 
 **ServerAdapter swap (v6):** `src/main.ts` is the ONE async seam — when `VITE_USE_SERVER_ADAPTER` is
 on, it resolves the session (`GET /api/planner/me`), constructs `ServerAuthProvider` + `ServerAdapter`,
-`await`s `hydrateAll()` (6 concurrent GETs warming the cache) and `setAdapter()` **before mount** — so
-every store `hydrate()` + router guard reads a warm cache **synchronously**. If the flag is off or the
-backend is unreachable, it falls back to `LocalStorageAdapter`. **The 6 stores + `expense-history.ts`
-+ `router/index.ts` are UNCHANGED by the swap** (the non-negotiable spine).
+`await`s `hydrateAll()` (7 concurrent GETs — one per `SERVER_KEYS` document, incl. `plan-baseline`)
+and `setAdapter()` **before mount** — so every store `hydrate()` + router guard reads a warm cache
+**synchronously**. If the flag is off or the backend is unreachable, it falls back to
+`LocalStorageAdapter`. **The 5 stores + `expense-history.ts` + `router/index.ts` are UNCHANGED by
+the swap** (the non-negotiable spine).
 **Demo-only affordances MUST be gated on `isServerMode()`** (`src/lib/runtime-mode.ts` — the ONE
 "are we in server/prod mode?" check): the seed switcher, "Explore with sample data", the product
 tour, and the command-palette seed actions all gate on it so they can never overwrite a real user's
