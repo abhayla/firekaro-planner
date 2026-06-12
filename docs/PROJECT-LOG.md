@@ -125,6 +125,24 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 
 ## §3 — Decision log (append-only, newest first)
 
+### 2026-06-13
+- **D-2026-06-13-01 — Prod deploy of `d7f11aa` (member-lens dashboard section-card fix).** Abhay reported on
+  prod that switching the AppBar "View as &lt;member&gt;" lens didn't refresh the dashboard. Root-caused (after
+  a faithful 2-earner reproduction in demo + server-adapter + the production build) to the Investments/
+  Liabilities/Expenses **section cards showing the whole-household VALUE beside a per-member COUNT** —
+  `Dashboard.vue` read household `fire.totalCorpus`/`totalLiabilitiesValue` for the headline while the
+  subtitle read lensed lists, so the value stayed frozen ("same value all the time"). Fix exposes member-
+  scoped display twins `lensedTotalCorpus`/`lensedTotalLiabilitiesValue` and lenses the three card headlines;
+  the FIRE number/hero stays whole-household (the #22/#23 honesty guardrail — FIRE math untouched, default
+  path byte-identical). Verified: 1223 unit tests + a new per-card coherence/Joint-overlap substance lock +
+  demo member-lens-sweep green; independent code-review + FinTech analyst both ship-cleared. **Deployed**
+  `git archive HEAD | ssh tar` → `npm ci && build && pm2 reload` (frontend-only, no migration; pre-deploy
+  backup `firekaro-pre-deploy-20260613-000745.tar.gz`). **Post-deploy verification:** Tier-1 smoke green
+  (`/api/health` ok, `/api/internal/smoke` user.count=3, **bundle hash `Bldil8Gc`→`D1wUdHhT`** = new build
+  serving) + Tier-1.5 unauth UI green (live login renders + Google button interactive, console clean).
+  **Tier-2 (authed dashboard lens confirmation on prod) PENDING a logged-in 2-adult session** (dev-bypass off
+  in prod) — surfaced, not silently skipped. Sibling on `/financial-health/reports` filed as **#161** (good-to-have).
+
 ### 2026-06-12
 - **D-2026-06-12-01 — Notifier becomes the portfolio-wide monitoring standard; healthchecks.io retired;
   distributed via the hub.** Abhay asked how a deployed project knows to wire Notifier, how Claude/a repo
