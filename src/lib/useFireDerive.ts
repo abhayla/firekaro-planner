@@ -257,6 +257,11 @@ export function useFireDerive() {
     estimatedDeductionsForOld: () => d.value.estimatedDeductionsForOld,
     totalCorpus: computed(() => d.value.totalCorpus),
     totalLiabilitiesValue: computed(() => d.value.totalLiabilitiesValue),
+    // Member-scoped twins for the dashboard section-card headlines — re-scope under "Viewing as
+    // <member>" so the displayed VALUE matches the lensed instrument/loan COUNT (default-lens =
+    // household value, byte-identical). The FIRE number/hero keeps the household totalCorpus above.
+    lensedTotalCorpus: computed(() => d.value.lensedTotalCorpus),
+    lensedTotalLiabilitiesValue: computed(() => d.value.lensedTotalLiabilitiesValue),
     npsAnnuityIncome: computed(() => d.value.npsAnnuityIncome),
     fireWithdrawableCorpus: computed(() => d.value.fireWithdrawableCorpus),
     // Whole-household income/tax for the cashflow / financial-health charts — they mix income with

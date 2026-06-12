@@ -37,18 +37,21 @@ const incomeSub = computed(
   () => `${fire.lensedEarners.value.length} earner${fire.lensedEarners.value.length === 1 ? "" : "s"}`,
 );
 
-const expensesHeadline = computed(() => formatINRCompact(fire.annualExpensesToday.value / 12) + " / mo");
+// Member-lens fix: the section-card VALUE must re-scope with its already-lensed COUNT under
+// "Viewing as <member>" (the bug was a household value beside a per-member count → frozen value).
+// All three read lensed twins; on the default "Whole household" view they equal the household totals.
+const expensesHeadline = computed(() => formatINRCompact(fire.lensedMonthlyExpenses.value) + " / mo");
 const expensesSub = computed(
   () =>
-    `${household.data.expenses.recurring.length} recurring line${household.data.expenses.recurring.length === 1 ? "" : "s"}`,
+    `${fire.lensedRecurringExpenses.value.length} recurring line${fire.lensedRecurringExpenses.value.length === 1 ? "" : "s"}`,
 );
 
-const investmentsHeadline = computed(() => formatINRCompact(fire.totalCorpus.value));
+const investmentsHeadline = computed(() => formatINRCompact(fire.lensedTotalCorpus.value));
 const investmentsSub = computed(
   () => `${fire.lensedInvestments.value.length} instrument${fire.lensedInvestments.value.length === 1 ? "" : "s"}`,
 );
 
-const liabilitiesHeadline = computed(() => formatINRCompact(fire.totalLiabilitiesValue.value));
+const liabilitiesHeadline = computed(() => formatINRCompact(fire.lensedTotalLiabilitiesValue.value));
 const nextEnd = computed(() => {
   const ends = fire.lensedLiabilities.value
     .map((l) => l.derivedEndYear)

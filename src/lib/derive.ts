@@ -808,6 +808,15 @@ export function derive(household: Household, assumptions: Assumptions, lens: Der
     estimatedDeductionsForOld,
     totalCorpus,
     totalLiabilitiesValue,
+    // Member-scoped corpus / liabilities for the DASHBOARD section-card headlines (gh member-lens
+    // fix). The household `totalCorpus`/`totalLiabilitiesValue` above stay whole-household for the
+    // FIRE-adequacy math (#22/#23 guardrail — the FIRE number must never lens). These lensed twins
+    // exist ONLY so the Investments/Liabilities summary cards show a VALUE that matches their
+    // already-lensed instrument/loan COUNT (the bug: household value + lensed count = frozen value
+    // under "Viewing as <member>"). On the default (no-lens) view lensedScope spans the whole
+    // household, so these are byte-identical to the household totals.
+    lensedTotalCorpus: lensedScope.totalCorpus,
+    lensedTotalLiabilitiesValue: lensedScope.totalLiabilitiesValue,
     npsAnnuityIncome,
     fireWithdrawableCorpus,
     // Whole-household income/tax — the coherent denominator for the cashflow / financial-health

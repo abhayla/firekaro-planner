@@ -260,6 +260,38 @@ describe("derive() — pure kernel", () => {
     }
   });
 
+  it("member-lens cards: lensedTotalCorpus/Liabilities re-scope WITH their count (display twin), while the FIRE corpus stays household", () => {
+    // Root cause this locks (prod bug — the dashboard Investments/Liabilities card showed a HOUSEHOLD
+    // value beside a PER-MEMBER count → the value never refreshed under "Viewing as <member>"). The
+    // fix exposes member-scoped display twins; this asserts (a) default-lens = household byte-identical,
+    // (b) a member's twin is a STRICT subset and COHERENT with its lensed instrument/loan list, and
+    // (c) the FIRE-math totalCorpus stays invariant (the #22/#23 guardrail is untouched).
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    loadSeedPersona(h, a); // Sharmas: rohit owns a strict subset of the household's investments
+    const whole = derive(h.data, a.values, { isFamilyView: false, viewingMemberId: null, currentFY: "2025-26" });
+    // (a) default lens → display twin equals the household total (no visible change on "Whole household").
+    expect(whole.lensedTotalCorpus).toBe(whole.totalCorpus);
+    expect(whole.lensedTotalLiabilitiesValue).toBe(whole.totalLiabilitiesValue);
+
+    const rohit = derive(h.data, a.values, { isFamilyView: false, viewingMemberId: "rohit", currentFY: "2025-26" });
+    // (b) the twin RE-SCOPES (the fix): rohit's investable corpus is a strict subset of the household's…
+    expect(rohit.lensedTotalCorpus).toBeLessThan(whole.lensedTotalCorpus);
+    expect(rohit.lensedTotalCorpus).toBeGreaterThan(0);
+    // …and the corpus DISPLAY corresponds to the corpus-eligible slice of the SAME lensed list that
+    // drives the card's instrument COUNT — value and count come from one scope (kills the incoherence).
+    expect(rohit.lensedInvestments.length).toBeLessThan(whole.lensedInvestments.length);
+    // (c) the FIRE-math household corpus is UNCHANGED under the lens — guardrail preserved.
+    expect(rohit.totalCorpus).toBe(whole.totalCorpus);
+
+    // (d) Joint assets are INTENTIONALLY visible at full value in EVERY member's own view (the
+    // established lens semantic — a co-owned asset is fully accessible to each owner; FinTech-noted).
+    // So Σ(members) OVER-counts the household by exactly the Joint overlap — locking this documents the
+    // overlap is deliberate and guards against a future "silently split Joint per owner" regression.
+    const priya = derive(h.data, a.values, { isFamilyView: false, viewingMemberId: "priya", currentFY: "2025-26" });
+    expect(rohit.lensedTotalCorpus + priya.lensedTotalCorpus).toBeGreaterThan(whole.lensedTotalCorpus);
+  });
+
   // #81 Phase 1: member-attributable itemised expenses. The lensed expense DISPLAY mirrors
   // lensedInvestments (member's own + the always-shared "Household"); the consolidated view
   // shows all; and the HOUSEHOLD expense/FIRE total stays INVARIANT to member selection.
