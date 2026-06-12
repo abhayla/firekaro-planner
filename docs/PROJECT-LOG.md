@@ -140,8 +140,13 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
   backup `firekaro-pre-deploy-20260613-000745.tar.gz`). **Post-deploy verification:** Tier-1 smoke green
   (`/api/health` ok, `/api/internal/smoke` user.count=3, **bundle hash `Bldil8Gc`→`D1wUdHhT`** = new build
   serving) + Tier-1.5 unauth UI green (live login renders + Google button interactive, console clean).
-  **Tier-2 (authed dashboard lens confirmation on prod) PENDING a logged-in 2-adult session** (dev-bypass off
-  in prod) — surfaced, not silently skipped. Sibling on `/financial-health/reports` filed as **#161** (good-to-have).
+  **Tier-2 (authed dashboard lens confirmation on prod) PASSED** — drove the live authed dashboard with the
+  dedicated test account `abhayfaircent` (seeded session in `e2e/.auth/user.json`, 2-adult Sharmas household),
+  NON-DESTRUCTIVE (only switched "View as", read values). The reported frozen-value bug is **gone on prod**:
+  Investments re-scopes Whole-household **₹1.10 Cr → Priya ₹27 L → Rohit ₹89 L** (value now matches the 11/5/9
+  instrument count); Income/Expenses/Tax also lens; Liabilities identical (the only loan is Rohit-shared →
+  correctly full-value for both); 0 unexpected console errors. Sibling on `/financial-health/reports` filed as
+  **#161** (good-to-have).
 
 ### 2026-06-12
 - **D-2026-06-12-01 — Notifier becomes the portfolio-wide monitoring standard; healthchecks.io retired;
