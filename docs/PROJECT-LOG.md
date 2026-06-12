@@ -145,7 +145,14 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
   to member selection; the new invariant = headline lenses to the proper individual FIRE, household stays
   combined, the absurd ÷1 result never occurs. Scope = flagship `FireHero.vue` + the honesty guardrail →
   goal-contracted build with FinTech validation. Supersedes the #81 hero-invariance clause; #81's
-  individual-FIRE *card* + same-scope rule stay.
+  individual-FIRE *card* + same-scope rule stay. **BUILT + shipped (`3bbf809`, 2026-06-13):** option B
+  locked — band / plan-variance / biggest-win / projection / milestones HIDE under the member lens; the
+  lensed hero (headline + corpus-progress + stats) reads the new `heroHeadline` selector with the member
+  caveat naming the exclusions (children/shared-split + healthcare reserve + bridge check — FinTech Q7);
+  Whole-household byte-identical (spec-locked); guardrail tests rewritten (default-byte-identical ·
+  member-sourced · sane-age · magnitude · unreachable→null); 1235 unit + 17/17 member-lens-sweep green.
+  Prod deploy + Tier-2 prod re-verify pending (Abhay's gate). FinTech follow-up filed: individual-fire
+  omits the healthcare reservation + bridge gate (optimistic vs household methodology) — see the issue.
 - **D-2026-06-13-01 — Prod deploy of `d7f11aa` (member-lens dashboard section-card fix).** Abhay reported on
   prod that switching the AppBar "View as &lt;member&gt;" lens didn't refresh the dashboard. Root-caused (after
   a faithful 2-earner reproduction in demo + server-adapter + the production build) to the Investments/
