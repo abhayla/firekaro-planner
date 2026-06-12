@@ -168,6 +168,49 @@ test.describe("Viewing-as lens — real-dropdown sweep across every member-attri
     });
   }
 
+  // D-2026-06-13-02 — the FIRE hero now LENSES to the selected member's individual FIRE
+  // (reverses the #81 hero-invariance). The generic ₹-sweep above can pass off other dashboard
+  // figures, so this pins the HERO specifically: the big FIRE-age token must DIFFER from the
+  // Whole-household rendering for ≥1 member, the member caveat must appear under the lens, and
+  // the Whole-household selection must restore the household headline (no residue).
+  test("dashboard FIRE-hero headline lenses per member (D-2026-06-13-02)", async ({ page }) => {
+    await bootstrapSample(page);
+    await page.goto("/fire-goals/dashboard", { waitUntil: "networkidle" });
+    await page.waitForSelector(HYDRATED, { timeout: 30000 });
+    await dismissTour(page);
+
+    const heroAge = page.getByTestId("fire-hero-age");
+    const labels = await memberOptionLabels(page);
+    expect(labels[0], 'the first "Viewing as" option must be Whole household').toMatch(/whole household/i);
+    const members = labels.slice(1);
+    expect(members.length, "sample seed must have ≥1 adult").toBeGreaterThan(0);
+
+    await selectViewing(page, labels[0]);
+    const householdAge = (await heroAge.innerText()).trim();
+    expect(householdAge, "household headline renders a real age").not.toBe("");
+
+    let differed = false;
+    for (const m of members) {
+      await selectViewing(page, m);
+      // Auto-waiting caveat assertion FIRST proves the lensed re-render landed before the age read.
+      await expect(
+        page.getByTestId("fire-hero-member-caveat"),
+        `the member caveat must render under "Viewing as ${m}"`,
+      ).toBeVisible();
+      const memberAge = (await heroAge.innerText()).trim();
+      if (memberAge !== householdAge) differed = true;
+    }
+    expect(
+      differed,
+      "the big FIRE age must DIFFER for ≥1 member vs Whole household (the lensed headline)",
+    ).toBe(true);
+
+    // Switching back restores the household headline exactly — and the caveat disappears.
+    await selectViewing(page, labels[0]);
+    await expect(heroAge).toHaveText(householdAge);
+    await expect(page.getByTestId("fire-hero-member-caveat")).toBeHidden();
+  });
+
   for (const route of BROKEN) {
     // gh #86 — these screens ignore "Viewing as" today (read household.data directly). Un-fixme as the
     // member-lens fix wires each one; each MUST go green before #86 closes.
