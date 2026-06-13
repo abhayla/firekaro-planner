@@ -161,6 +161,14 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
     Plus **#82** (CI "migrations apply cleanly" gate — closes the proven #67 bad-migration-passes-CI class),
     **#78** (widen What-If slider ranges — trivial), **#79** (capture email+mobile in profile — enabler for
     #68; member email recommended OPTIONAL per DPDP). #85/#87 are objective-1 honesty.
+  - **Also promoted (batch 6) — the data-import cluster** (objective-0 "automate" / kill the #1 onboarding
+    friction): **#88** (Account Aggregator consent-based read-only fetch — biggest friction-killer; has an
+    open **charter fork** on the "no bank connections" line + mandatory DPDP), **#90** (EPFO/UAN balance
+    pull), **#91** (NPS PRAN import), **#92** (Demat/broker CAS sync). **#89 (AIS/Form-26AS import) was
+    NOT promoted** — left good-to-have. Cross-cutting gates on the cluster: a DPDP data-posture `TODO(5W)`
+    + (for #88) the charter interpretation lock. **Abhay commissioned comprehensive per-asset-class research
+    on #88** (bank/FD/MF/insurance/NPS — the complete AA FIU consent-fetch process); findings to be posted
+    to gh #88.
 - **D-2026-06-13-03 — Member lens across the REST of the FIRE section ("lens where clean, badge the rest").**
   D-2026-06-13-02 lensed only the Dashboard hero; the other 5 FIRE-section screens still showed household
   figures and ignored "View as &lt;member&gt;" (0 lens refs). Resolved with Abhay (AskUserQuestion 2026-06-13):
