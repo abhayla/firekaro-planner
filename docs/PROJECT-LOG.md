@@ -137,7 +137,7 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
   while unmeasured. **#59** (close the 98 survived Stryker mutants in `tax.ts`, 69% mutation score) was
   promoted in the same review — tax-math correctness is core to a tax/FIRE product (coverage-% lies;
   mutation score is the real proof of the honest-number promise). Tier label flipped (`gh issue list
-  --label must-have` now = #44 #45 #46 #59 #61 #64 #68 #86 #137 #141 #142 #162). Note: #44 still carries a
+  --label must-have` now includes #44 #45 #46 #59 #61 #64 #68 + the batch-4 set below + the originals #86 #137 #141 #142 #162). Note: #44 still carries a
   DPDP/privacy-posture `TODO(5W)` on *what* is collected; #45's live sends stay gated on comms go-live
   (A6) — the *builds* are unblocked.
   - **Also promoted in the same review (batch 3):** **#61** (from-scratch HEADED UI data-entry new-user+family
@@ -146,6 +146,13 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
     same-event off-by-one would be Tier-0, not just labeling), **#68** (family-member vs separate-login
     cross-tenant identity reconciliation — duplicate data, no link/invite/dedup; an ADR-0001 single-tenant
     architecture gap). All goal-anchored to objective-1 honesty + the multi-user data-model integrity.
+  - **Also promoted (batch 4):** **#69** (stale "Name is required" error flashing after a SUCCESSFUL inline
+    Add across all forms — looks-broken on every add), **#70** (smart cross-link real-estate holding ⇄
+    rental income — stop double-entering a let-out property; cheap, the auto-flow hooks already exist),
+    **#71** (remove the redundant zero-entry Banking screen — Abhay-endorsed, analysis done, awaits go),
+    **#73** (Net-Worth-over-time chart blank for a populated user — netWorth captured only on Dashboard
+    visit + weak empty-state), **#75** (omnipresent FIRE summary on every screen — AppBar chip→popover).
+    Friction-reduction (objective-0) + looks-broken polish.
 - **D-2026-06-13-03 — Member lens across the REST of the FIRE section ("lens where clean, badge the rest").**
   D-2026-06-13-02 lensed only the Dashboard hero; the other 5 FIRE-section screens still showed household
   figures and ignored "View as &lt;member&gt;" (0 lens refs). Resolved with Abhay (AskUserQuestion 2026-06-13):
