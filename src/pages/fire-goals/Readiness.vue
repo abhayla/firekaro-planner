@@ -10,6 +10,10 @@ import { useHouseholdStore } from "@/stores/household";
 import ReadinessVerdictCard from "@/components/dashboard/ReadinessVerdictCard.vue";
 import BridgeBreakdownCard from "@/components/dashboard/BridgeBreakdownCard.vue";
 import LeafPageHeader from "@/components/income-layout/LeafPageHeader.vue";
+// gh #66 / D-2026-06-13-03: this readiness verdict is a WHOLE-HOUSEHOLD figure ("is the family
+// safe to stop?") — it does NOT lens per member (per-member readiness is the deferred #162 work).
+// The self-gating badge makes that explicit under a member lens; renders nothing on the default view.
+import WholeHouseholdBadge from "@/components/shared/WholeHouseholdBadge.vue";
 
 const household = useHouseholdStore();
 const showEmpty = computed(() => household.members.length === 0);
@@ -34,6 +38,8 @@ const showEmpty = computed(() => household.members.length === 0);
         title="Can I retire?"
         description="An honest read on whether your plan supports stopping work — now, or at what age — and what's setting the date. Decision support, not advice."
       />
+
+      <WholeHouseholdBadge class="mb-4" />
 
       <!-- The verdict, layered on the accessible-money bridge. -->
       <ReadinessVerdictCard />

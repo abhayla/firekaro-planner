@@ -15,6 +15,10 @@ import { useFireDerive } from "@/lib/useFireDerive";
 import WithdrawalBandsCard from "@/components/dashboard/WithdrawalBandsCard.vue";
 import SequenceRiskCard from "@/components/dashboard/SequenceRiskCard.vue";
 import LeafPageHeader from "@/components/income-layout/LeafPageHeader.vue";
+// gh #66 / D-2026-06-13-03: the post-FIRE drawdown guardrails are a WHOLE-HOUSEHOLD plan and do
+// not lens per member (per-member drawdown is the deferred #162 work). The self-gating badge makes
+// the household scope explicit under a member lens; renders nothing on the default view.
+import WholeHouseholdBadge from "@/components/shared/WholeHouseholdBadge.vue";
 import { formatINRCompact } from "@/lib/formatters";
 
 const household = useHouseholdStore();
@@ -59,6 +63,8 @@ const checkInLine = computed(() => {
         title="After you retire"
         description="The guardrails that keep your independence safe once you stop working — how much you can safely withdraw, and whether your plan survives a bad early-retirement market. Decision support, not advice."
       />
+
+      <WholeHouseholdBadge class="mb-4" />
 
       <!-- (A) this-year safe withdrawal range -->
       <WithdrawalBandsCard />

@@ -19,6 +19,10 @@ import DiscoveryFooter from "@/components/shared/DiscoveryFooter.vue";
 import LeafPageHeader from "@/components/income-layout/LeafPageHeader.vue";
 import PanelCard from "@/components/shared/PanelCard.vue";
 import EntityRow from "@/components/shared/EntityRow.vue";
+// gh #66 / D-2026-06-13-03: the stress scenarios run on the WHOLE-HOUSEHOLD plan and do not lens
+// per member (per-member stress is the deferred #162 work). The self-gating badge makes the
+// household scope explicit under a member lens; renders nothing on the default view.
+import WholeHouseholdBadge from "@/components/shared/WholeHouseholdBadge.vue";
 
 const fire = useFireDerive();
 
@@ -46,6 +50,8 @@ const summary = computed(() => run.value.summary);
       title="Stress test"
       description="How your plan holds up under market crashes, high inflation, job loss and 7 more audit-grounded scenarios. Pass = scenario adds ≤5 years to FIRE date."
     />
+
+    <WholeHouseholdBadge class="mb-4" />
 
     <v-row dense class="mb-3">
       <v-col cols="12" md="4">
