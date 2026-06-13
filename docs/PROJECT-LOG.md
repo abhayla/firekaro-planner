@@ -179,6 +179,11 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
     single highest-impact FIRE lever, corpus 30–50% lower; objective-2), **#109** (Lean/Fat FIRE comparison —
     reuses the existing `derive.variants`; objective-1), **#102** (SSY girl-child corpus instrument; obj-0),
     **#103** (SCSS) + **#104** (POMIS) (post-FIRE income instruments; obj-4).
+  - **Also promoted (batch 9) — insurance moat + goals:** the **insurance-moat mini-cluster #111** (employer-
+    insurance-dependency warning — FIRE-readiness false-positive; obj-3) + **#112** (critical-illness planner;
+    obj-3) + **#113** (super-top-up optimizer — ~40–50% cheaper, frees contributions; obj-2/3), and **#115**
+    (funded goal-tracks education/marriage/home/parents-care — central to how the Indian accumulator plans;
+    builds on existing `plannedFutureKind`; obj-1). **#116 (rent-vs-buy) left good-to-have.**
 - **D-2026-06-13-03 — Member lens across the REST of the FIRE section ("lens where clean, badge the rest").**
   D-2026-06-13-02 lensed only the Dashboard hero; the other 5 FIRE-section screens still showed household
   figures and ignored "View as &lt;member&gt;" (0 lens refs). Resolved with Abhay (AskUserQuestion 2026-06-13):
