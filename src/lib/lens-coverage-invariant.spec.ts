@@ -94,3 +94,70 @@ describe("member-lens coverage invariant — every member-attributable screen co
     expect(LENS_TOKEN.test(known), "NetWorth.vue should reference a lensed output").toBe(true);
   });
 });
+
+/**
+ * D-2026-06-13-03 — the fire-goals analytical-leaves fork (badge-only vs individual-FIRE), left an
+ * OPEN design fork in v1 above, is now RESOLVED ("lens where clean, badge the rest", Abhay 2026-06-13):
+ *   - Goals.vue LENSES to the selected member's individual FIRE (reads the same `heroHeadline`
+ *     member selector the Dashboard hero consumes — guarantees cross-screen coherence, rule 26).
+ *   - Readiness/StressTest/Drawdown/WhatIf render WholeHouseholdBadge — they run WHOLE-HOUSEHOLD
+ *     projections/simulations (no cheap per-member equivalent; per-member is the deferred #162 work),
+ *     so the badge makes that household scope explicit + honest under a member lens.
+ * This block encodes that resolution so a regression (Goals losing its lens, or a badge being dropped)
+ * is a CI failure. Substance ("figure visibly changes" / "badge actually shows") is the E2E sweep's job
+ * (e2e/member-lens-sweep.spec.ts); this is the cheap reference-presence rung that mirrors the scan above.
+ */
+describe("fire-goals member-lens coverage — Goals lenses, the 4 simulation screens badge (D-2026-06-13-03)", () => {
+  const FIRE_LENSED = "fire-goals/Goals.vue";
+  const FIRE_BADGED = [
+    "fire-goals/Readiness.vue",
+    "fire-goals/StressTest.vue",
+    "fire-goals/Drawdown.vue",
+    "fire-goals/WhatIf.vue",
+  ];
+  // Goals lenses via the hero's member selector (heroHeadline) + the member caveat computed.
+  const FIRE_LENS_TOKEN = /heroHeadline|individualFire|memberCaveat|viewingMemberId/;
+  const BADGE_TOKEN = /WholeHouseholdBadge/;
+
+  it("lists only real files", () => {
+    const all = [FIRE_LENSED, ...FIRE_BADGED];
+    const missing = all.filter((rel) => !existsSync(join(PAGES, ...rel.split("/"))));
+    expect(missing, `fire-goals screens listed but not found on disk:\n  ${missing.join("\n  ")}`).toEqual([]);
+  });
+
+  it("Goals.vue lenses to the member's individual FIRE (reads the heroHeadline selector)", () => {
+    const src = readFileSync(join(PAGES, "fire-goals", "Goals.vue"), "utf8");
+    expect(
+      FIRE_LENS_TOKEN.test(src),
+      "Goals.vue must consume the member-lensed FIRE (heroHeadline / individualFire / memberCaveat) so its " +
+        "FIRE target re-scopes per member (D-2026-06-13-03)",
+    ).toBe(true);
+  });
+
+  it("the 4 simulation screens each mount WholeHouseholdBadge", () => {
+    const offenders = FIRE_BADGED.filter(
+      (rel) => !BADGE_TOKEN.test(readFileSync(join(PAGES, ...rel.split("/")), "utf8")),
+    );
+    expect(
+      offenders,
+      `These whole-household FIRE screens must mount WholeHouseholdBadge so the household scope is explicit ` +
+        `under a member lens (D-2026-06-13-03):\n  ${offenders.join("\n  ")}`,
+    ).toEqual([]);
+  });
+
+  // FinTech drift-lock (D-2026-06-13-03): Goals' member caveat and the Dashboard hero caveat describe
+  // the SAME individual FIRE number, so both MUST disclose that this number SKIPS the healthcare reserve
+  // + locked-money bridge the household plan carries. Goals once dropped that clause (under-disclosure on
+  // the commitment screen — caught by FinTech review); this pins both to parity so they can never drift.
+  it("Goals member caveat discloses the same individual-FIRE omissions as the hero caveat (no honesty drift)", () => {
+    const goals = readFileSync(join(PAGES, "fire-goals", "Goals.vue"), "utf8");
+    const hero = readFileSync(join(PAGES, "..", "components", "dashboard", "FireHero.vue"), "utf8");
+    for (const phrase of ["healthcare reserve", "locked-money bridge"]) {
+      expect(hero.includes(phrase), `hero caveat (the precedent) must mention "${phrase}"`).toBe(true);
+      expect(
+        goals.includes(phrase),
+        `Goals member caveat must mention "${phrase}" to match the hero's disclosure for the same individual FIRE number`,
+      ).toBe(true);
+    }
+  });
+});

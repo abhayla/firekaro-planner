@@ -211,6 +211,80 @@ test.describe("Viewing-as lens — real-dropdown sweep across every member-attri
     await expect(page.getByTestId("fire-hero-member-caveat")).toBeHidden();
   });
 
+  // D-2026-06-13-03 — Goals.vue now LENSES to the selected member's individual FIRE (mirrors the
+  // hero, reads the same heroHeadline selector). The retirement card's FIRE target (₹) must DIFFER
+  // for ≥1 member vs Whole household, the member caveat must appear under the lens, and Whole
+  // household must restore the household figures with the caveat gone (no residue).
+  test("goals retirement card lenses to the member's individual FIRE (D-2026-06-13-03)", async ({ page }) => {
+    await bootstrapSample(page);
+    await page.goto("/fire-goals/goals", { waitUntil: "networkidle" });
+    await page.waitForSelector(HYDRATED, { timeout: 30000 });
+    await dismissTour(page);
+
+    const labels = await memberOptionLabels(page);
+    expect(labels[0], 'the first "Viewing as" option must be Whole household').toMatch(/whole household/i);
+    const members = labels.slice(1);
+    expect(members.length, "sample seed must have ≥1 adult").toBeGreaterThan(0);
+
+    await selectViewing(page, labels[0]); // Whole household baseline
+    await expect(page.getByTestId("goals-member-caveat")).toBeHidden();
+    const householdFigures = await captureFigures(page);
+    expect(householdFigures, "Goals renders ₹ figures on the household view").not.toBe("");
+
+    let differed = false;
+    for (const m of members) {
+      await selectViewing(page, m);
+      // Caveat is the auto-waiting anchor that proves the lensed re-render landed before the ₹ read.
+      await expect(
+        page.getByTestId("goals-member-caveat"),
+        `the Goals member caveat must render under "Viewing as ${m}"`,
+      ).toBeVisible();
+      if ((await captureFigures(page)) !== householdFigures) differed = true;
+    }
+    expect(differed, "the Goals FIRE target must DIFFER for ≥1 member vs Whole household (lensed individual FIRE)").toBe(
+      true,
+    );
+
+    // Back to Whole household — household figures restored, caveat gone (no residue).
+    await selectViewing(page, labels[0]);
+    await expect(page.getByTestId("goals-member-caveat")).toBeHidden();
+  });
+
+  // D-2026-06-13-03 — the 4 whole-household simulation screens render WholeHouseholdBadge under a
+  // member lens (their figures stay household — correct — and the badge makes that explicit/honest).
+  // The badge is visible under "Viewing as <member>" and hidden on Whole household (self-gating).
+  const FIRE_BADGED = [
+    "/fire-goals/readiness",
+    "/fire-goals/stress-test",
+    "/fire-goals/drawdown",
+    "/fire-goals/what-if",
+  ];
+  for (const route of FIRE_BADGED) {
+    test(`whole-household badge appears under the lens on ${route} (D-2026-06-13-03)`, async ({ page }) => {
+      await bootstrapSample(page);
+      await page.goto(route, { waitUntil: "networkidle" });
+      await page.waitForSelector(HYDRATED, { timeout: 30000 });
+      await dismissTour(page);
+
+      const labels = await memberOptionLabels(page);
+      const members = labels.slice(1);
+      expect(members.length, "sample seed must have ≥1 adult").toBeGreaterThan(0);
+      const badge = page.getByTestId("whole-household-badge").first();
+
+      // Whole household → no badge (byte-identical default).
+      await selectViewing(page, labels[0]);
+      await expect(badge, `${route} must NOT show the badge on Whole household`).toBeHidden();
+
+      // Member → badge visible.
+      await selectViewing(page, members[0]);
+      await expect(badge, `${route} must show the Whole-household badge under a member lens`).toBeVisible();
+
+      // Back to Whole household → badge hidden again (no residue).
+      await selectViewing(page, labels[0]);
+      await expect(badge, `${route} must hide the badge again on Whole household`).toBeHidden();
+    });
+  }
+
   for (const route of BROKEN) {
     // gh #86 — these screens ignore "Viewing as" today (read household.data directly). Un-fixme as the
     // member-lens fix wires each one; each MUST go green before #86 closes.
