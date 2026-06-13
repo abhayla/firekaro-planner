@@ -4,7 +4,7 @@ import { useHouseholdStore } from "@/stores/household";
 import { useAssumptionsStore } from "@/stores/assumptions";
 import { useFireDerive } from "@/lib/useFireDerive";
 import { formatINRCompact } from "@/lib/formatters";
-import { retirementGoalAgeYear } from "@/lib/retirement-goal";
+import { retirementGoalAgeYear, RETIREMENT_FALLBACK_YEARS } from "@/lib/retirement-goal";
 import EmptyState from "@/components/shared/EmptyState.vue";
 import LeafPageHeader from "@/components/income-layout/LeafPageHeader.vue";
 import PanelCard from "@/components/shared/PanelCard.vue";
@@ -24,6 +24,8 @@ interface GoalCard {
   icon: string;
   color: string;
   note?: string;
+  /** Member lens only: the adult's individual FIRE is not reachable within their working life — show "—" for the year/age, never a sentinel. */
+  unreachable?: boolean;
 }
 
 function inflatedAt(amount: number, year: number): number {
@@ -31,14 +33,47 @@ function inflatedAt(amount: number, year: number): number {
   return Math.round(amount * Math.pow(1 + assumptions.values.inflation, yrs));
 }
 
+// D-2026-06-13-03: the Retirement/FIRE card lenses to the selected "View as <member>" adult,
+// mirroring the Dashboard hero (D-2026-06-13-02). It reads the SAME `heroHeadline` selector the
+// hero consumes, so Goals' member FIRE target/progress/age agree with the hero headline + the
+// IndividualFireCard by construction (rule 26 coherence — never derive the member number twice).
+// On the default "Whole household" view heroHeadline carries today's exact household fields, so
+// this branch is byte-identical to the pre-lens card (#22/#33 guardrail).
 const retirementCard = computed<GoalCard>(() => {
+  const hh = fire.heroHeadline.value;
+  const currentYear = new Date().getFullYear();
+  if (hh.isMember) {
+    // Member lens — that adult's honest individual FIRE (attributed corpus/expenses, per-member
+    // SWR, reachability cap intact). Unreachable → honest "—" for year/age, never a sentinel.
+    const reachable = hh.reachable && hh.fireAge != null;
+    return {
+      id: "retirement",
+      label: reachable
+        ? `${hh.memberName}'s individual FIRE at age ${hh.fireAge}`
+        : `${hh.memberName}'s individual FIRE`,
+      // Member year uses ROUND to stay coherent with individualFireAge (= round(anchor + raw)) —
+      // the same convention the hero uses (the #33 round-vs-ceil class). Fallback year only sorts
+      // the unreachable card late; the template shows "—" for it (unreachable flag).
+      targetYear: reachable ? currentYear + Math.round(hh.yearsToFire) : currentYear + RETIREMENT_FALLBACK_YEARS,
+      todayAmount: hh.fireNumber, // the member's individualFireNumber (today's ₹)
+      inflatedAmount: hh.fireNumber,
+      progressPercent: hh.progressPercent,
+      category: "retirement",
+      icon: "mdi-beach",
+      color: "fire-orange",
+      unreachable: !reachable,
+      note: reachable
+        ? `${hh.progressPercent}% there · their corpus ${formatINRCompact(hh.corpusForProgress)}`
+        : `Not within ${hh.memberName}'s working life at current savings · their corpus ${formatINRCompact(hh.corpusForProgress)}`,
+    };
+  }
   // gh-issue #33: derive the displayed age AND year from the same source the
   // dashboard uses (anchorAge + yearsToRegular) so they always correspond —
   // never an aspirational target age next to a computed achievable year.
   const { age, year } = retirementGoalAgeYear(
     fire.anchorAge.value,
     fire.yearsToRegular.value,
-    new Date().getFullYear(),
+    currentYear,
   );
   return {
     id: "retirement",
@@ -51,6 +86,18 @@ const retirementCard = computed<GoalCard>(() => {
     icon: "mdi-beach",
     color: "fire-orange",
     note: `${fire.progressPercent.value}% there · current corpus ${formatINRCompact(fire.totalCorpus.value)}`,
+  };
+});
+
+// Member-lens caveat (mirrors the hero's honesty anchor): names that this is the member's
+// INDIVIDUAL goal and keeps the whole-household FIRE goal one glance away. Null on the default view.
+const memberCaveat = computed(() => {
+  const hh = fire.heroHeadline.value;
+  if (!hh.isMember) return null;
+  return {
+    name: hh.memberName,
+    householdFireNumber: fire.fireNumber.value, // derive() does not lens fireNumber — stays household (#22 guardrail)
+    householdFireAge: fire.householdFireAge.value,
   };
 });
 
@@ -89,10 +136,32 @@ const allGoals = computed<GoalCard[]>(() => [retirementCard.value, ...lifeEventC
       Other goals come from <router-link to="/expenses/planned">Expenses → Planned</router-link> — same data, two views.
     </p>
 
+    <v-alert
+      v-if="memberCaveat"
+      type="info"
+      variant="tonal"
+      density="comfortable"
+      class="mb-6"
+      style="max-width: 760px"
+      data-testid="goals-member-caveat"
+    >
+      This is <b>{{ memberCaveat.name }}'s individual</b> FIRE goal — it funds only their own lifestyle
+      (excludes the children + their split of shared costs) and skips the healthcare reserve and
+      locked-money bridge check the household plan includes.
+      <template v-if="memberCaveat.householdFireAge != null">
+        The <b>whole household's</b> FIRE goal is {{ formatINRCompact(memberCaveat.householdFireNumber) }}
+        (age {{ memberCaveat.householdFireAge }}).
+      </template>
+      <template v-else>
+        The <b>whole household's</b> FIRE goal is {{ formatINRCompact(memberCaveat.householdFireNumber) }}.
+      </template>
+      Switch to <b>Whole household</b> above for the family goal.
+    </v-alert>
+
     <v-row dense>
       <v-col v-for="g in allGoals" :key="g.id" cols="12" sm="6" md="4">
         <PanelCard :title="g.label" :icon="g.icon" :icon-color="g.color" class="h-100">
-          <div class="text-caption text-medium-emphasis mb-3 font-mono">Target · {{ g.targetYear }}</div>
+          <div class="text-caption text-medium-emphasis mb-3 font-mono">Target · {{ g.unreachable ? '—' : g.targetYear }}</div>
           <div class="d-flex justify-space-between mb-1">
             <span class="text-caption text-medium-emphasis">Today's ₹</span>
             <span class="font-weight-medium text-currency">{{ formatINRCompact(g.todayAmount) }}</span>
