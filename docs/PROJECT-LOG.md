@@ -175,6 +175,10 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
     lever ₹50k–3L/yr, dead-centre for the salaried wedge; objective-2) + **#97** (general capital-gains-on-sale
     estimator — generalises the existing `liquidation-tax.ts`; objective-4 post-FIRE drawdown honesty). #93
     (statement parser), #94 (LTCG harvesting), #96 (advance-tax) left good-to-have.
+  - **Also promoted (batch 8) — instruments + levers:** **#108** (geographic-arbitrage lever — often the
+    single highest-impact FIRE lever, corpus 30–50% lower; objective-2), **#109** (Lean/Fat FIRE comparison —
+    reuses the existing `derive.variants`; objective-1), **#102** (SSY girl-child corpus instrument; obj-0),
+    **#103** (SCSS) + **#104** (POMIS) (post-FIRE income instruments; obj-4).
 - **D-2026-06-13-03 — Member lens across the REST of the FIRE section ("lens where clean, badge the rest").**
   D-2026-06-13-02 lensed only the Dashboard hero; the other 5 FIRE-section screens still showed household
   figures and ignored "View as &lt;member&gt;" (0 lens refs). Resolved with Abhay (AskUserQuestion 2026-06-13):
