@@ -167,8 +167,14 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
     pull), **#91** (NPS PRAN import), **#92** (Demat/broker CAS sync). **#89 (AIS/Form-26AS import) was
     NOT promoted** — left good-to-have. Cross-cutting gates on the cluster: a DPDP data-posture `TODO(5W)`
     + (for #88) the charter interpretation lock. **Abhay commissioned comprehensive per-asset-class research
-    on #88** (bank/FD/MF/insurance/NPS — the complete AA FIU consent-fetch process); findings to be posted
-    to gh #88.
+    on #88** (bank/FD/MF/insurance/NPS — the complete AA FIU consent-fetch process); 5-thread cited research
+    DONE + posted to gh #88 (key finding: the FIU **SEBI-RIA/TSP regulatory gate** is the real blocker, not
+    the tech; per-asset maturity bank✅/MF✅/NPS🟡/FD🟠/insurance🔴-ULIP-unavailable; ~5–10mo, ~₹5–25L; charter
+    + DPDP `TODO(5W)` to lock; ship bank/MF first, FD+insurance manual-primary).
+  - **Also promoted (batch 7) — tax tools:** **#95** (CTC/salary-restructuring optimizer — highest-ROI tax
+    lever ₹50k–3L/yr, dead-centre for the salaried wedge; objective-2) + **#97** (general capital-gains-on-sale
+    estimator — generalises the existing `liquidation-tax.ts`; objective-4 post-FIRE drawdown honesty). #93
+    (statement parser), #94 (LTCG harvesting), #96 (advance-tax) left good-to-have.
 - **D-2026-06-13-03 — Member lens across the REST of the FIRE section ("lens where clean, badge the rest").**
   D-2026-06-13-02 lensed only the Dashboard hero; the other 5 FIRE-section screens still showed household
   figures and ignored "View as &lt;member&gt;" (0 lens refs). Resolved with Abhay (AskUserQuestion 2026-06-13):
