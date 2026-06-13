@@ -134,9 +134,12 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
   optimistic (no shocks). **#45** (wire the existing `nudge-engine.ts` to a live email/WhatsApp channel
   + cadence) — generation is built but **nothing is delivered**, so retention is currently zero-channel.
   **#44** (event/funnel/cohort analytics) — the **measurement backbone**; retention is unimprovable
-  while unmeasured. Tier label flipped on all three (`gh issue list --label must-have` now = #44 #45 #46
-  #86 #137 #141 #142 #162). Note: #44 still carries a DPDP/privacy-posture `TODO(5W)` on *what* is
-  collected; #45's live sends stay gated on comms go-live (A6) — the *builds* are unblocked.
+  while unmeasured. **#59** (close the 98 survived Stryker mutants in `tax.ts`, 69% mutation score) was
+  promoted in the same review — tax-math correctness is core to a tax/FIRE product (coverage-% lies;
+  mutation score is the real proof of the honest-number promise). Tier label flipped (`gh issue list
+  --label must-have` now = #44 #45 #46 #59 #86 #137 #141 #142 #162). Note: #44 still carries a
+  DPDP/privacy-posture `TODO(5W)` on *what* is collected; #45's live sends stay gated on comms go-live
+  (A6) — the *builds* are unblocked.
 - **D-2026-06-13-03 — Member lens across the REST of the FIRE section ("lens where clean, badge the rest").**
   D-2026-06-13-02 lensed only the Dashboard hero; the other 5 FIRE-section screens still showed household
   figures and ignored "View as &lt;member&gt;" (0 lens refs). Resolved with Abhay (AskUserQuestion 2026-06-13):
