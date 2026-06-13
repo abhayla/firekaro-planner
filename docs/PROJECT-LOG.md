@@ -126,6 +126,21 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 ## §3 — Decision log (append-only, newest first)
 
 ### 2026-06-13
+- **D-2026-06-13-03 — Member lens across the REST of the FIRE section ("lens where clean, badge the rest").**
+  D-2026-06-13-02 lensed only the Dashboard hero; the other 5 FIRE-section screens still showed household
+  figures and ignored "View as &lt;member&gt;" (0 lens refs). Resolved with Abhay (AskUserQuestion 2026-06-13):
+  **Goals.vue LENSES** to the selected member's individual FIRE (reuses the hero's `heroHeadline` selector →
+  ±0 coherence with the hero + IndividualFireCard, no duplicated math; member caveat at full disclosure parity
+  with the hero — names that the individual number skips the healthcare reserve + locked-money bridge); the
+  **4 simulation screens (Readiness/StressTest/Drawdown/WhatIf) render the self-gating `WholeHouseholdBadge`**
+  — they run whole-household projections with no cheap per-member equivalent (per-member projection = deferred
+  **#162** / option A), so the badge makes the household scope explicit + honest. Default ("Whole household")
+  view byte-identical; no FIRE-math edit (display-only). **Goal-anchored:** serves the wedge persona's
+  honest individual picture (objective 1) without optimistic bias — the badge prevents mistaking a frozen
+  household figure for a member one. Built via `/goal` contract `docs/goals/2026-06-13-fire-section-member-lens.md`;
+  merged **`3ea2ac6`** (2 commits adab90f + 4047ee9). Verified: type-check 0 · 1239 unit · build · full
+  member-lens E2E sweep 22/22 · code-review PASS · FinTech HIGH (caveat parity) fixed + drift-lock · Rule-33
+  blind verifier concurred (coverage reconciled by the full sweep). NOT yet deployed — Abhay's prod gate.
 - **D-2026-06-13-02 — REVERSE #81's hero-invariance: the FIRE headline SHOULD lens per member.** While
   verifying D-2026-06-13-01 on prod, Abhay clarified his actual intent: when "View as &lt;member&gt;" is
   selected, the **big FIRE headline (age + number) should show THAT member's individual FIRE** (Priya →
