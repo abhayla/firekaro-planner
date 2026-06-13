@@ -187,11 +187,16 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
   - **Also promoted (batch 10):** **#146** (portfolio-vs-NIFTY benchmark — Reddit-validated "is my portfolio
     beating a cheap index?"; obj-1/2) + **#119** (in-context financial-education hub — trust layer; stickiness).
     #117 (nomination audit), #143 (Schedule-FA helper — charter-gated), #144 (full-model export) left good-to-have.
-  - **Review complete — full good-to-have backlog (55) reviewed in 11 batches.** Net promoted to must-have
-    across D-2026-06-13-04: #44 #45 #46 #59 #61 #64 #68 #69 #70 #71 #73 #75 #78 #79 #82 #85 #87 #88 #90 #91 #92
-    #95 #97 #102 #103 #104 #108 #109 #111 #112 #113 #115 #119 #146 (+ the originals #86 #137 #141 #142 #162).
-    Left good-to-have (deferred polish / charter-gated / lower-priority): #41 #49 #53 #54 #56 #58 #60 #62 #89 #93
-    #94 #96 #116 #117 #143 #144 #147 #148 #156 #157 #161 — query the live set with `gh issue list --label good-to-have`.
+  - **Also promoted (batch 11 — the final 5):** **#156** (Sec 17(2)(vii)/(viia) ₹7.5L employer-retirals
+    perquisite not modeled — **optimistic tax bug → under-saving** for high-CTC; the honesty-risk direction,
+    Tier-0-adjacent), **#157** (scalar `computeTax` 80CCD(2) ceiling — government-employee cross-screen drift,
+    #65/#85 class, conservative), **#161** (member-lens Reports.vue corpus/liabilities sibling, conservative).
+  - **REVIEW COMPLETE — all 55 good-to-have reviewed in 11 batches; 40 open must-have total** (`gh issue list
+    --label must-have`). The ~18 left good-to-have (deferred polish / charter-gated / lower-priority / already
+    honest) = #41 #49 #53 #54 #56 #58 #60 #62 #89 #93 #94 #96 #116 #117 #143 #144 #147 #148 — query the live
+    set with `gh issue list --label good-to-have`. **Next: sequence the 40 must-haves into build order** (the
+    "Now" priority ladder — correctness/honesty first: #85 #87 #156 #157 + #162; then setup/import #88-#92;
+    then stickiness #44 #45 #119 #146; then the feature must-haves) — a separate prioritization pass.
 - **D-2026-06-13-03 — Member lens across the REST of the FIRE section ("lens where clean, badge the rest").**
   D-2026-06-13-02 lensed only the Dashboard hero; the other 5 FIRE-section screens still showed household
   figures and ignored "View as &lt;member&gt;" (0 lens refs). Resolved with Abhay (AskUserQuestion 2026-06-13):
