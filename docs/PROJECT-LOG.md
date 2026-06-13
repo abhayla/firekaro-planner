@@ -140,7 +140,15 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
   household figure for a member one. Built via `/goal` contract `docs/goals/2026-06-13-fire-section-member-lens.md`;
   merged **`3ea2ac6`** (2 commits adab90f + 4047ee9). Verified: type-check 0 · 1239 unit · build · full
   member-lens E2E sweep 22/22 · code-review PASS · FinTech HIGH (caveat parity) fixed + drift-lock · Rule-33
-  blind verifier concurred (coverage reconciled by the full sweep). NOT yet deployed — Abhay's prod gate.
+  blind verifier concurred (coverage reconciled by the full sweep). **DEPLOYED to prod + Tier-2 verified
+  (`aec52bc`, bundle `usnufzd8`, 2026-06-13):** Abhay authorized; supervisor-reproduced the gates
+  (type-check 0, 1239 unit) then redeployed the VPS (frontend-only, backup `firekaro-pre-deploy-20260613-102111.tar.gz`);
+  Tier-1 smoke green (bundle `BYJmfDLG`→`usnufzd8`, db connected). **Tier-2 headed prod re-verify on
+  `abhayfaircent` — all 5 FIRE screens respond LIVE:** Goals lenses (Whole-household age 56/₹10.55Cr/10%
+  vs Rohit age 44/₹4.04Cr/21% + caveat); Readiness/StressTest/Drawdown/WhatIf show the Whole-household badge
+  under a member lens (false→true on the lens switch), hidden on Whole-household. Blind verifier (rule 33)
+  CONCURRED on the raw prod screenshots (Goals before/after + Drawdown + WhatIf image-verified; Readiness +
+  StressTest via the booleans + identical self-gating component). Whole FIRE section + Dashboard now member-lensed live.
 - **D-2026-06-13-02 — REVERSE #81's hero-invariance: the FIRE headline SHOULD lens per member.** While
   verifying D-2026-06-13-01 on prod, Abhay clarified his actual intent: when "View as &lt;member&gt;" is
   selected, the **big FIRE headline (age + number) should show THAT member's individual FIRE** (Priya →
