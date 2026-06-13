@@ -153,6 +153,14 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
     **#73** (Net-Worth-over-time chart blank for a populated user — netWorth captured only on Dashboard
     visit + weak empty-state), **#75** (omnipresent FIRE summary on every screen — AppBar chip→popover).
     Friction-reduction (objective-0) + looks-broken polish.
+  - **Also promoted (batch 5):** **#85** + **#87** are **tax-correctness** items mis-stating the flagship
+    FIRE number — **#85** (derive.ts taxes LLP/Partnership/HUF profit-share that /tax-planning correctly
+    exempts per §10(2A); cross-screen tax divergence, the #65 class for partnership income) and **#87**
+    (household tax uses a single-aggregate-earner model → over-taxes dual-earner households by ~₹4L/yr on
+    the Sharmas → over-states the FIRE date for the dual-income wedge persona; fix = Σ per-earner ITRs).
+    Plus **#82** (CI "migrations apply cleanly" gate — closes the proven #67 bad-migration-passes-CI class),
+    **#78** (widen What-If slider ranges — trivial), **#79** (capture email+mobile in profile — enabler for
+    #68; member email recommended OPTIONAL per DPDP). #85/#87 are objective-1 honesty.
 - **D-2026-06-13-03 — Member lens across the REST of the FIRE section ("lens where clean, badge the rest").**
   D-2026-06-13-02 lensed only the Dashboard hero; the other 5 FIRE-section screens still showed household
   figures and ignored "View as &lt;member&gt;" (0 lens refs). Resolved with Abhay (AskUserQuestion 2026-06-13):
