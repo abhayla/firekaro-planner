@@ -5,7 +5,7 @@ measured against. A row is DONE only when the mockup column AND the plan column 
 Legend: ✓ covered · ◐ partial · ✗ missing · — deliberately out of scope (reason given).
 
 Source of truth for the left column: `D:\Abhay\Ventures\transcripts\FbYnFUwdODQ.md` (transcript) and
-`FbYnFUwdODQ-firekaro-crosscheck.md` (feature cross-check). FireKaro column verified against `main` 2026-08-27.
+`FbYnFUwdODQ-firekaro-crosscheck.md` (feature cross-check). FireKaro column verified against `main` 2026-08-27. **Pinned with the spec: this matrix, `option-c-merged.html` and `docs/goals/2026-08-27-quick-number-front-door.md` are versioned together — the dispatch pin is the commit that carries this sentence.**
 
 ## A. Inputs the advisor collected (video Part 1)
 
@@ -57,7 +57,7 @@ Source of truth for the left column: `D:\Abhay\Ventures\transcripts\FbYnFUwdODQ.
 | # | Video item | FireKaro today | Mockup now | Plan |
 |---|---|---|---|---|
 | D1 | XIRR vs benchmark (13.3 vs 13.4) | #146 open | listed in "What the full planner adds" | — (#146, separate) |
-| D2 | Access: direct vs regular TER (+80 bps) | none | ◐ lever (+0.8%; mock has no "already direct" gate — spec adds one) | QN-5 (household-level toggle) ; per-holding flag → #NEW |
+| D2 | Access: direct vs regular TER (+80 bps) | none | ✓ lever (+0.8%) gated by the Direct/Regular/Not-sure chip on the investments card | QN-5 (household-level toggle) ; per-holding flag → #NEW |
 | D3 | Selection: 72/18/9 vs 60/25–27/13–15 | none | listed | — (#141) |
 | D4 | Allocation: 65% funds underperform; 20 funds = index; keep 5–10 | none | listed ("we'll count your funds") | #NEW fund-count warning (good-to-have) |
 | D5 | Gold ~7% = ideal uncorrelated asset | goldReturn 7% | listed | — |

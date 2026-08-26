@@ -50,7 +50,8 @@ const FK = (() => {
     { key: "stepup",  label: "Raise investing 10% every year", note: "salary hikes → SIP hikes; the single biggest lever", apply: i => ({ ...i, stepUp: Math.max(i.stepUp, 0.10) }) },
     { key: "delay",   label: "Retire 3 years later",           note: "3 more years of investing, 3 fewer to fund",        apply: i => ({ ...i, targetAge: i.targetAge + 3 }) },
     { key: "trim",    label: "Trim spending 10%",              note: "lower spend lowers the target AND frees cash to invest", apply: i => ({ ...i, spend: i.spend * 0.9, sip: i.sip + i.spend * 0.1 }) },
-    { key: "direct",  label: "Move to direct mutual funds",    note: "~0.8% lower fees ≈ +0.8% return, for free",         apply: i => ({ ...i, equityReturn: i.equityReturn + 0.008 }) },
+    { key: "direct",  label: "Move to direct mutual funds",    note: "~0.8% lower fees ≈ +0.8% return, for free (if you are already on direct plans, ignore this)", apply: i => ({ ...i, equityReturn: i.equityReturn + 0.008 }),
+      available: i => i.directPlans !== true },
     { key: "noprepay",label: "Don't prepay the home loan — roll the EMI into investing when it ends", note: "your loan rate is below what investing earns; keep it, and the day the EMI stops, invest it", apply: i => ({ ...i, rollEmi: true }),
       available: i => i.hasLoan && i.emi > 0 && i.loanRate < i.equityReturn },
   ];
@@ -58,7 +59,7 @@ const FK = (() => {
   // Amit from the Dezerv video (FbYnFUwdODQ), in FireKaro's honest defaults
   const AMIT = { guess: 10 * CR, age: 38, targetAge: 50, spend: 2.8 * L, income: 5 * L, corpus: 80 * L, spouseCorpus: 70 * L, includeSpouse: true,
     sip: 1.75 * L, kids: 2, kidsAge: 6, education: 75 * L, postgrad: 1.5 * CR, wedding: 50 * L, house: 1 * CR,
-    includeHouse: true, hasLoan: true, emi: 1 * L, loanRate: 0.072, loanYearsLeft: 7, rollEmi: false,
+    includeHouse: true, directPlans: null, hasLoan: true, emi: 1 * L, loanRate: 0.072, loanYearsLeft: 7, rollEmi: false,
     inflation: 0.06, equityReturn: 0.12, swr: 0.035, stepUp: 0, planToAge: 90 };
   return { inr, compute, effSwr, applyPlan, LEVERS, AMIT, L, CR };
 })();

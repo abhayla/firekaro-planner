@@ -1,5 +1,6 @@
 <!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Option C — Merged (conversational intake → one-number hero → how to get there)</title>
+<!-- DESIGN SSOT for docs/goals/2026-08-27-quick-number-front-door.md — pinned with COVERAGE-MATRIX.md; the dispatch pin is the commit carrying this comment -->
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="fk-mock.css">
 <style>
@@ -99,7 +100,7 @@ const Q=[
  {k:"guess",q:"Gut feel first: how much do you think you need to retire?",h:"No maths yet — just your instinct. We'll compare it with the real number at the end.",type:"chips",opts:[[5*CR,"₹5 Cr"],[10*CR,"₹10 Cr"],[15*CR,"₹15 Cr"],[20*CR,"₹20 Cr"],[30*CR,"₹30 Cr+"]]},
  {k:"age",q:"How old are you, and when would you like to stop working?",h:"We plan from today to age 90 — 40 years of spending, not 15. A guess is fine; you'll drag the age later.",type:"num",extra:{k:"targetAge",label:"Retire at",plain:true}},
  {k:"spend",q:"What does your household spend in a month?",h:"Everything — EMI, school fees, travel, help, fun. ₹2.5–3 L? Say 2.8.",lakh:true,extra:{k:"income",label:"And the household take-home per month?"},sanity:true},
- {k:"corpus",q:"Total of ALL your investments today?",h:"Add everything up: mutual funds, stocks, ETFs, EPF, NPS, PPF, FDs, gold, bonds, crypto, plots and any flat you don't live in. Leave out only the home you live in.",lakh:true},
+ {k:"corpus",q:"Total of ALL your investments today?",h:"Add everything up: mutual funds, stocks, ETFs, EPF, NPS, PPF, FDs, gold, bonds, crypto, plots and any flat you don't live in. Leave out only the home you live in.",lakh:true,chips2:{k:"directPlans",label:"Are your mutual funds direct plans?",opts:[[true,"Direct"],[false,"Regular"],[null,"Not sure"]]}},
  {k:"sip",q:"How much do you put into investments every month?",h:"All of it: SIPs, stock/ETF buys, your PF + employer PF, NPS, PPF, RDs — whatever you add every month.",lakh:true},
  {k:"spouseCorpus",q:"Spouse's investments, if any?",h:"ALL of theirs too — MF, stocks, PF, NPS, gold, everything. Untick if not applicable.",lakh:true,toggle:"includeSpouse"},
  {k:"kids",q:"Kids?",h:"How many, and roughly how old? We time their education (at 18) and weddings (at 30) from this.",type:"chips",opts:[[0,"0"],[1,"1"],[2,"2"],[3,"3"]],extra:{k:"kidsAge",label:"Their age",plain:true}},
@@ -123,10 +124,12 @@ function draw(){
   if(q.extra) body+=field("ex",q.extra); if(q.extra2) body+=field("ex2",q.extra2);
   if(q.sanity) body+=`<div class="sanity" id="san">${sanityCopy()}</div>`;
   if(q.delta) body+=`<div class="hint" id="dh" style="margin-top:8px">${deltaCopy()}</div>`;
+  if(q.chips2) body+=`<label>${q.chips2.label}</label><div class="chips">${q.chips2.opts.map(([v,t])=>`<span class="chip c2 ${i[q.chips2.k]===v?"on":""}" data-v="${v}">${t}</span>`).join("")}</div>`;
   $("qcard").innerHTML=`<div class="q">${q.q}</div><div class="qhint">${q.h}</div>${body}`;
   const bind=(id,ex)=>{const el=$(id); if(!el) return; el.oninput=()=>{i[ex.k]=ex.plain?(+el.value||0):ex.pct?(+el.value||0)/100:(+el.value||0)*L; const p=$(id+"p"); if(p) p.textContent=FK.inr(i[ex.k]); sofar(); if($("dh")) $("dh").innerHTML=deltaCopy(); if($("san")) $("san").innerHTML=sanityCopy();};};
   bind("in",{k:q.k,plain:q.type==="num"}); if(q.extra) bind("ex",q.extra); if(q.extra2) bind("ex2",q.extra2);
-  document.querySelectorAll(".chip").forEach(c=>c.onclick=()=>{i[q.k]=+c.dataset.v;draw();});
+  document.querySelectorAll(".chip:not(.c2)").forEach(c=>c.onclick=()=>{i[q.k]=+c.dataset.v;draw();});
+  document.querySelectorAll(".chip.c2").forEach(c=>c.onclick=()=>{i[q.chips2.k]=c.dataset.v==="true"?true:c.dataset.v==="false"?false:null;draw();});
   const tg=$("tg"); if(tg) tg.onchange=()=>{i[q.toggle]=tg.checked;sofar(); if($("dh")) $("dh").innerHTML=deltaCopy();};
   $("back").disabled=s===0; $("next").textContent=s===Q.length-1?"See my number →":"Next →"; sofar();
 }
@@ -157,7 +160,7 @@ function render(){
   $("assump").textContent=`${+(i.inflation*100).toFixed(1)}% inflation · ${+(pi.equityReturn*100).toFixed(1)}% return · ${+(r.swrUsed*100).toFixed(2)}% safe withdrawal (for a ${90-pi.targetAge}-yr drawdown) · investing raised ${+(pi.stepUp*100).toFixed(0)}%/yr`;
   const toFind=(inp,res)=>Math.max(0,res.requiredSip-inp.sip);
   $("levers").innerHTML=FK.LEVERS.map(l=>{const avail=!l.available||l.available(i); const li=l.apply(i), one=FK.compute(li); const d=toFind(i,base)-toFind(li,one);
-    const fx=avail?`<b class="${d>0?"ok":"mut"}">−${FK.inr(Math.max(0,d))}/mo</b><span class="n">less to find</span>`:`<span class="n">${i.hasLoan?"your loan costs more than investing earns — prepay it":"no home loan"}</span>`;
+    const fx=avail?`<b class="${d>0?"ok":"mut"}">−${FK.inr(Math.max(0,d))}/mo</b><span class="n">less to find</span>`:`<span class="n">${l.key==="direct"?"you are already on direct plans":i.hasLoan?"your loan costs more than investing earns — prepay it":"no home loan"}</span>`;
     return `<label class="lever ${avail?"":"off"}"><input type="checkbox" data-k="${l.key}" ${on.has(l.key)?"checked":""} ${avail?"":"disabled"}><span>${l.label}<div class="n">${l.note}</div></span><span class="fx">${fx}</span></label>`;}).join("");
   document.querySelectorAll("#levers input").forEach(c=>c.onchange=()=>{c.checked?on.add(c.dataset.k):on.delete(c.dataset.k);render();});
   $("plansum").innerHTML = !planOn ? `Switch on a few moves to see the number you can actually live with.` :
