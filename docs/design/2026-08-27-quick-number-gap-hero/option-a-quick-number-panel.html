@@ -1,0 +1,132 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Option A — Quick Number (inputs-left panel, live gap hero)</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="fk-mock.css"></head><body>
+<div class="tag">OPTION A — QUICK NUMBER · panel + live gap hero</div>
+<h1>Your FIRE number in 3 minutes</h1>
+<div class="sub">10 fields, all optional after the first three. Everything recomputes as you type. Refine later in the full planner.</div>
+
+<div class="grid">
+<!-- ===== LEFT: inputs (GLOBAL.md: inputs in a left panel, assumptions collapsible) ===== -->
+<div class="card" id="inputs">
+  <h3>1 · You</h3>
+  <div class="two">
+    <div><label>Your age</label><input type="number" id="age" value="38"></div>
+    <div><label>Retire at</label><input type="number" id="targetAge" value="50"></div>
+  </div>
+  <h3 style="margin-top:16px">2 · Money today</h3>
+  <label>Household spend per month (all-in, incl. EMI + school fees)</label>
+  <input type="number" id="spend" value="280000"><div class="hint">Rough is fine — ₹2.5–3 L → put 2.8 L</div>
+  <label>Financial savings so far (MF + EPF + NPS + PPF, not property)</label>
+  <input type="number" id="corpus" value="8000000">
+  <label>Monthly investing incl. PF contributions</label>
+  <input type="number" id="sip" value="175000">
+  <label class="toggle"><input type="checkbox" id="includeSpouse" checked> Add spouse's savings <input type="number" id="spouseCorpus" value="7000000" style="width:120px;margin-left:auto"></label>
+
+  <h3 style="margin-top:16px">3 · Big things coming (today's ₹)</h3>
+  <div class="two">
+    <div><label>Kids</label><select id="kids"><option>0</option><option>1</option><option selected>2</option><option>3</option></select></div>
+    <div><label>Their age</label><input type="number" id="kidsAge" value="6"></div>
+  </div>
+  <label>Education (undergrad, all kids)</label><input type="number" id="education" value="7500000">
+  <label>Post-grad</label><input type="number" id="postgrad" value="15000000">
+  <label>Weddings</label><input type="number" id="wedding" value="5000000">
+  <label class="toggle"><input type="checkbox" id="includeHouse" checked> House upgrade / big purchase (net) <input type="number" id="house" value="10000000" style="width:120px;margin-left:auto"></label>
+  <div class="hint" id="houseHint"></div>
+
+  <details><summary>Assumptions — we picked honest defaults, change if you know better</summary>
+    <div class="two">
+      <div><label>Inflation</label><input type="number" id="inflation" value="6" step="0.5"><div class="hint">% · India CPI long-run</div></div>
+      <div><label>Return on investments</label><input type="number" id="equityReturn" value="12" step="0.5"><div class="hint">% · equity long-run, not 14</div></div>
+      <div><label>Safe withdrawal</label><input type="number" id="swr" value="3.5" step="0.25"><div class="hint">% of corpus per year, post-tax</div></div>
+      <div><label>Raise investing by</label><input type="number" id="stepUp" value="0" step="1"><div class="hint">% every year (0 = honest floor)</div></div>
+    </div>
+    <div class="hint" style="margin-top:8px">We plan for you to live to <b>90</b> — 40 years of spending, not 15.</div>
+  </details>
+</div>
+
+<!-- ===== RIGHT: live results ===== -->
+<div>
+  <div class="hero">
+    <div class="eyebrow">At your current pace you'll FIRE at age</div>
+    <div class="big" id="fireAge">—</div>
+    <div class="when" id="fireWhen"></div>
+    <div class="kpis">
+      <div class="kpi"><div class="k">You'll need</div><div class="v mono" id="need">—</div><div class="s" id="needSub">today's money</div></div>
+      <div class="kpi"><div class="k">You'll have</div><div class="v mono" id="have">—</div><div class="s" id="haveSub">by target age</div></div>
+      <div class="kpi"><div class="k">Gap</div><div class="v mono" id="gap">—</div><div class="s" id="gapSub"></div></div>
+      <div class="kpi act"><div class="k">Do this</div><div class="v mono" id="reqSip">—</div><div class="s" id="reqSub">per month to retire on time</div></div>
+    </div>
+    <div class="slider">
+      <div class="row"><span>What if you retire at</span><b id="sliderVal">50</b></div>
+      <input type="range" id="ageSlider" min="40" max="65" value="50">
+      <div class="ticks"><span>40</span><span>45</span><span>50</span><span>55</span><span>60</span><span>65</span></div>
+      <div class="hint" id="sliderHint"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>How we got this — no magic</h3>
+    <ol class="explain" id="explain"></ol>
+  </div>
+  <div class="card">
+    <h3>Corpus vs need, in today's money</h3>
+    <svg class="chart" id="chart" viewBox="0 0 600 170" preserveAspectRatio="none"></svg>
+    <div class="legend" style="font-size:12px"><span style="color:var(--blue)">■</span> what you'll have &nbsp; <span style="color:var(--amber)">■</span> what you'll need &nbsp; · dashed = target age</div>
+  </div>
+  <div class="card" style="display:flex;justify-content:space-between;align-items:center">
+    <div><b>Happy with the shape?</b><div class="hint">Refine income, investments, insurance and taxes in the full planner. Your numbers carry over.</div></div>
+    <button class="btn">Open full planner →</button>
+  </div>
+</div>
+</div>
+
+<script src="fk-mock.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const F = ["age","targetAge","spend","corpus","sip","spouseCorpus","kidsAge","education","postgrad","wedding","house","inflation","equityReturn","swr","stepUp"];
+function read(){
+  const i = {...FK.AMIT};
+  F.forEach(k => i[k] = +$(k).value || 0);
+  i.inflation/=100; i.equityReturn/=100; i.swr/=100; i.stepUp/=100;
+  i.includeSpouse = $("includeSpouse").checked; i.includeHouse = $("includeHouse").checked;
+  return i;
+}
+function render(){
+  const i = read(), r = FK.compute(i);
+  $("fireAge").textContent = r.fireAge ?? "90+";
+  const yrsAt = r.fireAge ? r.fireAge - i.age : null;
+  $("fireWhen").innerHTML = r.fireAge ? `in <b>${yrsAt} years</b> (${new Date().getFullYear()+yrsAt}) at today's investing pace · you asked for <b>${i.targetAge}</b>` : `not before 90 at today's pace — see "Do this"`;
+  $("need").textContent = FK.inr(r.needReal); $("needSub").textContent = `today's money · = ${FK.inr(r.needNominal)} in ${new Date().getFullYear()+r.n}`;
+  $("have").textContent = FK.inr(r.haveReal); $("haveSub").textContent = `by ${i.targetAge}, today's money`;
+  const short = r.gapReal > 0;
+  $("gap").textContent = (short? "−":"+") + FK.inr(Math.abs(r.gapReal)).replace("₹","₹");
+  $("gap").className = "v mono " + (short?"bad":"ok"); $("gapSub").textContent = short ? "short at " + i.targetAge : "surplus — you can stop earlier";
+  $("reqSip").textContent = FK.inr(r.requiredSip); $("reqSub").textContent = short ? `per month (you do ${FK.inr(i.sip)} now) to retire at ${i.targetAge}` : `you already invest enough for ${i.targetAge}`;
+  $("sliderVal").textContent = i.targetAge; $("ageSlider").value = i.targetAge;
+  const alt = FK.compute({...i, targetAge: i.targetAge+3});
+  $("sliderHint").innerHTML = `Working <b>3 more years</b> (to ${i.targetAge+3}) drops the needed monthly to <b>${FK.inr(alt.requiredSip)}</b>. Drag to feel it.`;
+  const noHouse = FK.compute({...i, includeHouse:false});
+  $("houseHint").innerHTML = i.includeHouse ? `Counted. It moves your FIRE age by <b>${(r.fireAge??90)-(noHouse.fireAge??90)} yr</b> — most tools silently ignore this.` : `Not counted.`;
+  $("explain").innerHTML = [
+    `Your ₹${(i.spend/FK.L).toFixed(1)} L/month is <b>${FK.inr(i.spend*12)}</b> a year. To draw that safely for 40 years we keep it at <b>${(i.swr*100).toFixed(2)}% of the corpus</b> → <b>${FK.inr(i.spend*12/i.swr)}</b>.`,
+    `Plus one-off goals in today's money — education, post-grad, weddings${i.includeHouse?", house":""} — <b>${FK.inr(r.goals)}</b>.`,
+    `Your ${FK.inr(i.corpus + (i.includeSpouse?i.spouseCorpus:0))} + ${FK.inr(i.sip)}/month grow at ${(i.equityReturn*100).toFixed(0)}% for ${r.n} years, then we <b>remove ${(i.inflation*100).toFixed(0)}% inflation</b> so you compare like with like → <b>${FK.inr(r.haveReal)}</b>.`,
+    `The big scary number others quote (<b>${FK.inr(r.needNominal)}</b>) is the same thing in ${new Date().getFullYear()+r.n} rupees. We show both; we plan in today's.`
+  ].map(t=>`<li>${t}</li>`).join("");
+  chart(i, r);
+}
+function chart(i, r){
+  const svg=$("chart"); const W=600,H=170,P=24; const ages=[]; for(let a=i.age;a<=Math.max(65,i.targetAge+5);a++) ages.push(a);
+  let maxV=0; const pts=ages.map(a=>{const c=FK.compute({...i,targetAge:a}); maxV=Math.max(maxV,c.haveReal,c.needReal); return {a,have:c.haveReal,need:c.needReal};});
+  const x=a=>P+(a-ages[0])/(ages[ages.length-1]-ages[0])*(W-2*P), y=v=>H-P-(v/maxV)*(H-2*P);
+  const path=(k,col)=>`<polyline fill="none" stroke="${col}" stroke-width="2.5" points="${pts.map(p=>x(p.a)+","+y(p[k])).join(" ")}"/>`;
+  svg.innerHTML = path("need","#b45309")+path("have","#2F5BFF")+`<line x1="${x(i.targetAge)}" x2="${x(i.targetAge)}" y1="${P}" y2="${H-P}" stroke="#94a3b8" stroke-dasharray="4 4"/>`+
+    `<text x="${x(i.targetAge)+4}" y="${P+10}" font-size="11" fill="#64748b">age ${i.targetAge}</text>`+
+    `<text x="${P}" y="${H-6}" font-size="10" fill="#64748b">${ages[0]}</text><text x="${W-P-14}" y="${H-6}" font-size="10" fill="#64748b">${ages[ages.length-1]}</text>`;
+}
+let t; F.forEach(k=>$(k).addEventListener("input",()=>{clearTimeout(t);t=setTimeout(render,120)}));
+["includeSpouse","includeHouse","kids"].forEach(k=>$(k).addEventListener("change",render));
+$("ageSlider").addEventListener("input",e=>{$("targetAge").value=e.target.value;render();});
+render();
+</script></body></html>
