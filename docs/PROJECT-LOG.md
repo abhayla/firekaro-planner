@@ -128,6 +128,26 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 ## §3 — Decision log (append-only, newest first)
 
 ### 2026-08-27
+- **D-2026-08-27-02 — T-376 (QN-3) LANDED: `general`/kind-less planned goals now enter the FIRE number
+  (closes #165).** Root cause: `derive.ts:449-451` summed only `familyLayer.educationGoals` +
+  `familyLayer.marriageEvents` into the corpus lump — a `plannedFuture` line of any other kind
+  (`general`/`medical`/unset, the v4-faithful default) was displayed in the planner but silently
+  excluded from `fireNumber`/`fireAge`. Fix: `derivedFamilyLayer()` now also exposes
+  `allPlannedGoals` (every kind, unfiltered) consumed ONLY by the FIRE-number lump in `derive.ts`;
+  `calculateFamilyLayerCorpus`'s arg renamed `educationMarriageLumpToday` → `plannedGoalsLumpToday`
+  (spec-mandated). The FamilyLayerCard/NudgeStack display aggregate is UNCHANGED (still
+  education+marriage only — out of this stage's scope). Golden-master headlines moved for 3 of 4
+  personas, matching their kind-less lines exactly: Mauryas +₹19L ("Car replacement" ₹15L + "Foreign
+  vacation" ₹4L, FIRE age 67.08→67.5), Mehtas +₹40L ("Retirement world tour" ₹15L + "Switzerland
+  residency" ₹25L, FIRE age 49.42→50.33), Sharmas +₹5L ("Foreign vacation every 3yrs" ₹5L, FIRE age
+  55.58→55.67); Iyers unchanged (no kind-less lines). No persona moved >1 year — expected, not a red
+  flag. **ADR-0004 follow-up (deferred, not this stage):** goals stay a today-rupee one-shot lump, not
+  time-phased/PV-discounted to their `targetYear` — a goal 20 years out is treated identically to one
+  next year. Time-phasing the family-layer lump into the temporal contribution schedule
+  (`docs/adr/0004-temporal-contribution-model.md`) is real follow-up work, tracked for a future stage,
+  not silently dropped. **Why (goal-anchored):** obj-1 honesty — an optimistic FIRE-number error for
+  the locked persona is Tier-0 regardless of fix size (`goal-anchored-decisions.md`). PR: see #165.
+
 - **D-2026-08-27-01 — "Quick Number" front door APPROVED for build (Abhay, 00:39 IST) — focus lock lifted for this
   scope.** Trigger: Dezerv "Portfolio Breakdown – Retirement Edition" (`FbYnFUwdODQ`) captured + cross-checked
   (`D:\Abhay\Ventures	ranscripts\FbYnFUwdODQ*.md`). Finding: FireKaro out-rigors the tool on inputs but loses on
