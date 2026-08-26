@@ -1,5 +1,5 @@
 <!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Option C — Merged (B's conversational intake → A's honest result, one headline number)</title>
+<title>Option C — Merged (conversational intake → one-number hero → how to get there)</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="fk-mock.css">
 <style>
@@ -7,28 +7,30 @@
 @media(min-width:1024px){
   .phone{max-width:1080px}
   #result{display:grid;grid-template-columns:1.15fr 1fr;gap:16px;align-items:start}
-  #result .hero{grid-row:span 3}
+  #result .hero{grid-row:span 5}
   #intake{max-width:560px;margin:0 auto}
 }
 .pace{margin-top:10px;font-size:13px;color:var(--muted);padding:10px 12px;border-radius:12px;background:#fff;border:1px dashed var(--line)}
 .pace b{color:var(--ink)}
+.guess{margin-top:8px;font-size:13px;color:var(--muted)}.guess b{color:var(--ink)}
 .lakh{position:relative}.lakh input{padding-right:64px}.lakh span{position:absolute;right:12px;top:50%;transform:translateY(-50%);font-size:12px;color:var(--muted);font-weight:600}
 .preview{font-size:12px;color:var(--blue);margin-top:4px;font-weight:600}
+.sanity{margin-top:10px;font-size:12px;padding:8px 10px;border-radius:10px;background:var(--amber-soft);color:var(--amber)}
 .edit summary{font-size:14px}
 .rows{display:grid;grid-template-columns:1fr 1fr;gap:6px 14px;font-size:13px;margin-top:8px}
 .rows span{color:var(--muted)}.rows b{text-align:right}
 .lever{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;padding:10px 0;border-top:1px solid var(--line);font-size:13px}
 .lever:first-child{border-top:0}.lever input{transform:scale(1.15)}.lever .n{font-size:11px;color:var(--muted)}
-.lever .fx{text-align:right;white-space:nowrap}.lever .fx b{display:block;font-size:14px}
+.lever.off{opacity:.45}.lever .fx{text-align:right;white-space:nowrap}.lever .fx b{display:block;font-size:14px}
 .plan-sum{margin-top:12px;padding:12px 14px;border-radius:14px;background:var(--blue-soft);font-size:13px;line-height:1.5}
 .plan-sum b{color:var(--blue);font-size:18px}
-@media(min-width:1024px){#result .hero{grid-row:span 4}}
+.why li{margin-bottom:6px}.next li{margin-bottom:5px}.next .tag2{font-size:10px;font-weight:700;color:var(--blue);background:var(--blue-soft);border-radius:999px;padding:2px 7px;margin-left:6px}
 </style></head><body>
-<div class="tag">OPTION C — MERGED · B intake → A result · one number</div>
+<div class="tag">OPTION C — MERGED · intake → one number → how to get there</div>
 <div class="phone">
 <div id="intake">
   <h1 style="font-size:18px">Let's find your number</h1>
-  <div class="sub">Ten quick questions, answers in lakh. Rough is fine — refine anything later. <span class="pill warn" title="Mockup only">example answers pre-filled</span></div>
+  <div class="sub">Ten quick questions, money in lakh. Rough is fine — refine anything later. <span class="pill warn" title="Mockup only">example answers pre-filled</span></div>
   <div class="dots" id="dots"></div>
   <div class="card" id="qcard"></div>
   <div class="sofar" id="sofar"></div>
@@ -40,6 +42,7 @@
     <div class="eyebrow">To retire at</div>
     <div class="big" id="tAge">50</div>
     <div class="when">you'll need <b id="needTop"></b> in today's money · that's <b id="needNom"></b> in <span id="needYear"></span></div>
+    <div class="guess" id="guessLine"></div>
     <div class="kpis" style="grid-template-columns:1fr 1fr">
       <div class="kpi"><div class="k">You'll have by <span id="hAge"></span></div><div class="v mono" id="have"></div><div class="s" id="haveSub"></div></div>
       <div class="kpi"><div class="k">Gap</div><div class="v mono" id="gap"></div><div class="s" id="gapSub"></div></div>
@@ -53,11 +56,32 @@
     <div class="hint" style="margin-bottom:8px">Nothing below is assumed by default. Switch on what you'd actually do; the hero updates.</div>
     <div id="levers"></div>
     <div class="plan-sum" id="plansum"></div>
+    <div class="hint" style="margin-top:8px">This part is arithmetic — it can't go wrong. What can go wrong is whether the monthly amount actually happens. Returns may be 10% one decade and 14% the next; the moves above are what you control.</div>
   </div>
+
+  <div class="card"><h3>Why is the number so big?</h3>
+    <ul class="why explain">
+      <li><b>You'll live off it for ~40 years</b>, not 15. Retire at 50, plan to 90.</li>
+      <li><b>Lifestyle creep.</b> You came to the city by train; you won't go back by train. The Seltos doesn't become an Alto at 50.</li>
+      <li><b>Healthcare and help cost more with age</b> — and rise faster than everything else (we use 14%, not 6%).</li>
+      <li><b>Taxes don't retire.</b> Withdrawals are taxed; we plan post-tax.</li>
+      <li><b>Every generation under-estimates by 4–6×.</b> In 2006 people spending ₹30K/month said "₹1 Cr is enough"; the honest number was ~₹6 Cr. Your gut said <span id="guessWhy"></span>.</li>
+    </ul>
+  </div>
+
   <div class="card"><h3>How we got this — no magic</h3><ol class="explain" id="explain"></ol>
     <div class="hint" style="margin-top:8px">Assumptions: <span id="assump"></span> · live to 90. Honest defaults, not sales defaults — <b>every one is editable in the full planner</b>.</div></div>
   <div class="card"><h3>What you'll have vs what you'll need · today's money</h3><svg class="chart" id="chart" viewBox="0 0 600 170" preserveAspectRatio="none"></svg>
     <div class="legend" style="font-size:12px"><span style="color:var(--blue)">■</span> have &nbsp; <span style="color:var(--amber)">■</span> need &nbsp; · dashed = your target</div></div>
+
+  <div class="card next"><h3>What the full planner adds</h3>
+    <ul class="explain">
+      <li>Your actual funds: <b>how many you hold</b> (20 funds ≈ owning the whole index; 5–10 is enough) and <b>direct vs regular</b> per fund <span class="tag2">portfolio review</span></li>
+      <li><b>Large / mid / small / gold mix</b> vs a target like 60/15/10/5, and a nudge when any slice drifts 5 points <span class="tag2">rebalancing</span></li>
+      <li><b>Your return vs the index</b> — are you actually getting the 12% we assumed? <span class="tag2">benchmark</span></li>
+      <li>Insurance gaps, tax regime, EPF/NPS rules, the locked-vs-liquid money check for early retirement <span class="tag2">honesty layer</span></li>
+    </ul>
+  </div>
   <div class="card edit"><details><summary>Your answers — tap to change</summary><div class="rows" id="rows"></div>
     <div style="margin-top:12px"><button class="btn ghost" id="reopen">Edit answers</button></div></details></div>
   <div class="card" style="display:flex;justify-content:space-between;align-items:center;gap:12px">
@@ -69,35 +93,38 @@
 
 <script src="fk-mock.js"></script>
 <script>
-const $=id=>document.getElementById(id); const i={...FK.AMIT}; const L=FK.L; const on=new Set();
+const $=id=>document.getElementById(id); const i={...FK.AMIT}; const L=FK.L, CR=FK.CR; const on=new Set();
 const Q=[
- {k:"age",q:"How old are you?",h:"We plan from today to age 90 — 40 years of spending, not 15.",type:"num"},
- {k:"targetAge",q:"When would you like to stop working?",h:"A guess is fine — you'll drag this on the next screen.",type:"chips",opts:[45,50,55,60]},
- {k:"spend",q:"What does your household spend in a month?",h:"Everything — EMI, school fees, travel, help. ₹2.5–3 L? Say 2.8.",lakh:true},
- {k:"corpus",q:"Total of ALL your investments today?",h:"Add everything up: mutual funds, stocks, ETFs, EPF, NPS, PPF, FDs, gold, bonds, crypto — every rupee you have invested anywhere. Leave out only the house you live in.",lakh:true},
+ {k:"guess",q:"Gut feel first: how much do you think you need to retire?",h:"No maths yet — just your instinct. We'll compare it with the real number at the end.",type:"chips",opts:[[5*CR,"₹5 Cr"],[10*CR,"₹10 Cr"],[15*CR,"₹15 Cr"],[20*CR,"₹20 Cr"],[30*CR,"₹30 Cr+"]]},
+ {k:"age",q:"How old are you, and when would you like to stop working?",h:"We plan from today to age 90 — 40 years of spending, not 15. A guess is fine; you'll drag the age later.",type:"num",extra:{k:"targetAge",label:"Retire at",plain:true}},
+ {k:"spend",q:"What does your household spend in a month?",h:"Everything — EMI, school fees, travel, help, fun. ₹2.5–3 L? Say 2.8.",lakh:true,extra:{k:"income",label:"And the household take-home per month?"},sanity:true},
+ {k:"corpus",q:"Total of ALL your investments today?",h:"Add everything up: mutual funds, stocks, ETFs, EPF, NPS, PPF, FDs, gold, bonds, crypto, plots and any flat you don't live in. Leave out only the home you live in.",lakh:true},
  {k:"sip",q:"How much do you put into investments every month?",h:"All of it: SIPs, stock/ETF buys, your PF + employer PF, NPS, PPF, RDs — whatever you add every month.",lakh:true},
  {k:"spouseCorpus",q:"Spouse's investments, if any?",h:"ALL of theirs too — MF, stocks, PF, NPS, gold, everything. Untick if not applicable.",lakh:true,toggle:"includeSpouse"},
- {k:"kids",q:"Kids?",h:"How many, and roughly how old?",type:"chips",opts:[0,1,2,3],extra:{k:"kidsAge",label:"Their age",plain:true}},
- {k:"education",q:"Their education, in today's money?",h:"Undergrad for all kids. Abroad? ₹75 L+ combined.",lakh:true,extra:{k:"postgrad",label:"Post-grad, if any"}},
- {k:"wedding",q:"Weddings?",h:"Today's money, all kids.",lakh:true},
+ {k:"kids",q:"Kids?",h:"How many, and roughly how old? We time their education and weddings from this.",type:"chips",opts:[[0,"0"],[1,"1"],[2,"2"],[3,"3"]],extra:{k:"kidsAge",label:"Their age",plain:true}},
+ {k:"education",q:"Their big costs, in today's money?",h:"Undergrad for all kids (abroad? ₹75 L+ combined), post-grad if likely, and weddings.",lakh:true,extra:{k:"postgrad",label:"Post-grad, if any"},extra2:{k:"wedding",label:"Weddings, all kids"}},
  {k:"house",q:"Any big purchase coming — bigger home, car?",h:"Net of what you'd sell. Most tools forget this; it moves your date.",lakh:true,toggle:"includeHouse",delta:true},
+ {k:"emi",q:"Home loan?",h:"EMI, interest rate and years left. We'll tell you whether to prepay it.",lakh:true,toggle:"hasLoan",extra:{k:"loanRate",label:"Interest rate (%)",pct:true},extra2:{k:"loanYearsLeft",label:"Years left",plain:true}},
 ];
 let s=0;
 const lakhInput=(id,val)=>`<div class="lakh"><input type="number" id="${id}" value="${(val/L).toFixed(val%L?2:0)}" step="0.5"><span>lakh</span></div><div class="preview" id="${id}p">${FK.inr(val)}</div>`;
+const field=(id,ex)=>`<label>${ex.label}</label>`+(ex.plain?`<input type="number" id="${id}" value="${i[ex.k]}">`:ex.pct?`<input type="number" id="${id}" value="${+(i[ex.k]*100).toFixed(2)}" step="0.1">`:lakhInput(id,i[ex.k]));
 function deltaCopy(){ if(!i.includeHouse) return "Not counted."; const w=FK.compute(i), wo=FK.compute({...i,includeHouse:false}); const d=(w.fireAge??90)-(wo.fireAge??90); return `Counted — it moves your FIRE age by <b>${d} yr</b> and adds <b>${FK.inr(w.requiredSip-wo.requiredSip)}/month</b> to "do this".`; }
-function sofar(){ const r=FK.compute(i); $("sofar").innerHTML = s<2 ? `Answer a few more and your number appears here.` : `So far, to retire at <b>${i.targetAge}</b> you'd need <b>${FK.inr(r.needReal)}</b>${s>=4?` · gap ${r.gapReal>0?"−":"+"}${FK.inr(Math.abs(r.gapReal))}`:""}`; }
+function sanityCopy(){ const out=i.spend+i.sip; if(!i.income) return ""; const pct=Math.round(out/i.income*100); return pct>105?`Spend + investing = <b>${FK.inr(out)}</b> — more than your ₹${(i.income/L).toFixed(1)} L take-home. One of the three is off; check before moving on.`:`Spend + investing = ${FK.inr(out)} of your ₹${(i.income/L).toFixed(1)} L take-home (${pct}%). Sounds right?`; }
+function sofar(){ const r=FK.compute(i); $("sofar").innerHTML = s<3 ? `Answer a few more and your number appears here.` : `So far, to retire at <b>${i.targetAge}</b> you'd need <b>${FK.inr(r.needReal)}</b>${s>=5?` · gap ${r.gapReal>0?"−":"+"}${FK.inr(Math.abs(r.gapReal))}`:""}`; }
 function draw(){
   $("dots").innerHTML=Q.map((_,j)=>`<i class="${j<=s?"on":""}"></i>`).join("");
   if(s>=Q.length){showResult();return;}
   const q=Q[s]; let body="";
   if(q.lakh) body=lakhInput("in",i[q.k]); else if(q.type==="num") body=`<input type="number" id="in" value="${i[q.k]}">`;
-  if(q.type==="chips") body=`<div class="chips">${q.opts.map(o=>`<span class="chip ${i[q.k]==o?"on":""}" data-v="${o}">${o}</span>`).join("")}</div>`;
-  if(q.toggle) body+=`<label class="toggle" style="margin-top:12px"><input type="checkbox" id="tg" ${i[q.toggle]?"checked":""}> Count this</label>`;
-  if(q.extra) body+=`<label>${q.extra.label}</label>`+(q.extra.plain?`<input type="number" id="ex" value="${i[q.extra.k]}">`:lakhInput("ex",i[q.extra.k]));
+  if(q.type==="chips") body=`<div class="chips">${q.opts.map(([v,t])=>`<span class="chip ${i[q.k]==v?"on":""}" data-v="${v}">${t}</span>`).join("")}</div>`;
+  if(q.toggle) body+=`<label class="toggle" style="margin-top:12px"><input type="checkbox" id="tg" ${i[q.toggle]?"checked":""}> ${q.k==="emi"?"I have a home loan":"Count this"}</label>`;
+  if(q.extra) body+=field("ex",q.extra); if(q.extra2) body+=field("ex2",q.extra2);
+  if(q.sanity) body+=`<div class="sanity" id="san">${sanityCopy()}</div>`;
   if(q.delta) body+=`<div class="hint" id="dh" style="margin-top:8px">${deltaCopy()}</div>`;
   $("qcard").innerHTML=`<div class="q">${q.q}</div><div class="qhint">${q.h}</div>${body}`;
-  const bind=(id,key,lakh)=>{const el=$(id); if(!el) return; el.oninput=()=>{i[key]=lakh?(+el.value||0)*L:(+el.value||0); const p=$(id+"p"); if(p) p.textContent=FK.inr(i[key]); sofar(); if($("dh")) $("dh").innerHTML=deltaCopy();};};
-  bind("in",q.k,!!q.lakh); if(q.extra) bind("ex",q.extra.k,!q.extra.plain);
+  const bind=(id,ex)=>{const el=$(id); if(!el) return; el.oninput=()=>{i[ex.k]=ex.plain?(+el.value||0):ex.pct?(+el.value||0)/100:(+el.value||0)*L; const p=$(id+"p"); if(p) p.textContent=FK.inr(i[ex.k]); sofar(); if($("dh")) $("dh").innerHTML=deltaCopy(); if($("san")) $("san").innerHTML=sanityCopy();};};
+  bind("in",{k:q.k,plain:q.type==="num"}); if(q.extra) bind("ex",q.extra); if(q.extra2) bind("ex2",q.extra2);
   document.querySelectorAll(".chip").forEach(c=>c.onclick=()=>{i[q.k]=+c.dataset.v;draw();});
   const tg=$("tg"); if(tg) tg.onchange=()=>{i[q.toggle]=tg.checked;sofar(); if($("dh")) $("dh").innerHTML=deltaCopy();};
   $("back").disabled=s===0; $("next").textContent=s===Q.length-1?"See my number →":"Next →"; sofar();
@@ -105,11 +132,13 @@ function draw(){
 function showResult(){ $("intake").style.display="none"; $("result").style.display=""; render(); window.scrollTo(0,0); }
 function render(){
   const base=FK.compute(i), yr=new Date().getFullYear();
-  const pi=FK.applyPlan(i,on), r=FK.compute(pi);            // plan-adjusted view drives the hero
-  const planOn=on.size>0, names=FK.LEVERS.filter(l=>on.has(l.key)).map(l=>l.label.toLowerCase());
+  const pi=FK.applyPlan(i,on), r=FK.compute(pi);
+  const planOn=on.size>0, names=FK.LEVERS.filter(l=>on.has(l.key)).map(l=>l.label.toLowerCase().split(" — ")[0]);
   $("tAge").textContent=pi.targetAge; $("sv").textContent=pi.targetAge; $("sl").value=pi.targetAge; $("hAge").textContent=pi.targetAge;
   $("needTop").textContent=FK.inr(r.needReal); $("needNom").textContent=FK.inr(r.needNominal); $("needYear").textContent=yr+r.n;
-  $("have").textContent=FK.inr(r.haveReal); $("haveSub").textContent=`at ${FK.inr(pi.sip)}/month${pi.stepUp>0?` rising ${Math.round(pi.stepUp*100)}%/yr`:""}, today's money`;
+  const ratio=r.needReal/i.guess; $("guessLine").innerHTML=`Your gut said <b>${FK.inr(i.guess)}</b> · the math says <b>${FK.inr(r.needReal)}</b> ${ratio>1.15?`— <b>${ratio.toFixed(1)}×</b> more, and that's normal (see "why so big")`:ratio<0.85?"— you were on the cautious side":"— good instinct"}.`;
+  $("guessWhy").innerHTML=`<b>${FK.inr(i.guess)}</b>`;
+  $("have").textContent=FK.inr(r.haveReal); $("haveSub").textContent=`at ${FK.inr(pi.sip)}/month${pi.stepUp>0?` rising ${Math.round(pi.stepUp*100)}%/yr`:""}${pi.rollEmi?` + the ₹${(pi.emi/L).toFixed(1)} L EMI from year ${pi.loanYearsLeft}`:""}, today's money`;
   const short=r.gapReal>0; $("gap").textContent=(short?"−":"+")+FK.inr(Math.abs(r.gapReal)); $("gap").className="v mono "+(short?"bad":"ok"); $("gapSub").textContent=short?"short":"surplus";
   $("req").textContent=short?FK.inr(r.requiredSip)+" / month":"You're already there";
   $("reqSub").innerHTML=short?`invest this every month (you do ${FK.inr(i.sip)} now) to retire at ${pi.targetAge}${planOn?` — <b>with</b> ${names.join(" + ")}`:""}`:`your current ${FK.inr(i.sip)}/month is enough for ${pi.targetAge}${planOn?` with ${names.join(" + ")}`:""}`;
@@ -119,23 +148,24 @@ function render(){
     pace<=i.targetAge ? `At today's pace you'd get there by <b>${pace}</b> — ${i.targetAge-pace} years early.` :
     `At today's pace you'd get there at <b>${pace}</b> — <b>${pace-i.targetAge} years later</b> than you'd like. The "do this" amount closes that gap.`;
   $("explain").innerHTML=[
-    `You spend ₹${(i.spend/L).toFixed(1)} L a month → <b>${FK.inr(i.spend*12)}</b> a year. To draw that safely until 90 (${90-i.targetAge} years) we keep it at <b>${+(r.swrUsed*100).toFixed(2)}% of the corpus</b> → <b>${FK.inr(i.spend*12/r.swrUsed)}</b>.`,
+    `You spend ₹${(i.spend/L).toFixed(1)} L a month → <b>${FK.inr(i.spend*12)}</b> a year. To draw that safely until 90 (${90-pi.targetAge} years) we keep it at <b>${+(r.swrUsed*100).toFixed(2)}% of the corpus</b> → <b>${FK.inr(i.spend*12/r.swrUsed)}</b>.`,
     `Plus one-off goals in today's money — education, post-grad, weddings${i.includeHouse?", the house":""} — <b>${FK.inr(r.goals)}</b>.`,
-    `Your ${FK.inr(i.corpus+(i.includeSpouse?i.spouseCorpus:0))} plus ${FK.inr(i.sip)}/month grow at ${+(i.equityReturn*100).toFixed(0)}% for ${r.n} years; then we <b>remove ${+(i.inflation*100).toFixed(0)}% inflation</b> so you compare like with like → <b>${FK.inr(r.haveReal)}</b>.`,
+    `Your ${FK.inr(i.corpus+(i.includeSpouse?i.spouseCorpus:0))} plus ${FK.inr(pi.sip)}/month grow at ${+(pi.equityReturn*100).toFixed(1)}% for ${r.n} years; then we <b>remove ${+(i.inflation*100).toFixed(0)}% inflation</b> so you compare like with like → <b>${FK.inr(r.haveReal)}</b>.`,
     `The scary number others quote (<b>${FK.inr(r.needNominal)}</b>) is the same thing in ${yr+r.n} rupees. We show both and plan in today's.`
   ].map(t=>`<li>${t}</li>`).join("");
-  $("assump").textContent=`${+(i.inflation*100).toFixed(1)}% inflation · ${+(pi.equityReturn*100).toFixed(1)}% return · ${+(r.swrUsed*100).toFixed(2)}% safe withdrawal (for a ${90-i.targetAge}-yr drawdown) · investing raised ${+(pi.stepUp*100).toFixed(0)}%/yr`;
-  const toFind=(inp,res)=>Math.max(0,res.requiredSip-inp.sip);           // "gap to close" = required − already investing
-  $("levers").innerHTML=FK.LEVERS.map(l=>{const li=l.apply(i), one=FK.compute(li); const d=toFind(i,base)-toFind(li,one);
-    return `<label class="lever"><input type="checkbox" data-k="${l.key}" ${on.has(l.key)?"checked":""}><span>${l.label}<div class="n">${l.note}</div></span><span class="fx"><b class="${d>0?"ok":"mut"}">−${FK.inr(Math.max(0,d))}/mo</b><span class="n">less to find</span></span></label>`;}).join("");
+  $("assump").textContent=`${+(i.inflation*100).toFixed(1)}% inflation · ${+(pi.equityReturn*100).toFixed(1)}% return · ${+(r.swrUsed*100).toFixed(2)}% safe withdrawal (for a ${90-pi.targetAge}-yr drawdown) · investing raised ${+(pi.stepUp*100).toFixed(0)}%/yr`;
+  const toFind=(inp,res)=>Math.max(0,res.requiredSip-inp.sip);
+  $("levers").innerHTML=FK.LEVERS.map(l=>{const avail=!l.available||l.available(i); const li=l.apply(i), one=FK.compute(li); const d=toFind(i,base)-toFind(li,one);
+    const fx=avail?`<b class="${d>0?"ok":"mut"}">−${FK.inr(Math.max(0,d))}/mo</b><span class="n">less to find</span>`:`<span class="n">${i.hasLoan?"your loan costs more than investing earns — prepay it":"no home loan"}</span>`;
+    return `<label class="lever ${avail?"":"off"}"><input type="checkbox" data-k="${l.key}" ${on.has(l.key)?"checked":""} ${avail?"":"disabled"}><span>${l.label}<div class="n">${l.note}</div></span><span class="fx">${fx}</span></label>`;}).join("");
   document.querySelectorAll("#levers input").forEach(c=>c.onchange=()=>{c.checked?on.add(c.dataset.k):on.delete(c.dataset.k);render();});
   $("plansum").innerHTML = !planOn ? `Switch on a few moves to see the number you can actually live with.` :
     r.requiredSip<=i.sip ? `With ${names.join(" + ")}: your current <b>${FK.inr(i.sip)}/month</b> is enough to retire at <b>${pi.targetAge}</b>.` :
     `With ${names.join(" + ")}: you need <b>${FK.inr(r.requiredSip)}/month</b> to retire at ${pi.targetAge} — instead of ${FK.inr(base.requiredSip)}. Of that, ${FK.inr(pi.sip)} is already flowing${pi.sip>i.sip?" (incl. the cash these moves free up)":""}; the extra to find is <b>${FK.inr(toFind(pi,r))}/month</b>${toFind(pi,r)<toFind(i,base)?` (was ${FK.inr(toFind(i,base))})`:""}.`;
-  $("rows").innerHTML=[["Age",i.age],["Spend / month",FK.inr(i.spend)],["All investments",FK.inr(i.corpus)],["Spouse savings",i.includeSpouse?FK.inr(i.spouseCorpus):"—"],["Investing / month",FK.inr(i.sip)],["Kids",`${i.kids} · age ${i.kidsAge}`],["Education",FK.inr(i.education)],["Post-grad",FK.inr(i.postgrad)],["Weddings",FK.inr(i.wedding)],["Big purchase",i.includeHouse?FK.inr(i.house):"—"]].map(([k,v])=>`<span>${k}</span><b>${v}</b>`).join("");
-  chart(r);
+  $("rows").innerHTML=[["Gut feel",FK.inr(i.guess)],["Age → retire at",`${i.age} → ${i.targetAge}`],["Spend / month",FK.inr(i.spend)],["Take-home / month",FK.inr(i.income)],["All investments",FK.inr(i.corpus)],["Spouse investments",i.includeSpouse?FK.inr(i.spouseCorpus):"—"],["Investing / month",FK.inr(i.sip)],["Kids",`${i.kids} · age ${i.kidsAge}`],["Education · PG · weddings",`${FK.inr(i.education)} · ${FK.inr(i.postgrad)} · ${FK.inr(i.wedding)}`],["Big purchase",i.includeHouse?FK.inr(i.house):"—"],["Home loan",i.hasLoan?`${FK.inr(i.emi)}/mo @ ${(i.loanRate*100).toFixed(1)}%, ${i.loanYearsLeft} yrs`:"—"]].map(([k,v])=>`<span>${k}</span><b>${v}</b>`).join("");
+  chart();
 }
-function chart(r){
+function chart(){
   const pi=FK.applyPlan(i,on); const svg=$("chart"),W=600,H=170,P=24; const a0=i.age,a1=Math.max(65,pi.targetAge+5); const pts=[];let maxV=0;
   for(let a=a0;a<=a1;a++){const c=FK.compute({...pi,targetAge:a});maxV=Math.max(maxV,c.haveReal,c.needReal);pts.push({a,have:c.haveReal,need:c.needReal});}
   const x=a=>P+(a-a0)/(a1-a0)*(W-2*P), y=v=>H-P-(v/maxV)*(H-2*P), line=(k,col)=>`<polyline fill="none" stroke="${col}" stroke-width="2.5" points="${pts.map(p=>x(p.a)+","+y(p[k])).join(" ")}"/>`;

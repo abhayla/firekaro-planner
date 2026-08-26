@@ -39,7 +39,9 @@
 **FOCUS LOCK (2026-06-07, D-2026-06-07-07): MUST-HAVE ONLY** — no new good-to-have/nice-to-have build
 without Abhay's explicit per-item approval (`.claude/rules/must-have-only-focus.md`).
 
-**✅ The full-lifecycle QA verification & hardening cycle is now DONE (2026-06-08, D-08-01/02):** Phase A
+**▶ ACTIVE (2026-08-27, D-2026-08-27-01): the Quick Number front door — spec `docs/goals/2026-08-27-quick-number-front-door.md`, stages QN-3→QN-2→QN-1→QN-4→QN-5 via `/get-work-done`.**
+
+**✅ The full-lifecycle QA verification & hardening cycle is DONE (2026-06-08, D-08-01/02):** Phase A
 merged to `main` (`b8fadd7`) + Phase B prod-verified PASS. **So the allowed must-have/hardening queue is
 now EMPTY.** Everything that remains — stickiness/retention (#44/#45), the other good-to-have
 (#41/#46/#49/#62), nice-to-have (#43/#47/#53/#63), adjacent personas (NRI/HUF) — is **BLOCKED by the
@@ -124,6 +126,23 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 ---
 
 ## §3 — Decision log (append-only, newest first)
+
+### 2026-08-27
+- **D-2026-08-27-01 — "Quick Number" front door APPROVED for build (Abhay, 00:39 IST) — focus lock lifted for this
+  scope.** Trigger: Dezerv "Portfolio Breakdown – Retirement Edition" (`FbYnFUwdODQ`) captured + cross-checked
+  (`D:\Abhay\Ventures	ranscripts\FbYnFUwdODQ*.md`). Finding: FireKaro out-rigors the tool on inputs but loses on
+  feel — no number in 3 min, no need/have/gap/do-this, no hero-level retirement-age what-if, no "how to get
+  there"; plus a Tier-0 honesty bug (`general` planned goals never enter the FIRE number, `derive.ts:449`).
+  Design: options A/B → blind review (6.5/6.0) → merged Option C → blind review 8.5 → owner corrections
+  (investments copy read as exclusive; "how to get there" half missing) → coverage matrix
+  (`docs/design/2026-08-27-quick-number-gap-hero/COVERAGE-MATRIX.md`) → Option C completed (gut-feel guess,
+  income sanity, home loan, investment property, explainer, levers, full-planner list). **Spec:**
+  `docs/goals/2026-08-27-quick-number-front-door.md` — stages QN-3 (Tier-0 fix) → QN-2 (solver + hero) →
+  QN-1 (`/quick` path) → QN-4 (explainers) → QN-5 (levers); QN-6 (InvestmentForm fast-add) + portfolio-review
+  items stay locked. Execution via `/get-work-done`, one PR per stage. **Why (goal-anchored):** obj-0
+  effortless setup + obj-1 honesty + obj-2 get-there-faster for the LOCKED persona; the honesty bug is
+  optimistic for the target user → Tier-0. Process lesson registered (`MECHANISM-DUE` →
+  `artifact-built-without-coverage-matrix`).
 
 ### 2026-08-26
 - **D-2026-08-26-03 — T-349 CLAUDE.md trim LANDED inline on Abhay's explicit approval (supersedes the

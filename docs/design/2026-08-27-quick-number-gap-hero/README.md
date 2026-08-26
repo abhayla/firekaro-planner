@@ -9,7 +9,8 @@ inputs-left / live results-right; assumptions collapsible; live recompute, no Ca
 |---|---|
 | `option-a-quick-number-panel.html` | Desktop-first: 10-field left panel → live "need / have / gap / do this" hero + retirement-age slider + transparent "how we got this" + corpus-vs-need chart |
 | `option-b-conversational.html` | Mobile-first Dezerv-style: one question per card, "your number so far" grows as you answer, lands on the same gap hero |
-| `option-c-merged.html` | **Post-review merge (recommended):** B's one-question intake (lakh inputs, live preview, house-delta hint on the question) → A's honest result (one headline number = target age; pace demoted to an annotation; "how we got this"; chart; editable answers) |
+| `option-c-merged.html` | **APPROVED DESIGN (2026-08-27) — the build SSOT with `COVERAGE-MATRIX.md`:** B's one-question intake (lakh inputs, live preview, house-delta hint on the question) → A's honest result (one headline number = target age; pace demoted to an annotation; "how we got this"; chart; editable answers) |
+| `COVERAGE-MATRIX.md` | Video item → mockup → plan traceability; the checklist every review and the worker use |
 | `fk-mock.js` / `fk-mock.css` | Shared mock math (simplified real-frame; **not** the kernel) + styles |
 | `shots-plan.mjs` | Option C with three levers on (step-up + delay + direct) → `shots/option-c-merged.plan.*.png` |
 | `shots/` | Screenshots at 390 / 1280 for review (regenerate: `node shots.mjs`) |
