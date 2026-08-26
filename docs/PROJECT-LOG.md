@@ -126,6 +126,23 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 ## §3 — Decision log (append-only, newest first)
 
 ### 2026-08-26
+- **D-2026-08-26-04 — T-354 (CI docs-only short-circuit, mechanism 3 of the fast-lane plan) code
+  LANDED; live verification BLOCKED by the same B8 GitHub Actions billing block as T-350.** Added a
+  `changes` job to `.github/workflows/ci.yml` (`ci/T-354-docs-only-short-circuit`, PR #164) that
+  diffs base...HEAD and sets `docs_only` when every changed file matches `*.md`, `docs/**`,
+  `.claude/**`, or `LICENSE*`; `frontend`/`backend` gain `needs: changes` +
+  `if: needs.changes.outputs.docs_only != 'true'`, job-level `if:` (never workflow-level
+  `paths-ignore`, which would leave a required check permanently un-run). Pushed with no skip-ci
+  marker to trigger the contract's required run (1) — **no workflow run was ever created** for the
+  branch/PR (`gh pr checks 164` → "no checks reported"; `gh api .../actions/runs` shows no entry for
+  the branch), matching the exact billing-block signature already diagnosed in D-2026-08-26-02 (jobs
+  queued-then-cancelled with zero steps on the last 3 `main` pushes). **Why (goal-anchored):** the
+  DoD requires two REAL CI run URLs with observed `docs_only` values and timings — that is
+  unverifiable while GitHub Actions cannot run at all on this account; fabricating a run URL would be
+  dishonest. No new needs-Abhay item filed — this is the same **B8** blocker
+  (`docs/comms-go-live-handoff.md`), not a second issue. Once B8 is resolved, the two verification
+  pushes on PR #164 can run with **no further code change** (the job is already on the branch).
+
 - **D-2026-08-26-03 — T-349 CLAUDE.md trim LANDED inline on Abhay's explicit approval (supersedes the
   "remain open" clause of D-2026-08-26-01).** `/init` re-review found the cancelled T-349 draft pointed at
   a `.claude/rules/server-backend.md` that did not exist (the file had been written but the global
