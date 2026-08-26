@@ -82,13 +82,23 @@ export function bridgeRentalPostTaxAnnual(
     }, 0);
 }
 
+import { usableOverride, type DeriveOverrides } from "@/lib/derive-overrides";
+export type { DeriveOverrides } from "@/lib/derive-overrides";
+
 export interface DeriveLens {
   isFamilyView: boolean;
   viewingMemberId: string | null;
   currentFY: string;
 }
 
-export function derive(household: Household, assumptions: Assumptions, lens: DeriveLens) {
+export function derive(
+  household: Household,
+  assumptions: Assumptions,
+  lens: DeriveLens,
+  overrides?: DeriveOverrides,
+) {
+  const contributionOverride = usableOverride(overrides?.monthlyContributionReal, 0);
+  const targetAgeOverride = usableOverride(overrides?.targetRetirementAge, 1);
   const members = household.members;
   // gh #67: earning is DERIVED from labour income (salary / active business), not a role flag.
   const earners = members.filter((m) => isEarningMember(m, household.businesses));
@@ -186,6 +196,9 @@ export function derive(household: Household, assumptions: Assumptions, lens: Der
     return primary ? ageFromDOB(primary.dateOfBirth) : 30;
   }
   function targetRetirementAgeFor(applyForScope: boolean): number {
+    // T-377: the hero slider's "what if I retired at N" — applied to EVERY scope so the
+    // horizon-dependent layers (SWR, glide path, bridge window) all move with it.
+    if (targetAgeOverride != null) return targetAgeOverride;
     if (applyForScope) {
       const m = members.find((x) => x.id === effectiveLensMemberId);
       if (m?.targetRetirementAge) return m.targetRetirementAge;
@@ -350,7 +363,9 @@ export function derive(household: Household, assumptions: Assumptions, lens: Der
     // so investments[].monthlyContribution is ALREADY inside annualSavings — adding it again
     // double-counted every SIP (≈10× over-statement for the Sharmas) and pulled the FIRE date years
     // early. SIPs are a subset of the surplus, never additive to it.
-    const monthlyContribution = Math.round(annualSavings / 12);
+    // T-377: the solver replaces ONLY the corpus inflow — `annualSavings`/`savingsRate` keep
+    // describing the household's real cashflow, so no display figure is silently rewritten.
+    const monthlyContribution = contributionOverride ?? Math.round(annualSavings / 12);
     const monthlyTakeHome = Math.round((annualIncome.total - annualTax) / 12);
     const savingsRate = calculateSavingsRate(monthlyTakeHome, Math.round(annualSavings / 12));
 
@@ -740,7 +755,7 @@ export function derive(household: Household, assumptions: Assumptions, lens: Der
   // "the family can stop". computeIndividualFire owns the attribution (single canonical helper).
   const individualFireByMember = members
     .filter((m) => isAdultRole(m.role))
-    .map((m) => computeIndividualFire(household, assumptions, m.id, lens.currentFY))
+    .map((m) => computeIndividualFire(household, assumptions, m.id, lens.currentFY, overrides))
     .filter((r): r is NonNullable<ReturnType<typeof computeIndividualFire>> => r != null);
   const sumAdultAttributableExpenses = individualFireByMember.reduce(
     (s, r) => s + r.attributableAnnualExpenses,

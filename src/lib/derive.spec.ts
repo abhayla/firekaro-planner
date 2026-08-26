@@ -1000,3 +1000,78 @@ describe("T-376/gh-#165 — 'general' planned goals enter the FIRE number (Tier-
     expect(after.fireNumber).toBeGreaterThan(before.fireNumber);
   });
 });
+
+describe("T-377/QN-2 — the additive `overrides` seam the required-contribution solver drives", () => {
+  beforeEach(() => setActivePinia(createPinia()));
+
+  const lens = (ui: ReturnType<typeof useUiStore>) => ({
+    isFamilyView: ui.isFamilyView,
+    viewingMemberId: ui.viewingMemberId,
+    currentFY: ui.currentFY,
+  });
+
+  it("omitting overrides is byte-identical to passing an empty object (the default path can never move)", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    const ui = useUiStore();
+    loadSeedPersona(h, a);
+
+    const base = derive(h.data, a.values, lens(ui));
+    const withEmpty = derive(h.data, a.values, lens(ui), {});
+
+    expect(withEmpty.yearsToRegular).toBe(base.yearsToRegular);
+    expect(withEmpty.householdFireAge).toBe(base.householdFireAge);
+    expect(withEmpty.fireNumber).toBe(base.fireNumber);
+    expect(withEmpty.monthlyContribution).toBe(base.monthlyContribution);
+    expect(withEmpty.targetRetirementAge).toBe(base.targetRetirementAge);
+  });
+
+  it("a non-finite / negative override is ignored (never NaN-poisons the kernel — rule 31)", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    const ui = useUiStore();
+    loadSeedPersona(h, a);
+
+    const base = derive(h.data, a.values, lens(ui));
+    for (const bad of [Number.NaN, Number.POSITIVE_INFINITY, -1]) {
+      const out = derive(h.data, a.values, lens(ui), { monthlyContributionReal: bad });
+      expect(out.monthlyContribution).toBe(base.monthlyContribution);
+      expect(out.yearsToRegular).toBe(base.yearsToRegular);
+    }
+    const badAge = derive(h.data, a.values, lens(ui), { targetRetirementAge: Number.NaN });
+    expect(badAge.targetRetirementAge).toBe(base.targetRetirementAge);
+  });
+
+  it("`monthlyContributionReal` replaces the corpus inflow — more money never makes FIRE later", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    const ui = useUiStore();
+    loadSeedPersona(h, a);
+
+    const base = derive(h.data, a.values, lens(ui));
+    const doubled = derive(h.data, a.values, lens(ui), {
+      monthlyContributionReal: base.monthlyContribution * 2,
+    });
+
+    expect(doubled.monthlyContribution).toBe(base.monthlyContribution * 2);
+    // The FIRE NUMBER must be untouched by a contribution change (it is expense-driven).
+    expect(doubled.fireNumber).toBe(base.fireNumber);
+    expect(doubled.yearsToRegular).toBeLessThanOrEqual(base.yearsToRegular);
+  });
+
+  it("`targetRetirementAge` moves the horizon-dependent layers (SWR / glide / bridge), not just a label", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    const ui = useUiStore();
+    loadSeedPersona(h, a);
+
+    const base = derive(h.data, a.values, lens(ui));
+    const later = derive(h.data, a.values, lens(ui), { targetRetirementAge: base.targetRetirementAge + 10 });
+
+    expect(later.targetRetirementAge).toBe(base.targetRetirementAge + 10);
+    // A longer working life ⇒ a shorter drawdown ⇒ a higher (or equal) horizon-SWR ⇒ a
+    // smaller-or-equal FIRE number. This is the proof the override reaches the real layers.
+    expect(later.effectiveSWR).toBeGreaterThanOrEqual(base.effectiveSWR);
+    expect(later.fireNumber).toBeLessThanOrEqual(base.fireNumber);
+  });
+});
