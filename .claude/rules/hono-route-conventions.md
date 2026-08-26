@@ -1,6 +1,6 @@
 ---
 description: Hono backend route conventions for all 41 route files in server/routes/
-globs: ["server/routes/**/*.ts", "server/index.ts"]
+globs: ["server/src/routes/**/*.ts", "server/src/index.ts"]
 ---
 
 # Hono Route Conventions

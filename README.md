@@ -52,7 +52,7 @@ strategy, glide path, freedom score, …). The `server/` is only the thin docume
 calculation backend; all math is client-side.
 
 **v6 ServerAdapter swap:** `src/main.ts` is the one async seam. When `VITE_USE_SERVER_ADAPTER` is
-on it resolves the session, warms the cache via 6 concurrent GETs, and installs the `ServerAdapter`
+on it resolves the session, warms the cache via 7 concurrent GETs (one per `SERVER_KEYS` document, incl. `plan-baseline`), and installs the `ServerAdapter`
 **before mount** — so every store and router guard reads a warm cache synchronously. If the flag is
 off or the backend is unreachable, it falls back to `LocalStorageAdapter`.
 
@@ -106,7 +106,7 @@ curl -H "x-dev-bypass: true" http://localhost:3100/api/planner/household
 
 - **DB:** Supabase project `firekaro-planner` (ap-south-1, Postgres 17), connected via the session
   pooler `aws-1-ap-south-1.pooler.supabase.com:5432`. `DATABASE_URL` + `BETTER_AUTH_SECRET` live in
-  `server/.env` (gitignored). 22-table schema in `server/prisma/schema.prisma`, derived 1:1 from the
+  `server/.env` (gitignored). 24-table schema in `server/prisma/schema.prisma`, derived 1:1 from the
   frontend's Zod model.
 - **Document endpoints:** `GET`+`PUT /api/planner/{household,assumptions,scenarios,features,ui,
   expense-history}` + `DELETE /api/planner/all` + `GET /api/planner/me`. They mirror the
@@ -116,7 +116,7 @@ curl -H "x-dev-bypass: true" http://localhost:3100/api/planner/household
   `Household` to per-table insert/update/delete; `PUT /household` applies it in one Prisma
   `$transaction`. The Prisma read/write layer it drives is `server/src/lib/household-repo.ts`.
 - **Auth:** Better Auth (Google + sessions) + a 3-factor dev-bypass
-  (`NODE_ENV !== 'production'` + `DEV_BYPASS_AUTH === 'true'` + an `x-dev-bypass` header).
+  (an EXPLICIT `NODE_ENV` of `development`/`test` + `DEV_BYPASS_AUTH === 'true'` + an `x-dev-bypass` header).
 
 ```bash
 cd server
@@ -137,7 +137,7 @@ npm run prisma:migrate:deploy
 - A 6-section onboarding questionnaire with a sticky "Skip — show me everything" affordance.
 - `/preferences` is the canonical home for every editable planning assumption (section-anchored
   nav; statutory facts read-only).
-- 4 seed personas in `src/seeds/`: **Sharmas** (default), **Iyers**, **Mehtas**, **Empty** (wizard).
+- 5 seed personas in `src/seeds/`: **Sharmas** (default), **Iyers**, **Mehtas**, **Mauryas**, **Empty** (wizard).
 
 ---
 
@@ -158,8 +158,9 @@ living SSOT for screen look & structure. Design tokens in `src/styles/tokens.css
 - v5 status artifacts: `FINAL-BRIEF-v5.md`, `VERIFICATION-REPORT-v5.md`, `POST-RUN-NOTES-v5.md`;
   deferrals in `DEFERRED-v5.md`.
 
-Phase 1 (v6 backend foundation) verified feature-complete; Google OAuth + login UI is the final
-pre-production task. The app is fully testable via the dev-bypass in the meantime.
+**Live in production since 2026-06-01 at https://firekaro.com** (Hostinger VPS, PM2 + nginx → Supabase,
+Cloudflare edge TLS; Google OAuth working). Deploy runbook: `docs/DEPLOY.md`. Locally the app is fully
+testable via the dev-bypass. 
 
 ---
 
