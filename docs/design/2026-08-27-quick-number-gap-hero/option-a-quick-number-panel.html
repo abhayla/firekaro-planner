@@ -111,7 +111,7 @@ function render(){
   const noHouse = FK.compute({...i, includeHouse:false});
   $("houseHint").innerHTML = i.includeHouse ? `Counted. It moves your FIRE age by <b>${(r.fireAge??90)-(noHouse.fireAge??90)} yr</b> — most tools silently ignore this.` : `Not counted.`;
   $("explain").innerHTML = [
-    `Your ₹${(i.spend/FK.L).toFixed(1)} L/month is <b>${FK.inr(i.spend*12)}</b> a year. To draw that safely for 40 years we keep it at <b>${(i.swr*100).toFixed(2)}% of the corpus</b> → <b>${FK.inr(i.spend*12/i.swr)}</b>.`,
+    `Your ₹${(i.spend/FK.L).toFixed(1)} L/month is <b>${FK.inr(i.spend*12)}</b> a year. To draw that safely for 40 years we keep it at <b>${+(r.swrUsed*100).toFixed(2)}% of the corpus</b> → <b>${FK.inr(i.spend*12/r.swrUsed)}</b>.`,
     `Plus one-off goals in today's money — education, post-grad, weddings${i.includeHouse?", house":""} — <b>${FK.inr(r.goals)}</b>.`,
     `Your ${FK.inr(i.corpus + (i.includeSpouse?i.spouseCorpus:0))} + ${FK.inr(i.sip)}/month grow at ${(i.equityReturn*100).toFixed(0)}% for ${r.n} years, then we <b>remove ${(i.inflation*100).toFixed(0)}% inflation</b> so you compare like with like → <b>${FK.inr(r.haveReal)}</b>.`,
     `The big scary number others quote (<b>${FK.inr(r.needNominal)}</b>) is the same thing in ${new Date().getFullYear()+r.n} rupees. We show both; we plan in today's.`

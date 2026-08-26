@@ -4,6 +4,12 @@
 <link rel="stylesheet" href="fk-mock.css">
 <style>
 .phone{max-width:520px}
+@media(min-width:1024px){
+  .phone{max-width:1080px}
+  #result{display:grid;grid-template-columns:1.15fr 1fr;gap:16px;align-items:start}
+  #result .hero{grid-row:span 3}
+  #intake{max-width:560px;margin:0 auto}
+}
 .pace{margin-top:10px;font-size:13px;color:var(--muted);padding:10px 12px;border-radius:12px;background:#fff;border:1px dashed var(--line)}
 .pace b{color:var(--ink)}
 .lakh{position:relative}.lakh input{padding-right:64px}.lakh span{position:absolute;right:12px;top:50%;transform:translateY(-50%);font-size:12px;color:var(--muted);font-weight:600}
@@ -16,7 +22,7 @@
 <div class="phone">
 <div id="intake">
   <h1 style="font-size:18px">Let's find your number</h1>
-  <div class="sub">Ten quick questions, answers in lakh. Rough is fine — refine anything later.</div>
+  <div class="sub">Ten quick questions, answers in lakh. Rough is fine — refine anything later. <span class="pill warn" title="Mockup only">example answers pre-filled</span></div>
   <div class="dots" id="dots"></div>
   <div class="card" id="qcard"></div>
   <div class="sofar" id="sofar"></div>
@@ -38,7 +44,7 @@
   </div>
 
   <div class="card"><h3>How we got this — no magic</h3><ol class="explain" id="explain"></ol>
-    <div class="hint" style="margin-top:8px">Assumptions: <span id="assump"></span> · live to 90. Honest defaults, not sales defaults.</div></div>
+    <div class="hint" style="margin-top:8px">Assumptions: <span id="assump"></span> · live to 90. Honest defaults, not sales defaults — <b>every one is editable in the full planner</b>.</div></div>
   <div class="card"><h3>What you'll have vs what you'll need · today's money</h3><svg class="chart" id="chart" viewBox="0 0 600 170" preserveAspectRatio="none"></svg>
     <div class="legend" style="font-size:12px"><span style="color:var(--blue)">■</span> have &nbsp; <span style="color:var(--amber)">■</span> need &nbsp; · dashed = your target</div></div>
   <div class="card edit"><details><summary>Your answers — tap to change</summary><div class="rows" id="rows"></div>
@@ -61,7 +67,7 @@ const Q=[
  {k:"sip",q:"How much do you put into investments every month?",h:"All of it: SIPs, stock/ETF buys, your PF + employer PF, NPS, PPF, RDs — whatever you add every month.",lakh:true},
  {k:"spouseCorpus",q:"Spouse's investments, if any?",h:"ALL of theirs too — MF, stocks, PF, NPS, gold, everything. Untick if not applicable.",lakh:true,toggle:"includeSpouse"},
  {k:"kids",q:"Kids?",h:"How many, and roughly how old?",type:"chips",opts:[0,1,2,3],extra:{k:"kidsAge",label:"Their age",plain:true}},
- {k:"education",q:"Their education, in today's money?",h:"Undergrad for all kids. Abroad? ₹75 L+ combined.",lakh:true,extra:{k:"postgrad",label:"Post-grad, if any (₹ lakh)"}},
+ {k:"education",q:"Their education, in today's money?",h:"Undergrad for all kids. Abroad? ₹75 L+ combined.",lakh:true,extra:{k:"postgrad",label:"Post-grad, if any"}},
  {k:"wedding",q:"Weddings?",h:"Today's money, all kids.",lakh:true},
  {k:"house",q:"Any big purchase coming — bigger home, car?",h:"Net of what you'd sell. Most tools forget this; it moves your date.",lakh:true,toggle:"includeHouse",delta:true},
 ];
@@ -100,12 +106,12 @@ function render(){
     pace<=i.targetAge ? `At today's pace you'd get there by <b>${pace}</b> — ${i.targetAge-pace} years early.` :
     `At today's pace you'd get there at <b>${pace}</b> — <b>${pace-i.targetAge} years later</b> than you'd like. The "do this" amount closes that gap.`;
   $("explain").innerHTML=[
-    `You spend ₹${(i.spend/L).toFixed(1)} L a month → <b>${FK.inr(i.spend*12)}</b> a year. To draw that safely for 40 years we keep it at <b>${+(i.swr*100).toFixed(2)}% of the corpus</b> → <b>${FK.inr(i.spend*12/i.swr)}</b>.`,
+    `You spend ₹${(i.spend/L).toFixed(1)} L a month → <b>${FK.inr(i.spend*12)}</b> a year. To draw that safely until 90 (${90-i.targetAge} years) we keep it at <b>${+(r.swrUsed*100).toFixed(2)}% of the corpus</b> → <b>${FK.inr(i.spend*12/r.swrUsed)}</b>.`,
     `Plus one-off goals in today's money — education, post-grad, weddings${i.includeHouse?", the house":""} — <b>${FK.inr(r.goals)}</b>.`,
     `Your ${FK.inr(i.corpus+(i.includeSpouse?i.spouseCorpus:0))} plus ${FK.inr(i.sip)}/month grow at ${+(i.equityReturn*100).toFixed(0)}% for ${r.n} years; then we <b>remove ${+(i.inflation*100).toFixed(0)}% inflation</b> so you compare like with like → <b>${FK.inr(r.haveReal)}</b>.`,
     `The scary number others quote (<b>${FK.inr(r.needNominal)}</b>) is the same thing in ${yr+r.n} rupees. We show both and plan in today's.`
   ].map(t=>`<li>${t}</li>`).join("");
-  $("assump").textContent=`${+(i.inflation*100).toFixed(1)}% inflation · ${+(i.equityReturn*100).toFixed(1)}% return · ${+(i.swr*100).toFixed(2)}% safe withdrawal · investing raised ${+(i.stepUp*100).toFixed(0)}%/yr`;
+  $("assump").textContent=`${+(i.inflation*100).toFixed(1)}% inflation · ${+(i.equityReturn*100).toFixed(1)}% return · ${+(r.swrUsed*100).toFixed(2)}% safe withdrawal (for a ${90-i.targetAge}-yr drawdown) · investing raised ${+(i.stepUp*100).toFixed(0)}%/yr`;
   $("rows").innerHTML=[["Age",i.age],["Spend / month",FK.inr(i.spend)],["All investments",FK.inr(i.corpus)],["Spouse savings",i.includeSpouse?FK.inr(i.spouseCorpus):"—"],["Investing / month",FK.inr(i.sip)],["Kids",`${i.kids} · age ${i.kidsAge}`],["Education",FK.inr(i.education)],["Post-grad",FK.inr(i.postgrad)],["Weddings",FK.inr(i.wedding)],["Big purchase",i.includeHouse?FK.inr(i.house):"—"]].map(([k,v])=>`<span>${k}</span><b>${v}</b>`).join("");
   chart(r);
 }
