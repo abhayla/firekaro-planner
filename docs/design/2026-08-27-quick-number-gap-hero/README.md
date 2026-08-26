@@ -19,3 +19,9 @@ FIRE number (hint line shows the age delta), (2) ≤10 inputs, (3) solve-for-req
 (6% / 12% / 3.5% SWR / step-up 0 / live to 90) — so the numbers differ from Dezerv's ₹38 Cr on purpose.
 
 Blind review 2026-08-27 (context-isolated reviewer): A 6.5 · B 6.0 → 5 fixes applied in C + the hero-contradiction fix back-ported to A/B. Decision: pending Abhay (design gate per GLOBAL.md §6). Not yet in PROJECT-LOG.
+
+## Copy principle learned in owner testing (2026-08-27) — carry into the build spec
+A hint that LISTS instruments ("MF + EPF + NPS + PPF + FDs") reads as **exclusive**: Abhay left his stocks out
+because stocks were not named. Every "total" question MUST say **ALL** first, name the commonly-forgotten
+buckets (stocks, ETFs, gold, crypto, bonds, RDs), and state the ONLY exclusion (the home you live in).
+Applies to: total investments, monthly investing, spouse's investments.
