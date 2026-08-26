@@ -1,131 +1,84 @@
 ---
-description: Hono backend route conventions for all 41 route files in server/routes/
+description: Hono route conventions for the v6 document API in server/src/routes/ (5 route files) — mount pattern, envelope, validation, logging, auth placement.
 globs: ["server/src/routes/**/*.ts", "server/src/index.ts"]
 ---
 
 # Hono Route Conventions
 
-## Route File Structure
+> **Rewritten 2026-08-26.** The previous body was inherited from the retired `FIREKaro-Vue`
+> monorepo (41 CRUD route files under `server/routes/`, raw `c.json`, `console.error`, FY query
+> params, pagination). None of that exists here, and its globs never matched `server/src/`, so the
+> rule had never loaded. This version describes THIS repo. Canonical example: `server/src/routes/planner.ts`.
 
-Every route file in `server/routes/` MUST follow this structure:
+## What the backend is
 
-```ts
-import { Hono } from 'hono'
-import { authMiddleware } from '../middleware/auth'
+A **document API**, not granular REST: `GET`+`PUT /api/planner/<key>` mirror
+`StorageAdapter.get/set(key)` 1:1 (see `.claude/rules/server-backend.md`). Five route files:
+`planner.ts` (the document endpoints), `comms-consent-route.ts`, `whatsapp-webhook.ts`,
+`lifecycle-internal.ts`, `smoke-internal.ts`. Do not add CRUD-style `/:id` sub-resources without an
+ADR — the frontend spine (stores + adapter) assumes whole-document reads/writes.
 
-const app = new Hono()
-app.use('*', authMiddleware)
-
-// ... route handlers ...
-
-export default app
-```
-
-Create a `new Hono()` instance, apply `app.use('*', authMiddleware)` globally, and `export default` the app instance. No exceptions.
-
-## Zod Schema Patterns
-
-Schemas are defined INLINE per route file, never shared across files.
-
-- Create schema: full object with all required fields
-- Update schema: reuse create schema with `.partial()`
-- Enums: standalone `z.enum([...])` constants at module level
+## Route file skeleton
 
 ```ts
-const statusEnum = z.enum(['ACTIVE', 'PAUSED', 'COMPLETED'])
-const createGoalSchema = z.object({ name: z.string(), target: z.number(), status: statusEnum })
-const updateGoalSchema = createGoalSchema.partial()
+import { Hono } from "hono";
+import { authMiddleware } from "../middleware/auth";
+import { apiSuccess, apiError, ErrorCode } from "../lib/api-utils";
+import { logger } from "../lib/logger";
+
+const app = new Hono();
+app.use("*", authMiddleware);   // session-gated routes only — see "Mounting" below
+
+app.get("/household", async (c) => {
+  const userId = c.get("userId");            // from the session, NEVER the body
+  try {
+    return apiSuccess(c, await readHousehold(userId));
+  } catch (err) {
+    logger.error({ err, userId }, "planner.household.read failed");
+    return apiError(c, "Failed to read household", 500, ErrorCode.INTERNAL_ERROR);
+  }
+});
+
+export default app;
 ```
 
-## Date Field Transforms
+## MUST / MUST NOT
 
-- Input (required): `z.string().transform((val) => new Date(val))`
-- Input (optional): `z.string().optional().nullable().transform((val) => val ? new Date(val) : null)`
-- Response output: `.toISOString().split('T')[0]` to produce `YYYY-MM-DD` strings
+- **Envelope only.** `apiSuccess(c, data, 200|201)` / `apiError(c, message, status, ErrorCode.X)`.
+  Raw `c.json(...)` is blocked by `server/eslint.config.mjs` (`npm run lint`). Details:
+  `.claude/rules/api-envelope-pattern.md`.
+- **Logging via pino only** (`../lib/logger`); `console.*` is lint-blocked. Structured object first,
+  message second; never interpolate secrets or PII into the message
+  (`.claude/rules/structured-logging.md`).
+- **`userId` comes from `c.get("userId")`** (set by `authMiddleware`). MUST NOT read it from the body,
+  query, or headers. Every Prisma query is scoped by it.
+- **Validation at the boundary with the shared Zod schemas** — `householdSchema` /
+  `assumptionsSchema` from `@planner/types/*` (the frontend's own model, aliased into the server) —
+  via `safeParse`. Malformed JSON → `400 VALIDATION_ERROR`; schema failure → `422 VALIDATION_ERROR`
+  with `parsed.error.message`. Do not hand-roll a second schema in the route file.
+- **Writes that touch multiple tables go through ONE Prisma `$transaction`** (`PUT /household` via
+  `applyHouseholdPlan` + the diff engine). The `ui` document PUT MERGES the prefs blob in a
+  SERIALIZABLE transaction — never wholesale-replace it (it shares a row with `plan-baseline`).
+- **Uncaught errors are already enveloped** by `app.onError` in `server/src/index.ts` (logged with
+  `traceId`). Catch in a route only to return a *more specific* message/code; never to swallow.
 
-## Error Handling
+## Mounting (`server/src/index.ts`)
 
-Every handler MUST be wrapped in a try/catch block:
+Global middleware order is fixed: `requestId` → `pinoLogger` → `secureHeaders` → `bodyLimit(1 MB)` →
+`cors(allowedOrigins)` → `app.onError` → `rateLimit` on `/api/auth/*` → route mounts.
 
-```ts
-try {
-  // handler logic
-} catch (error) {
-  console.error('Error <action>:', error)
-  return c.json({ success: false, error: '...' }, 500)
-}
-```
+| Mount | File | Auth |
+|---|---|---|
+| `/api/planner` | `planner.ts` | `authMiddleware` (session or the 3-factor dev-bypass — `.claude/rules/dev-bypass-auth.md`) |
+| `/api/comms` | `comms-consent-route.ts` | `authMiddleware` |
+| `/api/webhooks` | `whatsapp-webhook.ts` | No session (Wati is the caller); optional shared secret via `?token=` when `WATI_WEBHOOK_SECRET` is set |
+| `/api/internal` | `lifecycle-internal.ts`, `smoke-internal.ts` | Token-guarded (`LIFECYCLE_RUN_TOKEN` / `SMOKE_TOKEN`, constant-time, fail-closed if unset) — mounted OUTSIDE `authMiddleware` |
 
-## Status Codes
+A new token-guarded internal route copies the `smoke-internal.ts` guard; a new user-facing route goes
+under `authMiddleware`. Never mount a session-gated route outside it.
 
-- `201` for resource creation
-- `400` for validation failures
-- `404` for not found (including ownership check failures)
-- `500` for server errors in the catch block
+## Tests
 
-## Ownership Verification
-
-Before UPDATE or DELETE, MUST verify ownership:
-
-```ts
-const record = await prisma.model.findFirst({ where: { id, userId } })
-if (!record) return c.json({ success: false, error: 'Not found' }, 404)
-```
-
-Use `findFirst` with both `id` and `userId` — never trust the client to own the resource.
-
-## Sub-Resources and Nested Routes
-
-Sub-resources use nested route paths off the parent ID:
-
-- `/:id/transactions` — child collection under a parent
-- `/:id/payments` — payment records for a specific entity
-- `/:id/nominees` — nominee assignments for a specific entity
-
-## Summary and Overview Endpoints
-
-Alongside standard CRUD, include aggregation endpoints:
-
-- `GET /overview` — dashboard-style combined data
-- `GET /summary` — aggregated totals
-- `GET /stats` — statistical breakdowns
-
-## Action Endpoints
-
-State-changing actions use POST, not PUT or PATCH:
-
-- `POST /:id/pause`
-- `POST /:id/resume`
-- `POST /:id/skip`
-- `POST /process`
-- `POST /invalidate`
-
-## Query Parameters
-
-Extract query params via `c.req.query('param')` and build a typed `whereClause` object:
-
-```ts
-const fy = c.req.query('fy') || c.req.query('financialYear')
-const whereClause: any = { userId }
-if (fy) whereClause.financialYear = fy
-```
-
-The `fy` / `financialYear` backward compatibility pattern MUST be maintained on all FY-filtered endpoints.
-
-## Response Transformation
-
-Transform Prisma results inline before returning: format dates, map field names, add computed fields. Do not create separate serializer layers.
-
-## Route Registration
-
-All routes register in `server/index.ts` via `app.route('/api/<resource>', resourceRoutes)`, grouped by domain with comment blocks:
-
-```ts
-// Income
-app.route('/api/salary', salaryRoutes)
-app.route('/api/rental-income', rentalIncomeRoutes)
-
-// Expenses
-app.route('/api/expenses', expenseRoutes)
-app.route('/api/budgets', budgetRoutes)
-```
+Colocate `*.spec.ts`. Live-DB specs self-gate on `process.env.DATABASE_URL`
+(`planner.integration.spec.ts`; rule: `.claude/rules/vitest-config-split.md`). Pure logic (diff
+engine, guards) gets no-DB unit specs.
