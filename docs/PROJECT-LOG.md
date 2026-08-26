@@ -126,8 +126,7 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 ## §3 — Decision log (append-only, newest first)
 
 ### 2026-08-26
-<<<<<<< HEAD
-- **D-2026-08-26-02 — T-349 CLAUDE.md trim LANDED inline on Abhay's explicit approval (supersedes the
+- **D-2026-08-26-03 — T-349 CLAUDE.md trim LANDED inline on Abhay's explicit approval (supersedes the
   "remain open" clause of D-2026-08-26-01).** `/init` re-review found the cancelled T-349 draft pointed at
   a `.claude/rules/server-backend.md` that did not exist (the file had been written but the global
   `~/.config/git/ignore` ignores `.claude/` — new rule files need `git add -f`, so it never reached git).
@@ -140,8 +139,6 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
   dangling pointer would have silently deleted all backend knowledge. Fleet fast-lane fix still owned
   by the hub (`plans/get-work-done-fast-lane.md`).
 
-### 2026-08-26
-=======
 - **D-2026-08-26-02 — CI red-main (T-350) diagnosed as a GitHub Actions billing block, NOT a code
   defect — BLOCKED-awaiting-Abhay, no fix possible in-repo.** Fleet break-fix task fully reproduced
   every CI step locally from a fresh worktree off current `main` (frontend `npm ci`, `type-check`,
@@ -155,7 +152,6 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
   CI goes green with **no code change** (proven by the local pass). No PR opened; no commits on the
   `t350/ci-red-main-fix` worktree branch.
 
->>>>>>> origin/main
 - **D-2026-08-26-01 — CLAUDE.md trim (5 items) queued to the fleet as T-349, then CANCELLED by Abhay;
   fleet fast-lane fix moved to the hub.** A `/init` review found `CLAUDE.md` at 342 lines vs the ≤80
   budget (`rule-writing-meta.md`) with ZERO path drift; five relocation-only improvements were listed
