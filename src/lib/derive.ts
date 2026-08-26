@@ -803,6 +803,10 @@ export function derive(
     // uses — exposed so the #18 Monte Carlo band can taper its per-year MEAN identically
     // and the MC p50 converges to the headline for glide-ON households (#24 Part 1).
     realReturnSchedule,
+    // T-377: the ACTUAL corpus-inflow schedule the headline was solved with (scalar by default,
+    // step-up-resolved when householdSavingsStepUpPercent > 0). Exposed so the solver projects
+    // "what you will have" with the SAME inflow the kernel used, never a parallel schedule.
+    householdContributionSchedule,
     portfolioVolatility,
     // The canonical per-bucket corpus weights (₹, from fireCorpusInvestments — whole-household,
     // primary-residence excluded) that back blendedReturn + portfolioVolatility. Exposed so the

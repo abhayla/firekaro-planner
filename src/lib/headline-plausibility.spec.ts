@@ -28,6 +28,7 @@ import { loadMehtasSeed } from "@/seeds/mehtas";
 import { loadIyersSeed } from "@/seeds/iyers";
 import { loadMauryasSeed } from "@/seeds/mauryas";
 import { derive } from "@/lib/derive";
+import { requiredMonthlyContributionFor } from "@/lib/required-contribution";
 import { isEarningMember } from "@/lib/member-earning";
 import { useFireDerive, deflateProjectionPoints } from "@/lib/useFireDerive";
 import { calculateYearsToTarget } from "@/lib/fire-math";
@@ -631,6 +632,52 @@ describe("#81 individual FIRE plausibility — every adult, every persona", () =
         expect(lensed.fireNumber, `${persona.name}: household FIRE invariant under lens=${r.memberId}`).toBe(k.fireNumber);
         expect(lensed.yearsToRegular, `${persona.name}: household years invariant under lens=${r.memberId}`).toBe(k.yearsToRegular);
       }
+    });
+  }
+});
+
+describe("T-377/QN-2 — the 'do this' monthly amount is plausible (rule 31 flinch test)", () => {
+  beforeEach(() => setActivePinia(createPinia()));
+
+  // The hero's biggest new claim is "invest Rs X every month". An absurd X (negative,
+  // NaN, or several times the household's entire income) is exactly the optimism/despair
+  // error this gate exists to catch — asserted on the DEFAULT product lens.
+  const PERSONAS: Array<{ name: string; load: (h: ReturnType<typeof useHouseholdStore>, a: ReturnType<typeof useAssumptionsStore>) => void }> = [
+    { name: "sharmas", load: (h, a) => loadSeedPersona(h, a) },
+    { name: "mehtas", load: (h, a) => loadMehtasSeed(h, a) },
+    { name: "iyers", load: (h, a) => loadIyersSeed(h, a) },
+    { name: "mauryas", load: (h, a) => loadMauryasSeed(h, a) },
+  ];
+
+  for (const persona of PERSONAS) {
+    it(`${persona.name}: required monthly at the household target age is within [0, 3x monthly income]`, () => {
+      const h = useHouseholdStore();
+      const a = useAssumptionsStore();
+      const ui = useUiStore();
+      persona.load(h, a);
+      const lens = { isFamilyView: ui.isFamilyView, viewingMemberId: ui.viewingMemberId, currentFY: ui.currentFY };
+      const k = derive(h.data, a.values, lens);
+
+      const r = requiredMonthlyContributionFor({
+        snapshot: h.data,
+        assumptions: a.values,
+        lens,
+        targetAge: k.targetRetirementAge,
+      });
+
+      expect(Number.isNaN(r.requiredMonthlyReal)).toBe(false);
+      expect(r.requiredMonthlyReal).toBeGreaterThanOrEqual(0);
+      // Infinity is an HONEST answer ("beyond any realistic monthly amount - move the age");
+      // a finite answer must be inside a band a salaried household could recognise.
+      if (Number.isFinite(r.requiredMonthlyReal)) {
+        const monthlyIncome = Math.max(1, Math.round((k.householdAnnualIncome ?? 0) / 12));
+        expect(r.requiredMonthlyReal).toBeLessThanOrEqual(3 * monthlyIncome);
+      }
+      // Need/have/gap must be internally coherent and never negative-where-impossible.
+      expect(r.needReal).toBeGreaterThan(0);
+      expect(r.haveAtTargetReal).toBeGreaterThanOrEqual(0);
+      expect(r.gapReal).toBe(r.needReal - r.haveAtTargetReal);
+      expect(r.needNominal).toBeGreaterThanOrEqual(r.needReal);
     });
   }
 });
