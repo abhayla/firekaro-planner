@@ -230,6 +230,86 @@ describe("A7.1 kernel invariants — per-persona metamorphic (fast-check)", () =
   }
 });
 
+describe("T-377/QN-2 — solver precondition: FIRE is monotone in the real monthly contribution", () => {
+  beforeEach(() => setActivePinia(createPinia()));
+
+  // THE binary-search precondition. `required-contribution.ts` bisects the household real
+  // monthly contribution through the REAL derive() path; bisection is only sound if the
+  // predicate "reaches the target by age N" is monotone in that contribution. This property
+  // asserts it across every seed + fast-check perturbation, on the HEADLINE `yearsToRegular`
+  // — i.e. bridge/accessibility, horizon-SWR, the healthcare reservation and the NPS post-tax
+  // offset all included, not just the corpus-only leg. A violation is NOT a test to relax:
+  // per the contract the solver must fall back to a monotone-guaranteed scan.
+  for (const persona of PERSONAS) {
+    it(`${persona.name}: headline yearsToFire is non-increasing in the monthly contribution`, () => {
+      const h = useHouseholdStore();
+      const a = useAssumptionsStore();
+      persona.load(h, a);
+      const base = a.values;
+      const current = derive(h.data, base, LENS).monthlyContribution;
+      const hi = Math.max(10 * current, 500_000);
+      fc.assert(
+        fc.property(
+          fc.double({ min: 0, max: hi, noNaN: true }),
+          fc.double({ min: 0, max: hi, noNaN: true }),
+          (c1, c2) => {
+            const lo = Math.min(c1, c2);
+            const up = Math.max(c1, c2);
+            const kLo = derive(h.data, base, LENS, { monthlyContributionReal: lo });
+            const kUp = derive(h.data, base, LENS, { monthlyContributionReal: up });
+            expect(kUp.yearsToRegular).toBeLessThanOrEqual(kLo.yearsToRegular + EPS);
+          },
+        ),
+        { numRuns: 60 },
+      );
+    });
+
+    // The same predicate under a moved retirement target (the hero slider) — the solver
+    // re-solves at every slider position, so monotonicity must hold there too.
+    it(`${persona.name}: monotone in contribution at every slider target age`, () => {
+      const h = useHouseholdStore();
+      const a = useAssumptionsStore();
+      persona.load(h, a);
+      const base = a.values;
+      const current = derive(h.data, base, LENS).monthlyContribution;
+      const hi = Math.max(10 * current, 500_000);
+      fc.assert(
+        fc.property(
+          fc.integer({ min: 40, max: 70 }),
+          fc.double({ min: 0, max: hi, noNaN: true }),
+          fc.double({ min: 0, max: hi, noNaN: true }),
+          (targetAge, c1, c2) => {
+            const lo = Math.min(c1, c2);
+            const up = Math.max(c1, c2);
+            const kLo = derive(h.data, base, LENS, { monthlyContributionReal: lo, targetRetirementAge: targetAge });
+            const kUp = derive(h.data, base, LENS, { monthlyContributionReal: up, targetRetirementAge: targetAge });
+            expect(kUp.yearsToRegular).toBeLessThanOrEqual(kLo.yearsToRegular + EPS);
+          },
+        ),
+        { numRuns: 40 },
+      );
+    });
+
+    // No perturbation may put a NaN on screen (rule 31) — the solver reads these fields.
+    it(`${persona.name}: no NaN reaches the headline under any contribution override`, () => {
+      const h = useHouseholdStore();
+      const a = useAssumptionsStore();
+      persona.load(h, a);
+      const base = a.values;
+      fc.assert(
+        fc.property(fc.double({ min: 0, max: 5_000_000, noNaN: true }), (c) => {
+          const k = derive(h.data, base, LENS, { monthlyContributionReal: c });
+          expect(Number.isNaN(k.yearsToRegular)).toBe(false);
+          expect(Number.isNaN(k.fireNumber)).toBe(false);
+          expect(k.fireNumber).toBeGreaterThanOrEqual(0);
+          expect(k.householdFireAge == null || Number.isFinite(k.householdFireAge)).toBe(true);
+        }),
+        { numRuns: 40 },
+      );
+    });
+  }
+});
+
 describe("A7.1 tax-engine invariants — free-form (fast-check)", () => {
   // (5) Tax is non-negative, never exceeds gross income, finite, with a sane effective rate
   // — for ANY income/deduction/regime/FY. A negative tax or tax-above-income is a sign bug
