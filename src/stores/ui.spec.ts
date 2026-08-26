@@ -98,3 +98,68 @@ describe("ui store — lifecycleSnapshot persistence (Stage B)", () => {
     expect(ui.currentFY).toBe(getCurrentFinancialYear());
   });
 });
+
+describe("ui store — T-377 (QN-2) quick prefs + the shared session-only retirement age", () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    mem = makeMemoryAdapter();
+    setAdapter(mem);
+  });
+  afterEach(() => setAdapter(null));
+
+  it("quick prefs round-trip through persist() → hydrate()", async () => {
+    const ui = useUiStore();
+    ui.setQuickPrefs({ guess: 10_00_00_000, completedAt: "2026-08-27T00:00:00.000Z", directPlans: true });
+    await nextTick();
+
+    setActivePinia(createPinia());
+    const fresh = useUiStore();
+    fresh.hydrate();
+    expect(fresh.quick?.guess).toBe(10_00_00_000);
+    expect(fresh.quick?.completedAt).toBe("2026-08-27T00:00:00.000Z");
+    expect(fresh.quick?.directPlans).toBe(true);
+  });
+
+  it("setQuickPrefs MERGES (QN-1 may write one field at a time), null clears", async () => {
+    const ui = useUiStore();
+    ui.setQuickPrefs({ guess: 5_00_00_000 });
+    ui.setQuickPrefs({ directPlans: false });
+    await nextTick();
+    expect(ui.quick).toEqual({ guess: 5_00_00_000, directPlans: false });
+    ui.setQuickPrefs(null);
+    expect(ui.quick).toBeNull();
+  });
+
+  it("a pre-T-377 blob (no `quick` key) hydrates to null — no crash, no fabricated guess", () => {
+    mem.set("ui", { isFamilyView: false, viewingMemberId: null, lifecycleSnapshot: null });
+    const ui = useUiStore();
+    ui.hydrate();
+    expect(ui.quick).toBeNull();
+  });
+
+  it("whatIfTargetAge is SESSION-ONLY — never written to the persisted blob (#64 class)", async () => {
+    const ui = useUiStore();
+    ui.setWhatIfTargetAge(53);
+    ui.setQuickPrefs({ guess: 1 }); // force a persist so the blob is definitely written
+    await nextTick();
+
+    const blob = mem.get<Record<string, unknown>>("ui");
+    expect(blob).toBeTruthy();
+    expect(Object.keys(blob!)).not.toContain("whatIfTargetAge");
+
+    setActivePinia(createPinia());
+    const fresh = useUiStore();
+    fresh.hydrate();
+    expect(fresh.whatIfTargetAge).toBeNull();
+  });
+
+  it("setWhatIfTargetAge rounds and rejects a non-finite age (rule 31)", () => {
+    const ui = useUiStore();
+    ui.setWhatIfTargetAge(52.6);
+    expect(ui.whatIfTargetAge).toBe(53);
+    ui.setWhatIfTargetAge(Number.NaN);
+    expect(ui.whatIfTargetAge).toBeNull();
+    ui.setWhatIfTargetAge(null);
+    expect(ui.whatIfTargetAge).toBeNull();
+  });
+});

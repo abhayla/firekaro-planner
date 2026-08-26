@@ -19,6 +19,25 @@ interface UiPersistedShape {
   // blob (no new entity key, no Prisma migration). Older shapes lacking it
   // backfill to null on hydrate.
   lifecycleSnapshot?: LifecycleSnapshot | null;
+  // T-377 (QN-2) — the Quick-Number metadata blob. DECLARED + READ here (QN-2); WRITTEN by
+  // the /quick express path (QN-1). Rides the existing `ui` document (userUiPrefs.prefs JSON)
+  // — no new entity key, no Prisma migration. Older shapes lacking it backfill to null.
+  quick?: QuickPrefs | null;
+}
+
+/**
+ * T-377 (QN-2) — Quick-Number answers metadata. Every field optional: a user who never took
+ * the express path simply has no `quick` blob, and the hero's gut-feel line stays hidden.
+ */
+export interface QuickPrefs {
+  /** The user's own gut-feel FIRE number (₹) from card 1 — compared with the math in the hero. */
+  guess?: number;
+  /** ISO timestamp of the run that completed setup (the path taken; NOT a second "done" flag). */
+  completedAt?: string;
+  /** Ids of the household lines the quick path created, so a re-run updates instead of duplicating. */
+  createdIds?: string[];
+  /** True ONLY when the user said their mutual funds are direct plans (gates the QN-5 TER lever). */
+  directPlans?: boolean;
 }
 
 // Q10.1 (v3) — dark mode removed. darkMode field dropped from this store; older
@@ -32,6 +51,14 @@ export const useUiStore = defineStore("ui", () => {
   // comparison (it never writes here).
   const currentFY = ref(getCurrentFinancialYear());
   const lifecycleSnapshot = ref<LifecycleSnapshot | null>(null);
+  // T-377: Quick-Number metadata (persisted — see UiPersistedShape).
+  const quick = ref<QuickPrefs | null>(null);
+  // T-377: the ONE retirement-age the hero slider and /fire-goals/what-if share (#64 class —
+  // two controls for the same idea must never drift). SESSION-ONLY: deliberately NOT in
+  // UiPersistedShape, NOT in persist(), NOT in the watch list below — dragging the slider is a
+  // what-if, not a plan change. Persisting the target is the explicit "Set as my target" action,
+  // which writes the household member's targetRetirementAge instead. null = follow the household.
+  const whatIfTargetAge = ref<number | null>(null);
   const adapter = makeAdapter(getAuthProvider());
 
   function hydrate() {
@@ -48,6 +75,8 @@ export const useUiStore = defineStore("ui", () => {
         parsed.lifecycleSnapshot && typeof parsed.lifecycleSnapshot === "object"
           ? parsed.lifecycleSnapshot
           : null;
+      // Migration-on-hydrate: absent (every pre-T-377 blob) → null.
+      quick.value = parsed.quick && typeof parsed.quick === "object" ? parsed.quick : null;
     }
   }
 
@@ -56,17 +85,27 @@ export const useUiStore = defineStore("ui", () => {
       isFamilyView: isFamilyView.value,
       viewingMemberId: viewingMemberId.value,
       lifecycleSnapshot: lifecycleSnapshot.value,
+      quick: quick.value,
     });
   }
 
-  // currentFY is derived (not user state) → not watched/persisted.
-  watch([isFamilyView, viewingMemberId, lifecycleSnapshot], persist, { deep: true });
+  // currentFY is derived (not user state) → not watched/persisted. whatIfTargetAge is a
+  // session-only what-if → deliberately excluded from BOTH the blob and this watch list.
+  watch([isFamilyView, viewingMemberId, lifecycleSnapshot, quick], persist, { deep: true });
 
   function toggleFamilyView() {
     isFamilyView.value = !isFamilyView.value;
   }
   function setViewingMemberId(id: string | null) {
     viewingMemberId.value = id;
+  }
+  /** T-377: set (or clear with null) the shared hero/What-If retirement age. Session-only. */
+  function setWhatIfTargetAge(age: number | null) {
+    whatIfTargetAge.value = age != null && Number.isFinite(age) ? Math.round(age) : null;
+  }
+  /** T-377: merge a partial Quick-Number blob (QN-1 writes; QN-2 only reads). */
+  function setQuickPrefs(next: QuickPrefs | null) {
+    quick.value = next == null ? null : { ...(quick.value ?? {}), ...next };
   }
   /** Re-baseline the lifecycle digest (called on dismiss/acknowledge + silent first load). */
   function captureLifecycleSnapshot(snapshot: LifecycleSnapshot) {
@@ -78,7 +117,11 @@ export const useUiStore = defineStore("ui", () => {
     viewingMemberId,
     currentFY,
     lifecycleSnapshot,
+    quick,
+    whatIfTargetAge,
     hydrate,
+    setWhatIfTargetAge,
+    setQuickPrefs,
     toggleFamilyView,
     setViewingMemberId,
     captureLifecycleSnapshot,

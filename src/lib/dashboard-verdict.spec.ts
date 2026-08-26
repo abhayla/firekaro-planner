@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { resolveHeroTone } from "./dashboard-verdict";
+import { resolveHeroTone, resolveGapTone } from "./dashboard-verdict";
 
 /**
  * Stage A (Option-D dashboard) — verdict-tone mapping for the hero tint + "Vs your plan" KPI.
@@ -37,5 +37,29 @@ describe("resolveHeroTone", () => {
   it("makes NO claim on a non-finite/absent delta even with a baseline (neutral, never a false ✓)", () => {
     expect(resolveHeroTone({ hasBaseline: true, fireDateDeltaMonths: NaN })).toBe("no-baseline");
     expect(resolveHeroTone({ hasBaseline: true, fireDateDeltaMonths: null })).toBe("no-baseline");
+  });
+});
+
+describe("T-377/QN-2 — resolveGapTone (the second, independent hero signal)", () => {
+  it("positive gap = short, zero-or-negative = surplus", () => {
+    expect(resolveGapTone(1)).toBe("short");
+    expect(resolveGapTone(50_00_000)).toBe("short");
+    expect(resolveGapTone(0)).toBe("surplus");
+    expect(resolveGapTone(-1)).toBe("surplus");
+  });
+
+  it("makes NO claim on NaN, ±Infinity, null or undefined (rule 31)", () => {
+    for (const bad of [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY, null, undefined]) {
+      expect(resolveGapTone(bad)).toBe("unknown");
+    }
+  });
+
+  it("is INDEPENDENT of resolveHeroTone — the plan-variance contract is untouched", () => {
+    // A locked plan can be "ahead" while the money is still short of the number, and
+    // vice-versa. Neither resolver may be derived from the other.
+    expect(resolveHeroTone({ hasBaseline: true, fireDateDeltaMonths: 6 })).toBe("ahead");
+    expect(resolveGapTone(10_00_000)).toBe("short");
+    expect(resolveHeroTone({ hasBaseline: false, fireDateDeltaMonths: null })).toBe("no-baseline");
+    expect(resolveGapTone(-10_00_000)).toBe("surplus");
   });
 });
