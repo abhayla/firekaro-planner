@@ -107,7 +107,7 @@ carries ONLY the `whatsappMessageId`; fixed to correlate by that id (commit `996
   works regardless (verified).
 
 - **B8. GitHub Actions billing block — CI on `main` cannot run at all — 🚦 needs your GitHub billing
-  fix (found 2026-08-26, fleet task T-350).** `main`'s CI workflow (`.github/workflows/ci.yml`) has
+  fix (found 2026-08-26, fleet task T-350).** **UPDATE 2026-08-27 01:45 IST: still blocked (every run on 2026-08-26 19:xx UTC failed the same way) and now BLOCKS THE QUICK NUMBER WAVE — T-376→T-379 (`docs/goals/2026-08-27-quick-number-front-door.md`) will open PRs whose checks never start; checkers verify locally but nothing can merge until GitHub → Settings → Billing & plans is fixed (payment method / spending limit).** `main`'s CI workflow (`.github/workflows/ci.yml`) has
   been RED on the last 2 pushes (2026-06-25 `ac7dc76`, 2026-08-26 `b7614de`), but **the code is not
   broken** — a full local reproduction of every CI step (frontend `npm ci` + `type-check` + 1239/1239
   unit tests + `build`, exact CI env vars) passed cleanly on current `main`. The real cause, confirmed
