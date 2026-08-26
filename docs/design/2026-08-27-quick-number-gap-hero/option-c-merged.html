@@ -57,8 +57,8 @@ const Q=[
  {k:"age",q:"How old are you?",h:"We plan from today to age 90 — 40 years of spending, not 15.",type:"num"},
  {k:"targetAge",q:"When would you like to stop working?",h:"A guess is fine — you'll drag this on the next screen.",type:"chips",opts:[45,50,55,60]},
  {k:"spend",q:"What does your household spend in a month?",h:"Everything — EMI, school fees, travel, help. ₹2.5–3 L? Say 2.8.",lakh:true},
- {k:"corpus",q:"Financial savings so far?",h:"Mutual funds + EPF + NPS + PPF + FDs. Not the house you live in.",lakh:true},
- {k:"sip",q:"How much do you invest every month?",h:"SIPs plus your and your employer's PF, all together.",lakh:true},
+ {k:"corpus",q:"Total of ALL your investments today?",h:"Add everything up: mutual funds, stocks, ETFs, EPF, NPS, PPF, FDs, gold, bonds, crypto — every rupee you have invested anywhere. Leave out only the house you live in.",lakh:true},
+ {k:"sip",q:"How much do you put into investments every month?",h:"All of it: SIPs, stock/ETF buys, your PF + employer PF, NPS, PPF, RDs — whatever you add every month.",lakh:true},
  {k:"spouseCorpus",q:"Spouse's savings, if any?",h:"Their MF + PF. Untick if not applicable.",lakh:true,toggle:"includeSpouse"},
  {k:"kids",q:"Kids?",h:"How many, and roughly how old?",type:"chips",opts:[0,1,2,3],extra:{k:"kidsAge",label:"Their age",plain:true}},
  {k:"education",q:"Their education, in today's money?",h:"Undergrad for all kids. Abroad? ₹75 L+ combined.",lakh:true,extra:{k:"postgrad",label:"Post-grad, if any (₹ lakh)"}},
@@ -106,7 +106,7 @@ function render(){
     `The scary number others quote (<b>${FK.inr(r.needNominal)}</b>) is the same thing in ${yr+r.n} rupees. We show both and plan in today's.`
   ].map(t=>`<li>${t}</li>`).join("");
   $("assump").textContent=`${+(i.inflation*100).toFixed(1)}% inflation · ${+(i.equityReturn*100).toFixed(1)}% return · ${+(i.swr*100).toFixed(2)}% safe withdrawal · investing raised ${+(i.stepUp*100).toFixed(0)}%/yr`;
-  $("rows").innerHTML=[["Age",i.age],["Spend / month",FK.inr(i.spend)],["Savings",FK.inr(i.corpus)],["Spouse savings",i.includeSpouse?FK.inr(i.spouseCorpus):"—"],["Investing / month",FK.inr(i.sip)],["Kids",`${i.kids} · age ${i.kidsAge}`],["Education",FK.inr(i.education)],["Post-grad",FK.inr(i.postgrad)],["Weddings",FK.inr(i.wedding)],["Big purchase",i.includeHouse?FK.inr(i.house):"—"]].map(([k,v])=>`<span>${k}</span><b>${v}</b>`).join("");
+  $("rows").innerHTML=[["Age",i.age],["Spend / month",FK.inr(i.spend)],["All investments",FK.inr(i.corpus)],["Spouse savings",i.includeSpouse?FK.inr(i.spouseCorpus):"—"],["Investing / month",FK.inr(i.sip)],["Kids",`${i.kids} · age ${i.kidsAge}`],["Education",FK.inr(i.education)],["Post-grad",FK.inr(i.postgrad)],["Weddings",FK.inr(i.wedding)],["Big purchase",i.includeHouse?FK.inr(i.house):"—"]].map(([k,v])=>`<span>${k}</span><b>${v}</b>`).join("");
   chart(r);
 }
 function chart(r){
