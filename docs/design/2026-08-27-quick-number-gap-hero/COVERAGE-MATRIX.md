@@ -21,7 +21,7 @@ Source of truth for the left column: `D:\Abhay\Ventures\transcripts\FbYnFUwdODQ.
 | A8 | Education (today ₹; advisor bumps 60→75 L for abroad) | plannedFuture `education` | ✓ | ✓ | QN-1 |
 | A9 | Post-grad | plannedFuture `education` | ✓ | ✓ | QN-1 |
 | A10 | Wedding (today ₹, ~25 yrs out) | plannedFuture `marriage` | ✓ amount · ✗ timing | ✓ amount · timing derived from kids' age (wedding ≈ age 28) | QN-1, QN-3 |
-| A11 | House upgrade, net ₹1 Cr, 5–8 yrs | plannedFuture `general` — **NOT in FIRE number** | ✓ + delta hint | ✓ | QN-3 (Tier-0 fix) |
+| A11 | House upgrade, net ₹1 Cr, 5–8 yrs | plannedFuture `general` — **NOT in FIRE number** (#165) | ✓ + delta hint | ✓ | QN-3 (Tier-0 fix) |
 | A12 | Lifestyle inflation 8% (advisor-set) | 4-bucket inflation | ✓ (assumptions) | ✓ | QN-4 |
 | A13 | Investment real estate (plot ₹1.2 Cr, 8% IRR outlook) | realEstate asset type | **✗** (copy said "leave out the house" — implied all property) | ✓ counted in A5 copy; outlook — (needs market data) | QN-1 |
 | A14 | Spouse's investments (₹70 L) — the "missed then added" moment | Members | ✓ | ✓ | QN-1 |

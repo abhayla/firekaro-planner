@@ -50,7 +50,7 @@ file/symbol below before creating it; `docs/goals/.run/quick-number-PROGRESS.md`
 
 **TDD:** red-first specs in `derive.spec.ts` (a Sharmas variant with a ₹1 Cr `general` goal → FIRE age strictly later; removing it → byte-identical to today's headline), `fire-math.spec.ts` (renamed arg), `headline-plausibility.spec.ts` bound unchanged, `kernel-invariants.property.spec.ts` monotonicity: adding a planned goal never makes FIRE earlier. Mutation: `npx stryker run` on `fire-math.ts` — no new survivors in the changed lines.
 
-**Acceptance:** all specs green both trees; FinTech-analyst review of the change + `fintech-domain-analyst` agent dispatched; dashboard screenshot before/after on Sharmas with a general goal (rule 24/31); rule 26: `/fire-goals/goals` and the dashboard agree on the FIRE age; `docs/PROJECT-LOG.md` entry; closes a new GitHub issue filed at stage start ("general planned-future goals do not enter the FIRE number").
+**Acceptance:** all specs green both trees; FinTech-analyst review of the change + `fintech-domain-analyst` agent dispatched; dashboard screenshot before/after on Sharmas with a general goal (rule 24/31); rule 26: `/fire-goals/goals` and the dashboard agree on the FIRE age; `docs/PROJECT-LOG.md` entry; closes GitHub issue #165 (filed 2026-08-27).
 
 ## 3. STAGE QN-2 — solver + gap hero + slider on the dashboard  (matrix C1–C5, E3, E4, F3)
 
