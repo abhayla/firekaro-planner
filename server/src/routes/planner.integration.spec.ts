@@ -297,6 +297,53 @@ dlive("/api/planner integration (live DB — Supabase firekaro-planner)", () => 
     expect(baseline.data.fireNumber).toBe(105500000);
   });
 
+  // ---- T-377 (QN-2): the `quick` carve-out on uiBodySchema ----
+  it("PUT /ui with `quick` round-trips it (without the schema entry it would be silently stripped)", async () => {
+    const quick = {
+      guess: 100_000_000,
+      completedAt: "2026-08-27T00:00:00.000Z",
+      createdIds: ["inv-1", "mem-2"],
+      directPlans: true,
+    };
+    const put = await app.request("/api/planner/ui", {
+      method: "PUT",
+      headers: H,
+      body: JSON.stringify({ isFamilyView: false, currentFY: "2025-26", quick }),
+    });
+    expect(put.status).toBe(200);
+
+    const got: any = await (await app.request("/api/planner/ui", { headers: H })).json();
+    expect(got.data.quick, "quick survived the strip-mode parse + the merge").toEqual(quick);
+  });
+
+  it("PUT /ui WITHOUT `quick` leaves an existing `quick` intact (merge, not replace)", async () => {
+    const quick = { guess: 50_000_000, directPlans: false };
+    await app.request("/api/planner/ui", {
+      method: "PUT",
+      headers: H,
+      body: JSON.stringify({ isFamilyView: false, currentFY: "2025-26", quick }),
+    });
+    // A plain ui write from a client that knows nothing about `quick` (e.g. a family-view toggle).
+    await app.request("/api/planner/ui", {
+      method: "PUT",
+      headers: H,
+      body: JSON.stringify({ isFamilyView: true, currentFY: "2025-26" }),
+    });
+
+    const got: any = await (await app.request("/api/planner/ui", { headers: H })).json();
+    expect(got.data.isFamilyView, "the later ui write took effect").toBe(true);
+    expect(got.data.quick, "the quick blob was NOT clobbered by a quick-less write").toEqual(quick);
+  });
+
+  it("PUT /ui rejects a malformed `quick` (422) — a negative guess is not a number we accept", async () => {
+    const res = await app.request("/api/planner/ui", {
+      method: "PUT",
+      headers: H,
+      body: JSON.stringify({ isFamilyView: false, quick: { guess: -1 } }),
+    });
+    expect(res.status).toBe(422);
+  });
+
   it("GET /plan-baseline rejects an unauthenticated request (401)", async () => {
     const res = await app.request("/api/planner/plan-baseline"); // no dev-bypass header
     expect(res.status).toBe(401);

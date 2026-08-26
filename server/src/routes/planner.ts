@@ -55,11 +55,23 @@ const lifecycleSnapshotSchema = z.object({
   monteCarloP50Age: z.number().nullable(),
 });
 
-const uiBodySchema = z.object({
+// T-377 (QN-2) — the Quick-Number metadata blob (frontend SSOT: src/stores/ui.ts QuickPrefs).
+// It rides the EXISTING userUiPrefs.prefs JSON row (like lifecycleSnapshot / planBaseline) — no
+// Prisma change. It MUST be declared here: uiBodySchema is a strip-mode z.object, so an unknown
+// `quick` key would be silently dropped on PUT and the user's gut-feel guess would vanish.
+export const quickPrefsSchema = z.object({
+  guess: z.number().min(0).optional(),
+  completedAt: z.string().optional(),
+  createdIds: z.array(z.string()).optional(),
+  directPlans: z.boolean().optional(),
+});
+
+export const uiBodySchema = z.object({
   isFamilyView: z.boolean().optional(),
   viewingMemberId: z.string().nullable().optional(),
   currentFY: z.string().optional(),
   lifecycleSnapshot: lifecycleSnapshotSchema.nullable().optional(),
+  quick: quickPrefsSchema.nullable().optional(),
 });
 
 const expenseSnapshotSchema = z.object({
