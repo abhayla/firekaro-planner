@@ -126,6 +126,7 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 ## §3 — Decision log (append-only, newest first)
 
 ### 2026-08-26
+<<<<<<< HEAD
 - **D-2026-08-26-02 — T-349 CLAUDE.md trim LANDED inline on Abhay's explicit approval (supersedes the
   "remain open" clause of D-2026-08-26-01).** `/init` re-review found the cancelled T-349 draft pointed at
   a `.claude/rules/server-backend.md` that did not exist (the file had been written but the global
@@ -140,6 +141,21 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
   by the hub (`plans/get-work-done-fast-lane.md`).
 
 ### 2026-08-26
+=======
+- **D-2026-08-26-02 — CI red-main (T-350) diagnosed as a GitHub Actions billing block, NOT a code
+  defect — BLOCKED-awaiting-Abhay, no fix possible in-repo.** Fleet break-fix task fully reproduced
+  every CI step locally from a fresh worktree off current `main` (frontend `npm ci`, `type-check`,
+  1239/1239 unit tests, `build` with CI's exact env) — all green. `gh run view` on both failing runs
+  (2026-06-25, 2026-08-26) showed jobs never started (2-3s), annotated "recent account payments have
+  failed or your spending limit needs to be increased" — an account-level billing gate on `abhayla`,
+  confirmed not a repo-config issue (Actions enabled, workflow active). **Why (goal-anchored):** a
+  code PR cannot fix a payment/spending-limit block, so opening one would be theater, not a fix — the
+  DoD's environmental-drift allowance covers config/lockfile drift, not billing. Logged as needs-Abhay
+  register item **B8** (`docs/comms-go-live-handoff.md`) with the exact unblock steps. Once resolved,
+  CI goes green with **no code change** (proven by the local pass). No PR opened; no commits on the
+  `t350/ci-red-main-fix` worktree branch.
+
+>>>>>>> origin/main
 - **D-2026-08-26-01 — CLAUDE.md trim (5 items) queued to the fleet as T-349, then CANCELLED by Abhay;
   fleet fast-lane fix moved to the hub.** A `/init` review found `CLAUDE.md` at 342 lines vs the ≤80
   budget (`rule-writing-meta.md`) with ZERO path drift; five relocation-only improvements were listed

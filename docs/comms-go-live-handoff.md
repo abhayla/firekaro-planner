@@ -106,6 +106,26 @@ carries ONLY the `whatsappMessageId`; fixed to correlate by that id (commit `996
   feature is inert without the column **only on the ServerAdapter path** — the localStorage demo path
   works regardless (verified).
 
+- **B8. GitHub Actions billing block — CI on `main` cannot run at all — 🚦 needs your GitHub billing
+  fix (found 2026-08-26, fleet task T-350).** `main`'s CI workflow (`.github/workflows/ci.yml`) has
+  been RED on the last 2 pushes (2026-06-25 `ac7dc76`, 2026-08-26 `b7614de`), but **the code is not
+  broken** — a full local reproduction of every CI step (frontend `npm ci` + `type-check` + 1239/1239
+  unit tests + `build`, exact CI env vars) passed cleanly on current `main`. The real cause, confirmed
+  via `gh run view <run-id>` on both failing runs: **both jobs never start** (2-3s "run" time) with the
+  annotation *"The job was not started because recent account payments have failed or your spending
+  limit needs to be increased. Please check the 'Billing & plans' section in your settings"* — an
+  **account-level** GitHub Actions billing/spending-limit block on `abhayla` (this private repo's
+  owner), not a repo config issue (`repos/.../actions/permissions` confirms Actions are enabled;
+  workflow is registered `active`). **No code change or PR can fix this** — a diff cannot un-block a
+  payment method. **What unblocks it:** go to https://github.com/settings/billing on the `abhayla`
+  account → resolve any failed payment method under "Payment information" → check "Spending limits"
+  for Actions minutes (a $0/low limit is common once free-tier private-repo minutes are exhausted,
+  or a card decline needs re-auth). Once fixed, no re-push is even needed —
+  `gh run rerun 32976850742 --repo abhayla/firekaro-planner` (or any new push) will go green, since
+  local reproduction already proves current `main` passes every CI step. T-350 closed as
+  `BLOCKED-awaiting-billing`; worktree `C:\Abhay\Ventures\firekaro-planner-t350` (no commits, nothing
+  to land) kept for reference until this is resolved.
+
 ---
 
 ## C. Optional / nice-to-have
