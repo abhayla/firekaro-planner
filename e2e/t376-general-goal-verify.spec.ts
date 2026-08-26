@@ -46,5 +46,14 @@ test("T-376: general-kind planned goal moves the FIRE headline (before/after)", 
   console.log("BEFORE_LINES:", JSON.stringify(beforeLines));
   console.log("AFTER_LINES:", JSON.stringify(afterLines));
 
-  expect(beforeText).not.toEqual(afterText);
+  // Assert the SPECIFIC honesty-critical figures moved, not just "the DOM differed"
+  // (a body-text diff would also pass on an unrelated console/DOM change).
+  const beforeFireAge = beforeText.match(/FIRE @(\d+)/)?.[1];
+  const afterFireAge = afterText.match(/FIRE @(\d+)/)?.[1];
+  expect(beforeFireAge, "FIRE @<age> chip must be present before the goal is added").not.toBeUndefined();
+  expect(afterFireAge, "FIRE @<age> chip must be present after the goal is added").not.toBeUndefined();
+  expect(
+    Number(afterFireAge),
+    `adding a ₹1Cr general-kind goal must push FIRE age later (was ${beforeFireAge}, now ${afterFireAge})`,
+  ).toBeGreaterThan(Number(beforeFireAge));
 });
