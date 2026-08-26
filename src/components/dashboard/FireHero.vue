@@ -14,7 +14,7 @@
  * household-primary headline (#22/#66) — same useFireDerive fields as before.
  */
 import { computed, onMounted, ref, watch } from "vue";
-import { useRoute } from "vue-router";
+import { useRoute, RouterLink } from "vue-router";
 import { useFireDerive } from "@/lib/useFireDerive";
 import { useHouseholdStore } from "@/stores/household";
 import { useAssumptionsStore } from "@/stores/assumptions";
@@ -187,7 +187,10 @@ const showWinSlot = computed(() => bridgeBinding.value || topWin.value !== null)
 // The hero's own floor: never below the shared minimum, never at-or-below the user's age
 // (dragging to an age you have already passed cannot produce an honest plan — code-review L3).
 const HERO_AGE_MIN = computed(() => {
-  const anchor = fire.anchorAge.value;
+  // The lensed adult's own age (the solver's `anchorAgeUsed`), never the household anchor —
+  // otherwise a younger spouse loses valid positions and an older one can drag below their own
+  // current age (FinTech re-review E2).
+  const anchor = req.value.anchorAgeUsed;
   return Number.isFinite(anchor) ? Math.max(SHARED_TARGET_AGE_MIN, Math.round(anchor) + 1) : SHARED_TARGET_AGE_MIN;
 });
 const HERO_AGE_MAX = SHARED_TARGET_AGE_MAX;
@@ -255,15 +258,19 @@ const gapTone = computed(() => resolveGapTone(req.value.gapReal));
 const feasibilityNote = computed<string | null>(() => {
   if (!requiredFinite.value || !mustInvestMore.value) return null;
   const takeHome = hh.value.monthlyTakeHome;
+  if (!Number.isFinite(takeHome) || takeHome <= 0) return null;
   const left = takeHome - req.value.requiredMonthlyReal;
-  if (!Number.isFinite(takeHome) || takeHome <= 0 || left < 0) return null;
+  // A negative remainder is the LOUDEST case, not a reason to go quiet — the earlier version
+  // returned null here, switching the caveat off exactly when it mattered most.
+  if (left < 0) {
+    return "That is more than you take home each month — see the moves below, or retire a little later.";
+  }
   return `That would leave ${formatINRCompact(left)}/month to live on — spending less also lowers the number above, which this figure does not yet credit you for.`;
 });
-const needYear = computed(() => {
-  const anchor = fire.anchorAge.value;
-  const yrs = Number.isFinite(anchor) ? Math.max(0, targetAge.value - anchor) : 0;
-  return new Date().getFullYear() + Math.round(yrs);
-});
+// The label MUST come from the same horizon the amount was inflated over — re-deriving it here
+// from the household anchor made the year disagree with the rupees under a member lens
+// (FinTech re-review E1; contract §10 "no parallel math" applies to labels too).
+const needYear = computed(() => new Date().getFullYear() + req.value.yearsToTarget);
 
 /** "+3 years → ₹X/month" — the mockup's "Drag to feel it" hint. */
 const plus3Hint = computed(() => {
@@ -342,7 +349,11 @@ function yearsLabel(years: number): string {
         {{ hh.isMember ? `${hh.memberName}'s individual plan — to retire at` : "To retire at" }}
       </div>
       <div class="fire-hero__age" data-testid="fire-hero-age">{{ targetAge }}</div>
-      <div class="fire-hero__when" data-testid="fire-hero-need">
+      <div v-if="!req.hasTarget" class="fire-hero__when" data-testid="fire-hero-need">
+        we can't put a number on this yet —
+        <RouterLink to="/expenses">add your monthly spending</RouterLink> and your FIRE number appears here.
+      </div>
+      <div v-else class="fire-hero__when" data-testid="fire-hero-need">
         you'll need <b class="text-currency">{{ formatINRCompact(req.needReal) }}</b> in today's money
         <span class="fire-hero__sep">·</span> that's
         <b class="text-currency">{{ formatINRCompact(req.needNominal) }}</b> in {{ needYear }}
@@ -352,7 +363,7 @@ function yearsLabel(years: number): string {
       <p v-if="guessLine" class="fire-hero__guess" data-testid="fire-hero-guess">{{ guessLine }}</p>
 
       <!-- The four numbers: need (above) · have by target · gap · do this. -->
-      <div class="gap-tiles mt-3" data-testid="hero-gap-tiles">
+      <div v-if="req.hasTarget" class="gap-tiles mt-3" data-testid="hero-gap-tiles">
         <div class="gap-tile">
           <div class="gap-tile__k">You'll have by {{ targetAge }}</div>
           <div class="gap-tile__v text-currency" data-testid="hero-have">
@@ -403,7 +414,7 @@ function yearsLabel(years: number): string {
       </div>
 
       <!-- Live what-if on the retirement age — the SAME field /fire-goals/what-if writes. -->
-      <div class="hero-slider mt-4">
+      <div v-if="req.hasTarget" class="hero-slider mt-4">
         <div class="hero-slider__row">
           <span>Drag your retirement age</span>
           <b class="font-mono" data-testid="hero-target-age">{{ sliderAge }}</b>
@@ -445,7 +456,7 @@ function yearsLabel(years: number): string {
 
       <!-- DEMOTED: the current-pace FIRE age (what the headline used to claim) + the
            NON-REMOVABLE #18 confidence band + the "since you were away" delta. -->
-      <p class="fire-hero__pace" data-testid="fire-hero-pace">
+      <p v-if="req.hasTarget" class="fire-hero__pace" data-testid="fire-hero-pace">
         <span v-html="paceLine"></span>
         <template v-if="band">
           <span class="fire-hero__sep">·</span>

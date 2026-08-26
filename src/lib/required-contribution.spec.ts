@@ -12,7 +12,11 @@ import { useAssumptionsStore } from "@/stores/assumptions";
 import { loadSeedPersona } from "@/lib/seed-persona";
 import { loadMehtasSeed } from "@/seeds/mehtas";
 import { derive } from "@/lib/derive";
-import { requiredMonthlyContributionFor, REQUIRED_CONTRIBUTION_TOLERANCE } from "@/lib/required-contribution";
+import {
+  requiredMonthlyContributionFor,
+  REQUIRED_CONTRIBUTION_TOLERANCE,
+  MIN_LIVING_RETENTION,
+} from "@/lib/required-contribution";
 
 const LENS = { isFamilyView: false, viewingMemberId: null, currentFY: "2025-26" } as const;
 
@@ -210,6 +214,154 @@ describe("requiredMonthlyContributionFor — solves through the REAL derive() pa
     });
     expect(lensed.needReal).toBe(household.needReal);
     expect(lensed.requiredMonthlyReal).toBe(household.requiredMonthlyReal);
+  });
+
+  // ---- member-lens substance locks (FinTech re-review: fixes 1 and 2 shipped with NO test —
+  // reverting either left the whole suite green) ----
+
+  it("member lens: 'have' is the member's OWN corpus at the member's OWN return and horizon", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    loadMehtasSeed(h, a);
+    const targetAge = 60;
+    const k = derive(h.data, a.values, LENS);
+    // Pick the adult whose age differs from the household anchor — that is where a household
+    // anchor would silently project the wrong number of years.
+    const adult =
+      k.individualFireByMember.find((m) => m.anchorAge !== k.anchorAge) ?? k.individualFireByMember[0];
+    expect(adult, "the seed must expose an adult to lens on").toBeTruthy();
+
+    const memberLens = { ...LENS, viewingMemberId: adult.memberId };
+    const r = requiredMonthlyContributionFor({
+      snapshot: h.data,
+      assumptions: a.values,
+      lens: memberLens,
+      targetAge,
+    });
+    const atTarget = derive(h.data, a.values, memberLens, { targetRetirementAge: targetAge });
+    const adultAtTarget = atTarget.individualFireByMember.find((m) => m.memberId === adult.memberId)!;
+
+    // The horizon is THEIR age to the target — not the primary earner's.
+    expect(r.anchorAgeUsed).toBe(adultAtTarget.anchorAge);
+    expect(r.yearsToTarget).toBe(Math.max(0, Math.round(targetAge - adultAtTarget.anchorAge)));
+
+    // …and the corpus grows at THEIR blended real return, reproduced independently here.
+    const monthly = Math.round(adultAtTarget.attributableAnnualSavings / 12);
+    let corpus = adultAtTarget.attributableCorpus;
+    for (let y = 0; y < r.yearsToTarget; y++) {
+      corpus = corpus * (1 + adultAtTarget.realReturn) + monthly * 12;
+    }
+    // projectCorpus compounds monthly within the year, so allow a small intra-year difference.
+    expect(Math.abs(r.haveAtTargetReal - corpus) / Math.max(1, corpus)).toBeLessThan(0.06);
+  });
+
+  it("member lens: growing the member's corpus at the HOUSEHOLD return would OVERSTATE it (bug signature)", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    loadMehtasSeed(h, a);
+    const targetAge = 60;
+    const k = derive(h.data, a.values, LENS);
+    // The adult whose own return is furthest BELOW the household blend — the debt-heavy spouse.
+    const adult = [...k.individualFireByMember].sort((x, y) => x.realReturn - y.realReturn)[0];
+    const memberLens = { ...LENS, viewingMemberId: adult.memberId };
+    const atTarget = derive(h.data, a.values, memberLens, { targetRetirementAge: targetAge });
+    const adultAtTarget = atTarget.individualFireByMember.find((m) => m.memberId === adult.memberId)!;
+    const householdReal = (1 + atTarget.blendedReturn) / (1 + a.values.inflation) - 1;
+
+    // Only meaningful when the two rates actually differ on this seed.
+    if (Math.abs(householdReal - adultAtTarget.realReturn) < 0.001) return;
+
+    const r = requiredMonthlyContributionFor({
+      snapshot: h.data,
+      assumptions: a.values,
+      lens: memberLens,
+      targetAge,
+    });
+    const monthly = Math.round(adultAtTarget.attributableAnnualSavings / 12);
+    const grow = (rate: number) => {
+      let c = adultAtTarget.attributableCorpus;
+      for (let y = 0; y < r.yearsToTarget; y++) c = c * (1 + rate) + monthly * 12;
+      return c;
+    };
+    const atHouseholdRate = grow(householdReal);
+    const atMemberRate = grow(adultAtTarget.realReturn);
+    if (householdReal > adultAtTarget.realReturn) {
+      expect(atHouseholdRate).toBeGreaterThan(atMemberRate);
+      // The shipped figure must be the MEMBER's, i.e. nearer the member-rate projection.
+      expect(Math.abs(r.haveAtTargetReal - atMemberRate)).toBeLessThan(
+        Math.abs(r.haveAtTargetReal - atHouseholdRate),
+      );
+    }
+  });
+
+  it("member lens: never prescribes more than THAT adult's own take-home", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    loadMehtasSeed(h, a);
+    const k = derive(h.data, a.values, LENS);
+    for (const adult of k.individualFireByMember) {
+      const memberTakeHome = Math.round(
+        (adult.attributableAnnualIncome - adult.attributableAnnualTax) / 12,
+      );
+      for (const age of [45, 50, 55, 60, 65]) {
+        const r = requiredMonthlyContributionFor({
+          snapshot: h.data,
+          assumptions: a.values,
+          lens: { ...LENS, viewingMemberId: adult.memberId },
+          targetAge: age,
+        });
+        if (Number.isFinite(r.requiredMonthlyReal)) {
+          expect(
+            r.requiredMonthlyReal,
+            `${adult.name} at ${age} is quoted more than their own take-home (${memberTakeHome})`,
+          ).toBeLessThanOrEqual(memberTakeHome);
+        }
+      }
+    }
+  });
+
+  it("a prescription that would need cutting spending past the living floor returns Infinity", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    loadSeedPersona(h, a);
+    const k = derive(h.data, a.values, LENS);
+    const monthlyExpenses = k.annualExpensesToday / 12;
+    const feasibleCeiling = k.monthlyTakeHome - MIN_LIVING_RETENTION * monthlyExpenses;
+    for (const age of [40, 45, 47, 50, 55, 60]) {
+      const r = requiredMonthlyContributionFor({ snapshot: h.data, assumptions: a.values, lens: LENS, targetAge: age });
+      if (Number.isFinite(r.requiredMonthlyReal)) {
+        // Anything quoted must sit inside the feasible band — a plan that requires spending
+        // less than half of today's outgoings contradicts the very number it is solving for.
+        expect(
+          r.requiredMonthlyReal,
+          `retiring at ${age} quotes an amount that needs a >50% spending cut`,
+        ).toBeLessThanOrEqual(Math.ceil(feasibleCeiling));
+      }
+    }
+  });
+
+  it("no income at all ⇒ no monthly amount is quoted (never the old Rs5 L fallback)", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    loadSeedPersona(h, a);
+    // Strip every income source: no take-home ⇒ no feasible headroom ⇒ no honest prescription.
+    for (const m of h.data.members) m.salary = undefined;
+    h.data.businesses = [];
+    h.data.otherIncome = [];
+    const r = requiredMonthlyContributionFor({ snapshot: h.data, assumptions: a.values, lens: LENS, targetAge: 55 });
+    expect(r.requiredMonthlyReal).toBe(Number.POSITIVE_INFINITY);
+  });
+
+  it("no expenses entered ⇒ hasTarget is false so the hero makes NO claim (empty-state honesty)", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    loadSeedPersona(h, a);
+    h.data.expenses.avgMonthly = 0;
+    h.data.expenses.recurring = [];
+    h.data.expenses.plannedFuture = [];
+    const r = requiredMonthlyContributionFor({ snapshot: h.data, assumptions: a.values, lens: LENS, targetAge: 55 });
+    expect(r.hasTarget).toBe(false);
+    expect(r.needReal).toBe(0);
   });
 
   it("a non-finite target age makes NO claim (NaN gap → the 'unknown' tone), never a number", () => {

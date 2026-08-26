@@ -21,6 +21,7 @@ import type { Household } from "@/types/household";
 import type { Assumptions } from "@/types/assumptions";
 import { derive, type DeriveLens } from "@/lib/derive";
 import { projectCorpus } from "@/lib/fire-math";
+import { toMonthly } from "@/lib/cashflow";
 
 /** Bisection stops once the bracket is this tight (rupees/month). */
 export const REQUIRED_CONTRIBUTION_TOLERANCE = 100;
@@ -54,7 +55,23 @@ export interface RequiredContributionResult {
   needNominal: number;
   /** Horizon-driven safe withdrawal rate used for this target age. */
   swrUsed: number;
+  /** The age the projection actually started from (the LENSED adult's, not the household's). */
+  anchorAgeUsed: number;
+  /** Whole years from `anchorAgeUsed` to the target — the card must reuse this, never re-derive it. */
+  yearsToTarget: number;
+  /** False when there is no FIRE target yet (no expenses entered) — the card must make NO claim. */
+  hasTarget: boolean;
 }
+
+/**
+ * The share of today's spending a household is assumed to keep. A prescription that requires
+ * cutting spending below this is not a plan — and it is also SELF-CONTRADICTORY, because the
+ * FIRE number it is solving against was built on today's spending (FinTech re-review §B: quoting
+ * Rs3.11 L/month to a household that spends Rs1.73 L/month asserts both "you'll spend Rs20.8 L/yr
+ * forever, hence Rs10.6 Cr" and "spend Rs2.8 L/yr for 17 years"). Beyond this floor the honest
+ * answer is Infinity → "Move the age", not a number from a different household's plan.
+ */
+export const MIN_LIVING_RETENTION = 0.5;
 
 /** Finite-or-fallback guard so no arithmetic edge can put a NaN on screen. */
 function safe(v: number, fallback = 0): number {
@@ -78,6 +95,9 @@ export function requiredMonthlyContributionFor(
       paceFireAge: null,
       needNominal: 0,
       swrUsed: safe(k.effectiveSWR, 0.035),
+      anchorAgeUsed: safe(k.anchorAge, 30),
+      yearsToTarget: 0,
+      hasTarget: false,
     };
   }
   const targetAge = Math.round(input.targetAge);
@@ -164,23 +184,38 @@ export function requiredMonthlyContributionFor(
     return k.householdFireAge != null && k.householdFireAge <= targetAge;
   };
 
-  // The ceiling must be a FEASIBLE amount. Nobody can invest more per month than they take
-  // home, so a "do this Rs4.8 L/month" quoted at a Rs1 L/month take-home is domain-absurd
-  // (rule 31) — beyond that the honest answer is Infinity, which renders "Move the age".
-  // FinTech HIGH-4. NOTE the residual model limit, stated in the UI copy: an amount above
-  // today's savings implies cutting spending, which would ALSO lower the FIRE number; the
-  // solver does not re-solve that fixed point, so such an amount is CONSERVATIVE (too high),
-  // never optimistic.
-  const monthlyTakeHome = safe(base.monthlyTakeHome);
-  const uncappedCeiling = Math.max(
-    10 * Math.max(0, currentMonthlyReal),
-    5 * monthlyTakeHome,
-    REQUIRED_CONTRIBUTION_MIN_CEILING,
-  );
-  const hi = monthlyTakeHome > 0 ? Math.min(uncappedCeiling, monthlyTakeHome) : uncappedCeiling;
+  // ---- the FEASIBLE ceiling (rule 31) ----
+  // Take-home alone is an asymptote, not a bound: investing 100% of it means spending zero.
+  // The real ceiling is take-home MINUS a living floor, and the floor is the larger of
+  //   (a) contractually committed outflows — the auto-flowed EMI + insurance premium, which a
+  //       solver has no business assuming away (prescribing a loan default), and
+  //   (b) half of today's spending — a 50% permanent cut is already the outer edge of what a
+  //       salaried accumulator will actually do.
+  // Scope matters: under a member lens this must be THAT adult's take-home and THAT adult's
+  // expenses, never the couple's — the household figure would let the card quote one spouse
+  // more than twice their own income (FinTech re-review §D).
+  const monthlyTakeHome = atTargetAdult
+    ? Math.max(0, Math.round((atTargetAdult.attributableAnnualIncome - atTargetAdult.attributableAnnualTax) / 12))
+    : safe(base.monthlyTakeHome);
+  const monthlyExpenses = atTargetAdult
+    ? Math.max(0, atTargetAdult.attributableAnnualExpenses / 12)
+    : Math.max(0, safe(atTarget.annualExpensesToday) / 12);
+  // Contractual outflows already inside the expense base (auto-flowed by the household store).
+  const scopeSplit = atTargetAdult
+    ? Math.min(100, Math.max(0, assumptions.householdSplitPercent ?? 50)) / 100
+    : 1;
+  const committedMonthly = snapshot.expenses.recurring
+    .filter((r) => r.source === "auto-loan" || r.source === "auto-insurance")
+    .reduce((sum, r) => sum + toMonthly({ amount: r.amount, period: r.frequency }) * scopeSplit, 0);
+  const livingFloor = Math.max(committedMonthly, MIN_LIVING_RETENTION * monthlyExpenses);
+  const hi = Math.max(0, monthlyTakeHome - livingFloor);
 
   let requiredMonthlyReal: number;
-  if (reaches(0)) {
+  if (hi <= 0) {
+    // No feasible headroom (no income, or every rupee of take-home is already committed) —
+    // there is no honest monthly amount to quote (FinTech re-review §A finding 4, MEDIUM).
+    requiredMonthlyReal = Number.POSITIVE_INFINITY;
+  } else if (reaches(0)) {
     // Already there without investing another rupee (a genuine surplus case).
     requiredMonthlyReal = 0;
   } else if (!reaches(hi)) {
@@ -218,5 +253,8 @@ export function requiredMonthlyContributionFor(
     paceFireAge: paceFireAgeRaw != null && Number.isFinite(paceFireAgeRaw) ? paceFireAgeRaw : null,
     needNominal: Math.max(0, Math.round(safe(needRealRounded * inflator, needRealRounded))),
     swrUsed,
+    anchorAgeUsed: anchorAge,
+    yearsToTarget: wholeYears,
+    hasTarget: needRealRounded > 0,
   };
 }
