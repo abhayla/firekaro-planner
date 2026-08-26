@@ -10,7 +10,9 @@ globs: ["src/lib/**/*.ts"]
 > extracted `firekaro-planner` repo, **all calculation math lives in `src/lib/*.ts`** and is
 > consumed directly by the Vue planner (Pinia stores + composables) — there is no calc backend.
 > The `server/` here is only the thin Hono/Prisma document API (`household-diff.ts`). Paths and
-> the module inventory below reflect THIS repo; `CLAUDE.md` → "Calculations" is the SSOT.
+> the module inventory below reflect THIS repo; this rule is the SSOT for the full module
+> inventory (T-349, 2026-08-26) — `CLAUDE.md` → "Calculations" keeps the kernel/ADR-0004/bridge
+> prose and points here.
 
 ## Architecture
 
@@ -22,7 +24,13 @@ input → output.
 
 ## Module Inventory
 
-Calculation modules in `src/lib/` (see `CLAUDE.md` for the authoritative list):
+**The kernel** (kept in full in `CLAUDE.md` → "Calculations", not duplicated here): `derive.ts` is
+the ONE pure FIRE-math function (household snapshot + resolved assumptions + UI lens → every
+dashboard field); `useFireDerive.ts` is its thin Pinia-aware wrapper; `derive.spec.ts` and
+`useFireDerive.seed.spec.ts` are its colocated + end-to-end specs.
+
+Calculation modules in `src/lib/` (this table is the authoritative full inventory — extend it here,
+never create a second table; `CLAUDE.md` keeps only the kernel/ADR-0004/bridge prose + a pointer):
 
 | Module | Purpose |
 |--------|---------|
@@ -42,6 +50,31 @@ Calculation modules in `src/lib/` (see `CLAUDE.md` for the authoritative list):
 | `freedom-score.ts` | 0–100 financial-independence score |
 | `assumption-math.ts` | Resolves research-default + override assumptions |
 | `derived-records.ts` · `nudge-engine.ts` · `expense-history.ts` · `investment-traits.ts` | Derived records, nudges, expense history, instrument traits |
+| `retirement-goal.ts` | Retirement-card age/year coherence — derives both from the same FIRE source so they correspond (#33) |
+| `stress-test.ts` | Stress-test scenarios against the FIRE plan |
+| `monte-carlo.ts` | FIRE date as a confidence distribution, not a point (#18) |
+| `business-legal-kinds.ts` | Business legal-kind vocabulary — `BUSINESS_LEGAL_KINDS` labels, owner share math, and the #158 browse-column builder whose membership is entry-existence, never money, so ₹0 rows stay reachable |
+| `salary-percent.ts` | The salary-form % ⇄ ₹ bridge: Basic as % of CTC + employer NPS as % of basic, law-grounded fresh-entry defaults (Code-on-Wages 50% floor; sector-aware NPS govt 14 / private 0); existing records never resurrect defaults |
+| `lifecycle-digest.ts` | The `derive()`-grounded "since you were away" delta engine — the Tier-1 stickiness digest card on the dashboard |
+| `member-horizon.ts` | Member-level horizon calculation feeding the app-wide "View as member" lens |
+| `age.ts` | Age calculation helpers |
+| `fire-milestone-copy.ts` | Coast/Barista card copy gated on a real FIRE target existing — the honest "add your data" fallback for zero-data users (#39) |
+| `accessibility.ts` | #15 accessible-money bridge — when/how-much each holding unlocks |
+| `liquidation-tax.ts` | #15 accessible-money bridge — post-tax net of selling a holding |
+| `eps-pension.ts` | #15 accessible-money bridge — EPS pension income stream |
+| `gratuity.ts` | #15 accessible-money bridge — gratuity income stream |
+| `bridge.ts` | #15 accessible-money bridge — `computeBridgeCoverage` runs a conservative year-by-year liquidity check and moves the effective headline FIRE age LATER when the liquid runway can't cover the bridge years |
+| `fire-confidence-band.ts` | Obj-1 honesty — FIRE date as a confidence band, not a point |
+| `contribution-schedule.ts` | ADR-0004 temporal contributions — age-relative contribution segments |
+| `lever-catalog.ts` · `lever-bands.ts` · `lever-impact.ts` | Obj-2 "get there faster" — per-lever FIRE-date-delta ranking (#48) |
+| `readiness.ts` | Obj-3 "is it safe to stop?" |
+| `decumulation.ts` | Obj-4 post-FIRE guardrails |
+| `plan-variance.ts` | #138 plan-vs-actual variance against the persisted `plan-baseline` document |
+| `dashboard-verdict.ts` | #155 Option-D hero verdict-tone resolver consuming `plan-variance.ts` — no-baseline/NaN makes NO claim, ±Infinity does |
+| `runway.ts` | #140 layoff/income-shock runway |
+| `member-earning.ts` · `member-draft.ts` | Member model — `Member.role` is DERIVED from income, not stored; feeds the app-wide "View as \<member\>" lens while keeping household-solvency ratios coherent (#66/#67) |
+| `expense-attribution.ts` | The ONE canonical ring/lens expense attributor — "Household"/"Dependents" sentinels are deliberately distinct from the asset "Joint" sentinel |
+| `individual-fire.ts` | #81 — one adult's standalone FIRE as a "mini-household": attributed corpus/expenses/per-individual tax; household stays the primary + invariant headline |
 
 ## Colocated Tests
 
