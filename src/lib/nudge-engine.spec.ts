@@ -29,6 +29,7 @@ function emptyFamily(): DerivedFamilyLayer {
     parentsRecurring: [],
     educationGoals: [],
     marriageEvents: [],
+    allPlannedGoals: [],
     extendedContingency: null,
     totalAnnualCost: 0,
     hasFamilyLayer: false,

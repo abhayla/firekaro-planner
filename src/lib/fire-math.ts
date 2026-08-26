@@ -133,19 +133,21 @@ export function blendedInflation(
  * FIRE number), so they are NOT re-added here.
  *
  * Components added:
- *  - education + marriage planned-future goals → their today-rupee target
+ *  - EVERY planned-future goal (T-376/gh-#165: was education+marriage kinds
+ *    only — a `general` goal like a house upgrade silently never moved the
+ *    FIRE number, an optimistic honesty error) → their today-rupee target
  *    amounts (one-shot future lump sums; not perpetual, so NOT divided by SWR).
  *  - extended-family contingency → an ongoing buffer, capitalized at SWR
  *    (annual ÷ swr) like any other perpetual expense.
  */
 export function calculateFamilyLayerCorpus(args: {
-  educationMarriageLumpToday: number;
+  plannedGoalsLumpToday: number;
   extendedContingencyAnnual: number;
   swr: number;
 }): number {
-  const { educationMarriageLumpToday, extendedContingencyAnnual, swr } = args;
+  const { plannedGoalsLumpToday, extendedContingencyAnnual, swr } = args;
   const contingencyCorpus = swr > 0 ? extendedContingencyAnnual / swr : 0;
-  return Math.max(0, educationMarriageLumpToday) + Math.max(0, contingencyCorpus);
+  return Math.max(0, plannedGoalsLumpToday) + Math.max(0, contingencyCorpus);
 }
 
 /**

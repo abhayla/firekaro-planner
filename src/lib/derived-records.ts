@@ -29,6 +29,17 @@ export interface DerivedFamilyLayer {
   educationGoals: PlannedFutureLine[];
   /** Marriage events (planned-future kind='marriage'). */
   marriageEvents: PlannedFutureLine[];
+  /**
+   * EVERY planned-future line, regardless of `kind` (general/education/marriage/
+   * medical/undefined) — T-376/gh-#165. This is the FIRE-NUMBER lump source
+   * (derive.ts's family-layer corpus): a `general` goal like a house upgrade
+   * MUST move the FIRE number just like an education/marriage goal does, or
+   * the app makes an optimistic honesty error. Kept SEPARATE from
+   * `educationGoals`/`marriageEvents` above, which remain the narrower
+   * DISPLAY-only family-layer set (FamilyLayerCard / NudgeStack / lifecycle
+   * digest) — their scope is unchanged by this fix.
+   */
+  allPlannedGoals: PlannedFutureLine[];
   /** Extended-family contingency line (synthesized from household %). */
   extendedContingency: RecurringExpenseLine | null;
   /**
@@ -107,6 +118,7 @@ export function derivedFamilyLayer(household: Household): DerivedFamilyLayer {
     parentsRecurring,
     educationGoals,
     marriageEvents,
+    allPlannedGoals: planned,
     extendedContingency,
     totalAnnualCost,
     hasFamilyLayer,

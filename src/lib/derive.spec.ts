@@ -908,12 +908,17 @@ describe("seed-anchor regression locks (gh-issue #17 — catch silent adequacy-l
     const a = useAssumptionsStore();
     loadSeedPersona(h, a);
     const k = derive(h.data, a.values, { isFamilyView: false, viewingMemberId: null, currentFY: "2025-26" });
-    // Pinned to the known-good values (anchored 2026-06-04, post-#29 Sec 24a). The byte-identical
+    // Pinned to the known-good values (re-anchored 2026-08-27, T-376/gh-#165). The byte-identical
     // wrapper/kernel test only proves the two agree with EACH OTHER; this anchors the ACTUAL headline
     // so a future adequacy-leg refactor (#23) that silently drifts it is a CI failure. FIRE age ≈ 59
-    // (anchor 33 + ~25.58y), comfortably under the #22 sanity ceiling.
-    expect(k.yearsToRegular).toBeCloseTo(25.58, 2);
-    expect(Math.round(k.fireNumber)).toBe(105_482_068);
+    // (anchor 33 + ~25.67y), comfortably under the #22 sanity ceiling.
+    // Re-anchor note: this moved from 25.58y/₹105,482,068 → 25.67y/₹105,982,068 (a +₹5,00,000 shift)
+    // when T-376 fixed the Tier-0 honesty bug (gh-#165): the Sharmas seed's kind-less "Foreign
+    // vacation" plannedFuture line (`seed-persona.ts`, no `kind` set → defaults to 'general') now
+    // correctly enters the FIRE-number family-layer lump, matching every other planned goal. This is
+    // the EXPECTED, intended effect of the fix, not drift.
+    expect(k.yearsToRegular).toBeCloseTo(25.67, 2);
+    expect(Math.round(k.fireNumber)).toBe(105_982_068);
   });
 });
 

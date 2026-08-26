@@ -444,16 +444,20 @@ export function derive(household: Household, assumptions: Assumptions, lens: Der
 
   const baseFireNumber = calculateFIRENumber(netAnnualExpenses, effectiveSWR, anchorAge);
 
-  // Family-layer additive corpus (A6.10).
+  // Family-layer additive corpus (A6.10). T-376/gh-#165: EVERY plannedFuture line
+  // (general/education/marriage/medical/undefined kind) enters the lump — not just
+  // education+marriage. A general goal (e.g. a house upgrade) that doesn't move the
+  // FIRE number is an optimistic honesty error for the accumulator persona.
   const familyLayer = derivedFamilyLayer(household);
-  const educationMarriageLumpToday =
-    familyLayer.educationGoals.reduce((s, g) => s + (g.todayAmount ?? 0), 0) +
-    familyLayer.marriageEvents.reduce((s, g) => s + (g.todayAmount ?? 0), 0);
+  const plannedGoalsLumpToday = familyLayer.allPlannedGoals.reduce(
+    (s, g) => s + (g.todayAmount ?? 0),
+    0,
+  );
   const extendedContingencyAnnual = familyLayer.extendedContingency
     ? familyLayer.extendedContingency.amount * 12
     : 0;
   const familyLayerCorpus = calculateFamilyLayerCorpus({
-    educationMarriageLumpToday,
+    plannedGoalsLumpToday,
     extendedContingencyAnnual,
     swr: effectiveSWR,
   });
