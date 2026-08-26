@@ -23,7 +23,7 @@ import { usePlanBaseline } from "@/composables/usePlanBaseline";
 import { computePlanVariance } from "@/lib/plan-variance";
 import { useAcceleration } from "@/composables/useAcceleration";
 import { useLifecycleDigest } from "@/composables/useLifecycleDigest";
-import { resolveHeroTone } from "@/lib/dashboard-verdict";
+import { resolveHeroTone, resolveGapTone } from "@/lib/dashboard-verdict";
 import { describeFireConfidenceBand } from "@/lib/fire-confidence-band";
 import { MAX_PROJECTION_YEARS } from "@/lib/monte-carlo";
 import { formatINRCompact, formatYearsMonths } from "@/lib/formatters";
@@ -184,6 +184,89 @@ const moreWinsCount = computed(() => Math.max(0, reachableWins.value.length - 1)
 const bridgeBinding = computed(() => accel.bridgeBinding.value);
 const showWinSlot = computed(() => bridgeBinding.value || topWin.value !== null);
 
+// ================= T-377 (QN-2): the gap hero =================
+// Design SSOT: docs/design/2026-08-27-quick-number-gap-hero/option-c-merged.html.
+// The headline is now the age the user WANTS ("To retire at 50 you'll need ₹X"); the
+// current-pace age is demoted to the honest annotation below the slider. EVERY number here
+// comes from `useFireDerive().requiredContribution` (which solves through derive()) — this
+// component computes no money of its own (contract §10: no parallel math).
+const HERO_AGE_MIN = 40;
+const HERO_AGE_MAX = 70;
+
+const req = computed(() => fire.requiredContribution.value);
+const reqPlus3 = computed(() => fire.requiredContributionAtTargetPlus3.value);
+
+/** The shared slider age — reads/writes `ui.whatIfTargetAge`, the SAME field /what-if uses. */
+const targetAge = computed<number>({
+  get: () => fire.heroTargetAge.value,
+  set: (v: number) => ui.setWhatIfTargetAge(v),
+});
+/** True once the user has dragged away from their saved plan (enables "Set as my target"). */
+const sliderMoved = computed(
+  () => ui.whatIfTargetAge != null && ui.whatIfTargetAge !== fire.targetRetirementAge.value,
+);
+
+const requiredFinite = computed(() => Number.isFinite(req.value.requiredMonthlyReal));
+/** The action question: does the user have to put MORE in every month than they do today? */
+const mustInvestMore = computed(
+  () => !requiredFinite.value || req.value.requiredMonthlyReal > req.value.currentMonthlyReal,
+);
+const gapTone = computed(() => resolveGapTone(req.value.gapReal));
+const needYear = computed(() => {
+  const anchor = fire.anchorAge.value;
+  const yrs = Number.isFinite(anchor) ? Math.max(0, targetAge.value - anchor) : 0;
+  return new Date().getFullYear() + Math.round(yrs);
+});
+
+/** "+3 years → ₹X/month" — the mockup's "Drag to feel it" hint. */
+const plus3Hint = computed(() => {
+  const r = reqPlus3.value.requiredMonthlyReal;
+  if (!Number.isFinite(r)) {
+    return `Three more years (to ${targetAge.value + 3}) still wouldn't be enough at any realistic monthly amount.`;
+  }
+  return `Three more years (to ${targetAge.value + 3}) → ${formatINRCompact(r)}/month. Drag to feel it.`;
+});
+
+/** Gut-feel comparison — only when the /quick path actually recorded a guess (QN-1 writes it). */
+const guessLine = computed(() => {
+  const guess = ui.quick?.guess;
+  if (!guess || !Number.isFinite(guess) || guess <= 0 || req.value.needReal <= 0) return null;
+  const ratio = req.value.needReal / guess;
+  const verdict =
+    ratio > 1.15
+      ? `— ${ratio.toFixed(1)}× more, and that's normal`
+      : ratio < 0.85
+        ? "— you were on the cautious side"
+        : "— good instinct";
+  return `Your gut said ${formatINRCompact(guess)} · the math says ${formatINRCompact(req.value.needReal)} ${verdict}.`;
+});
+
+/** The DEMOTED current-pace annotation (what the headline used to claim). */
+const paceLine = computed(() => {
+  const pace = req.value.paceFireAge;
+  if (pace == null) {
+    return `At today's pace you would <b>not</b> reach this number within your plan horizon — the "do this" amount is what closes it.`;
+  }
+  if (pace <= targetAge.value) {
+    const early = targetAge.value - pace;
+    return early === 0
+      ? `At today's pace you'd get there right on time, at <b>${pace}</b>.`
+      : `At today's pace you'd get there at <b>${pace}</b> — ${early} year${early === 1 ? "" : "s"} early.`;
+  }
+  const late = pace - targetAge.value;
+  return `At today's pace you'd get there at <b>${pace}</b> — <b>${late} year${late === 1 ? "" : "s"} later</b> than you'd like. The "do this" amount closes that gap.`;
+});
+
+/** Persist the dragged age as the real plan (the only write the slider can make). */
+function setAsMyTarget() {
+  const age = targetAge.value;
+  for (const m of h.earners) h.updateMember(m.id, { targetRetirementAge: age });
+  ui.setWhatIfTargetAge(null); // follow the plan again now that the plan IS this age
+}
+function resetTargetAge() {
+  ui.setWhatIfTargetAge(null);
+}
+
 function yearsLabel(years: number): string {
   const abs = Math.abs(years);
   if (abs < 1) return `${Math.round(abs * 12)} mo`;
@@ -200,72 +283,148 @@ function yearsLabel(years: number): string {
     :class="toneClass"
     data-testid="fire-hero"
   >
-    <!-- Verdict block -->
+    <!-- ===== T-377 (QN-2) gap hero: ONE headline = the age you WANT ===== -->
     <div class="text-center">
-      <template v-if="achieved">
-        <div class="fire-hero__eyebrow">Your FIRE status</div>
-        <div class="fire-hero__age fire-hero__age--text" data-testid="fire-hero-age">
-          You're already at Regular FIRE — congratulations!
+      <div class="fire-hero__eyebrow">
+        {{ hh.isMember ? `${hh.memberName}'s individual plan — to retire at` : "To retire at" }}
+      </div>
+      <div class="fire-hero__age" data-testid="fire-hero-age">{{ targetAge }}</div>
+      <div class="fire-hero__when" data-testid="fire-hero-need">
+        you'll need <b class="text-currency">{{ formatINRCompact(req.needReal) }}</b> in today's money
+        <span class="fire-hero__sep">·</span> that's
+        <b class="text-currency">{{ formatINRCompact(req.needNominal) }}</b> in {{ needYear }}
+      </div>
+
+      <!-- Gut-feel comparison (only when the /quick path recorded a guess). -->
+      <p v-if="guessLine" class="fire-hero__guess" data-testid="fire-hero-guess">{{ guessLine }}</p>
+
+      <!-- The four numbers: need (above) · have by target · gap · do this. -->
+      <div class="gap-tiles mt-3" data-testid="hero-gap-tiles">
+        <div class="gap-tile">
+          <div class="gap-tile__k">You'll have by {{ targetAge }}</div>
+          <div class="gap-tile__v text-currency" data-testid="hero-have">
+            {{ formatINRCompact(req.haveAtTargetReal) }}
+          </div>
+          <div class="gap-tile__s">
+            at {{ formatINRCompact(req.currentMonthlyReal) }}/month, today's money
+          </div>
         </div>
-      </template>
-      <template v-else-if="!finiteYears">
-        <div class="fire-hero__eyebrow">
-          {{ hh.isMember ? `${hh.memberName}'s individual FIRE — you'll FIRE at age` : "You'll FIRE at age" }}
+        <div class="gap-tile">
+          <div class="gap-tile__k">Gap</div>
+          <div
+            class="gap-tile__v text-currency"
+            :class="gapTone === 'short' ? 'text-warning' : gapTone === 'surplus' ? 'text-success' : ''"
+            data-testid="hero-gap"
+          >
+            <template v-if="gapTone === 'unknown'">—</template>
+            <template v-else>{{ gapTone === "short" ? "−" : "+" }}{{ formatINRCompact(Math.abs(req.gapReal)) }}</template>
+          </div>
+          <div class="gap-tile__s">
+            {{ gapTone === "short" ? "short" : gapTone === "surplus" ? "surplus" : "not enough data to say" }}
+          </div>
         </div>
-        <div class="fire-hero__age fire-hero__age--text" data-testid="fire-hero-age">—</div>
-        <div class="fire-hero__when">
-          {{
-            hh.isMember
-              ? `${hh.memberName}'s individual FIRE is not within their working life at current savings.`
-              : "Increase income or savings to project a FIRE date."
-          }}
+        <div class="gap-tile gap-tile--act">
+          <div class="gap-tile__k">Do this</div>
+          <div class="gap-tile__v text-currency" data-testid="hero-required-monthly">
+            <template v-if="!requiredFinite">Move the age</template>
+            <template v-else-if="!mustInvestMore">You're already there</template>
+            <template v-else>{{ formatINRCompact(req.requiredMonthlyReal) }} / month</template>
+          </div>
+          <div class="gap-tile__s">
+            <template v-if="!requiredFinite">
+              retiring at {{ targetAge }} is beyond any realistic monthly amount — drag the age later
+            </template>
+            <template v-else-if="!mustInvestMore">
+              your current {{ formatINRCompact(req.currentMonthlyReal) }}/month is enough for {{ targetAge }}
+            </template>
+            <template v-else>
+              invest this every month (you do {{ formatINRCompact(req.currentMonthlyReal) }} now) to retire at
+              {{ targetAge }}
+            </template>
+          </div>
         </div>
-      </template>
-      <template v-else>
-        <div class="fire-hero__eyebrow">
-          {{
-            hh.isMember
-              ? `${hh.memberName}'s individual FIRE — you'll FIRE at age`
-              : fireAge != null
-                ? "You'll FIRE at age"
-                : "You'll FIRE in"
-          }}
+      </div>
+
+      <!-- Live what-if on the retirement age — the SAME field /fire-goals/what-if writes. -->
+      <div class="hero-slider mt-4">
+        <div class="hero-slider__row">
+          <span>Drag your retirement age</span>
+          <b class="font-mono" data-testid="hero-target-age">{{ targetAge }}</b>
         </div>
-        <div class="fire-hero__age" data-testid="fire-hero-age">
-          {{ fireAge ?? formatYearsMonths(hh.yearsToFire) }}
+        <v-slider
+          v-model="targetAge"
+          :min="HERO_AGE_MIN"
+          :max="HERO_AGE_MAX"
+          :step="1"
+          density="compact"
+          color="primary"
+          hide-details
+          aria-label="Target retirement age"
+          data-testid="hero-age-slider"
+        />
+        <div class="hero-slider__hint" data-testid="hero-slider-hint">{{ plus3Hint }}</div>
+        <div v-if="sliderMoved" class="mt-2">
+          <v-btn
+            size="small"
+            color="primary"
+            variant="flat"
+            prepend-icon="mdi-target"
+            data-testid="hero-set-target"
+            @click="setAsMyTarget"
+          >
+            Set {{ targetAge }} as my target
+          </v-btn>
+          <v-btn size="small" variant="outlined" class="ml-2" data-testid="hero-reset-target" @click="resetTargetAge">
+            Reset
+          </v-btn>
+          <div class="fire-hero__when mt-1">
+            dragging is a what-if — nothing is saved until you set it as your target
+          </div>
         </div>
-        <div class="fire-hero__when">
-          in <b>{{ formatYearsMonths(hh.yearsToFire) }}</b> ({{ fireYear }})
-          <template v-if="band">
-            <span class="fire-hero__sep">·</span>
-            <span data-testid="fire-hero-confidence-subline">
-              <template v-if="band.offChart">{{ band.text }}</template>
-              <template v-else>most likely <b>{{ band.text }}</b> allowing for markets</template>
-              <v-tooltip location="bottom" max-width="380" aria-label="How the confidence range is modelled">
-                <template #activator="{ props: tipProps }">
-                  <button type="button" v-bind="tipProps" class="fire-hero__band-info" aria-label="How the confidence range is modelled">
-                    <v-icon icon="mdi-chart-bell-curve" size="14" aria-hidden="true" />
-                  </button>
-                </template>
-                <div class="text-body-2">{{ fullBandCopy }}</div>
-              </v-tooltip>
-            </span>
-          </template>
-          <template v-if="!hh.isMember && digest.heroDeltaText.value">
-            <span class="fire-hero__sep">·</span>
-            <span :class="deltaClass" data-testid="hero-digest-delta">{{ digest.heroDeltaText.value }}</span>
-            <button
-              type="button"
-              class="fire-hero__delta-dismiss"
-              data-testid="hero-digest-dismiss"
-              aria-label="Dismiss the since-you-were-away delta"
-              @click="digest.acknowledge()"
-            >
-              <v-icon icon="mdi-close" size="12" aria-hidden="true" />
-            </button>
-          </template>
-        </div>
-      </template>
+      </div>
+
+      <!-- DEMOTED: the current-pace FIRE age (what the headline used to claim) + the
+           NON-REMOVABLE #18 confidence band + the "since you were away" delta. -->
+      <p class="fire-hero__pace" data-testid="fire-hero-pace">
+        <span v-html="paceLine"></span>
+        <template v-if="band">
+          <span class="fire-hero__sep">·</span>
+          <span data-testid="fire-hero-confidence-subline">
+            <template v-if="band.offChart">{{ band.text }}</template>
+            <template v-else>most likely <b>{{ band.text }}</b> allowing for markets</template>
+            <v-tooltip location="bottom" max-width="380" aria-label="How the confidence range is modelled">
+              <template #activator="{ props: tipProps }">
+                <button
+                  type="button"
+                  v-bind="tipProps"
+                  class="fire-hero__band-info"
+                  aria-label="How the confidence range is modelled"
+                >
+                  <v-icon icon="mdi-chart-bell-curve" size="14" aria-hidden="true" />
+                </button>
+              </template>
+              <div class="text-body-2">{{ fullBandCopy }}</div>
+            </v-tooltip>
+          </span>
+        </template>
+        <template v-if="achieved">
+          <span class="fire-hero__sep">·</span>
+          <span class="text-success" data-testid="fire-hero-achieved">you're already at Regular FIRE</span>
+        </template>
+        <template v-if="!hh.isMember && digest.heroDeltaText.value">
+          <span class="fire-hero__sep">·</span>
+          <span :class="deltaClass" data-testid="hero-digest-delta">{{ digest.heroDeltaText.value }}</span>
+          <button
+            type="button"
+            class="fire-hero__delta-dismiss"
+            data-testid="hero-digest-dismiss"
+            aria-label="Dismiss the since-you-were-away delta"
+            @click="digest.acknowledge()"
+          >
+            <v-icon icon="mdi-close" size="12" aria-hidden="true" />
+          </button>
+        </template>
+      </p>
 
       <p v-if="bridgeSubline" class="fire-hero__subline" data-testid="fire-hero-bridge-subline">
         <v-icon icon="mdi-lock-clock" size="16" color="warning" class="mr-1" />
@@ -446,6 +605,76 @@ function yearsLabel(years: number): string {
   color: var(--text-muted);
   vertical-align: middle;
 }
+/* ===== T-377 (QN-2) gap hero ===== */
+.fire-hero__guess {
+  font-size: var(--type-sm);
+  color: var(--text-secondary);
+  margin: var(--space-2) auto 0;
+  max-width: 640px;
+}
+/* The DEMOTED current-pace annotation — deliberately smaller than the headline it replaced. */
+.fire-hero__pace {
+  font-size: var(--type-sm);
+  line-height: var(--leading-snug);
+  color: var(--text-secondary);
+  margin: var(--space-3) auto 0;
+  max-width: 760px;
+}
+.fire-hero__pace b {
+  color: var(--text-primary);
+}
+.gap-tiles {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+  text-align: left;
+}
+.gap-tile {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg, 12px);
+  padding: var(--space-3);
+  background: rgba(var(--v-theme-surface), 0.55);
+}
+/* "Do this" is the single action — full width, tinted, visually the loudest tile. */
+.gap-tile--act {
+  grid-column: 1 / -1;
+  border-color: rgba(var(--v-theme-primary), 0.35);
+  background: rgba(var(--v-theme-primary), 0.06);
+}
+.gap-tile__k {
+  font-size: var(--type-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+.gap-tile__v {
+  font-size: var(--type-lg);
+  font-weight: var(--weight-semibold);
+  line-height: var(--leading-tight);
+  margin-top: 2px;
+}
+.gap-tile__s {
+  font-size: var(--type-xs);
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+.hero-slider__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: var(--type-sm);
+  color: var(--text-secondary);
+}
+.hero-slider__hint {
+  font-size: var(--type-xs);
+  color: var(--text-muted);
+}
+@media (max-width: 600px) {
+  .gap-tiles {
+    grid-template-columns: 1fr;
+  }
+}
+
 .fire-hero__subline {
   font-size: var(--type-sm);
   line-height: var(--leading-snug);

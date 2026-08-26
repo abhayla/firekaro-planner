@@ -14,6 +14,7 @@ import { useFireDerive } from "@/lib/useFireDerive";
 import { useAssumptionsStore } from "@/stores/assumptions";
 import { useHouseholdStore } from "@/stores/household";
 import { useScenariosStore, type LeverValues } from "@/stores/scenarios";
+import { useUiStore } from "@/stores/ui";
 import { calculateFIRENumber, calculateYearsToTarget, projectCorpus, type ContributionSchedule } from "@/lib/fire-math";
 import { buildContributionResolver } from "@/lib/contribution-schedule";
 import { retireByAgeRequiredSIP } from "@/lib/adequacy";
@@ -32,6 +33,8 @@ const fire = useFireDerive();
 const assumptions = useAssumptionsStore();
 const household = useHouseholdStore();
 const scenarios = useScenariosStore();
+// T-377: the shared session-only retirement-age field (also driven by the dashboard hero slider).
+const ui = useUiStore();
 
 onMounted(() => scenarios.hydrate());
 
@@ -249,11 +252,17 @@ const defaultTargetAge = computed(() => {
   return Math.min(ageCeiling, Math.max(ageFloor.value, Math.round(raw)));
 });
 
-const targetAge = ref(defaultTargetAge.value);
-
-// Re-seed when the baseline anchor/target shifts (e.g. family-view toggle elsewhere).
-watch(defaultTargetAge, (next) => {
-  targetAge.value = next;
+// T-377 (QN-2): the retirement age is now ONE shared session-only field (`ui.whatIfTargetAge`)
+// read/written by BOTH this slider and the dashboard gap-hero slider — two controls for the same
+// idea must never drift (#64 class). null = follow the household's saved target. Clamped to this
+// page's own floor/ceiling so a hero value outside them can never render an impossible age here.
+const targetAge = computed<number>({
+  get: () => {
+    const shared = ui.whatIfTargetAge;
+    if (shared == null || !Number.isFinite(shared)) return defaultTargetAge.value;
+    return Math.min(ageCeiling, Math.max(ageFloor.value, Math.round(shared)));
+  },
+  set: (next: number) => ui.setWhatIfTargetAge(next),
 });
 
 const retireByAge = computed(() =>
@@ -271,7 +280,8 @@ const retireByAge = computed(() =>
 const hasFireTarget = computed(() => (fire.fireNumber.value ?? 0) > 0);
 
 function resetTargetAge() {
-  targetAge.value = defaultTargetAge.value;
+  // Clearing the shared field is the reset — it makes both sliders follow the saved plan again.
+  ui.setWhatIfTargetAge(null);
 }
 </script>
 
