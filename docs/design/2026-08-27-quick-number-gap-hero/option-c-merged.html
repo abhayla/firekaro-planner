@@ -1,0 +1,122 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Option C — Merged (B's conversational intake → A's honest result, one headline number)</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="fk-mock.css">
+<style>
+.phone{max-width:520px}
+.pace{margin-top:10px;font-size:13px;color:var(--muted);padding:10px 12px;border-radius:12px;background:#fff;border:1px dashed var(--line)}
+.pace b{color:var(--ink)}
+.lakh{position:relative}.lakh input{padding-right:64px}.lakh span{position:absolute;right:12px;top:50%;transform:translateY(-50%);font-size:12px;color:var(--muted);font-weight:600}
+.preview{font-size:12px;color:var(--blue);margin-top:4px;font-weight:600}
+.edit summary{font-size:14px}
+.rows{display:grid;grid-template-columns:1fr 1fr;gap:6px 14px;font-size:13px;margin-top:8px}
+.rows span{color:var(--muted)}.rows b{text-align:right}
+</style></head><body>
+<div class="tag">OPTION C — MERGED · B intake → A result · one number</div>
+<div class="phone">
+<div id="intake">
+  <h1 style="font-size:18px">Let's find your number</h1>
+  <div class="sub">Ten quick questions, answers in lakh. Rough is fine — refine anything later.</div>
+  <div class="dots" id="dots"></div>
+  <div class="card" id="qcard"></div>
+  <div class="sofar" id="sofar"></div>
+  <div class="nav"><button class="btn ghost" id="back">← Back</button><button class="btn" id="next">Next →</button></div>
+</div>
+
+<div id="result" style="display:none">
+  <div class="hero">
+    <div class="eyebrow">To retire at</div>
+    <div class="big" id="tAge">50</div>
+    <div class="when">you'll need <b id="needTop"></b> in today's money · that's <b id="needNom"></b> in <span id="needYear"></span></div>
+    <div class="kpis" style="grid-template-columns:1fr 1fr">
+      <div class="kpi"><div class="k">You'll have by <span id="hAge"></span></div><div class="v mono" id="have"></div><div class="s" id="haveSub"></div></div>
+      <div class="kpi"><div class="k">Gap</div><div class="v mono" id="gap"></div><div class="s" id="gapSub"></div></div>
+      <div class="kpi act" style="grid-column:1/-1"><div class="k">Do this</div><div class="v mono" id="req"></div><div class="s" id="reqSub"></div></div>
+    </div>
+    <div class="slider"><div class="row"><span>Drag your retirement age</span><b id="sv"></b></div><input type="range" id="sl" min="40" max="65"><div class="ticks"><span>40</span><span>45</span><span>50</span><span>55</span><span>60</span><span>65</span></div><div class="hint" id="slHint"></div></div>
+    <div class="pace" id="pace"></div>
+  </div>
+
+  <div class="card"><h3>How we got this — no magic</h3><ol class="explain" id="explain"></ol>
+    <div class="hint" style="margin-top:8px">Assumptions: <span id="assump"></span> · live to 90. Honest defaults, not sales defaults.</div></div>
+  <div class="card"><h3>What you'll have vs what you'll need · today's money</h3><svg class="chart" id="chart" viewBox="0 0 600 170" preserveAspectRatio="none"></svg>
+    <div class="legend" style="font-size:12px"><span style="color:var(--blue)">■</span> have &nbsp; <span style="color:var(--amber)">■</span> need &nbsp; · dashed = your target</div></div>
+  <div class="card edit"><details><summary>Your answers — tap to change</summary><div class="rows" id="rows"></div>
+    <div style="margin-top:12px"><button class="btn ghost" id="reopen">Edit answers</button></div></details></div>
+  <div class="card" style="display:flex;justify-content:space-between;align-items:center;gap:12px">
+    <div><b>Happy with the shape?</b><div class="hint">Refine income, investments, insurance and taxes in the full planner. Your answers carry over.</div></div>
+    <button class="btn" style="flex:none">Open full planner →</button>
+  </div>
+</div>
+</div>
+
+<script src="fk-mock.js"></script>
+<script>
+const $=id=>document.getElementById(id); const i={...FK.AMIT}; const L=FK.L;
+const Q=[
+ {k:"age",q:"How old are you?",h:"We plan from today to age 90 — 40 years of spending, not 15.",type:"num"},
+ {k:"targetAge",q:"When would you like to stop working?",h:"A guess is fine — you'll drag this on the next screen.",type:"chips",opts:[45,50,55,60]},
+ {k:"spend",q:"What does your household spend in a month?",h:"Everything — EMI, school fees, travel, help. ₹2.5–3 L? Say 2.8.",lakh:true},
+ {k:"corpus",q:"Financial savings so far?",h:"Mutual funds + EPF + NPS + PPF + FDs. Not the house you live in.",lakh:true},
+ {k:"sip",q:"How much do you invest every month?",h:"SIPs plus your and your employer's PF, all together.",lakh:true},
+ {k:"spouseCorpus",q:"Spouse's savings, if any?",h:"Their MF + PF. Untick if not applicable.",lakh:true,toggle:"includeSpouse"},
+ {k:"kids",q:"Kids?",h:"How many, and roughly how old?",type:"chips",opts:[0,1,2,3],extra:{k:"kidsAge",label:"Their age",plain:true}},
+ {k:"education",q:"Their education, in today's money?",h:"Undergrad for all kids. Abroad? ₹75 L+ combined.",lakh:true,extra:{k:"postgrad",label:"Post-grad, if any (₹ lakh)"}},
+ {k:"wedding",q:"Weddings?",h:"Today's money, all kids.",lakh:true},
+ {k:"house",q:"Any big purchase coming — bigger home, car?",h:"Net of what you'd sell. Most tools forget this; it moves your date.",lakh:true,toggle:"includeHouse",delta:true},
+];
+let s=0;
+const lakhInput=(id,val)=>`<div class="lakh"><input type="number" id="${id}" value="${(val/L).toFixed(val%L?2:0)}" step="0.5"><span>lakh</span></div><div class="preview" id="${id}p">${FK.inr(val)}</div>`;
+function deltaCopy(){ if(!i.includeHouse) return "Not counted."; const w=FK.compute(i), wo=FK.compute({...i,includeHouse:false}); const d=(w.fireAge??90)-(wo.fireAge??90); return `Counted — it moves your FIRE age by <b>${d} yr</b> and adds <b>${FK.inr(w.requiredSip-wo.requiredSip)}/month</b> to "do this".`; }
+function sofar(){ const r=FK.compute(i); $("sofar").innerHTML = s<2 ? `Answer a few more and your number appears here.` : `So far, to retire at <b>${i.targetAge}</b> you'd need <b>${FK.inr(r.needReal)}</b>${s>=4?` · gap ${r.gapReal>0?"−":"+"}${FK.inr(Math.abs(r.gapReal))}`:""}`; }
+function draw(){
+  $("dots").innerHTML=Q.map((_,j)=>`<i class="${j<=s?"on":""}"></i>`).join("");
+  if(s>=Q.length){showResult();return;}
+  const q=Q[s]; let body="";
+  if(q.lakh) body=lakhInput("in",i[q.k]); else if(q.type==="num") body=`<input type="number" id="in" value="${i[q.k]}">`;
+  if(q.type==="chips") body=`<div class="chips">${q.opts.map(o=>`<span class="chip ${i[q.k]==o?"on":""}" data-v="${o}">${o}</span>`).join("")}</div>`;
+  if(q.toggle) body+=`<label class="toggle" style="margin-top:12px"><input type="checkbox" id="tg" ${i[q.toggle]?"checked":""}> Count this</label>`;
+  if(q.extra) body+=`<label>${q.extra.label}</label>`+(q.extra.plain?`<input type="number" id="ex" value="${i[q.extra.k]}">`:lakhInput("ex",i[q.extra.k]));
+  if(q.delta) body+=`<div class="hint" id="dh" style="margin-top:8px">${deltaCopy()}</div>`;
+  $("qcard").innerHTML=`<div class="q">${q.q}</div><div class="qhint">${q.h}</div>${body}`;
+  const bind=(id,key,lakh)=>{const el=$(id); if(!el) return; el.oninput=()=>{i[key]=lakh?(+el.value||0)*L:(+el.value||0); const p=$(id+"p"); if(p) p.textContent=FK.inr(i[key]); sofar(); if($("dh")) $("dh").innerHTML=deltaCopy();};};
+  bind("in",q.k,!!q.lakh); if(q.extra) bind("ex",q.extra.k,!q.extra.plain);
+  document.querySelectorAll(".chip").forEach(c=>c.onclick=()=>{i[q.k]=+c.dataset.v;draw();});
+  const tg=$("tg"); if(tg) tg.onchange=()=>{i[q.toggle]=tg.checked;sofar(); if($("dh")) $("dh").innerHTML=deltaCopy();};
+  $("back").disabled=s===0; $("next").textContent=s===Q.length-1?"See my number →":"Next →"; sofar();
+}
+function showResult(){ $("intake").style.display="none"; $("result").style.display=""; render(); window.scrollTo(0,0); }
+function render(){
+  const r=FK.compute(i), yr=new Date().getFullYear();
+  $("tAge").textContent=i.targetAge; $("sv").textContent=i.targetAge; $("sl").value=i.targetAge; $("hAge").textContent=i.targetAge;
+  $("needTop").textContent=FK.inr(r.needReal); $("needNom").textContent=FK.inr(r.needNominal); $("needYear").textContent=yr+r.n;
+  $("have").textContent=FK.inr(r.haveReal); $("haveSub").textContent=`at ${FK.inr(i.sip)}/month, today's money`;
+  const short=r.gapReal>0; $("gap").textContent=(short?"−":"+")+FK.inr(Math.abs(r.gapReal)); $("gap").className="v mono "+(short?"bad":"ok"); $("gapSub").textContent=short?"short":"surplus";
+  $("req").textContent=short?FK.inr(r.requiredSip)+" / month":"You're already there";
+  $("reqSub").textContent=short?`invest this every month (you do ${FK.inr(i.sip)} now) to retire at ${i.targetAge}`:`your current ${FK.inr(i.sip)}/month is enough for ${i.targetAge}`;
+  const alt=FK.compute({...i,targetAge:i.targetAge+3});
+  $("slHint").innerHTML=`Three more years (to ${i.targetAge+3}) → <b>${FK.inr(alt.requiredSip)}/month</b>. Drag to feel it.`;
+  const pace=r.fireAge; $("pace").innerHTML = pace==null ? `At today's pace you would <b>not</b> reach this number before 90 — the "do this" amount closes that.` :
+    pace<=i.targetAge ? `At today's pace you'd get there by <b>${pace}</b> — ${i.targetAge-pace} years early.` :
+    `At today's pace you'd get there at <b>${pace}</b> — <b>${pace-i.targetAge} years later</b> than you'd like. The "do this" amount closes that gap.`;
+  $("explain").innerHTML=[
+    `You spend ₹${(i.spend/L).toFixed(1)} L a month → <b>${FK.inr(i.spend*12)}</b> a year. To draw that safely for 40 years we keep it at <b>${+(i.swr*100).toFixed(2)}% of the corpus</b> → <b>${FK.inr(i.spend*12/i.swr)}</b>.`,
+    `Plus one-off goals in today's money — education, post-grad, weddings${i.includeHouse?", the house":""} — <b>${FK.inr(r.goals)}</b>.`,
+    `Your ${FK.inr(i.corpus+(i.includeSpouse?i.spouseCorpus:0))} plus ${FK.inr(i.sip)}/month grow at ${+(i.equityReturn*100).toFixed(0)}% for ${r.n} years; then we <b>remove ${+(i.inflation*100).toFixed(0)}% inflation</b> so you compare like with like → <b>${FK.inr(r.haveReal)}</b>.`,
+    `The scary number others quote (<b>${FK.inr(r.needNominal)}</b>) is the same thing in ${yr+r.n} rupees. We show both and plan in today's.`
+  ].map(t=>`<li>${t}</li>`).join("");
+  $("assump").textContent=`${+(i.inflation*100).toFixed(1)}% inflation · ${+(i.equityReturn*100).toFixed(1)}% return · ${+(i.swr*100).toFixed(2)}% safe withdrawal · investing raised ${+(i.stepUp*100).toFixed(0)}%/yr`;
+  $("rows").innerHTML=[["Age",i.age],["Spend / month",FK.inr(i.spend)],["Savings",FK.inr(i.corpus)],["Spouse savings",i.includeSpouse?FK.inr(i.spouseCorpus):"—"],["Investing / month",FK.inr(i.sip)],["Kids",`${i.kids} · age ${i.kidsAge}`],["Education",FK.inr(i.education)],["Post-grad",FK.inr(i.postgrad)],["Weddings",FK.inr(i.wedding)],["Big purchase",i.includeHouse?FK.inr(i.house):"—"]].map(([k,v])=>`<span>${k}</span><b>${v}</b>`).join("");
+  chart(r);
+}
+function chart(r){
+  const svg=$("chart"),W=600,H=170,P=24; const a0=i.age,a1=Math.max(65,i.targetAge+5); const pts=[];let maxV=0;
+  for(let a=a0;a<=a1;a++){const c=FK.compute({...i,targetAge:a});maxV=Math.max(maxV,c.haveReal,c.needReal);pts.push({a,have:c.haveReal,need:c.needReal});}
+  const x=a=>P+(a-a0)/(a1-a0)*(W-2*P), y=v=>H-P-(v/maxV)*(H-2*P), line=(k,col)=>`<polyline fill="none" stroke="${col}" stroke-width="2.5" points="${pts.map(p=>x(p.a)+","+y(p[k])).join(" ")}"/>`;
+  svg.innerHTML=line("need","#b45309")+line("have","#2F5BFF")+`<line x1="${x(i.targetAge)}" x2="${x(i.targetAge)}" y1="${P}" y2="${H-P}" stroke="#94a3b8" stroke-dasharray="4 4"/><text x="${x(i.targetAge)+4}" y="${P+10}" font-size="11" fill="#64748b">age ${i.targetAge}</text><text x="${P}" y="${H-6}" font-size="10" fill="#64748b">${a0}</text><text x="${W-P-14}" y="${H-6}" font-size="10" fill="#64748b">${a1}</text>`;
+}
+$("sl").oninput=e=>{i.targetAge=+e.target.value;render();};
+$("reopen").onclick=()=>{s=0;$("result").style.display="none";$("intake").style.display="";draw();};
+$("next").onclick=()=>{s++;draw();}; $("back").onclick=()=>{s=Math.max(0,s-1);draw();};
+draw();
+</script></body></html>

@@ -11,7 +11,7 @@ if (!chromium) throw new Error("@playwright/test not found in any known root —
 const out = path.join(here, "shots"); fs.mkdirSync(out, { recursive: true });
 const browser = await chromium.launch();
 let bad = 0;
-for (const file of ["option-a-quick-number-panel.html", "option-b-conversational.html"]) {
+for (const file of ["option-a-quick-number-panel.html", "option-b-conversational.html", "option-c-merged.html"]) {
   for (const w of [390, 1280]) {
     const page = await browser.newPage({ viewport: { width: w, height: w === 390 ? 844 : 900 } });
     const errs = [];
@@ -21,7 +21,7 @@ for (const file of ["option-a-quick-number-panel.html", "option-b-conversational
     await page.waitForTimeout(400);
     const name = `${file.replace(".html", "")}.${w}.png`;
     await page.screenshot({ path: path.join(out, name), fullPage: true });
-    if (file.startsWith("option-b")) { // also capture the result screen: answer through all 10 cards
+    if (file.startsWith("option-b") || file.startsWith("option-c")) { // also capture the result screen: answer through all 10 cards
       for (let k = 0; k < 10; k++) await page.click("#next");
       await page.waitForTimeout(300);
       await page.screenshot({ path: path.join(out, `${file.replace(".html", "")}.result.${w}.png`), fullPage: true });

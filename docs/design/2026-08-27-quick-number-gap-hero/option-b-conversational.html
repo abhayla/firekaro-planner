@@ -52,8 +52,9 @@ function draw(){
 function result(){
   const r=FK.compute(i), yrs=r.fireAge?r.fireAge-i.age:null;
   $("qcard").className="hero"; $("sofar").style.display="none"; $("next").style.display="none"; $("back").textContent="← Change an answer";
-  $("qcard").innerHTML=`<div class="eyebrow">At your current pace you'll FIRE at</div><div class="big" id="fa">${r.fireAge??"90+"}</div>
-   <div class="when">${r.fireAge?`in <b>${yrs} years</b> · you asked for <b>${i.targetAge}</b>`:"not before 90 at today's pace"}</div>
+  const pace=r.fireAge, paceTxt = pace==null ? `at today's pace you would <b>not</b> get there before 90` : pace<=i.targetAge ? `at today's pace you'd get there by <b>${pace}</b>` : `at today's pace you'd get there at <b>${pace}</b> — <b>${pace-i.targetAge} yrs later</b> than you'd like`;
+  $("qcard").innerHTML=`<div class="eyebrow">To retire at</div><div class="big" id="fa">${i.targetAge}</div>
+   <div class="when">you'll need <b>${FK.inr(r.needReal)}</b> in today's money · ${paceTxt}</div>
    <div class="kpis" style="grid-template-columns:1fr 1fr">
      <div class="kpi"><div class="k">Need</div><div class="v mono">${FK.inr(r.needReal)}</div><div class="s">today's money · ${FK.inr(r.needNominal)} in ${new Date().getFullYear()+r.n}</div></div>
      <div class="kpi"><div class="k">Have by ${i.targetAge}</div><div class="v mono">${FK.inr(r.haveReal)}</div><div class="s">at ${FK.inr(i.sip)}/month</div></div>
@@ -61,7 +62,12 @@ function result(){
      <div class="kpi act"><div class="k">Do this</div><div class="v mono">${FK.inr(r.requiredSip)}</div><div class="s">per month to retire at ${i.targetAge}</div></div>
    </div>
    <div class="slider"><div class="row"><span>What if you retire at</span><b id="sv">${i.targetAge}</b></div><input type="range" id="sl" min="40" max="65" value="${i.targetAge}"><div class="ticks"><span>40</span><span>50</span><span>60</span><span>65</span></div></div>
-   <div class="hint" style="margin-top:10px">Numbers are in today's money. Assumptions: ${+(i.inflation*100).toFixed(1)}% inflation, ${+(i.equityReturn*100).toFixed(1)}% return, ${+(i.swr*100).toFixed(2)}% safe withdrawal, live to 90 — <a href="#" style="color:var(--blue)">why these</a>.</div>
+   <div class="hint" style="margin-top:10px">Numbers are in today's money. Assumptions: ${+(i.inflation*100).toFixed(1)}% inflation, ${+(i.equityReturn*100).toFixed(1)}% return, ${+(i.swr*100).toFixed(2)}% safe withdrawal, live to 90.</div>
+   <details style="margin-top:10px;border:0"><summary>How we got this — no magic</summary><ol class="explain" style="margin-top:8px;padding-left:18px">
+     <li>₹${(i.spend/FK.L).toFixed(1)} L/month = <b>${FK.inr(i.spend*12)}</b> a year; drawn at <b>${+(i.swr*100).toFixed(2)}%</b> of the corpus for 40 years → <b>${FK.inr(i.spend*12/i.swr)}</b>.</li>
+     <li>Plus one-off goals in today's money — education, post-grad, weddings${i.includeHouse?", the house":""} — <b>${FK.inr(r.goals)}</b>.</li>
+     <li>${FK.inr(i.corpus+(i.includeSpouse?i.spouseCorpus:0))} + ${FK.inr(i.sip)}/month grow at ${+(i.equityReturn*100).toFixed(0)}% for ${r.n} yrs, minus ${+(i.inflation*100).toFixed(0)}% inflation → <b>${FK.inr(r.haveReal)}</b>.</li>
+     <li>The scary number others quote (<b>${FK.inr(r.needNominal)}</b>) is the same thing in ${new Date().getFullYear()+r.n} rupees.</li></ol></details>
    <div style="margin-top:14px"><button class="btn">Refine in the full planner →</button></div>`;
   $("sl").oninput=e=>{i.targetAge=+e.target.value;result();};
 }
