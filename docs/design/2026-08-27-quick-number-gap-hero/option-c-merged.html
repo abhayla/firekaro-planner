@@ -17,6 +17,12 @@
 .edit summary{font-size:14px}
 .rows{display:grid;grid-template-columns:1fr 1fr;gap:6px 14px;font-size:13px;margin-top:8px}
 .rows span{color:var(--muted)}.rows b{text-align:right}
+.lever{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;padding:10px 0;border-top:1px solid var(--line);font-size:13px}
+.lever:first-child{border-top:0}.lever input{transform:scale(1.15)}.lever .n{font-size:11px;color:var(--muted)}
+.lever .fx{text-align:right;white-space:nowrap}.lever .fx b{display:block;font-size:14px}
+.plan-sum{margin-top:12px;padding:12px 14px;border-radius:14px;background:var(--blue-soft);font-size:13px;line-height:1.5}
+.plan-sum b{color:var(--blue);font-size:18px}
+@media(min-width:1024px){#result .hero{grid-row:span 4}}
 </style></head><body>
 <div class="tag">OPTION C — MERGED · B intake → A result · one number</div>
 <div class="phone">
@@ -43,6 +49,11 @@
     <div class="pace" id="pace"></div>
   </div>
 
+  <div class="card" id="plancard"><h3>How to get there — pick your moves</h3>
+    <div class="hint" style="margin-bottom:8px">Nothing below is assumed by default. Switch on what you'd actually do; the hero updates.</div>
+    <div id="levers"></div>
+    <div class="plan-sum" id="plansum"></div>
+  </div>
   <div class="card"><h3>How we got this — no magic</h3><ol class="explain" id="explain"></ol>
     <div class="hint" style="margin-top:8px">Assumptions: <span id="assump"></span> · live to 90. Honest defaults, not sales defaults — <b>every one is editable in the full planner</b>.</div></div>
   <div class="card"><h3>What you'll have vs what you'll need · today's money</h3><svg class="chart" id="chart" viewBox="0 0 600 170" preserveAspectRatio="none"></svg>
@@ -58,7 +69,7 @@
 
 <script src="fk-mock.js"></script>
 <script>
-const $=id=>document.getElementById(id); const i={...FK.AMIT}; const L=FK.L;
+const $=id=>document.getElementById(id); const i={...FK.AMIT}; const L=FK.L; const on=new Set();
 const Q=[
  {k:"age",q:"How old are you?",h:"We plan from today to age 90 — 40 years of spending, not 15.",type:"num"},
  {k:"targetAge",q:"When would you like to stop working?",h:"A guess is fine — you'll drag this on the next screen.",type:"chips",opts:[45,50,55,60]},
@@ -93,16 +104,18 @@ function draw(){
 }
 function showResult(){ $("intake").style.display="none"; $("result").style.display=""; render(); window.scrollTo(0,0); }
 function render(){
-  const r=FK.compute(i), yr=new Date().getFullYear();
-  $("tAge").textContent=i.targetAge; $("sv").textContent=i.targetAge; $("sl").value=i.targetAge; $("hAge").textContent=i.targetAge;
+  const base=FK.compute(i), yr=new Date().getFullYear();
+  const pi=FK.applyPlan(i,on), r=FK.compute(pi);            // plan-adjusted view drives the hero
+  const planOn=on.size>0, names=FK.LEVERS.filter(l=>on.has(l.key)).map(l=>l.label.toLowerCase());
+  $("tAge").textContent=pi.targetAge; $("sv").textContent=i.targetAge; $("sl").value=i.targetAge; $("hAge").textContent=pi.targetAge;
   $("needTop").textContent=FK.inr(r.needReal); $("needNom").textContent=FK.inr(r.needNominal); $("needYear").textContent=yr+r.n;
-  $("have").textContent=FK.inr(r.haveReal); $("haveSub").textContent=`at ${FK.inr(i.sip)}/month, today's money`;
+  $("have").textContent=FK.inr(r.haveReal); $("haveSub").textContent=`at ${FK.inr(pi.sip)}/month${pi.stepUp>0?` rising ${Math.round(pi.stepUp*100)}%/yr`:""}, today's money`;
   const short=r.gapReal>0; $("gap").textContent=(short?"−":"+")+FK.inr(Math.abs(r.gapReal)); $("gap").className="v mono "+(short?"bad":"ok"); $("gapSub").textContent=short?"short":"surplus";
   $("req").textContent=short?FK.inr(r.requiredSip)+" / month":"You're already there";
-  $("reqSub").textContent=short?`invest this every month (you do ${FK.inr(i.sip)} now) to retire at ${i.targetAge}`:`your current ${FK.inr(i.sip)}/month is enough for ${i.targetAge}`;
+  $("reqSub").innerHTML=short?`invest this every month (you do ${FK.inr(i.sip)} now) to retire at ${pi.targetAge}${planOn?` — <b>with</b> ${names.join(" + ")}`:""}`:`your current ${FK.inr(i.sip)}/month is enough for ${pi.targetAge}${planOn?` with ${names.join(" + ")}`:""}`;
   const alt=FK.compute({...i,targetAge:i.targetAge+3});
   $("slHint").innerHTML=`Three more years (to ${i.targetAge+3}) → <b>${FK.inr(alt.requiredSip)}/month</b>. Drag to feel it.`;
-  const pace=r.fireAge; $("pace").innerHTML = pace==null ? `At today's pace you would <b>not</b> reach this number before 90 — the "do this" amount closes that.` :
+  const pace=base.fireAge; $("pace").innerHTML = pace==null ? `At today's pace you would <b>not</b> reach this number before 90 — the "do this" amount closes that.` :
     pace<=i.targetAge ? `At today's pace you'd get there by <b>${pace}</b> — ${i.targetAge-pace} years early.` :
     `At today's pace you'd get there at <b>${pace}</b> — <b>${pace-i.targetAge} years later</b> than you'd like. The "do this" amount closes that gap.`;
   $("explain").innerHTML=[
@@ -112,14 +125,20 @@ function render(){
     `The scary number others quote (<b>${FK.inr(r.needNominal)}</b>) is the same thing in ${yr+r.n} rupees. We show both and plan in today's.`
   ].map(t=>`<li>${t}</li>`).join("");
   $("assump").textContent=`${+(i.inflation*100).toFixed(1)}% inflation · ${+(i.equityReturn*100).toFixed(1)}% return · ${+(r.swrUsed*100).toFixed(2)}% safe withdrawal (for a ${90-i.targetAge}-yr drawdown) · investing raised ${+(i.stepUp*100).toFixed(0)}%/yr`;
+  $("levers").innerHTML=FK.LEVERS.map(l=>{const one=FK.compute(l.apply(i)); const d=base.requiredSip-one.requiredSip;
+    return `<label class="lever"><input type="checkbox" data-k="${l.key}" ${on.has(l.key)?"checked":""}><span>${l.label}<div class="n">${l.note}</div></span><span class="fx"><b class="${d>0?"ok":"mut"}">−${FK.inr(Math.max(0,d))}/mo</b><span class="n">on its own</span></span></label>`;}).join("");
+  document.querySelectorAll("#levers input").forEach(c=>c.onchange=()=>{c.checked?on.add(c.dataset.k):on.delete(c.dataset.k);render();});
+  $("plansum").innerHTML = !planOn ? `Switch on a few moves to see the number you can actually live with.` :
+    r.requiredSip<=i.sip ? `With ${names.join(" + ")}: your current <b>${FK.inr(i.sip)}/month</b> is enough to retire at <b>${pi.targetAge}</b>.` :
+    `With ${names.join(" + ")}: you need <b>${FK.inr(r.requiredSip)}/month</b> to retire at ${pi.targetAge} — instead of ${FK.inr(base.requiredSip)}. You do ${FK.inr(i.sip)} now; the gap to close is <b>${FK.inr(r.requiredSip-i.sip)}/month</b>.`;
   $("rows").innerHTML=[["Age",i.age],["Spend / month",FK.inr(i.spend)],["All investments",FK.inr(i.corpus)],["Spouse savings",i.includeSpouse?FK.inr(i.spouseCorpus):"—"],["Investing / month",FK.inr(i.sip)],["Kids",`${i.kids} · age ${i.kidsAge}`],["Education",FK.inr(i.education)],["Post-grad",FK.inr(i.postgrad)],["Weddings",FK.inr(i.wedding)],["Big purchase",i.includeHouse?FK.inr(i.house):"—"]].map(([k,v])=>`<span>${k}</span><b>${v}</b>`).join("");
   chart(r);
 }
 function chart(r){
-  const svg=$("chart"),W=600,H=170,P=24; const a0=i.age,a1=Math.max(65,i.targetAge+5); const pts=[];let maxV=0;
-  for(let a=a0;a<=a1;a++){const c=FK.compute({...i,targetAge:a});maxV=Math.max(maxV,c.haveReal,c.needReal);pts.push({a,have:c.haveReal,need:c.needReal});}
+  const pi=FK.applyPlan(i,on); const svg=$("chart"),W=600,H=170,P=24; const a0=i.age,a1=Math.max(65,pi.targetAge+5); const pts=[];let maxV=0;
+  for(let a=a0;a<=a1;a++){const c=FK.compute({...pi,targetAge:a});maxV=Math.max(maxV,c.haveReal,c.needReal);pts.push({a,have:c.haveReal,need:c.needReal});}
   const x=a=>P+(a-a0)/(a1-a0)*(W-2*P), y=v=>H-P-(v/maxV)*(H-2*P), line=(k,col)=>`<polyline fill="none" stroke="${col}" stroke-width="2.5" points="${pts.map(p=>x(p.a)+","+y(p[k])).join(" ")}"/>`;
-  svg.innerHTML=line("need","#b45309")+line("have","#2F5BFF")+`<line x1="${x(i.targetAge)}" x2="${x(i.targetAge)}" y1="${P}" y2="${H-P}" stroke="#94a3b8" stroke-dasharray="4 4"/><text x="${x(i.targetAge)+4}" y="${P+10}" font-size="11" fill="#64748b">age ${i.targetAge}</text><text x="${P}" y="${H-6}" font-size="10" fill="#64748b">${a0}</text><text x="${W-P-14}" y="${H-6}" font-size="10" fill="#64748b">${a1}</text>`;
+  svg.innerHTML=line("need","#b45309")+line("have","#2F5BFF")+`<line x1="${x(pi.targetAge)}" x2="${x(pi.targetAge)}" y1="${P}" y2="${H-P}" stroke="#94a3b8" stroke-dasharray="4 4"/><text x="${x(pi.targetAge)+4}" y="${P+10}" font-size="11" fill="#64748b">age ${pi.targetAge}</text><text x="${P}" y="${H-6}" font-size="10" fill="#64748b">${a0}</text><text x="${W-P-14}" y="${H-6}" font-size="10" fill="#64748b">${a1}</text>`;
 }
 $("sl").oninput=e=>{i.targetAge=+e.target.value;render();};
 $("reopen").onclick=()=>{s=0;$("result").style.display="none";$("intake").style.display="";draw();};

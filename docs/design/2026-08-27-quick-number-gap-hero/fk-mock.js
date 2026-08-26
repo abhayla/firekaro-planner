@@ -59,5 +59,15 @@ const FK = (() => {
   const AMIT = { age: 38, targetAge: 50, spend: 2.8 * L, corpus: 80 * L, spouseCorpus: 70 * L, includeSpouse: true,
     sip: 1.75 * L, kids: 2, kidsAge: 6, education: 75 * L, postgrad: 1.5 * CR, wedding: 50 * L, house: 1 * CR,
     includeHouse: true, ownHouse: true, inflation: 0.06, equityReturn: 0.12, swr: 0.035, stepUp: 0, planToAge: 90 };
-  return { inr, compute, effSwr, AMIT, L, CR };
+  // Levers — the "how to get there" moves. Each returns the inputs with ONE change applied so the
+  // hero can show its individual effect; applyPlan() stacks the ones the user switches on.
+  const LEVERS = [
+    { key: "stepup",  label: "Raise investing 10% every year", note: "salary hikes → SIP hikes; the single biggest lever", apply: i => ({ ...i, stepUp: Math.max(i.stepUp, 0.10) }) },
+    { key: "delay",   label: "Retire 3 years later",           note: "3 more years of investing, 3 fewer to fund",        apply: i => ({ ...i, targetAge: i.targetAge + 3 }) },
+    { key: "trim",    label: "Trim spending 10%",              note: "lower spend lowers the target AND frees cash to invest", apply: i => ({ ...i, spend: i.spend * 0.9, sip: i.sip + i.spend * 0.1 }) },
+    { key: "direct",  label: "Move to direct mutual funds",    note: "~0.8% lower fees ≈ +0.8% return, for free",         apply: i => ({ ...i, equityReturn: i.equityReturn + 0.008 }) },
+    { key: "noprepay",label: "Don't prepay the home loan",     note: "a 7–8% loan loses to 12% investing; keep the EMI, invest the surplus", apply: i => ({ ...i, sip: i.sip + 0.5 * L }) },
+  ];
+  function applyPlan(i, on) { return LEVERS.filter(l => on.has(l.key)).reduce((acc, l) => l.apply(acc), i); }
+  return { inr, compute, effSwr, applyPlan, LEVERS, AMIT, L, CR };
 })();
