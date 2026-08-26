@@ -125,6 +125,24 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 
 ## §3 — Decision log (append-only, newest first)
 
+### 2026-08-26
+- **D-2026-08-26-01 — CLAUDE.md trim (5 items) queued to the fleet as T-349, then CANCELLED by Abhay;
+  fleet fast-lane fix moved to the hub.** A `/init` review found `CLAUDE.md` at 342 lines vs the ≤80
+  budget (`rule-writing-meta.md`) with ZERO path drift; five relocation-only improvements were listed
+  (src/lib inventory → `calculation-modules.md`; backend block → a new `server/**`-scoped rule;
+  `.env.local` recipe → README pointer; two stray `#` H1s inside the Commands block; hoist the 3
+  invariants — prod boot guard / storage invariant / `isServerMode()` gating — into the first 20
+  lines). Dispatched via `/get-work-done` (repo fleet-registered the same day: `GWD\settings.json`
+  + 5wealths `PORTFOLIO.yml` → active/pc). Abhay cancelled at 15 min: a 15-minute edit priced at ~2 h
+  is a fleet defect, not a cost of the skill. **Why (goal-anchored):** the trim is Tier-3 hygiene;
+  the fleet overhead class blocks every small FireKaro task, so it is fixed first.
+  **Artifacts:** contract `GWD\queue\T-349-…cancelled.md`; worker's partial diff
+  `GWD\evidence\2026-08-26-T-349\`; dirty worktree `firekaro-planner-wt-t349` (branch
+  `docs/T-349-claude-md-trim`, kept as the fast-lane acceptance fixture); fix plan
+  `claude-best-practices/plans/get-work-done-fast-lane.md`; learning-debt row
+  `GWD\MECHANISM-DUE.md → trivial-task-pays-full-fleet-ceremony`. **The five improvements remain
+  open** — re-run T-349's contract once the fast lane exists.
+
 ### 2026-06-13
 - **D-2026-06-13-04 — Re-tier #44, #45, #46 good-to-have → MUST-HAVE** (Abhay, during a good-to-have
   backlog review). **Goal-anchored why:** all three are foundational to objective-1 ("the plan is
