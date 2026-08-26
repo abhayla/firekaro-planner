@@ -65,6 +65,7 @@
       <li><b>Lifestyle creep.</b> You came to the city by train; you won't go back by train. The Seltos doesn't become an Alto at 50.</li>
       <li><b>Healthcare and help cost more with age</b> — and rise faster than everything else (we use 14%, not 6%).</li>
       <li><b>Taxes don't retire.</b> Withdrawals are taxed; we plan post-tax.</li>
+      <li><b>Every withdrawal restarts the clock.</b> Pulling money out for a wedding or a house every few years quietly kills the compounding you were counting on.</li>
       <li><b>Every generation under-estimates by 4–6×.</b> In 2006 people spending ₹30K/month said "₹1 Cr is enough"; the honest number was ~₹6 Cr. Your gut said <span id="guessWhy"></span>.</li>
     </ul>
   </div>
@@ -101,7 +102,7 @@ const Q=[
  {k:"corpus",q:"Total of ALL your investments today?",h:"Add everything up: mutual funds, stocks, ETFs, EPF, NPS, PPF, FDs, gold, bonds, crypto, plots and any flat you don't live in. Leave out only the home you live in.",lakh:true},
  {k:"sip",q:"How much do you put into investments every month?",h:"All of it: SIPs, stock/ETF buys, your PF + employer PF, NPS, PPF, RDs — whatever you add every month.",lakh:true},
  {k:"spouseCorpus",q:"Spouse's investments, if any?",h:"ALL of theirs too — MF, stocks, PF, NPS, gold, everything. Untick if not applicable.",lakh:true,toggle:"includeSpouse"},
- {k:"kids",q:"Kids?",h:"How many, and roughly how old? We time their education and weddings from this.",type:"chips",opts:[[0,"0"],[1,"1"],[2,"2"],[3,"3"]],extra:{k:"kidsAge",label:"Their age",plain:true}},
+ {k:"kids",q:"Kids?",h:"How many, and roughly how old? We time their education (at 18) and weddings (at 30) from this.",type:"chips",opts:[[0,"0"],[1,"1"],[2,"2"],[3,"3"]],extra:{k:"kidsAge",label:"Their age",plain:true}},
  {k:"education",q:"Their big costs, in today's money?",h:"Undergrad for all kids (abroad? ₹75 L+ combined), post-grad if likely, and weddings.",lakh:true,extra:{k:"postgrad",label:"Post-grad, if any"},extra2:{k:"wedding",label:"Weddings, all kids"}},
  {k:"house",q:"Any big purchase coming — bigger home, car?",h:"Net of what you'd sell. Most tools forget this; it moves your date.",lakh:true,toggle:"includeHouse",delta:true},
  {k:"emi",q:"Home loan?",h:"EMI, interest rate and years left. We'll tell you whether to prepay it.",lakh:true,toggle:"hasLoan",extra:{k:"loanRate",label:"Interest rate (%)",pct:true},extra2:{k:"loanYearsLeft",label:"Years left",plain:true}},

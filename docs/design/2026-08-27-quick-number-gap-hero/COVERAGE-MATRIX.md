@@ -20,12 +20,13 @@ Source of truth for the left column: `D:\Abhay\Ventures\transcripts\FbYnFUwdODQ.
 | A7 | Kids: count, ages | DEPENDENT members | ✓ | ✓ | QN-1 |
 | A8 | Education (today ₹; advisor bumps 60→75 L for abroad) | plannedFuture `education` | ✓ | ✓ | QN-1 |
 | A9 | Post-grad | plannedFuture `education` | ✓ | ✓ | QN-1 |
-| A10 | Wedding (today ₹, ~25 yrs out) | plannedFuture `marriage` | ✓ amount · ✗ timing | ✓ amount · timing derived from kids' age (wedding ≈ age 28) | QN-1, QN-3 |
+| A10 | Wedding (today ₹, ~25 yrs out, "at the age of 30") | plannedFuture `marriage` | ✓ amount · ✗ timing | ✓ amount · timing derived from kids' age (wedding at 30, per transcript) | QN-1 |
 | A11 | House upgrade, net ₹1 Cr, 5–8 yrs | plannedFuture `general` — **NOT in FIRE number** (#165) | ✓ + delta hint | ✓ | QN-3 (Tier-0 fix) |
 | A12 | Lifestyle inflation 8% (advisor-set) | 4-bucket inflation | ✓ (assumptions) | ✓ | QN-4 |
 | A13 | Investment real estate (plot ₹1.2 Cr, 8% IRR outlook) | realEstate asset type | **✗** (copy said "leave out the house" — implied all property) | ✓ counted in A5 copy; outlook — (needs market data) | QN-1 |
 | A14 | Spouse's investments (₹70 L) — the "missed then added" moment | Members | ✓ | ✓ | QN-1 |
 | A15 | Household income sanity check (spend + SIP ≈ income?) | Income section | **✗** | ✓ income asked with spend; "₹4.55 L of your ₹5 L — sound right?" line | QN-1 |
+| A17 | "I withdrew from my MFs every 2–3 years… missed the cumulative impact" — broken-compounding aside | — | **✗** | ✓ 6th "why so big" bullet | QN-4 |
 | A16 | User's own guess ("8–10 Cr") vs the math ("32 Cr") — the hook | — | **✗** | ✓ Q1 gut-feel chips; hero shows "you guessed ₹10 Cr · the math says ₹13.3 Cr" | QN-1, QN-2 |
 
 ## B. Assumptions the tool used (Part 2)
@@ -56,7 +57,7 @@ Source of truth for the left column: `D:\Abhay\Ventures\transcripts\FbYnFUwdODQ.
 | # | Video item | FireKaro today | Mockup now | Plan |
 |---|---|---|---|---|
 | D1 | XIRR vs benchmark (13.3 vs 13.4) | #146 open | listed in "What the full planner adds" | — (#146, separate) |
-| D2 | Access: direct vs regular TER (+80 bps) | none | ✓ lever (+0.8%) | QN-5 (household-level toggle) ; per-holding flag → #NEW |
+| D2 | Access: direct vs regular TER (+80 bps) | none | ◐ lever (+0.8%; mock has no "already direct" gate — spec adds one) | QN-5 (household-level toggle) ; per-holding flag → #NEW |
 | D3 | Selection: 72/18/9 vs 60/25–27/13–15 | none | listed | — (#141) |
 | D4 | Allocation: 65% funds underperform; 20 funds = index; keep 5–10 | none | listed ("we'll count your funds") | #NEW fund-count warning (good-to-have) |
 | D5 | Gold ~7% = ideal uncorrelated asset | goldReturn 7% | listed | — |
