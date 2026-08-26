@@ -290,6 +290,38 @@ describe("T-377/QN-2 — solver precondition: FIRE is monotone in the real month
       );
     });
 
+    // The solver bisects on `individualFireAge` under a member lens, so THAT predicate needs
+    // the same monotonicity guarantee — the household property does not cover the branch the
+    // code actually takes when "Viewing as <member>" is active (code-review M5).
+    it(`${persona.name}: individual FIRE age is non-increasing in the member's contribution`, () => {
+      const h = useHouseholdStore();
+      const a = useAssumptionsStore();
+      persona.load(h, a);
+      const base = a.values;
+      const adults = derive(h.data, base, LENS).individualFireByMember;
+      for (const adult of adults) {
+        const memberLens = { ...LENS, viewingMemberId: adult.memberId };
+        fc.assert(
+          fc.property(
+            fc.integer({ min: 40, max: 70 }),
+            fc.double({ min: 0, max: 500_000, noNaN: true }),
+            fc.double({ min: 0, max: 500_000, noNaN: true }),
+            (targetAge, c1, c2) => {
+              const lo = Math.min(c1, c2);
+              const up = Math.max(c1, c2);
+              const pick = (c: number) =>
+                derive(h.data, base, memberLens, {
+                  monthlyContributionReal: c,
+                  targetRetirementAge: targetAge,
+                }).individualFireByMember.find((m) => m.memberId === adult.memberId)!;
+              expect(pick(up).individualFireAge).toBeLessThanOrEqual(pick(lo).individualFireAge + EPS);
+            },
+          ),
+          { numRuns: 25 },
+        );
+      }
+    });
+
     // No perturbation may put a NaN on screen (rule 31) — the solver reads these fields.
     it(`${persona.name}: no NaN reaches the headline under any contribution override`, () => {
       const h = useHouseholdStore();

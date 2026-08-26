@@ -40,6 +40,10 @@ export interface QuickPrefs {
   directPlans?: boolean;
 }
 
+/** T-377: the ONE retirement-age range both the dashboard hero and /what-if honour. */
+export const SHARED_TARGET_AGE_MIN = 40;
+export const SHARED_TARGET_AGE_MAX = 75;
+
 // Q10.1 (v3) — dark mode removed. darkMode field dropped from this store; older
 // localStorage shapes are tolerated by hydrate (extra keys are simply ignored).
 export const useUiStore = defineStore("ui", () => {
@@ -81,11 +85,15 @@ export const useUiStore = defineStore("ui", () => {
   }
 
   function persist() {
+    // `quick` is OMITTED when null, never sent as null. The server merges `{...existingPrefs,
+    // ...body}`, so a null would CLOBBER a stored quick blob — and this store writes on every
+    // family-view toggle, including before hydrate() has run. Omitting the key is what makes the
+    // server's merge-not-replace guarantee reachable from the real client (code-review L1).
     adapter.set<UiPersistedShape>(ENTITY_KEY, {
       isFamilyView: isFamilyView.value,
       viewingMemberId: viewingMemberId.value,
       lifecycleSnapshot: lifecycleSnapshot.value,
-      quick: quick.value,
+      ...(quick.value != null ? { quick: quick.value } : {}),
     });
   }
 
@@ -99,9 +107,21 @@ export const useUiStore = defineStore("ui", () => {
   function setViewingMemberId(id: string | null) {
     viewingMemberId.value = id;
   }
-  /** T-377: set (or clear with null) the shared hero/What-If retirement age. Session-only. */
-  function setWhatIfTargetAge(age: number | null) {
-    whatIfTargetAge.value = age != null && Number.isFinite(age) ? Math.round(age) : null;
+  /**
+   * T-377: set (or clear with null) the shared hero/What-If retirement age. Session-only.
+   *
+   * Clamped HERE, once, to the shared range — so the two sliders can never render different
+   * numbers for the same stored value (the hero used 40-70, What-If clamps to
+   * [anchorAge + 1, 75]; a hero value of 42 for a 45-year-old showed 42 on one screen and 46 on
+   * the other — code-review M4). Callers pass their own floor when they know the anchor age.
+   */
+  function setWhatIfTargetAge(age: number | null, floor = SHARED_TARGET_AGE_MIN) {
+    if (age == null || !Number.isFinite(age)) {
+      whatIfTargetAge.value = null;
+      return;
+    }
+    const lo = Math.max(SHARED_TARGET_AGE_MIN, Math.round(floor));
+    whatIfTargetAge.value = Math.min(SHARED_TARGET_AGE_MAX, Math.max(lo, Math.round(age)));
   }
   /** T-377: merge a partial Quick-Number blob (QN-1 writes; QN-2 only reads). */
   function setQuickPrefs(next: QuickPrefs | null) {

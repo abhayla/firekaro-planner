@@ -52,15 +52,25 @@ describe("FireHero binding locks — T-377 QN-2 gap hero", () => {
     expect(src).toMatch(/Number\.isFinite\(req\.value\.requiredMonthlyReal\)/);
   });
 
-  it("the retirement-age slider is live, bounded 40-70, and writes the SHARED ui field (#64 class)", () => {
-    expect(template).toMatch(/v-model="targetAge"[\s\S]{0,400}data-testid="hero-age-slider"/);
+  it("the retirement-age slider is bounded by the SHARED range and commits to the SHARED ui field", () => {
+    expect(template).toMatch(/data-testid="hero-age-slider"/);
     expect(template).toMatch(/:min="HERO_AGE_MIN"/);
     expect(template).toMatch(/:max="HERO_AGE_MAX"/);
-    expect(src).toMatch(/const HERO_AGE_MIN = 40/);
-    expect(src).toMatch(/const HERO_AGE_MAX = 70/);
-    // The setter must go through the ui store — a component-local ref would re-open the drift.
-    expect(src).toMatch(/set: \(v: number\) => ui\.setWhatIfTargetAge\(v\)/);
-    expect(src).toMatch(/get: \(\) => fire\.heroTargetAge\.value/);
+    // Bounds come from the store's shared constants — a hard-coded pair here is what let the
+    // hero (40-70) and What-If ([anchor+1, 75]) disagree about the same stored value.
+    expect(src).toMatch(/SHARED_TARGET_AGE_MIN/);
+    expect(src).toMatch(/SHARED_TARGET_AGE_MAX/);
+    // Never below the user's own age + 1 — an age already passed cannot carry an honest plan.
+    expect(src).toMatch(/Math\.max\(SHARED_TARGET_AGE_MIN, Math\.round\(anchor\) \+ 1\)/);
+    // The commit must go through the ui store action (a component-local ref re-opens the drift),
+    // and it must happen on RELEASE, not on every integer the thumb crosses (perf).
+    expect(src).toMatch(/ui\.setWhatIfTargetAge\(/);
+    expect(src).toMatch(/fire\.heroTargetAge\.value/);
+    expect(template).toMatch(/@end="commitSliderAge"/);
+    // ...but a keyboard user never fires @end, so a non-drag change must commit immediately
+    // (gating the commit on @end alone froze the numbers for keyboard users).
+    expect(template).toMatch(/@update:model-value="onSliderInput"/);
+    expect(src).toMatch(/if \(!dragging\.value\) ui\.setWhatIfTargetAge\(/);
   });
 
   it("dragging is a WHAT-IF: nothing persists until 'Set as my target' is clicked", () => {
@@ -104,6 +114,15 @@ describe("FireHero binding locks — T-377 QN-2 gap hero", () => {
     }
     // The plan-variance tone resolver is untouched by QN-2 — two signals, two types.
     expect(src).toMatch(/resolveHeroTone\(\{/);
+  });
+
+  it("'Set as my target' writes only the LENSED member when a lens is on (never both spouses)", () => {
+    expect(src).toMatch(/hh\.value\.isMember[\s\S]{0,160}m\.id === ui\.viewingMemberId/);
+  });
+
+  it("a prescription above today's savings says where the money must come from", () => {
+    expect(src).toMatch(/const feasibilityNote = computed/);
+    expect(template).toContain("feasibilityNote");
   });
 
   it("every money figure comes from the solver — the component computes no money of its own", () => {

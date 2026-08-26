@@ -21,17 +21,24 @@ const uiStore = readFileSync(fileURLToPath(new URL("../../stores/ui.ts", import.
 
 describe("shared retirement-age field — hero slider ⇄ What-If slider", () => {
   it("What-If's targetAge is backed by the shared ui field, not a page-local ref", () => {
-    expect(whatIf, "must read the shared field").toMatch(/const shared = ui\.whatIfTargetAge/);
-    expect(whatIf, "must write the shared field").toMatch(/set: \(next: number\) => ui\.setWhatIfTargetAge\(next\)/);
+    expect(whatIf, "must read the shared field").toMatch(/ui\.whatIfTargetAge/);
+    expect(whatIf, "must write the shared field").toMatch(/ui\.setWhatIfTargetAge\(/);
     expect(whatIf, "the old page-local ref must be gone").not.toMatch(/const targetAge = ref\(/);
   });
 
   it("the hero slider writes the SAME field", () => {
-    expect(hero).toMatch(/ui\.setWhatIfTargetAge\(v\)/);
+    expect(hero).toMatch(/ui\.setWhatIfTargetAge\(/);
   });
 
-  it("What-If clamps a hero value to its own floor/ceiling (never renders an impossible age)", () => {
-    expect(whatIf).toMatch(/Math\.min\(ageCeiling, Math\.max\(ageFloor\.value, Math\.round\(shared\)\)\)/);
+  it("BOTH screens use ONE range, clamped once in the store (no per-screen bounds)", () => {
+    // The drift this file exists to prevent: the hero allowed 40-70 while What-If clamped to
+    // [anchor+1, 75], so one stored value rendered as two different ages (code-review M4).
+    for (const [name, srcText] of [["what-if", whatIf], ["hero", hero]] as const) {
+      expect(srcText, `${name} must use the shared minimum`).toMatch(/SHARED_TARGET_AGE_MIN/);
+      expect(srcText, `${name} must use the shared maximum`).toMatch(/SHARED_TARGET_AGE_MAX/);
+    }
+    // The clamp itself lives in the store action, applied to every writer.
+    expect(uiStore).toMatch(/Math\.min\(SHARED_TARGET_AGE_MAX, Math\.max\(lo, Math\.round\(age\)\)\)/);
   });
 
   it("reset clears the shared field so BOTH sliders follow the saved plan again", () => {

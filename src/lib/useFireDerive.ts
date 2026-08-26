@@ -247,8 +247,15 @@ export function useFireDerive() {
   const heroTargetAge = computed<number>(() => {
     const slider = ui.whatIfTargetAge;
     if (slider != null && Number.isFinite(slider)) return Math.round(slider);
-    const fromPlan = d.value.targetRetirementAge;
-    return Number.isFinite(fromPlan) && fromPlan > 0 ? Math.round(fromPlan) : 50;
+    // Untouched slider ⇒ follow the SAVED plan of whatever scope is on screen. Under a member
+    // lens that is THAT adult's own targetRetirementAge — `derive().targetRetirementAge` is
+    // deliberately the household/primary-earner value, so using it would show one spouse the
+    // other's target age (code-review M3).
+    const lensedMember = d.value.applyMemberLens
+      ? h.data.members.find((m) => m.id === ui.viewingMemberId) ?? null
+      : null;
+    const fromPlan = lensedMember?.targetRetirementAge ?? d.value.targetRetirementAge;
+    return Number.isFinite(fromPlan) && (fromPlan ?? 0) > 0 ? Math.round(fromPlan as number) : 50;
   });
 
   // One solver run per (household, assumptions, lens, targetAge). Vue caches it, so the

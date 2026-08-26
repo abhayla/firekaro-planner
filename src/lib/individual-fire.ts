@@ -52,6 +52,9 @@ export interface IndividualFireResult {
   attributableAnnualSavings: number;
   /** SWR-based personal FIRE number from attributable expenses. ₹ today. */
   individualFireNumber: number;
+  /** The member's OWN real (inflation-adjusted) blended return — the rate their FIRE age was
+   *  solved at. Exposed so no consumer grows a member's corpus at the HOUSEHOLD rate (T-377). */
+  realReturn: number;
   yearsToIndividualFire: number;
   /** anchorAge + yearsToIndividualFire (Infinity → anchorAge unchanged sentinel handled by caller). */
   individualFireAge: number;
@@ -223,6 +226,7 @@ export function computeIndividualFire(
     attributableAnnualTax,
     attributableAnnualSavings,
     individualFireNumber,
+    realReturn,
     yearsToIndividualFire,
     individualFireAge,
   };

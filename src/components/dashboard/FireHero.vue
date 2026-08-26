@@ -13,12 +13,12 @@
  * confidence band (#18) non-removable; bridge-gated headline subline (#15); the
  * household-primary headline (#22/#66) — same useFireDerive fields as before.
  */
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import { useFireDerive } from "@/lib/useFireDerive";
 import { useHouseholdStore } from "@/stores/household";
 import { useAssumptionsStore } from "@/stores/assumptions";
-import { useUiStore } from "@/stores/ui";
+import { useUiStore, SHARED_TARGET_AGE_MIN, SHARED_TARGET_AGE_MAX } from "@/stores/ui";
 import { usePlanBaseline } from "@/composables/usePlanBaseline";
 import { computePlanVariance } from "@/lib/plan-variance";
 import { useAcceleration } from "@/composables/useAcceleration";
@@ -26,7 +26,7 @@ import { useLifecycleDigest } from "@/composables/useLifecycleDigest";
 import { resolveHeroTone, resolveGapTone } from "@/lib/dashboard-verdict";
 import { describeFireConfidenceBand } from "@/lib/fire-confidence-band";
 import { MAX_PROJECTION_YEARS } from "@/lib/monte-carlo";
-import { formatINRCompact, formatYearsMonths } from "@/lib/formatters";
+import { formatINRCompact } from "@/lib/formatters";
 import InfoTip from "@/components/shared/InfoTip.vue";
 
 const fire = useFireDerive();
@@ -48,12 +48,6 @@ const achieved = computed(() => !hh.value.isMember && finiteYears.value && hh.va
 // Member year uses ROUND so it stays coherent with individualFireAge (= round(anchor + raw),
 // integer anchor) — pairing a ceil'd year with a rounded age drifts by 1 for fractional years
 // (the #33 round-vs-ceil class). Household keeps ceil (byte-identical with householdFireAge).
-const fireYear = computed(() =>
-  hh.value.isMember
-    ? new Date().getFullYear() + Math.round(hh.value.yearsToFire || 0)
-    : new Date().getFullYear() + Math.ceil(hh.value.yearsToFire || 0),
-);
-const fireAge = computed(() => hh.value.fireAge);
 // Member savings rate for the corpus-KPI sub — same-scope with the member headline
 // (the household savingsRate beside an individual target would mix scopes).
 const savingsRateDisplay = computed(() =>
@@ -190,17 +184,56 @@ const showWinSlot = computed(() => bridgeBinding.value || topWin.value !== null)
 // current-pace age is demoted to the honest annotation below the slider. EVERY number here
 // comes from `useFireDerive().requiredContribution` (which solves through derive()) — this
 // component computes no money of its own (contract §10: no parallel math).
-const HERO_AGE_MIN = 40;
-const HERO_AGE_MAX = 70;
+// The hero's own floor: never below the shared minimum, never at-or-below the user's age
+// (dragging to an age you have already passed cannot produce an honest plan — code-review L3).
+const HERO_AGE_MIN = computed(() => {
+  const anchor = fire.anchorAge.value;
+  return Number.isFinite(anchor) ? Math.max(SHARED_TARGET_AGE_MIN, Math.round(anchor) + 1) : SHARED_TARGET_AGE_MIN;
+});
+const HERO_AGE_MAX = SHARED_TARGET_AGE_MAX;
 
 const req = computed(() => fire.requiredContribution.value);
 const reqPlus3 = computed(() => fire.requiredContributionAtTargetPlus3.value);
 
-/** The shared slider age — reads/writes `ui.whatIfTargetAge`, the SAME field /what-if uses. */
-const targetAge = computed<number>({
-  get: () => fire.heroTargetAge.value,
-  set: (v: number) => ui.setWhatIfTargetAge(v),
-});
+/**
+ * The committed slider age — the value every money figure on the card is solved at. Reads the
+ * SAME `ui.whatIfTargetAge` field /fire-goals/what-if writes.
+ */
+const targetAge = computed<number>(() => fire.heroTargetAge.value);
+
+/**
+ * The thumb's live position. The slider is bound to this local ref and only COMMITS to the
+ * store on release (`@end`), because each committed value costs ~30 full `derive()` runs
+ * (the solver bisects, plus the +3 hint) — binding v-model straight to the store re-solved on
+ * every integer the thumb crossed and janked the drag (code-review M6). The thumb still moves
+ * at 60fps; the numbers land the moment the user lets go.
+ */
+const sliderAge = ref<number>(fire.heroTargetAge.value);
+watch(
+  () => fire.heroTargetAge.value,
+  (v) => {
+    sliderAge.value = v;
+  },
+);
+/**
+ * True only while a pointer drag is in flight. A keyboard user (arrow keys) or a click on the
+ * track never fires `@end`, so gating the commit on `@end` alone would leave the numbers frozen
+ * for anyone not using a mouse — an a11y regression the perf fix must not introduce.
+ */
+const dragging = ref(false);
+
+function commitSliderAge(v: number | number[]) {
+  dragging.value = false;
+  const n = Array.isArray(v) ? v[0] : v;
+  ui.setWhatIfTargetAge(n, HERO_AGE_MIN.value);
+}
+
+/** Keyboard / track-click: commit immediately. Pointer drag: wait for release (`@end`). */
+function onSliderInput(v: number | number[]) {
+  const n = Array.isArray(v) ? v[0] : v;
+  sliderAge.value = n;
+  if (!dragging.value) ui.setWhatIfTargetAge(n, HERO_AGE_MIN.value);
+}
 /** True once the user has dragged away from their saved plan (enables "Set as my target"). */
 const sliderMoved = computed(
   () => ui.whatIfTargetAge != null && ui.whatIfTargetAge !== fire.targetRetirementAge.value,
@@ -212,6 +245,20 @@ const mustInvestMore = computed(
   () => !requiredFinite.value || req.value.requiredMonthlyReal > req.value.currentMonthlyReal,
 );
 const gapTone = computed(() => resolveGapTone(req.value.gapReal));
+
+/**
+ * The honest caveat on any prescription above today's savings: the extra has to come out of
+ * spending, and cutting spending would ALSO lower the FIRE number — which this solver does not
+ * re-solve (it holds today's expenses fixed). So such an amount is CONSERVATIVE, never
+ * optimistic, and the user is told where it would have to come from (FinTech review HIGH-4).
+ */
+const feasibilityNote = computed<string | null>(() => {
+  if (!requiredFinite.value || !mustInvestMore.value) return null;
+  const takeHome = hh.value.monthlyTakeHome;
+  const left = takeHome - req.value.requiredMonthlyReal;
+  if (!Number.isFinite(takeHome) || takeHome <= 0 || left < 0) return null;
+  return `That would leave ${formatINRCompact(left)}/month to live on — spending less also lowers the number above, which this figure does not yet credit you for.`;
+});
 const needYear = computed(() => {
   const anchor = fire.anchorAge.value;
   const yrs = Number.isFinite(anchor) ? Math.max(0, targetAge.value - anchor) : 0;
@@ -260,7 +307,13 @@ const paceLine = computed(() => {
 /** Persist the dragged age as the real plan (the only write the slider can make). */
 function setAsMyTarget() {
   const age = targetAge.value;
-  for (const m of h.earners) h.updateMember(m.id, { targetRetirementAge: age });
+  // Under "Viewing as <member>" the card is about THAT adult — writing every earner's target
+  // would silently rewrite the other spouse's plan from a button labelled with one name
+  // (code-review M2). On the household view, all earners share the household target.
+  const targets = hh.value.isMember
+    ? h.data.members.filter((m) => m.id === ui.viewingMemberId)
+    : h.earners;
+  for (const m of targets) h.updateMember(m.id, { targetRetirementAge: age });
   ui.setWhatIfTargetAge(null); // follow the plan again now that the plan IS this age
 }
 function resetTargetAge() {
@@ -339,7 +392,11 @@ function yearsLabel(years: number): string {
             </template>
             <template v-else>
               invest this every month (you do {{ formatINRCompact(req.currentMonthlyReal) }} now) to retire at
-              {{ targetAge }}
+              {{ targetAge }}<template v-if="feasibilityNote"> — {{ feasibilityNote }}</template>
+            </template>
+            <template v-if="hh.isMember">
+              <br />This funds {{ hh.memberName }}'s own lifestyle only — see the caveat below for what
+              the household plan additionally covers.
             </template>
           </div>
         </div>
@@ -349,11 +406,14 @@ function yearsLabel(years: number): string {
       <div class="hero-slider mt-4">
         <div class="hero-slider__row">
           <span>Drag your retirement age</span>
-          <b class="font-mono" data-testid="hero-target-age">{{ targetAge }}</b>
+          <b class="font-mono" data-testid="hero-target-age">{{ sliderAge }}</b>
         </div>
         <v-slider
-          v-model="targetAge"
+          :model-value="sliderAge"
           :min="HERO_AGE_MIN"
+          @start="dragging = true"
+          @update:model-value="onSliderInput"
+          @end="commitSliderAge"
           :max="HERO_AGE_MAX"
           :step="1"
           density="compact"
@@ -575,12 +635,6 @@ function yearsLabel(years: number): string {
   font-weight: 800;
   line-height: 1.05;
   color: var(--text-primary);
-}
-.fire-hero__age--text {
-  font-size: var(--type-xl);
-  font-weight: var(--weight-semibold);
-  line-height: var(--leading-tight);
-  padding: var(--space-2) 0;
 }
 .fire-hero__when {
   font-size: var(--type-sm);

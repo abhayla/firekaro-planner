@@ -14,7 +14,7 @@ import { useFireDerive } from "@/lib/useFireDerive";
 import { useAssumptionsStore } from "@/stores/assumptions";
 import { useHouseholdStore } from "@/stores/household";
 import { useScenariosStore, type LeverValues } from "@/stores/scenarios";
-import { useUiStore } from "@/stores/ui";
+import { useUiStore, SHARED_TARGET_AGE_MIN, SHARED_TARGET_AGE_MAX } from "@/stores/ui";
 import { calculateFIRENumber, calculateYearsToTarget, projectCorpus, type ContributionSchedule } from "@/lib/fire-math";
 import { buildContributionResolver } from "@/lib/contribution-schedule";
 import { retireByAgeRequiredSIP } from "@/lib/adequacy";
@@ -243,8 +243,12 @@ function loadScenario(id: string) {
 // ---- Retire-by-age reverse solver (gh-issue #30) ----
 // "Pick a target retirement age → see the required monthly SIP to get there."
 // Reuses the shared engine (retireByAgeRequiredSIP); no math duplicated here.
-const ageFloor = computed(() => Math.round((fire.anchorAge.value ?? 30) + 1));
-const ageCeiling = 75;
+// T-377: one shared range with the dashboard hero (the store clamps to it too) so the two
+// sliders can never render different numbers for the same stored value (code-review M4).
+const ageFloor = computed(() =>
+  Math.max(SHARED_TARGET_AGE_MIN, Math.round((fire.anchorAge.value ?? 30) + 1)),
+);
+const ageCeiling = SHARED_TARGET_AGE_MAX;
 const defaultTargetAge = computed(() => {
   const fromHousehold = fire.targetRetirementAge.value;
   const fallback = (fire.anchorAge.value ?? 30) + 15;
@@ -262,7 +266,7 @@ const targetAge = computed<number>({
     if (shared == null || !Number.isFinite(shared)) return defaultTargetAge.value;
     return Math.min(ageCeiling, Math.max(ageFloor.value, Math.round(shared)));
   },
-  set: (next: number) => ui.setWhatIfTargetAge(next),
+  set: (next: number) => ui.setWhatIfTargetAge(next, ageFloor.value),
 });
 
 const retireByAge = computed(() =>

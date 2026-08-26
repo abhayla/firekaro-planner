@@ -93,16 +93,138 @@ describe("requiredMonthlyContributionFor — solves through the REAL derive() pa
     expect(Number.isNaN(r.requiredMonthlyReal)).toBe(false);
   });
 
-  it("paceFireAge is the CURRENT-pace age (unchanged by the slider), null when never reached", () => {
+  // FinTech review 2026-08-27 (MEDIUM-HIGH-5): pace and prescription MUST sit on one curve.
+  // Reading the pace age from the STORED target's kernel run while the need/required came from
+  // the SLIDER's run let one card say both "your current amount is enough for 55" and "at
+  // today's pace: 56". The pace is now resolved from the same at-target run.
+  it("paceFireAge sits on the SAME curve as the prescription beside it (no self-contradiction)", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    loadSeedPersona(h, a);
+    for (const age of [45, 50, 55, 60]) {
+      const atTarget = derive(h.data, a.values, LENS, { targetRetirementAge: age });
+      const r = requiredMonthlyContributionFor({ snapshot: h.data, assumptions: a.values, lens: LENS, targetAge: age });
+      expect(r.paceFireAge).toBe(atTarget.householdFireAge);
+      // The coherence property the old spec could not see: "current amount is already enough"
+      // and "today's pace gets you there LATER than you want" can never both be true.
+      const alreadyEnough = r.requiredMonthlyReal <= r.currentMonthlyReal;
+      if (alreadyEnough && r.paceFireAge != null) {
+        expect(
+          r.paceFireAge,
+          `at target ${age} the card claims the current amount suffices, so the pace age must not be later`,
+        ).toBeLessThanOrEqual(age);
+      }
+    }
+  });
+
+  it("currentMonthlyReal is what the household actually invests today (never the solved amount)", () => {
     const h = useHouseholdStore();
     const a = useAssumptionsStore();
     loadSeedPersona(h, a);
     const base = derive(h.data, a.values, LENS);
-    const r45 = requiredMonthlyContributionFor({ snapshot: h.data, assumptions: a.values, lens: LENS, targetAge: 45 });
-    const r60 = requiredMonthlyContributionFor({ snapshot: h.data, assumptions: a.values, lens: LENS, targetAge: 60 });
-    expect(r45.paceFireAge).toBe(base.householdFireAge);
-    expect(r60.paceFireAge).toBe(base.householdFireAge);
-    expect(r45.currentMonthlyReal).toBe(base.monthlyContribution);
+    for (const age of [45, 60]) {
+      const r = requiredMonthlyContributionFor({ snapshot: h.data, assumptions: a.values, lens: LENS, targetAge: age });
+      expect(r.currentMonthlyReal).toBe(base.monthlyContribution);
+    }
+  });
+
+  // ---- substance locks added after the 2026-08-27 reviews (they would have caught H1/H2) ----
+
+  it("targetAge == anchorAge means 'today': no phantom year of growth is invented", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    loadSeedPersona(h, a);
+    const k = derive(h.data, a.values, LENS);
+    const r = requiredMonthlyContributionFor({
+      snapshot: h.data,
+      assumptions: a.values,
+      lens: LENS,
+      targetAge: k.anchorAge,
+    });
+    expect(r.haveAtTargetReal).toBe(Math.round(k.fireWithdrawableCorpus));
+  });
+
+  it("haveAtTargetReal grows STRICTLY with the target age (one year = one year, never two)", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    loadSeedPersona(h, a);
+    let prev = -1;
+    for (const age of [45, 46, 47, 48]) {
+      const r = requiredMonthlyContributionFor({ snapshot: h.data, assumptions: a.values, lens: LENS, targetAge: age });
+      expect(r.haveAtTargetReal).toBeGreaterThan(prev);
+      prev = r.haveAtTargetReal;
+    }
+  });
+
+  it("needNominal is needReal grown at GENERAL CPI over the real horizon (not a vacuous >= check)", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    loadSeedPersona(h, a);
+    const k = derive(h.data, a.values, LENS);
+    const targetAge = 50;
+    const r = requiredMonthlyContributionFor({ snapshot: h.data, assumptions: a.values, lens: LENS, targetAge });
+    const expected = r.needReal * Math.pow(1 + a.values.inflation, targetAge - k.anchorAge);
+    expect(r.needNominal).toBe(Math.round(expected));
+  });
+
+  it("never prescribes an impossible amount: required <= monthly take-home, else Infinity", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    loadSeedPersona(h, a);
+    const k = derive(h.data, a.values, LENS);
+    for (const age of [40, 42, 45, 50, 55, 60, 65, 70]) {
+      const r = requiredMonthlyContributionFor({ snapshot: h.data, assumptions: a.values, lens: LENS, targetAge: age });
+      if (Number.isFinite(r.requiredMonthlyReal)) {
+        expect(
+          r.requiredMonthlyReal,
+          `retiring at ${age} quotes more per month than the household takes home`,
+        ).toBeLessThanOrEqual(k.monthlyTakeHome);
+      }
+    }
+  });
+
+  it("a TRUE solo household ignores a stale viewingMemberId (follows derive()'s own lens gate)", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    loadSeedPersona(h, a);
+    // derive() switches off the member lens for a one-member household (`isSolo`). The solver
+    // must follow that gate rather than keying off `viewingMemberId` alone — otherwise a stale
+    // id silently swaps the household number for the individual one, which excludes ring-3
+    // (dependant) costs. NOTE: a single parent WITH children is not `isSolo` (the children are
+    // members), so the lens legitimately applies there and the member caveat carries the
+    // "excludes the children" warning — that is #81's documented design, not this gate.
+    const soloId = h.data.members.find((m) => m.role !== "DEPENDENT")!.id;
+    h.data.members = h.data.members.filter((m) => m.id === soloId);
+
+    const household = requiredMonthlyContributionFor({
+      snapshot: h.data,
+      assumptions: a.values,
+      lens: LENS,
+      targetAge: 55,
+    });
+    const lensed = requiredMonthlyContributionFor({
+      snapshot: h.data,
+      assumptions: a.values,
+      lens: { ...LENS, viewingMemberId: soloId },
+      targetAge: 55,
+    });
+    expect(lensed.needReal).toBe(household.needReal);
+    expect(lensed.requiredMonthlyReal).toBe(household.requiredMonthlyReal);
+  });
+
+  it("a non-finite target age makes NO claim (NaN gap → the 'unknown' tone), never a number", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    loadSeedPersona(h, a);
+    const r = requiredMonthlyContributionFor({
+      snapshot: h.data,
+      assumptions: a.values,
+      lens: LENS,
+      targetAge: Number.NaN,
+    });
+    expect(r.requiredMonthlyReal).toBe(Number.POSITIVE_INFINITY);
+    expect(Number.isNaN(r.gapReal)).toBe(true);
+    expect(r.paceFireAge).toBeNull();
   });
 
   it("member lens: returns THAT adult's individual number (#81), household stays primary", () => {
