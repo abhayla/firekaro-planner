@@ -26,7 +26,7 @@ import { useAssumptionsStore } from "@/stores/assumptions";
 import { loadSeedPersona } from "@/lib/seed-persona";
 import { loadMehtasSeed } from "@/seeds/mehtas";
 import { loadIyersSeed } from "@/seeds/iyers";
-import { derive } from "@/lib/derive";
+import { derive, cpiWithinYearReindexFactor } from "@/lib/derive";
 import { runMonteCarloFire, headlineBandInputs, MAX_PROJECTION_YEARS } from "@/lib/monte-carlo";
 import { evaluateNudges } from "@/lib/nudge-engine";
 import { derivedFamilyLayer } from "@/lib/derived-records";
@@ -317,8 +317,11 @@ describe("lifecycle-digest — frame-change migration (ADR-0006)", () => {
         // household the two differ, which is exactly why the band must not read the base leg.
         effectiveTargetDriftRate: 0.0023,
         householdContributionSchedule: 100_000,
-        // ADR-0006 Phase 1b: the CPI-re-indexed band inflow (≈ 96.8% of the real amount at 6% CPI).
-        bandContributionSchedule: 96_766,
+        // ADR-0006 Phase 1b: the CPI-re-indexed band inflow (≈ 96.9% of the real amount at 6% CPI).
+        // Phase 1d: COMPUTED from the kernel's own factor, not hard-coded. The literal that used to
+        // sit here (96_766) was arithmetically wrong — the factor is 0.969067, not 0.96766 — and a
+        // wrong constant in a fixture is a lock on the wrong behaviour.
+        bandContributionSchedule: 100_000 * cpiWithinYearReindexFactor(0.06),
         portfolioVolatility: 0.15,
         monthlyContribution: 100_000,
       },

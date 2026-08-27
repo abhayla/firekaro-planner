@@ -214,19 +214,25 @@ export function requiredMonthlyContributionFor(
   const yearsToTarget = Math.max(0, targetAge - anchorAge);
   const inflation = safe(assumptions.inflation, 0.06);
   // ADR-0006. The FIRE number the household must actually hit AT the target age is today's number
-  // grown at the household basket for `yearsToTarget` years. Expressed two ways, from ONE growth:
-  //   needNominal = needToday x (1+b)^T        (target-year rupees)
-  //   needReal    = needNominal / (1+CPI)^T    = needToday x (1+g)^T   (today's rupees)
-  // where g = (1+b)/(1+CPI) − 1 is the kernel's own `realTargetDriftRate`. Before ADR-0006 the
-  // real figure was the UNDRIFTED needToday and the nominal one was `needToday x (1+CPI)^T`, so
-  // both were short by ((1+b)/(1+CPI))^T — an optimistic prescription (gh #167).
+  // re-priced along the kernel's COMPONENT TARGET SCHEDULE for `yearsToTarget` years — NOT grown at
+  // one rate. The target is a sum of legs that move differently:
   //
-  // ADR-0006 PHASE 1C. `(1+g)^T` was only ever an approximation of that growth, because the
-  // target is not one rate: the reservation rides medical inflation and each dated goal STOPS
-  // rising on its due year. So the drift is read off the kernel's own COMPONENT schedule at the
-  // target horizon instead of recomputed from a scalar — for a goal-heavy household the scalar
-  // over-states the need (and the prescription with it), and the three narrated components would
-  // stop summing to the headline the moment one goal's due year fell inside the horizon.
+  //   target(T) = (base + contingency)·(1+b)^T          the perpetual ongoing spend, at the basket
+  //             + reservation·(1+healthcareInflation)^T  the medical-shock buffer, at medical inflation
+  //             + Σ goal_i·(1+rate_i)^min(T, due_i)      each dated lump, at ITS bucket, capped on its due year
+  //
+  // and the two figures the hero prints are that one schedule read in two frames:
+  //   needReal    = regularTargetComponentsRealAt(T).total   (today's rupees — already CPI-deflated)
+  //   needNominal = needReal × (1+CPI)^T                     (target-year rupees)
+  //
+  // Before ADR-0006 the real figure was the UNDRIFTED needToday and the nominal one was
+  // `needToday × (1+CPI)^T`, so both were short — an optimistic prescription (gh #167). Phase 1b
+  // then grew the whole target at a single scalar `(1+g)^T` where `g = realTargetDriftRate`; Phase
+  // 1c retired that, because a scalar OVER-states the need for any household whose goals fall due
+  // inside the horizon (their legs stop rising and the scalar does not), and because the three
+  // narrated components would stop summing to the headline the moment one goal's due year landed
+  // inside T. `realTargetDriftRate` survives only as the fallback below, for the degenerate case
+  // where the kernel could not produce a component total at all.
   const atTargetComponents = atTarget.regularTargetComponentsRealAt(yearsToTarget);
   const componentDriftFactor =
     atTarget.fireNumber > 0 && Number.isFinite(atTargetComponents.total)
@@ -365,9 +371,10 @@ export function requiredMonthlyContributionFor(
     needReal: needRealRounded,
     haveAtTargetReal,
     paceFireAge: paceFireAgeRaw != null && Number.isFinite(paceFireAgeRaw) ? paceFireAgeRaw : null,
-    // needReal x (1+CPI)^T === needToday x (1+b)^T — the nominal target at T, read off the same
-    // basket growth. Grown from the ROUNDED real figure so the two numbers the hero prints side
-    // by side reconcile exactly for a user who checks them.
+    // The SAME component total, quoted in target-year rupees: `needReal × (1+CPI)^T`. It is not
+    // `needToday × (1+b)^T` — that single-rate form was retired in Phase 1c because the basket is
+    // only the perpetual leg's rate (see the derivation above). Grown from the ROUNDED real figure
+    // so the two numbers the hero prints side by side reconcile exactly for a user who checks them.
     needNominal: Math.max(0, Math.round(safe(needRealRounded * cpiInflator, needRealRounded))),
     swrUsed,
     anchorAgeUsed: anchorAge,

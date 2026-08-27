@@ -105,6 +105,25 @@ export interface DeriveLens {
   currentFY: string;
 }
 
+/**
+ * ADR-0006 Phase 1b/1d — the within-year CPI re-index factor.
+ *
+ * The nominal kernel steps the contribution ONCE a year, so the amount paid in month `j` of year
+ * `y` is worth `C_real(y)·(1+CPI)^−(j+1)/12` in today's rupees — strictly less than `C_real(y)` in
+ * every month of the year. A CPI-real engine (the Monte Carlo band, `lever-bands`) handed the
+ * un-discounted figure is credited with purchasing power the nominal kernel never gives, which put
+ * the band's p50 ~0.4 years AHEAD of the headline it exists to bracket.
+ *
+ * This is the mean of those twelve monthly discounts: exact for the year's contribution TOTAL, and
+ * independent of `y`, so it is one scalar. At 6% CPI it is 0.969067.
+ */
+export function cpiWithinYearReindexFactor(inflation: number): number {
+  const cpi = Number.isFinite(inflation) ? inflation : 0;
+  let sum = 0;
+  for (let k = 1; k <= 12; k++) sum += Math.pow(1 + cpi, -k / 12);
+  return sum / 12;
+}
+
 export function derive(
   household: Household,
   assumptions: Assumptions,
@@ -465,6 +484,23 @@ export function derive(
   // Note: householdMarginalRate is the bare slab rate (no 4% cess/surcharge) by
   // design — do NOT "fix" it to the effective rate; the slab-proxy above already
   // over-taxes the annuity, and adding cess would double-stack the conservatism.
+  //
+  // ADR-0006 Phase 1d — STATED SIMPLIFICATION (the frame). The annuity is credited as a LEVEL
+  // NOMINAL income: PFRDA annuities are overwhelmingly level-payout, so this is the product, not
+  // an approximation. But `netAnnualExpenses` — the difference it is subtracted from — is a
+  // TODAY's-rupee figure that the kernel then grows at the household basket. Netting a level
+  // nominal stream against a growing one and then growing the REMAINDER at the basket lets the
+  // annuity keep its full purchasing power for the whole horizon, when in reality it decays at
+  // CPI. The effect is to slightly UNDERSTATE the gap the corpus must fund, i.e. slightly
+  // optimistic, bounded by how large the annuity is relative to expenses (zero for any household
+  // below the ₹5 L NPS threshold, which is most of them, and a few percent otherwise).
+  //
+  // The conservative alternative, named so the next reader does not have to re-derive it: credit
+  // the annuity as a DECAYING real stream — `npsAnnuityIncome / (1 + CPI)^t` — inside the target
+  // schedule rather than as a one-off subtraction from today's expenses. Not done here because it
+  // turns `netAnnualExpenses` from a scalar into a schedule, which touches the variants, the
+  // family layer and the bridge's "annuity-once" contract; it belongs in its own change with its
+  // own per-persona numbers, not as a rider.
   const npsAnnuityIncome = postTaxAnnuityIncome(npsSplit.annuityIncomeAnnual, householdMarginalRate);
   const npsAnnuityCorpus = npsSplit.annuityCorpus;
   const netAnnualExpenses = Math.max(0, annualExpensesToday - npsAnnuityIncome);
@@ -724,11 +760,10 @@ export function derive(
   // ~0.4 years AHEAD of the headline it exists to bracket. The factor is the mean of those twelve
   // monthly discounts — exact for the year's contribution TOTAL, and independent of `y`, so it is
   // one scalar.
-  const CPI_WITHIN_YEAR_REINDEX = (() => {
-    let sum = 0;
-    for (let k = 1; k <= 12; k++) sum += Math.pow(1 + generalInflation, -k / 12);
-    return sum / 12;
-  })();
+  // ADR-0006 Phase 1d: hoisted to an exported function so a spec fixture can COMPUTE it instead
+  // of hard-coding a rounded copy — the first hard-coded copy (0.96766) was simply wrong, and a
+  // wrong constant in a test is a lock on the wrong behaviour. At 6% CPI it is 0.969067.
+  const CPI_WITHIN_YEAR_REINDEX = cpiWithinYearReindexFactor(generalInflation);
   const bandContributionSchedule: ContributionSchedule =
     typeof householdContributionSchedule === "number" && householdContributionSchedule <= 0
       ? householdContributionSchedule

@@ -64,8 +64,31 @@ describe("headline plausibility — DEFAULT product lens (#22 foolproof gate)", 
 
       // (1) FIRE must be REACHABLE within a human lifetime — and not absurdly late.
       // The #22 bug produced age 81 (household target ÷ one earner). 70 is the ceiling.
+      //
+      // ADR-0006 Phase 1d (F6) — UNITS. `fireAge` above is the RAW fractional age
+      // (`anchorAge + yearsToRegular`, e.g. 68.92). What a user actually reads is
+      // `householdFireAge`, the CEILED figure (`anchorAge + ceil(yearsToRegular)`, e.g. 69). The
+      // raw measurement is kept because it is the sharper signal, but the bound is now asserted on
+      // BOTH — a raw 69.6 passes a raw-only `<= 70` while the screen prints 70, and the whole point
+      // of this gate is what reaches a user.
+      //
+      // PER-PERSONA EXPECTATION, named so a future reader does not "fix" it by moving the bound:
+      // sharmas 56, mehtas 51, iyers 58, mauryas 68–69 DISPLAYED. The Mauryas are the tight one —
+      // single income, age 44, a ~₹11.9 Cr target, an 8.7% portfolio and a 3.25% SWR over a
+      // 48-year drawdown. If they ever cross 70, the answer is the ADR item-4 "unreachable at
+      // these assumptions" state on the hero, NOT a re-baseline of this bound.
       expect(Number.isFinite(k.yearsToRegular), `${ctx} — yearsToRegular finite`).toBe(true);
-      expect(fireAge, `${ctx} — FIRE age must be ≤ 70 (caught the #22 age-81 bug)`).toBeLessThanOrEqual(70);
+      expect(fireAge, `${ctx} — RAW FIRE age must be ≤ 70 (caught the #22 age-81 bug)`).toBeLessThanOrEqual(70);
+      expect(
+        k.householdFireAge,
+        `${ctx} — DISPLAYED FIRE age (anchor + ceil(years)) must exist for a reachable plan`,
+      ).not.toBeNull();
+      expect(
+        k.householdFireAge!,
+        `${ctx} — DISPLAYED FIRE age ${k.householdFireAge} must be ≤ 70 — this is the number on screen`,
+      ).toBeLessThanOrEqual(70);
+      // The two must be the same statement, not two independent locks that could drift apart.
+      expect(k.householdFireAge!, `${ctx} — displayed == ceil(raw)`).toBe(Math.ceil(fireAge));
       // …and not earlier than the retirement TARGET (that would be optimistic nonsense).
       expect(fireAge, `${ctx} — FIRE age not absurdly early`).toBeGreaterThanOrEqual(
         Math.min(k.targetRetirementAge, k.anchorAge + 1),

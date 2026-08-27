@@ -32,17 +32,26 @@ never credited back). A goal falling beyond the horizon inflates throughout.
 
 ### The expectation was hit exactly
 
-| Persona | Expected (probe column) | Measured | delta |
-|---|---|---|---|
-| Sharmas | 55.42 | **55.42** | 0.00 |
-| Mehtas | 51.00 | **51.00** | 0.00 |
-| Iyers | 57.83 | **57.83** | 0.00 |
-| Mauryas | 68.92 | **68.92** | 0.00 |
+> **UNITS (corrected in Phase 1d).** Two different figures were being compared in this report's
+> first version: the RAW fractional age `anchorAge + yearsToRegular` (55.42) against the CEILED age
+> a user actually reads, `householdFireAge = anchorAge + ceil(yearsToRegular)` (56). Both are given
+> below. Nothing measured changed — only the prose, which had been comparing a raw post-value
+> against a displayed pre-value and so overstated the movement.
 
-Guards: every persona <= 70 (Mauryas has **1.08 y** of margin) and <= `planToAge`. Every persona is
-**LATER than the pre-ADR headline** — the one apparent exception is the Sharmas (56 -> 55.42), and
-that is the step-up leg: the frame leg alone puts them at 73, locked separately as assertion 4 of
-`inflation-frame-invariant.spec.ts`. No bound was widened to accommodate anything.
+| Persona | Expected raw (probe column) | Measured raw | delta | **Displayed age pre -> post** |
+|---|---|---|---|---|
+| Sharmas | 55.42 | **55.42** | 0.00 | **56 -> 56** |
+| Mehtas | 51.00 | **51.00** | 0.00 | **51 -> 51** |
+| Iyers | 57.83 | **57.83** | 0.00 | **57 -> 58** |
+| Mauryas | 68.92 | **68.92** | 0.00 | **68 -> 69** |
+
+So the DISPLAYED headline moves for two of the four personas (Iyers +1, Mauryas +1) and holds for
+the other two; the raw years move for all four. Guards: every persona <= 70 on BOTH the raw age and
+the displayed age (Mauryas 68.92 raw / 69 displayed, **1.08 y** of raw margin) and <= `planToAge`.
+Every persona is **LATER than the pre-ADR headline** on the raw measure — the one apparent
+exception is the Sharmas (raw 25.67 -> 25.42 years), and that is the step-up leg: the frame leg
+alone puts them at 73, locked separately as assertion 4 of `inflation-frame-invariant.spec.ts`. No
+bound was widened to accommodate anything.
 
 ---
 
@@ -52,24 +61,29 @@ Default product lens, stored target age. `needReal` / `needNominal` / `requiredM
 `requiredMonthlyContributionFor` at the stored target age; MC p50 from the production
 `useFireDerive().monteCarlo`.
 
+> Ages in the `fireAge` rows are RAW fractional (`anchorAge + yearsToRegular`); the DISPLAYED age a
+> user reads is `ceil` of it, and is given pre -> post in the metric cell. The pre-ADR-0006 raw
+> figures are reconstructed from the pre-ADR `yearsToRegular` (25.667 / 5.333 / 18.917 / 23.500,
+> ADR §4 method note), not from the displayed integers the ADR table quotes.
+
 | Persona | metric | pre-ADR-0006 | Phase 1 | **Phase 1c** | why |
 |---|---|---|---|---|---|
-| **Sharmas** (30 -> 47) | fireAge | 56 | 54.42 | **55.42** | +1.00 y: the reservation leg at 9% instead of 6.24% over 25 y. Their dated goals are small, so (b)'s cap barely offsets it. |
+| **Sharmas** (30 -> 47) | fireAge (raw; displayed 56 -> **56**) | 55.67 | 54.42 | **55.42** | +1.00 y: the reservation leg at 9% instead of 6.24% over 25 y. Their dated goals are small, so (b)'s cap barely offsets it. |
 | | needReal | Rs 10.60 Cr | Rs 11.01 Cr | **Rs 12.17 Cr** | +10.5% on Phase 1 — same cause, compounded over T = 17. |
 | | needNominal | Rs 28.54 Cr | Rs 29.66 Cr | **Rs 32.76 Cr** | the same figure in target-year rupees. |
 | | requiredMonthlyReal | Inf | Inf | **Inf** | honestly unreachable at 47; the hero says "move the age". |
 | | MC p50 | — | 25.83 | **26.83** | tracks the +1 y headline; gap to deterministic 1.42 y. |
-| **Mehtas** (45 -> 47) | fireAge | 51 | 50.58 | **51.00** | +0.42 y: same cause, but a 6-year horizon gives it little room. |
+| **Mehtas** (45 -> 47) | fireAge (raw; displayed 51 -> **51**) | 50.33 | 50.58 | **51.00** | +0.42 y: same cause, but a 6-year horizon gives it little room. |
 | | needReal | Rs 10.23 Cr | Rs 10.28 Cr | **Rs 10.35 Cr** | +0.7% — T = 2, so almost nothing compounds. |
 | | needNominal | Rs 11.50 Cr | Rs 11.55 Cr | **Rs 11.63 Cr** | |
 | | requiredMonthlyReal | Inf | Inf | **Inf** | |
 | | MC p50 | — | 6.00 | **6.17** | gap to deterministic 0.17 y. |
-| **Iyers** (38 -> 55) | fireAge | 57 | 56.83 | **57.83** | +1.00 y: reservation leg over a 20-year horizon; small family layer. |
+| **Iyers** (38 -> 55) | fireAge (raw; displayed 57 -> **58**) | 56.92 | 56.83 | **57.83** | +1.00 y: reservation leg over a 20-year horizon; small family layer. |
 | | needReal | Rs 8.03 Cr | Rs 8.35 Cr | **Rs 8.74 Cr** | +4.7% on Phase 1. |
 | | needNominal | Rs 21.63 Cr | Rs 22.48 Cr | **Rs 23.54 Cr** | |
 | | requiredMonthlyReal | Rs 1,48,264 | Rs 1,46,273 | **Rs 1,58,421** | +8.3%, **upward** = conservative. Re-recorded in the live-defaults lock with this reason; the +/-8% allowance was NOT widened. |
 | | MC p50 | — | 20.58 | **21.58** | gap to deterministic 1.75 y. |
-| **Mauryas** (44 -> 50) | fireAge | 68 | 68.33 | **68.92** | +0.59 y only. The reservation leg alone is worth ~+2 y here; (b)'s goal cap claws most of it back — this persona has the largest education goals of the four. That interaction is exactly why the two halves had to land together. |
+| **Mauryas** (44 -> 50) | fireAge (raw; displayed 68 -> **69**) | 67.50 | 68.33 | **68.92** | +0.59 y only. The reservation leg alone is worth ~+2 y here; (b)'s goal cap claws most of it back — this persona has the largest education goals of the four. That interaction is exactly why the two halves had to land together. |
 | | needReal | Rs 11.33 Cr | Rs 11.49 Cr | **Rs 11.90 Cr** | +3.6% on Phase 1. |
 | | needNominal | Rs 16.07 Cr | Rs 16.29 Cr | **Rs 16.88 Cr** | |
 | | requiredMonthlyReal | Inf | Inf | **Inf** | |
