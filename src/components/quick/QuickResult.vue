@@ -22,6 +22,7 @@ import {
   FULL_PLANNER_ADDS,
   PLAN_HONESTY_LINE,
   QUICK_PORTFOLIO_CAVEAT,
+  overCommitmentWarning,
 } from "@/lib/quick-number-copy";
 import { formatINRCompact } from "@/lib/formatters";
 import type { QuickAnswers } from "@/types/quick-number";
@@ -35,6 +36,19 @@ const a = useAssumptionsStore();
 const ui = useUiStore();
 
 const req = computed(() => fire.requiredContribution.value);
+
+// T-378C F3 — the over-commitment guard was architecturally dead in the forward flow (it only
+// rendered on card 3, before the SIP and EMI were known). By the result screen all three answers
+// are locked in, so this is where the guard can actually fire.
+const overCommitted = computed(() => {
+  const q = props.answers;
+  return overCommitmentWarning(
+    q.spend ?? 0,
+    q.sip ?? 0,
+    q.income ?? 0,
+    q.hasLoan ? (q.emi ?? 0) : 0,
+  );
+});
 
 /**
  * "What you'll have vs what you'll need · today's money" — six sampled retirement ages, each a full
@@ -119,6 +133,17 @@ const answerRows = computed(() => {
 
 <template>
   <div class="quick-result" data-testid="quick-result">
+    <v-alert
+      v-if="overCommitted"
+      type="warning"
+      variant="tonal"
+      density="comfortable"
+      class="mb-4"
+      data-testid="quick-overcommit-warning"
+    >
+      {{ overCommitted }}
+    </v-alert>
+
     <FireHero />
 
     <p class="text-caption text-medium-emphasis mt-3 mb-4" data-testid="quick-honesty-line">

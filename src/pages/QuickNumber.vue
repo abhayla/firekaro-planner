@@ -17,7 +17,12 @@ import { useRouter } from "vue-router";
 import QuickCard from "@/components/quick/QuickCard.vue";
 import LakhInput from "@/components/quick/LakhInput.vue";
 import QuickResult from "@/components/quick/QuickResult.vue";
-import { QUICK_CARDS, sanityLine, SO_FAR_PLACEHOLDER } from "@/lib/quick-number-copy";
+import {
+  QUICK_CARDS,
+  sanityLine,
+  overCommitmentWarning,
+  SO_FAR_PLACEHOLDER,
+} from "@/lib/quick-number-copy";
 import { applyQuickAnswers, quickAnswersFromHousehold } from "@/lib/quick-number";
 import { emptyQuickAnswers, type QuickAnswersDraft } from "@/types/quick-number";
 import { useHouseholdStore } from "@/stores/household";
@@ -71,6 +76,19 @@ const DIRECT_CHIPS: readonly [boolean | null, string][] = [
 
 const sanity = computed(() =>
   sanityLine(
+    answers.value.spend ?? 0,
+    answers.value.sip ?? 0,
+    answers.value.income ?? 0,
+    answers.value.hasLoan ? (answers.value.emi ?? 0) : 0,
+  ),
+);
+
+/**
+ * T-378C F3 — by the LAST card the SIP (card 5) and EMI (card 10) are both known, unlike card 3
+ * where `sanity` above is blind to both. This is the guard that can actually fire.
+ */
+const overCommitted = computed(() =>
+  overCommitmentWarning(
     answers.value.spend ?? 0,
     answers.value.sip ?? 0,
     answers.value.income ?? 0,
@@ -426,6 +444,16 @@ function editAnswers() {
                   </v-col>
                 </v-row>
               </template>
+              <v-alert
+                v-if="overCommitted"
+                type="warning"
+                variant="tonal"
+                density="compact"
+                class="mt-4"
+                data-testid="quick-overcommit-warning"
+              >
+                {{ overCommitted }}
+              </v-alert>
             </div>
           </QuickCard>
 

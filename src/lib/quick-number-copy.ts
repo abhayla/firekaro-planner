@@ -140,6 +140,32 @@ export function sanityLine(
   )} of your ${formatINRCompact(incomeMonthly)} take-home (${share}%).${leakNote}`;
 }
 
+/**
+ * T-378C finding F3 — `sanityLine()` only renders inside card 3, which comes BEFORE the SIP
+ * (card 5) and the EMI (card 10) are known, so it can never actually catch the over-commitment it
+ * exists to catch. By the LAST card (or the result screen) all three are known; this is the guard
+ * that fires there. Distinct from `sanityLine()`'s always-on strip so the result screen doesn't
+ * repeat the routine "X% of take-home" note — it only speaks up when the answers cannot all be true.
+ */
+export function overCommitmentWarning(
+  spendMonthly: number,
+  sipMonthly: number,
+  incomeMonthly: number,
+  emiMonthly: number,
+): string {
+  if (!incomeMonthly || incomeMonthly <= 0) return "";
+  const unaccounted = incomeMonthly - spendMonthly - sipMonthly - emiMonthly;
+  if (unaccounted >= 0) return "";
+  return (
+    `Your spending (${formatINRCompact(spendMonthly)}), investing (${formatINRCompact(
+      sipMonthly,
+    )})${emiMonthly > 0 ? ` and EMI (${formatINRCompact(emiMonthly)})` : ""} add up to ` +
+    `${formatINRCompact(spendMonthly + sipMonthly + emiMonthly)} — more than your ` +
+    `${formatINRCompact(incomeMonthly)} take-home. These three answers can't all be true; worth a ` +
+    `re-check before you trust the number below.`
+  );
+}
+
 /** The "So far…" strip that appears once there is enough to say something honest. */
 export const SO_FAR_PLACEHOLDER = "Answer a few more and your number appears here.";
 

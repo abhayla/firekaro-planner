@@ -9,6 +9,7 @@ import {
   PLAN_HONESTY_LINE,
   QUICK_PORTFOLIO_CAVEAT,
   sanityLine,
+  overCommitmentWarning,
   type ExplainerInput,
 } from "./quick-number-copy";
 import { formatINRCompact } from "@/lib/formatters";
@@ -192,6 +193,23 @@ describe("quick-number copy — QN-4 explainers", () => {
     expect(ok).toContain("₹45.0K");
     expect(ok).toContain("count it as spending");
     expect(sanityLine(1_80_000, 1_75_000, 0, 1_00_000)).toBe("");
+  });
+
+  // T-378C finding F3: the over-commitment guard was architecturally dead — it only rendered on
+  // card 3, before the SIP (card 5) and EMI (card 10) were known. This is the guard that fires
+  // once all three are known (last card / result screen).
+  it("overCommitmentWarning fires only when spend+sip+emi exceeds take-home", () => {
+    // AMIT-shaped answers: 1.8L spend + 1.75L sip + 1L emi = 4.55L against 5L take-home — fine.
+    expect(overCommitmentWarning(1_80_000, 1_75_000, 5_00_000, 1_00_000)).toBe("");
+    // Bump spend past the take-home: 2.8L spend + 1.75L sip + 1L emi = 5.55L against 5L — impossible.
+    const warning = overCommitmentWarning(2_80_000, 1_75_000, 5_00_000, 1_00_000);
+    expect(warning).not.toBe("");
+    expect(warning).toContain("can't all be true");
+    expect(warning).toContain(formatINRCompact(5_55_000));
+  });
+
+  it("overCommitmentWarning is silent with no income given (nothing to check against)", () => {
+    expect(overCommitmentWarning(2_80_000, 1_75_000, 0, 1_00_000)).toBe("");
   });
 
   it("keeps the honesty framing and the full-planner list", () => {
