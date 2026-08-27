@@ -27,8 +27,6 @@ import { toMonthly } from "@/lib/cashflow";
 export const REQUIRED_CONTRIBUTION_TOLERANCE = 100;
 /** Hard iteration cap — bisection over the bracket converges long before this. */
 export const REQUIRED_CONTRIBUTION_MAX_ITERATIONS = 60;
-/** Absolute floor for the search ceiling (contract section 3). */
-export const REQUIRED_CONTRIBUTION_MIN_CEILING = 500_000;
 
 export interface RequiredContributionInput {
   snapshot: Household;
