@@ -40,12 +40,14 @@ describe("FireHero binding locks — T-377 QN-2 gap hero", () => {
     // NOT today's FIRE number. The note must say so, name the basket, and show it LIVE.
     expect(template).toContain('data-testid="fire-hero-frame-note"');
     expect(template).toMatch(/today's rupees, at age \{\{ targetAge \}\}/);
-    expect(template, "the basket rate must be read live from the kernel, never hard-coded").toMatch(
-      /fire\.householdInflation\.value \* 100/,
-    );
-    expect(template, "and the general-CPI deflator named as the different rate it is").toMatch(
-      /a\.values\.inflation \* 100/,
-    );
+    expect(template, "both rates render through the guarded computeds").toMatch(/\{\{ basketPct \}\}/);
+    expect(template).toMatch(/\{\{ generalPct \}\}/);
+    // ...which must read the kernel live — a hard-coded 6.2% would lie to anyone who edits a bucket.
+    expect(src).toMatch(/fire\.householdInflation\.value/);
+    expect(src).toMatch(/a\.values\.inflation/);
+    // ...and never emit NaN% if an assumption is ever non-finite (rule 31 / defensive-coding).
+    expect(src).toMatch(/const basketPct = computed[\s\S]{0,200}Number\.isFinite/);
+    expect(src).toMatch(/const generalPct = computed[\s\S]{0,200}Number\.isFinite/);
     expect(template).toMatch(/\/preferences#pref-section-inflation/);
   });
 

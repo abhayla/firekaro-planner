@@ -27,6 +27,7 @@ import { resolveHeroTone, resolveGapTone } from "@/lib/dashboard-verdict";
 import { describeFireConfidenceBand } from "@/lib/fire-confidence-band";
 import { MAX_PROJECTION_YEARS } from "@/lib/monte-carlo";
 import { formatINRCompact } from "@/lib/formatters";
+import { DEFAULT_ASSUMPTIONS } from "@/types/assumptions";
 import InfoTip from "@/components/shared/InfoTip.vue";
 import QuickExplainer from "@/components/quick/QuickExplainer.vue";
 
@@ -262,6 +263,20 @@ const sliderMoved = computed(
   () => ui.whatIfTargetAge != null && ui.whatIfTargetAge !== fire.targetRetirementAge.value,
 );
 
+/**
+ * The two rates the frame note names, guarded so a non-finite assumption can never render as "NaN%"
+ * (rule 31 / defensive-coding). Both are read live from the kernel — hard-coding either would let
+ * the copy drift from a user who edited their buckets.
+ */
+const basketPct = computed(() => {
+  const v = fire.householdInflation.value;
+  return (Number.isFinite(v) ? v * 100 : DEFAULT_ASSUMPTIONS.inflation * 100).toFixed(1);
+});
+const generalPct = computed(() => {
+  const v = a.values.inflation;
+  return (Number.isFinite(v) ? v * 100 : DEFAULT_ASSUMPTIONS.inflation * 100).toFixed(0);
+});
+
 const requiredFinite = computed(() => Number.isFinite(req.value.requiredMonthlyReal));
 
 /**
@@ -411,8 +426,8 @@ function yearsLabel(years: number): string {
       <p v-if="req.hasTarget" class="fire-hero__frame-note" data-testid="fire-hero-frame-note">
         today's rupees, at age {{ targetAge }} — the target rises with your
         <RouterLink to="/preferences#pref-section-inflation">spending basket</RouterLink>
-        ({{ (fire.householdInflation.value * 100).toFixed(1) }}%/yr), a little faster than the
-        {{ (a.values.inflation * 100).toFixed(0) }}% general inflation we deflate by.
+        ({{ basketPct }}%/yr), a little faster than the {{ generalPct }}% general inflation we
+        deflate by.
       </p>
 
       <!-- ADR-0006 item 4 — the honest headline-level state when no monthly amount closes the gap.
