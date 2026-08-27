@@ -117,7 +117,9 @@ describe("A2.5b EMPTY/PARTIAL honesty sweep (gh #39 sibling sweep)", () => {
     const coast = calculateCoastFire({
       fireNumber: k.fireNumber,
       yearsToRetirement: k.targetRetirementAge - k.anchorAge,
-      realReturn: realReturnForCoast(a.values.equityReturn, k.householdInflation),
+      // ADR-0006 / gh #180: deflate at GENERAL CPI, never at the household basket — this line
+      // used to reproduce inside a spec the exact two-rate contradiction #180 was filed for.
+      realReturn: realReturnForCoast(a.values.equityReturn, a.values.inflation),
     });
     expect(coast.hasReachedCoast(0), `${ctx} — Coast NOT reached on ₹0 corpus`).toBe(false);
     expect(coast.hasReachedCoast(k.fireWithdrawableCorpus), `${ctx} — Coast NOT reached`).toBe(false);

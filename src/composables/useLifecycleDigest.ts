@@ -8,7 +8,6 @@
  */
 import { computed } from "vue";
 import { useHouseholdStore } from "@/stores/household";
-import { useAssumptionsStore } from "@/stores/assumptions";
 import { useUiStore } from "@/stores/ui";
 import { useFireDerive } from "@/lib/useFireDerive";
 import { evaluateNudges } from "@/lib/nudge-engine";
@@ -24,7 +23,6 @@ import { formatINRCompact } from "@/lib/formatters";
 
 export function useLifecycleDigest() {
   const household = useHouseholdStore();
-  const assumptions = useAssumptionsStore();
   const ui = useUiStore();
   const fire = useFireDerive();
 
@@ -65,7 +63,10 @@ export function useLifecycleDigest() {
       fy: ui.currentFY ?? "2025-26",
       marginalSlabRate: fire.householdMarginalRate.value,
       currentMonth: setupNow.getMonth(),
-      lifestyleInflation: analyzeLifestyleInflation(assumptions.householdInflation()),
+      // ADR-0006: the kernel's ONE spending basket (`derive().householdInflation`), not a second
+      // store-side resolution of the same blend — actual spend growth is compared against the
+      // basket the plan itself assumes.
+      lifestyleInflation: analyzeLifestyleInflation(fire.householdInflation.value),
       goalPostShift: detectGoalPostShift(),
       // Default lens is whole-household (#22), so fire.annualSavings is the household surplus.
       monthlySurplus: Math.round(fire.annualSavings.value / 12),

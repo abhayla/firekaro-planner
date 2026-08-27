@@ -85,7 +85,20 @@ export function calculateCoastFire(input: CoastFireInput): CoastFireResult {
 }
 
 /**
- * Real return for the Coast-FIRE calc = nominal blended return − inflation.
+ * Real return for the Coast-FIRE calc — the ONE real return, defined exactly as the
+ * kernel's `derive().realBlendedReturn`.
+ *
+ * ADR-0006 / gh #180. Two things were wrong here and they compounded:
+ *   1. the deflator was the household EXPENSE BASKET while the hero deflated at GENERAL CPI,
+ *      so the same dashboard carried two different real returns for one household;
+ *   2. the arithmetic form `nominal − inflation` is not the geometric real return the kernel
+ *      uses, so even with the same deflator the two figures would not have matched
+ *      (at 11% / 6% the gap is ~28 bp — enough to move a Coast crossover).
+ * Both are closed: the deflator is GENERAL CPI (never the basket — that re-creates the #20
+ * "FIRE at 115" class), and the form is `(1+r)/(1+π) − 1`, identical to
+ * `derive.ts`'s `toRealReturn`. `FireMilestonesCard` now reads `realBlendedReturn` straight
+ * off the kernel; this helper exists for callers that hold only the raw inputs, and
+ * `FireMilestonesCard.binding.spec.ts` pins the two to 1e-9 on every seed persona.
  *
  * A1 (gh-issue #9 L2): this MUST NOT be clamped to a positive floor. A negative
  * real return is a meaningful state for debt-heavy / high-inflation households —
@@ -96,8 +109,8 @@ export function calculateCoastFire(input: CoastFireInput): CoastFireResult {
  * saving sooner than you actually can" signal. Pass the true real return through
  * so the library's `realReturn <= 0 → fireNumber` guard can fire.
  */
-export function realReturnForCoast(nominalReturn: number, inflation: number): number {
-  return nominalReturn - inflation;
+export function realReturnForCoast(nominalReturn: number, generalInflation: number): number {
+  return (1 + nominalReturn) / (1 + generalInflation) - 1;
 }
 
 /**

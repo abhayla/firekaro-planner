@@ -52,7 +52,10 @@ const nudges = computed(() => {
   // Re-read snapshot-derived analyses when a snapshot is captured (P2 nudges
   // A29.2/A30.2 depend on real history). Pure-engine purity: compute here, pass in.
   void household.snapshotVersion;
-  const lifestyleInflation = analyzeLifestyleInflation(assumptions.householdInflation());
+  // ADR-0006: the household spending BASKET, read from the kernel (`derive().householdInflation`)
+  // so there is ONE basket on screen. Correct input here — the nudge asks whether ACTUAL spend
+  // growth outruns the basket the plan assumes, which is a basket question, not a CPI one.
+  const lifestyleInflation = analyzeLifestyleInflation(fire.householdInflation.value);
   const goalPostShift = detectGoalPostShift();
   // Affordability (over-committed SIPs) is a WHOLE-household property — compute the
   // surplus from the unlensed household so it matches the whole-household SIP total

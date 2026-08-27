@@ -90,18 +90,35 @@ describe("calculateCoastFire", () => {
 });
 
 describe("realReturnForCoast (A1 — no positive clamp, gh-issue #9 L2)", () => {
-  it("returns the true (positive) real return", () => {
-    expect(realReturnForCoast(0.11, 0.079)).toBeCloseTo(0.031, 10);
+  // ADR-0006 / gh #180 re-baseline: the helper was `nominal − inflation` (arithmetic). It is now
+  // the GEOMETRIC `(1+r)/(1+π) − 1` — byte-identical to the kernel's `toRealReturn` in derive.ts —
+  // so a display surface can never carry a different real return from the headline. The two
+  // expectations below moved by exactly that difference (3.10% → 2.873%, −5.00% → −4.464%);
+  // nothing about the no-clamp contract these cases exist for changed.
+  it("returns the true (positive) real return, in the kernel's geometric form", () => {
+    expect(realReturnForCoast(0.11, 0.079)).toBeCloseTo(0.0287303058, 10);
+  });
+
+  it("IS the kernel's real-return formula — not an approximation of it (gh #180)", () => {
+    // The identity that makes "one real return on screen" structural rather than a convention.
+    for (const [r, pi] of [
+      [0.11, 0.06],
+      [0.09673, 0.06],
+      [0.07694, 0.06],
+      [0.04, 0.075],
+    ] as const) {
+      expect(realReturnForCoast(r, pi)).toBeCloseTo((1 + r) / (1 + pi) - 1, 12);
+    }
   });
 
   it("returns a NEGATIVE real return when inflation exceeds nominal — NOT clamped", () => {
-    // Debt-heavy / high-inflation household: blended return 7%, healthcare-weighted
-    // inflation 12% → real return is genuinely negative.
-    expect(realReturnForCoast(0.07, 0.12)).toBeCloseTo(-0.05, 10);
+    // Debt-heavy / high-inflation household: blended return 7%, general inflation 12%
+    // → real return is genuinely negative.
+    expect(realReturnForCoast(0.07, 0.12)).toBeCloseTo(-0.0446428571, 10);
   });
 
   it("a negative real return flows through to coast == fireNumber (no understatement)", () => {
-    const real = realReturnForCoast(0.07, 0.12); // -0.05
+    const real = realReturnForCoast(0.07, 0.12); // ≈ −0.0446
     const r = calculateCoastFire({ fireNumber: 5_000_000, yearsToRetirement: 20, realReturn: real });
     expect(r.coastCorpus).toBe(5_000_000);
   });

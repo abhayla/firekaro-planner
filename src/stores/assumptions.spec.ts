@@ -1,6 +1,12 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { setActivePinia, createPinia } from "pinia";
 import { useAssumptionsStore } from "@/stores/assumptions";
+import { useHouseholdStore } from "@/stores/household";
+import { loadSeedPersona } from "@/lib/seed-persona";
+import { loadMehtasSeed } from "@/seeds/mehtas";
+import { loadIyersSeed } from "@/seeds/iyers";
+import { loadMauryasSeed } from "@/seeds/mauryas";
+import { derive } from "@/lib/derive";
 
 describe("assumptions store — householdInflation (A3.2 editable weights)", () => {
   beforeEach(() => setActivePinia(createPinia()));
@@ -46,4 +52,41 @@ describe("assumptions store — householdInflation (A3.2 editable weights)", () 
     a.set("inflationWeights", { general: 37, healthcare: 4, education: 0, housing: 9 });
     expect(a.householdInflation()).toBeCloseTo(0.0624, 6);
   });
+});
+
+/**
+ * ADR-0006 — ONE basket. `assumptions.householdInflation()` (what the expense chart, the
+ * lifestyle-inflation nudge and the Preferences readout show) and `derive().householdInflation`
+ * (what the FIRE target actually grows at) resolve the same blend from the same store. Nothing
+ * enforced that until now, so a change to either resolver could have put a different rate on the
+ * screen from the one in the plan — the #180 class, one layer down.
+ */
+describe("householdInflation is the SAME basket the kernel plans with (ADR-0006)", () => {
+  const DEFAULT_PRODUCT_LENS = { isFamilyView: false, viewingMemberId: null, currentFY: "2025-26" } as const;
+  type Store = ReturnType<typeof useHouseholdStore>;
+  type ASt = ReturnType<typeof useAssumptionsStore>;
+  const PERSONAS: Array<{ name: string; load: (h: Store, a: ASt) => void }> = [
+    { name: "sharmas", load: (h, a) => loadSeedPersona(h, a) },
+    { name: "mehtas", load: (h, a) => loadMehtasSeed(h, a) },
+    { name: "iyers", load: (h, a) => loadIyersSeed(h, a) },
+    { name: "mauryas", load: (h, a) => loadMauryasSeed(h, a) },
+  ];
+
+  beforeEach(() => setActivePinia(createPinia()));
+
+  for (const p of PERSONAS) {
+    it(`${p.name}: store basket === derive().householdInflation`, () => {
+      const h = useHouseholdStore();
+      const a = useAssumptionsStore();
+      p.load(h, a);
+      const k = derive(h.data, a.values, DEFAULT_PRODUCT_LENS);
+      expect(a.householdInflation()).toBeCloseTo(k.householdInflation, 12);
+      // ...and it is strictly ABOVE general CPI, which is what makes the target drift real.
+      expect(k.householdInflation).toBeGreaterThan(a.values.inflation);
+      expect(k.realTargetDriftRate).toBeCloseTo(
+        (1 + k.householdInflation) / (1 + a.values.inflation) - 1,
+        12,
+      );
+    });
+  }
 });

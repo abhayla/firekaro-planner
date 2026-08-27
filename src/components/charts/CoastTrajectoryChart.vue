@@ -4,7 +4,11 @@
  * compounding at the real return with NO further contributions against the flat
  * FIRE-number line. Where the curve crosses the line is the Coast crossover —
  * reaching it on/before retirement means the user can stop saving and still hit
- * FIRE. Both series are in today's rupees (real return).
+ * FIRE. Both series are in today's rupees: the corpus compounds at the kernel's ONE real return
+ * (`derive().realBlendedReturn` — the nominal blended return deflated at GENERAL CPI, the exact
+ * figure the FireHero headline is solved with), and the flat FIRE-number line is today's target.
+ * ADR-0006 / gh #180: this used to be deflated at the household spending BASKET while the hero
+ * deflated at CPI — two real returns on one dashboard. There is now only one.
  */
 import { computed } from "vue";
 import { Line } from "vue-chartjs";
