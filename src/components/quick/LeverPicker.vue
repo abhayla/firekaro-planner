@@ -173,6 +173,13 @@ const committable = computed(() =>
   selected.value.filter((k) => k === "step-up-10" || k === "delay-3" || k === "direct-plans"),
 );
 
+/**
+ * Only offer to commit a plan that actually WORKS. When even every move leaves the target out of
+ * reach the summary says "move the retirement age" — putting a "Make this my plan" button under
+ * that sentence invites the user to persist a plan the same card just told them is impossible.
+ */
+const canCommit = computed(() => committable.value.length > 0 && planReachable.value);
+
 function makeThisMyPlan() {
   if (!committable.value.length) return;
   if (committable.value.includes("step-up-10")) {
@@ -312,7 +319,7 @@ function openPreferences() {
 
     <p class="lever-picker__honesty" data-testid="lever-honesty-line">{{ PLAN_HONESTY_LINE }}</p>
 
-    <div v-if="props.showCommit && committable.length" class="lever-picker__commit">
+    <div v-if="props.showCommit && canCommit" class="lever-picker__commit">
       <v-btn
         color="primary"
         variant="flat"

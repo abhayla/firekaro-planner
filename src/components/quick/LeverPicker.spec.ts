@@ -60,6 +60,14 @@ describe("LeverPicker — the Option-C card surface", () => {
     expect(src).toContain("Make this my plan");
   });
 
+  it("does NOT offer to commit a plan that cannot reach the target", () => {
+    // Putting a commit button under "move the retirement age" invites the user to persist a plan
+    // the same card just called impossible.
+    expect(src).toContain("const canCommit = computed(");
+    expect(src).toMatch(/canCommit[\s\S]{0,160}planReachable\.value/);
+    expect(src).toContain('v-if="props.showCommit && canCommit"');
+  });
+
   it("reports a RESCUE as a rescue, never as '−₹0/mo less to find' (the Amit case)", () => {
     // On the reference persona the baseline is unreachable, so the rupee delta cannot exist.
     // Flattening that to "0 less to find" would hide the best news the card has.
