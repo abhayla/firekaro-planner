@@ -106,7 +106,7 @@ the **Monte Carlo p50**, in the conservative direction on all four personas (+0.
 | Gate | Result |
 |---|---|
 | `npm run type-check` (root) | clean |
-| `npx vitest run` (root) | **98 files / 1461 tests passed, 0 failed** (1448 -> 1461; +13 net new) |
+| `npx vitest run` (root) | **98 files / 1460 tests passed, 0 failed** (1443 at branch HEAD -> 1460; +17 net new) |
 | `cd server && npm run type-check` | clean |
 | `cd server && npm run lint` | clean |
 | `cd server && npm run test:unit` | **21 files / 179 passed, 1 skipped** (the `DATABASE_URL`-gated live integration spec) |
