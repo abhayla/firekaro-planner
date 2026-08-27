@@ -32,7 +32,8 @@ import type {
   PlannedFutureLine,
   RecurringExpenseLine,
 } from "@/types/household";
-import type { QuickAnswers } from "@/types/quick-number";
+import type { QuickAnswers, QuickAnswersDraft } from "@/types/quick-number";
+import { emptyQuickAnswers } from "@/types/quick-number";
 import { derive } from "@/lib/derive";
 
 /** Every row the quick path owns carries this id prefix — that is what makes a re-run idempotent. */
@@ -44,7 +45,7 @@ export const POSTGRAD_AT_AGE = 22;
 export const WEDDING_AT_AGE = 30;
 /** Bisection budget for the salary solve — the residual is monotone in CTC. */
 const SALARY_SOLVE_ITERATIONS = 44;
-const SALARY_SOLVE_TOLERANCE = 500; // rupees/month
+const SALARY_SOLVE_TOLERANCE = 500; // rupees of ANNUAL CTC — this brackets `hi - lo`, not a monthly figure
 
 export interface ApplyQuickAnswersOptions {
   /** Needed because the salary solve runs the real kernel. Defaults to the research defaults. */
@@ -69,10 +70,25 @@ export interface ApplyQuickAnswersResult {
   salaryAnnualCTC: number;
   /** What `derive()` actually reports as the monthly contribution for the returned household. */
   solvedContributionMonthly: number;
+  /**
+   * Take-home minus (spend + EMI + investing), Rs/month. Positive = spending the user did not
+   * itemise, recorded as a visible expense line. Negative = the three answers cannot all be true.
+   */
+  unaccountedMonthly: number;
 }
 
 const n = (v: number | undefined | null): number =>
   typeof v === "number" && Number.isFinite(v) && v > 0 ? v : 0;
+
+/**
+ * Ages are the one input `n()` cannot guard: a cleared field yields 0, and an anchor age of 0 hands
+ * the kernel a 50-year runway for a 42-year-old. Clamp to the same bounds `quickAnswersSchema`
+ * declares, so an empty or absurd field degrades to a sane default instead of a fantasy plan.
+ */
+function clampAge(value: number | undefined, lo: number, hi: number, fallback: number): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) return fallback;
+  return Math.min(hi, Math.max(lo, Math.round(value)));
+}
 
 /** Jan-1 birthday keeps the derived age exact for every day of the year. */
 function birthDateFor(age: number, now: Date): string {
@@ -105,7 +121,9 @@ function autoLoanRecurringLine(loan: Liability): RecurringExpenseLine {
     source: "auto-loan",
     sourceRefId: loan.id,
     endYear: loan.derivedEndYear ?? undefined,
-    ownerId: "Household",
+    // Mirrors the store's `autoFlowOwnerId(l.ownerId)` — writing "Household" here made this line
+    // disagree with the one the store rebuilds a moment later (code-review LOW).
+    ownerId: loan.ownerId,
   };
 }
 
@@ -138,7 +156,7 @@ function solveSalary(
   assumptions: Assumptions,
   target: number,
   read: (k: ReturnType<typeof deriveOnce>) => number,
-): { ctc: number; value: number } {
+): { ctc: number; value: number; reachable: boolean } {
   const withCtc = (ctc: number) => {
     const hh = clone(base);
     const member = hh.members.find((m) => m.id === memberId);
@@ -155,7 +173,8 @@ function solveSalary(
   let lo = 0;
   let hi = Math.max(target * 12 * 2, 1_000_000);
   for (let expand = 0; expand < 10 && at(hi) < target; expand += 1) hi *= 2;
-  if (at(hi) < target) return { ctc: Math.round(hi), value: at(hi) }; // unreachable: report honestly
+  // Unreachable: report it instead of persisting a fabricated Rs100 Cr salary as the user's income.
+  if (at(hi) < target) return { ctc: 0, value: at(hi), reachable: false };
 
   for (let i = 0; i < SALARY_SOLVE_ITERATIONS && hi - lo > SALARY_SOLVE_TOLERANCE; i += 1) {
     const mid = (lo + hi) / 2;
@@ -163,7 +182,7 @@ function solveSalary(
     else lo = mid;
   }
   const ctc = Math.floor(hi / 1000) * 1000;
-  return { ctc, value: at(ctc) };
+  return { ctc, value: at(ctc), reachable: true };
 }
 
 function deriveOnce(hh: Household, assumptions: Assumptions) {
@@ -192,14 +211,18 @@ export function applyQuickAnswers(
   const previous = new Set(options.previousCreatedIds ?? []);
 
   const hh = clone(household);
+  const age = clampAge(answers.age, 18, 80, 35);
+  const targetAge = Math.max(age + 1, clampAge(answers.targetAge, 40, 75, 50));
 
   // ---- 1. clear out whatever a previous quick run owned (never duplicate) ----
   const isOurs = (id: string) => id.startsWith(QUICK_ID_PREFIX) || previous.has(id);
   const removedMemberIds = new Set(hh.members.filter((m) => isOurs(m.id)).map((m) => m.id));
   hh.members = hh.members.filter((m) => !isOurs(m.id));
-  hh.investments = hh.investments.filter(
-    (i) => !isOurs(i.id) && i.quickSource !== true && !removedMemberIds.has(i.ownerId),
-  );
+  // Only the rows THIS module created are reclaimed. An earlier version also dropped anything
+  // owned by a removed member — but `quick-self` is re-created with the same id below, so that
+  // clause silently deleted every investment the user had since added by hand in the full planner
+  // (code-review H3). The id-prefix + `quickSource` clauses already cover everything we own.
+  hh.investments = hh.investments.filter((i) => !isOurs(i.id) && i.quickSource !== true);
   const removedLoanIds = new Set(hh.liabilities.filter((l) => isOurs(l.id)).map((l) => l.id));
   hh.liabilities = hh.liabilities.filter((l) => !isOurs(l.id));
   hh.expenses.plannedFuture = hh.expenses.plannedFuture.filter((p) => !isOurs(p.id));
@@ -218,9 +241,9 @@ export function applyQuickAnswers(
   const self: Member = {
     id: selfId,
     name: "You",
-    dateOfBirth: birthDateFor(answers.age, now),
+    dateOfBirth: birthDateFor(age, now),
     role: "ADULT",
-    targetRetirementAge: answers.targetAge,
+    targetRetirementAge: targetAge,
     city: "Metro",
     health: "Healthy",
     riskAppetite: "Moderate",
@@ -235,9 +258,9 @@ export function applyQuickAnswers(
     spouse = {
       id: `${QUICK_ID_PREFIX}spouse`,
       name: "Spouse",
-      dateOfBirth: birthDateFor(answers.age, now),
+      dateOfBirth: birthDateFor(age, now),
       role: "ADULT",
-      targetRetirementAge: answers.targetAge,
+      targetRetirementAge: targetAge,
       city: "Metro",
       health: "Healthy",
       riskAppetite: "Moderate",
@@ -307,7 +330,7 @@ export function applyQuickAnswers(
       // the full planner rather than invented with a false precision.
       outstandingBalance: Math.round(emi * 12 * yearsLeft),
       monthlyEMI: emi,
-      // The schema stores the rate as a PERCENT; the card collects it as one too.
+      // `answers.loanRate` is a FRACTION (0.072); the Liability schema stores a PERCENT (7.2).
       interestRate: Math.round(n(answers.loanRate) * 1000) / 10,
       ownerId: self.id,
       isSharedWithSpouse: Boolean(spouse),
@@ -387,7 +410,32 @@ export function applyQuickAnswers(
     );
   }
 
-  // ---- 6. the salary solve (see the module header for why this exists) ----
+  // ---- 6. reconcile the answers: the unaccounted rupee was SPENT, not vanished ----
+  // Three of the four cashflow figures are stated (take-home, spend, EMI, investing) and they
+  // over-determine each other. Anchoring the pace on `sip` alone is the conservative half of the
+  // reconciliation; without this second half it would ALSO assume the leftover is neither invested
+  // NOR spent — deleting real spending from the one figure the FIRE number multiplies by ~30x
+  // (1/SWR). For the reference household that is Rs45k/month of invisible spending, about Rs2 Cr
+  // understated. So the residual becomes a VISIBLE expense line the user can see and edit.
+  // (A negative leak means the three answers cannot all be true; card 3's sanity line flags that
+  // at entry time and we keep what they told us rather than quietly shrinking a number.)
+  const emiMonthly = answers.hasLoan ? n(answers.emi) : 0;
+  const leakMonthly = Math.round(n(answers.income) - n(answers.spend) - emiMonthly - sip);
+  if (leakMonthly > 0) {
+    const unaccounted: RecurringExpenseLine = {
+      id: `${QUICK_ID_PREFIX}unaccounted`,
+      label: "Unaccounted spending (from your take-home)",
+      amount: leakMonthly,
+      frequency: "M",
+      source: "manual",
+      kind: "general",
+      inflationBucket: "general",
+      ownerId: "Household",
+    };
+    hh.expenses.recurring.push(track(unaccounted));
+  }
+
+  // ---- 7. the salary solve (see the module header for why this exists) ----
   let salaryAnnualCTC = 0;
   let solvedContributionMonthly = 0;
   const wantsSalarySolve = options.solveSalary !== false;
@@ -395,7 +443,13 @@ export function applyQuickAnswers(
     hh.profileComplete = true;
     hh.wizardCompleted = true;
     if (!hh.name) hh.name = "My household";
-    return { household: hh, createdIds, salaryAnnualCTC: 0, solvedContributionMonthly: 0 };
+    return {
+      household: hh,
+      createdIds,
+      unaccountedMonthly: leakMonthly,
+      salaryAnnualCTC: 0,
+      solvedContributionMonthly: 0,
+    };
   }
   if (sip > 0) {
     const solved = solveSalary(hh, self.id, assumptions, sip, (k) => k.monthlyContribution);
@@ -435,8 +489,75 @@ export function applyQuickAnswers(
   return {
     household: hh,
     createdIds,
+    unaccountedMonthly: leakMonthly,
     salaryAnnualCTC,
     solvedContributionMonthly:
       solvedContributionMonthly || deriveOnce(hh, assumptions).monthlyContribution,
+  };
+}
+
+/**
+ * Rebuild the ten answers from the rows a previous `/quick` run wrote.
+ *
+ * Without this, re-opening `/quick` (a bookmark, a reload of the result screen, "edit answers"
+ * after a refresh) starts from blanks — and ten clicks of Next would then overwrite a real plan
+ * with zeros (code-review H2). Everything the express path creates carries a stable `quick-` id,
+ * so the answers are recoverable from the household itself; nothing has to be stored twice.
+ *
+ * Returns null when this household was not set up through the express path — the caller then
+ * starts from `emptyQuickAnswers()` and touches nothing.
+ */
+export function quickAnswersFromHousehold(
+  household: Household,
+  quickGuess?: number,
+  now: Date = new Date(),
+): QuickAnswersDraft | null {
+  const self = household.members.find((m) => m.id === `${QUICK_ID_PREFIX}self`);
+  if (!self) return null;
+  const year = now.getFullYear();
+  const ageOf = (m: { dateOfBirth: string }) => year - Number(m.dateOfBirth.slice(0, 4));
+  const spouse = household.members.find((m) => m.id === `${QUICK_ID_PREFIX}spouse`);
+  const kids = household.members.filter((m) => m.id.startsWith(`${QUICK_ID_PREFIX}kid-`));
+  const quickInv = (ownerId: string) =>
+    household.investments.find((i) => i.id === `${QUICK_ID_PREFIX}inv-${ownerId}`);
+  const goal = (suffix: string) =>
+    household.expenses.plannedFuture.find((p) => p.id === `${QUICK_ID_PREFIX}goal-${suffix}`);
+  const loan = household.liabilities.find((l) => l.id === `${QUICK_ID_PREFIX}home-loan`);
+  const unaccounted = household.expenses.recurring.find(
+    (r) => r.id === `${QUICK_ID_PREFIX}unaccounted`,
+  );
+  const selfInv = quickInv(self.id);
+  const spouseInv = spouse ? quickInv(spouse.id) : undefined;
+  const epf = household.investments.find((i) => i.id === `${QUICK_ID_PREFIX}epf-${self.id}`);
+  const sip =
+    n(selfInv?.monthlyContribution) + n(spouseInv?.monthlyContribution) + n(epf?.monthlyContribution);
+  const spend = n(household.expenses.avgMonthly);
+  const emi = n(loan?.monthlyEMI);
+  const purchase = goal("purchase");
+
+  return {
+    ...emptyQuickAnswers(ageOf(self)),
+    guess: n(quickGuess),
+    age: ageOf(self),
+    targetAge: self.targetRetirementAge ?? 50,
+    spend,
+    // The take-home is the identity the mapping enforces, so it reconstructs exactly.
+    income: spend + emi + sip + n(unaccounted?.amount),
+    corpus: n(selfInv?.value),
+    sip,
+    includeSpouse: Boolean(spouse),
+    spouseCorpus: n(spouseInv?.value),
+    kids: kids.length,
+    kidsAge: kids.length > 0 ? ageOf(kids[0]) : 0,
+    education: n(goal("education")?.todayAmount),
+    postgrad: n(goal("postgrad")?.todayAmount),
+    wedding: n(goal("wedding")?.todayAmount),
+    includeHouse: Boolean(purchase),
+    house: n(purchase?.todayAmount),
+    houseInYears: purchase ? Math.max(0, purchase.targetYear - year) : 6,
+    hasLoan: Boolean(loan),
+    emi,
+    loanRate: loan ? loan.interestRate / 100 : 0.085,
+    loanYearsLeft: loan?.derivedEndYear ? Math.max(0, loan.derivedEndYear - year) : 10,
   };
 }

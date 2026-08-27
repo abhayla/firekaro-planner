@@ -49,7 +49,8 @@ export const QUICK_CARDS: readonly QuickCardCopy[] = [
     key: "spend",
     question: "What does your household spend in a month?",
     hint:
-      "Everything except your home-loan EMI — school fees, travel, help, groceries, fun. " +
+      "Everything except your home-loan EMI — groceries, school fees, help, travel, fun, and a monthly share of " +
+      "the lumpy ones people forget: insurance premiums, annual fees, festivals. " +
       "If you have a loan we add its EMI from the last card, so leaving it out here keeps it from being counted twice. " +
       "Around ₹2.5–3 L a month? Say 2.8.",
   },
@@ -77,7 +78,9 @@ export const QUICK_CARDS: readonly QuickCardCopy[] = [
   {
     key: "kids",
     question: "Kids?",
-    hint: "How many, and roughly how old? We time their education (at 18) and weddings (at 30) from this.",
+    hint:
+      "How many, and roughly how old? We date their education (at 18) and weddings (at 30) from this, and " +
+      "count every goal in today's money.",
   },
   {
     key: "goals",
@@ -92,30 +95,49 @@ export const QUICK_CARDS: readonly QuickCardCopy[] = [
   {
     key: "loan",
     question: "Home loan?",
-    hint: "EMI, interest rate and years left. We add the EMI to your monthly spending until the loan ends.",
+    hint:
+      "EMI, interest rate and years left. We add the EMI to your monthly spending. Today we keep it there " +
+      "for the whole plan rather than dropping it the year the loan ends — deliberately cautious, so your " +
+      "number can only be too big, never too small.",
   },
 ] as const;
 
 /** The cards that ask for a TOTAL — the ones the ALL/stocks/one-exclusion copy rule governs. */
 export const TOTAL_QUESTION_KEYS: readonly QuickCardKey[] = ["corpus", "sip", "spouse"];
 
-/** Card 3's live sanity line — the video's "4.55 L of your 5 L, sound right?" moment (A15). */
+/**
+ * Card 3's live sanity line — the video's "Rs4.55 L of your Rs5 L, sound right?" moment (A15).
+ *
+ * The EMI is an ARGUMENT, not an afterthought: card 3 deliberately asks for spending WITHOUT the
+ * home-loan EMI, so a check that adds only spend + investing is blind to a household's single
+ * largest outflow and would happily bless Rs5.55 L of outgoings against a Rs5 L take-home.
+ */
 export function sanityLine(
   spendMonthly: number,
   sipMonthly: number,
   incomeMonthly: number,
+  emiMonthly = 0,
 ): string {
   if (!incomeMonthly || incomeMonthly <= 0) return "";
-  const out = spendMonthly + sipMonthly;
+  const out = spendMonthly + sipMonthly + emiMonthly;
   const share = Math.round((out / incomeMonthly) * 100);
   if (share > 105) {
-    return `Spending plus investing = ${formatINRCompact(out)} — more than your ${formatINRCompact(
+    return `Spending${emiMonthly > 0 ? " plus the EMI" : ""} plus investing = ${formatINRCompact(
+      out,
+    )} — more than your ${formatINRCompact(
       incomeMonthly,
-    )} take-home. One of the three is off; worth a check before moving on.`;
+    )} take-home. One of these is off; worth a check before moving on.`;
   }
-  return `Spending plus investing = ${formatINRCompact(out)} of your ${formatINRCompact(
-    incomeMonthly,
-  )} take-home (${share}%). Sounds right?`;
+  const leak = incomeMonthly - out;
+  const leakNote =
+    leak > 0
+      ? ` The other ${formatINRCompact(
+          leak,
+        )} is going somewhere too — we count it as spending, so your number isn't flattered.`
+      : "";
+  return `Spending${emiMonthly > 0 ? " plus the EMI" : ""} plus investing = ${formatINRCompact(
+    out,
+  )} of your ${formatINRCompact(incomeMonthly)} take-home (${share}%).${leakNote}`;
 }
 
 /** The "So far…" strip that appears once there is enough to say something honest. */
@@ -128,6 +150,10 @@ export interface ExplainerInput {
   targetAge: number;
   planToAge: number;
   plannedGoalsLumpToday: number;
+  /** What the goals layer actually ADDS to the number (goals + the extended-family contingency). */
+  plannedGoalsCorpus: number;
+  /** The 20% medical-shock reservation the kernel adds on top of the base corpus. */
+  healthcareReservation: number;
   currentCorpus: number;
   monthlyContributionReal: number;
   expectedReturn: number;
@@ -152,14 +178,23 @@ export function whySoBigBullets(input: ExplainerInput): string[] {
   return [
     `You'll live off it for about ${drawdown} years, not 15. Retire at ${input.targetAge}, plan to ${input.planToAge}.`,
     "Lifestyle creep. You came to the city by train; you won't go back by train. The Seltos doesn't become an Alto at 50.",
-    "Healthcare and help cost more with age — and rise faster than everything else (we use 14%, not 6%).",
-    "Taxes don't retire. Withdrawals are taxed; we plan post-tax.",
+    "Healthcare and help cost more with age — and rise faster than everything else, so we set aside an extra " +
+      "20% of the corpus purely for medical shocks.",
+    "Taxes don't retire. Withdrawals get taxed, so we hold the safe withdrawal rate well below the American 4% " +
+      "to leave room for it.",
     "Every withdrawal restarts the clock. Pulling money out for a wedding or a house every few years quietly kills the compounding you were counting on.",
-    `Every generation under-estimates by 4–6×. In 2006, people spending ₹30,000 a month said "₹1 Cr is enough"; the honest number was about ₹6 Cr.${guessEcho}`,
+    `Every generation under-estimates by 4–6×. In 2006, people spending ₹30,000 a month said "₹1 Cr is enough"; the honest number was ₹4–6 Cr.${guessEcho}`,
   ];
 }
 
-/** B1–B3 — the four-step "how we got this", carrying the live numbers. */
+/**
+ * B1–B3 — "how we got this", carrying the live numbers.
+ *
+ * The steps MUST add up to the headline. An earlier draft showed only base + goals and left the
+ * medical reservation and the extended-family contingency out — 17% of the number unexplained,
+ * which is worse than not explaining at all: a user who adds up the steps gets a different figure
+ * from the hero sitting beside them.
+ */
 export function howWeGotThis(input: ExplainerInput): string[] {
   const drawdown = Math.max(0, Math.round(input.planToAge - input.targetAge));
   const baseCorpus = input.swrUsed > 0 ? input.annualExpensesToday / input.swrUsed : 0;
@@ -170,7 +205,12 @@ export function howWeGotThis(input: ExplainerInput): string[] {
     )} of the corpus, which needs ${formatINRCompact(baseCorpus)}.`,
     `Plus your one-off goals in today's money — education, post-grad, weddings, any big purchase — ${formatINRCompact(
       input.plannedGoalsLumpToday,
+    )}. With the buffer we keep for extended family, that layer adds ${formatINRCompact(
+      input.plannedGoalsCorpus,
     )}. Every planned purchase counts, not just the ones we label.`,
+    `Plus ${formatINRCompact(
+      input.healthcareReservation,
+    )} reserved purely for medical shocks — 20% of the base, because health is the one cost that reliably outruns everything else.`,
     `Your ${formatINRCompact(input.currentCorpus)} plus ${formatINRCompact(
       input.monthlyContributionReal,
     )} a month grow at ${pct(input.expectedReturn)} for ${input.yearsToTarget} years; then we remove ${pct(
@@ -196,6 +236,16 @@ export function assumptionsLine(input: ExplainerInput): string {
 export const PLAN_HONESTY_LINE =
   "This part is arithmetic — it can't go wrong. What can go wrong is whether the monthly amount actually happens. " +
   "Returns may be 10% one decade and 14% the next; the moves you pick are what you control.";
+
+/**
+ * The one simplification the express path cannot hide: card 4 asks for EVERY holding, and we book
+ * the total as a single equity line. A real salaried portfolio has EPF/PPF/FD money compounding at
+ * 7–8%, not 12% — so a corpus that is part debt grows slower than this screen shows.
+ */
+export const QUICK_PORTFOLIO_CAVEAT =
+  "One simplification you should know about: we booked your whole corpus as one equity holding at " +
+  "12%. If a chunk of it sits in EPF, PPF, NPS or FDs — which grow at 7–8% — your real blend is " +
+  "lower and this projection is optimistic. Split it in the full planner and the number gets honest.";
 
 /** D1/D3–D6 — what the express path deliberately leaves to the full planner. */
 export const FULL_PLANNER_ADDS: readonly string[] = [

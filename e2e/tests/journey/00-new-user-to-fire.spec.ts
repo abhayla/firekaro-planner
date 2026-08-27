@@ -66,7 +66,10 @@ test.describe("new-user journey (v6) — entry surfaces, guards, demo entry, tou
     await expect(page.getByRole("button", { name: /Try the sample/i })).toBeVisible();
     // The primary new-user front door — always present.
     await expect(page.getByText("Start my own plan")).toBeVisible();
-    await expect(page.getByRole("button", { name: /Begin wizard/i })).toBeVisible();
+    // T-378: "Start my own plan" now leads with the ten-card express path; the seven-step
+    // wizard is still offered, one link down.
+    await expect(page.getByRole("button", { name: /Find my number/i })).toBeVisible();
+    await expect(page.locator('[data-testid="splash-detailed-wizard"]')).toBeVisible();
   });
 
   test("router guard: a brand-new (zero-member) user hitting a deep route is bounced to onboarding", async ({ page }) => {

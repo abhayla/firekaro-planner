@@ -1,6 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { mkdirSync } from "node:fs";
-import { fillQuickPath } from "./quick-number.spec";
+import { fillQuickPath, parseCompact } from "./quick-path-helper";
 
 /**
  * T-378 (QN-1 + QN-4) rule 24/25/26/31/32 verification evidence.
@@ -14,14 +14,6 @@ import { fillQuickPath } from "./quick-number.spec";
  */
 
 const DIR = `verification-screenshots/T-378-${new Date().toISOString().replace(/[:.]/g, "-")}`;
-
-function parseCompact(text: string): number {
-  const m = text.replace(/[,\s]/g, "").match(/₹?([\d.]+)(Cr|L|K)?/i);
-  if (!m) return NaN;
-  const n = Number(m[1]);
-  const unit = (m[2] ?? "").toLowerCase();
-  return unit === "cr" ? n * 1e7 : unit === "l" ? n * 1e5 : unit === "k" ? n * 1e3 : n;
-}
 
 async function shootEveryCard(page: Page, width: number, height: number, tag: string) {
   await page.setViewportSize({ width, height });

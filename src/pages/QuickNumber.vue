@@ -18,7 +18,7 @@ import QuickCard from "@/components/quick/QuickCard.vue";
 import LakhInput from "@/components/quick/LakhInput.vue";
 import QuickResult from "@/components/quick/QuickResult.vue";
 import { QUICK_CARDS, sanityLine, SO_FAR_PLACEHOLDER } from "@/lib/quick-number-copy";
-import { applyQuickAnswers } from "@/lib/quick-number";
+import { applyQuickAnswers, quickAnswersFromHousehold } from "@/lib/quick-number";
 import { emptyQuickAnswers, type QuickAnswersDraft } from "@/types/quick-number";
 import { useHouseholdStore } from "@/stores/household";
 import { useAssumptionsStore } from "@/stores/assumptions";
@@ -39,7 +39,14 @@ features.hydrate();
 ui.hydrate();
 
 const CR = 1e7;
-const answers = ref<QuickAnswersDraft>(emptyQuickAnswers());
+// Re-entering /quick must never start blank over a real plan: ten clicks of Next would then
+// overwrite it with zeros (code-review H2). Everything the express path wrote carries a stable
+// `quick-` id, so the previous answers are recoverable from the household itself.
+const answers = ref<QuickAnswersDraft>(
+  quickAnswersFromHousehold(household.data, ui.quick?.guess) ?? emptyQuickAnswers(),
+);
+/** Set when the user tries to finish without the one answer the whole number rests on. */
+const blockedReason = ref("");
 const step = ref(0);
 const showResult = ref(false);
 /** Recomputed only on card change — the preview must never cost a kernel run per keystroke. */
@@ -63,7 +70,12 @@ const DIRECT_CHIPS: readonly [boolean | null, string][] = [
 ];
 
 const sanity = computed(() =>
-  sanityLine(answers.value.spend ?? 0, answers.value.sip ?? 0, answers.value.income ?? 0),
+  sanityLine(
+    answers.value.spend ?? 0,
+    answers.value.sip ?? 0,
+    answers.value.income ?? 0,
+    answers.value.hasLoan ? (answers.value.emi ?? 0) : 0,
+  ),
 );
 
 /** Card 9's live "it moves your date by…" hint — the mockup's delta line, honestly sourced. */
@@ -88,7 +100,10 @@ function previewNeed(a: QuickAnswersDraft): number | null {
       currentFY: ui.currentFY,
     });
     return Number.isFinite(k.fireNumber) && k.fireNumber > 0 ? k.fireNumber : null;
-  } catch {
+  } catch (err) {
+    // Never silent: a kernel throw during intake would otherwise leave the strip on its
+    // placeholder forever with no signal at all (error-handling.md).
+    console.warn("[quick] preview kernel run failed", err);
     return null;
   }
 }
@@ -123,6 +138,15 @@ function onBack() {
 }
 
 function finish() {
+  // Spending is the one answer the FIRE number cannot be computed without. Refusing here is what
+  // stops a half-finished re-run from zeroing a real plan (code-review H2).
+  if (!(answers.value.spend > 0)) {
+    blockedReason.value =
+      "We need your monthly spending before we can give you a number — it is what the whole plan is sized against.";
+    step.value = QUICK_CARDS.findIndex((c) => c.key === "spend");
+    return;
+  }
+  blockedReason.value = "";
   const result = applyQuickAnswers(household.data, answers.value, {
     assumptions: assumptions.values,
     previousCreatedIds: ui.quick?.createdIds,
@@ -171,7 +195,6 @@ function editAnswers() {
             :hint="card.hint"
             :step="step"
             :total="QUICK_CARDS.length"
-            :can-back="true"
             :is-last="isLast"
             @next="onNext"
             @back="onBack"
@@ -405,6 +428,17 @@ function editAnswers() {
               </template>
             </div>
           </QuickCard>
+
+          <v-alert
+            v-if="blockedReason"
+            type="warning"
+            variant="tonal"
+            density="compact"
+            class="mt-4"
+            data-testid="quick-blocked"
+          >
+            {{ blockedReason }}
+          </v-alert>
 
           <p class="text-caption text-medium-emphasis mt-4" data-testid="quick-so-far">
             {{ soFar }}

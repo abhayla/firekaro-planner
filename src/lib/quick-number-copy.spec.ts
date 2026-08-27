@@ -7,6 +7,8 @@ import {
   assumptionsLine,
   FULL_PLANNER_ADDS,
   PLAN_HONESTY_LINE,
+  QUICK_PORTFOLIO_CAVEAT,
+  sanityLine,
   type ExplainerInput,
 } from "./quick-number-copy";
 
@@ -16,6 +18,8 @@ const explainer: ExplainerInput = {
   targetAge: 50,
   planToAge: 90,
   plannedGoalsLumpToday: 3_25_00_000,
+  plannedGoalsCorpus: 3_78_00_000,
+  healthcareReservation: 1_16_00_000,
   currentCorpus: 1_50_00_000,
   monthlyContributionReal: 1_75_000,
   expectedReturn: 0.12,
@@ -94,22 +98,25 @@ describe("quick-number copy — QN-4 explainers", () => {
     expect(noGuess).not.toContain("Your gut said");
   });
 
-  it("how-we-got-this is four steps carrying the LIVE derive() numbers", () => {
+  it("how-we-got-this is five steps carrying the LIVE derive() numbers", () => {
     const steps = howWeGotThis(explainer);
-    expect(steps).toHaveLength(4);
+    expect(steps).toHaveLength(5);
     // Step 1: annual spend, the horizon SWR and the resulting base corpus.
     expect(steps[0]).toContain("₹21.60 L");
     expect(steps[0]).toContain("3.70%");
     expect(steps[0]).toContain("40 years");
-    // Step 2: the planned-goals lump (T-376: every planned goal counts).
+    // Step 2: the planned-goals lump (T-376: every planned goal counts) AND what it adds.
     expect(steps[1]).toContain("₹3.25 Cr");
-    // Step 3: corpus + monthly, growth, and inflation removed.
-    expect(steps[2]).toContain("12.0%");
-    expect(steps[2]).toContain("6%");
-    expect(steps[2]).toContain("₹6.10 Cr");
-    // Step 4: the same number in future rupees, shown once.
-    expect(steps[3]).toContain("₹18.29 Cr");
-    expect(steps[3]).toContain("2038");
+    expect(steps[1]).toContain("₹3.78 Cr");
+    // Step 3: the medical reservation — without it the steps do not add up to the headline.
+    expect(steps[2]).toContain("₹1.16 Cr");
+    // Step 4: corpus + monthly, growth, and inflation removed.
+    expect(steps[3]).toContain("12.0%");
+    expect(steps[3]).toContain("6%");
+    expect(steps[3]).toContain("₹6.10 Cr");
+    // Step 5: the same number in future rupees, shown once.
+    expect(steps[4]).toContain("₹18.29 Cr");
+    expect(steps[4]).toContain("2038");
   });
 
   it("the assumptions line names the horizon the SWR was chosen for", () => {
@@ -119,6 +126,28 @@ describe("quick-number copy — QN-4 explainers", () => {
     expect(line).toContain("3.70% safe withdrawal");
     expect(line).toContain("40-yr drawdown");
     expect(line).toContain("live to 90");
+  });
+
+  it("the five steps reconcile to the headline they explain", () => {
+    const base = explainer.annualExpensesToday / explainer.swrUsed;
+    const sum = base + explainer.plannedGoalsCorpus + explainer.healthcareReservation;
+    // The three corpus components the steps name ARE the FIRE number the hero shows.
+    expect(sum).toBeCloseTo(base + 3_78_00_000 + 1_16_00_000, 0);
+    expect(howWeGotThis(explainer)[0]).toContain("₹5.84 Cr");
+  });
+
+  it("names the single-equity-line simplification rather than hiding it", () => {
+    expect(QUICK_PORTFOLIO_CAVEAT).toContain("EPF");
+    expect(QUICK_PORTFOLIO_CAVEAT.toLowerCase()).toContain("optimistic");
+  });
+
+  it("the sanity line counts the EMI and names the unaccounted rupee", () => {
+    const impossible = sanityLine(2_80_000, 1_75_000, 5_00_000, 1_00_000);
+    expect(impossible).toContain("more than your");
+    const ok = sanityLine(1_80_000, 1_75_000, 5_00_000, 1_00_000);
+    expect(ok).toContain("₹45.0K");
+    expect(ok).toContain("count it as spending");
+    expect(sanityLine(1_80_000, 1_75_000, 0, 1_00_000)).toBe("");
   });
 
   it("keeps the honesty framing and the full-planner list", () => {

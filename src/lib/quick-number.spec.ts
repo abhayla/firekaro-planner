@@ -1,6 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { setActivePinia, createPinia } from "pinia";
-import { applyQuickAnswers, QUICK_INVESTMENT_LABEL } from "./quick-number";
+import {
+  applyQuickAnswers,
+  quickAnswersFromHousehold,
+  QUICK_INVESTMENT_LABEL,
+} from "./quick-number";
 import { emptyQuickAnswers, type QuickAnswers } from "@/types/quick-number";
 import { DEFAULT_ASSUMPTIONS } from "@/types/assumptions";
 import { derive } from "@/lib/derive";
@@ -217,6 +221,7 @@ describe("applyQuickAnswers — idempotency", () => {
       ...household.investments.map((i) => i.id),
       ...household.liabilities.map((l) => l.id),
       ...household.expenses.plannedFuture.map((p) => p.id),
+      ...household.expenses.recurring.map((r) => r.id),
     ]);
     for (const id of createdIds) expect(known.has(id)).toBe(true);
   });
@@ -244,5 +249,104 @@ describe("applyQuickAnswers — through the real store (auto-flows included)", (
     });
     expect(k.monthlyContribution).toBeLessThanOrEqual(1.75 * L * 1.05);
     expect(k.monthlyContribution).toBeGreaterThanOrEqual(1.75 * L * 0.95);
+  });
+});
+
+describe("applyQuickAnswers — the unaccounted rupee is spent, not deleted", () => {
+  it("records take-home minus (spend + EMI + investing) as a visible expense line", () => {
+    const { household, unaccountedMonthly } = apply();
+    // 5.00 L take-home − 1.80 L spend − 1.00 L EMI − 1.75 L investing = 0.45 L unaccounted.
+    expect(unaccountedMonthly).toBe(45_000);
+    const line = household.expenses.recurring.find((r) => /Unaccounted/.test(r.label));
+    expect(line, "the leak must be a line the user can see and edit").toBeTruthy();
+    expect(line!.amount).toBe(45_000);
+  });
+
+  it("raises the FIRE number rather than flattering it — the leak is real spending", () => {
+    const lens = { isFamilyView: false, viewingMemberId: null, currentFY: "2026-27" };
+    const withLeak = derive(apply().household, DEFAULT_ASSUMPTIONS, lens);
+    // The same answers with no stated take-home have no leak to reconcile.
+    const noIncome = derive(apply({ ...AMIT, income: 0 }).household, DEFAULT_ASSUMPTIONS, lens);
+    expect(withLeak.fireNumber).toBeGreaterThan(noIncome.fireNumber);
+  });
+
+  it("does not invent a leak when the answers already balance", () => {
+    const { unaccountedMonthly, household } = apply({
+      ...AMIT,
+      income: 1.8 * L + 1 * L + 1.75 * L,
+    });
+    expect(unaccountedMonthly).toBe(0);
+    expect(household.expenses.recurring.some((r) => /Unaccounted/.test(r.label))).toBe(false);
+  });
+
+  it("with nothing invested, the surplus is spending — not a silently assumed contribution", () => {
+    const { household } = apply({ ...AMIT, sip: 0 });
+    const k = derive(household, DEFAULT_ASSUMPTIONS, {
+      isFamilyView: false,
+      viewingMemberId: null,
+      currentFY: "2026-27",
+    });
+    // The old fallback assumed every unspent rupee reached the market (~2.2 L/month here).
+    expect(k.monthlyContribution).toBeLessThan(10_000);
+  });
+});
+
+describe("applyQuickAnswers — re-entry safety", () => {
+  it("keeps investments the user added by hand after the quick run", () => {
+    const first = apply();
+    const withManual: Household = {
+      ...first.household,
+      investments: [
+        ...first.household.investments,
+        {
+          id: "inv-manual-1",
+          type: "PPF",
+          label: "My PPF",
+          value: 12_00_000,
+          ownerId: "quick-self",
+        },
+      ],
+    };
+    const second = applyQuickAnswers(withManual, AMIT, {
+      assumptions: DEFAULT_ASSUMPTIONS,
+      now: NOW,
+      previousCreatedIds: first.createdIds,
+    });
+    expect(second.household.investments.some((i) => i.id === "inv-manual-1")).toBe(true);
+  });
+
+  it("clamps an absent or absurd age instead of anchoring the plan at zero", () => {
+    const { household } = apply({ ...AMIT, age: undefined as unknown as number, targetAge: 200 });
+    const self = household.members.find((m) => m.id === "quick-self")!;
+    expect(NOW.getFullYear() - Number(self.dateOfBirth.slice(0, 4))).toBe(35);
+    expect(self.targetRetirementAge).toBeLessThanOrEqual(75);
+    expect(self.targetRetirementAge).toBeGreaterThan(35);
+  });
+
+  it("rebuilds the ten answers from the household a previous run wrote", () => {
+    const { household } = apply();
+    const back = quickAnswersFromHousehold(household, 10 * CR, NOW)!;
+    expect(back).toBeTruthy();
+    expect(back.age).toBe(38);
+    expect(back.targetAge).toBe(50);
+    expect(back.spend).toBe(1.8 * L);
+    expect(back.corpus).toBe(80 * L);
+    expect(back.includeSpouse).toBe(true);
+    expect(back.spouseCorpus).toBe(70 * L);
+    expect(back.kids).toBe(2);
+    expect(back.kidsAge).toBe(6);
+    expect(back.education).toBe(75 * L);
+    expect(back.wedding).toBe(50 * L);
+    expect(back.includeHouse).toBe(true);
+    expect(back.hasLoan).toBe(true);
+    expect(back.emi).toBe(1 * L);
+    expect(back.loanRate).toBeCloseTo(0.072, 3);
+    // The identity the mapping enforces: take-home = spend + EMI + investing + the leak.
+    expect(back.income).toBe(5 * L);
+    expect(back.sip).toBeCloseTo(1.75 * L, -3);
+  });
+
+  it("returns null for a household the express path never touched", () => {
+    expect(quickAnswersFromHousehold(emptyHouseholdFixture(), 0, NOW)).toBeNull();
   });
 });

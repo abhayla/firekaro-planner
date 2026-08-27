@@ -39,7 +39,8 @@ async function freshSplash(page: Page) {
 test.describe("keyboard a11y — operability + no traps (A7.9)", () => {
   test("primary CTA is keyboard-focusable AND Enter-activatable (WCAG 2.1.1)", async ({ page }) => {
     await freshSplash(page);
-    const begin = page.getByRole("button", { name: /Begin wizard/i });
+    // T-378: the splash primary CTA is now "Find my number" (the /quick express path).
+    const begin = page.getByRole("button", { name: /Find my number/i });
     await begin.focus();
     await expect(begin, "the primary CTA must be focusable").toBeFocused();
     // Activating with the keyboard (Enter) — not a mouse click — must work.
@@ -49,7 +50,7 @@ test.describe("keyboard a11y — operability + no traps (A7.9)", () => {
 
   test("the wizard form is Tab-traversable across multiple controls (WCAG 2.1.2 — no keyboard trap)", async ({ page }) => {
     await freshSplash(page);
-    await page.getByRole("button", { name: /Begin wizard/i }).click();
+    await page.locator('[data-testid="splash-detailed-wizard"]').click();
     await page.waitForURL(/\/wizard\/profile/, { timeout: 15000 });
     await waitHydrated(page);
     await dismissTour(page);

@@ -18,7 +18,11 @@ import { useHouseholdStore } from "@/stores/household";
 import { useAssumptionsStore } from "@/stores/assumptions";
 import { useUiStore } from "@/stores/ui";
 import { requiredMonthlyContributionFor } from "@/lib/required-contribution";
-import { FULL_PLANNER_ADDS, PLAN_HONESTY_LINE } from "@/lib/quick-number-copy";
+import {
+  FULL_PLANNER_ADDS,
+  PLAN_HONESTY_LINE,
+  QUICK_PORTFOLIO_CAVEAT,
+} from "@/lib/quick-number-copy";
 import { formatINRCompact } from "@/lib/formatters";
 import type { QuickAnswers } from "@/types/quick-number";
 
@@ -120,6 +124,19 @@ const answerRows = computed(() => {
     <p class="text-caption text-medium-emphasis mt-3 mb-4" data-testid="quick-honesty-line">
       {{ PLAN_HONESTY_LINE }}
     </p>
+
+    <!-- The express path collapses every holding into one equity line to stay at ten cards. That
+         makes the projection optimistic for anyone holding PF/PPF/FD money, so it is stated on the
+         screen rather than buried (FinTech review HIGH 3/4). -->
+    <v-alert
+      type="info"
+      variant="tonal"
+      density="comfortable"
+      class="mb-4"
+      data-testid="quick-portfolio-caveat"
+    >
+      {{ QUICK_PORTFOLIO_CAVEAT }}
+    </v-alert>
 
     <QuickExplainer />
 

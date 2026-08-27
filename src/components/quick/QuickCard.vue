@@ -9,7 +9,6 @@ defineProps<{
   hint: string;
   step: number;
   total: number;
-  canBack: boolean;
   isLast: boolean;
 }>();
 
@@ -32,7 +31,8 @@ defineEmits<{ (e: "next"): void; (e: "back"): void }>();
     </v-card>
 
     <div class="quick-card__nav mt-4">
-      <v-btn variant="outlined" :disabled="!canBack" data-testid="quick-back" @click="$emit('back')">
+      <!-- Back on the first card returns to the splash, so it is never disabled. -->
+      <v-btn variant="outlined" data-testid="quick-back" @click="$emit('back')">
         <v-icon icon="mdi-arrow-left" class="mr-1" /> Back
       </v-btn>
       <v-btn color="fire-orange" variant="flat" data-testid="quick-next" @click="$emit('next')">

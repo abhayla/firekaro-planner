@@ -40,6 +40,10 @@ const input = computed<ExplainerInput>(() => ({
   targetAge: fire.heroTargetAge.value,
   planToAge: fire.planToAge.value,
   plannedGoalsLumpToday: plannedGoalsLumpToday.value,
+  // The two components an earlier draft left out — without them the four steps explained only
+  // ~83% of the headline they sit beside (code-review H5 / FinTech HIGH 7).
+  plannedGoalsCorpus: fire.familyLayerCorpus.value,
+  healthcareReservation: fire.healthcareReservation.value,
   currentCorpus: fire.totalCorpus.value,
   monthlyContributionReal: req.value.currentMonthlyReal,
   expectedReturn: fire.blendedReturn.value,
