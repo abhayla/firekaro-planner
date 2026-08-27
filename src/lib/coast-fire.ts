@@ -31,6 +31,18 @@ export interface CoastFireInput {
   yearsToRetirement: number;
   /** Expected real return (nominal - inflation) as decimal, e.g. 0.06. */
   realReturn: number;
+  /**
+   * ADR-0006. The REAL annual drift of `fireNumber` — the FIRE target rises in TODAY's rupees
+   * because the household's spending basket outruns the general CPI everything here is deflated
+   * by (`derive().realTargetDriftRate`). Absent/0 ⇒ the pre-ADR-0006 CONSTANT target, byte-identical.
+   *
+   * Coasting is a race between two compounding series, so a drifting target is not a detail: with
+   * `g > 0` the corpus must out-earn the target, i.e. the discount rate is the NET rate
+   * `(1+realReturn)/(1+g) − 1`, not `realReturn`. Discounting a constant target under-states the
+   * coast corpus and tells the user they can stop saving sooner than they actually can — the
+   * optimistic direction, which is Tier-0 for this persona.
+   */
+  targetDriftRate?: number;
 }
 
 export interface CoastFireResult {
@@ -54,14 +66,25 @@ export interface CoastFireResult {
  */
 export function calculateCoastFire(input: CoastFireInput): CoastFireResult {
   const { fireNumber, yearsToRetirement, realReturn } = input;
+  const drift =
+    Number.isFinite(input.targetDriftRate) && (input.targetDriftRate as number) > -1
+      ? (input.targetDriftRate as number)
+      : 0;
+  // The rate at which the corpus GAINS on the target. Equivalent to
+  // `fireNumber x (1+g)^Y / (1+realReturn)^Y`, written as one net rate so every branch and the
+  // `yearsAtCurrent` inverse below share it. drift = 0 ⇒ netRate === realReturn, byte-identical.
+  const netRate = (1 + realReturn) / (1 + drift) - 1;
 
   let coastCorpus: number;
   if (fireNumber <= 0) {
     coastCorpus = 0;
-  } else if (yearsToRetirement <= 0 || realReturn <= 0) {
-    coastCorpus = fireNumber;
+  } else if (yearsToRetirement <= 0 || netRate <= 0) {
+    // Compounding never gains on the target, so no amount of coasting closes the gap. The honest
+    // floor is the target AS IT WILL BE — the drifted number in today's rupees, which is
+    // `fireNumber` exactly when g = 0 (the pre-ADR-0006 behaviour, preserved).
+    coastCorpus = fireNumber * Math.pow(1 + drift, Math.max(0, yearsToRetirement));
   } else {
-    coastCorpus = fireNumber / Math.pow(1 + realReturn, yearsToRetirement);
+    coastCorpus = fireNumber / Math.pow(1 + netRate, yearsToRetirement);
   }
 
   function coastRatio(currentCorpus: number): number {
@@ -76,9 +99,10 @@ export function calculateCoastFire(input: CoastFireInput): CoastFireResult {
   function yearsAtCurrent(currentCorpus: number): number {
     if (currentCorpus <= 0) return Infinity;
     if (currentCorpus >= fireNumber) return 0;
-    if (realReturn <= 0) return Infinity;
-    // current * (1 + r)^t = fireNumber  =>  t = log(fireNumber/current) / log(1 + r)
-    return Math.log(fireNumber / currentCorpus) / Math.log(1 + realReturn);
+    if (netRate <= 0) return Infinity;
+    // current x (1+r)^t = fireNumber x (1+g)^t  =>  t = log(fireNumber/current) / log(1+netRate).
+    // g = 0 collapses to the prior `log(1 + realReturn)` denominator.
+    return Math.log(fireNumber / currentCorpus) / Math.log(1 + netRate);
   }
 
   return { coastCorpus, coastRatio, hasReachedCoast, yearsAtCurrent };

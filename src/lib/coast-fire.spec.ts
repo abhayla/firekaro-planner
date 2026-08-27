@@ -36,6 +36,47 @@ describe("calculateCoastFire", () => {
     expect(result.coastCorpus).toBe(5_000_000);
   });
 
+  it("ADR-0006: a DRIFTING target needs a bigger coast corpus, and the round trip holds", () => {
+    // The bug this locks: discounting a CONSTANT target while the real FIRE number rises at g
+    // under-states the coast corpus, i.e. tells the user they can stop saving sooner than they
+    // can. The invariant is the round trip — coasting must land on the target AS IT WILL BE.
+    const fireNumber = 10_000_000;
+    const years = 20;
+    const realReturn = 0.06;
+    const g = 0.0023; // the live basket drift
+    const drifted = calculateCoastFire({ fireNumber, yearsToRetirement: years, realReturn, targetDriftRate: g });
+    const constant = calculateCoastFire({ fireNumber, yearsToRetirement: years, realReturn });
+
+    expect(drifted.coastCorpus).toBeGreaterThan(constant.coastCorpus);
+    expect(
+      drifted.coastCorpus * Math.pow(1 + realReturn, years),
+      "coasting must reach the target AS IT WILL BE, not as it is today",
+    ).toBeGreaterThanOrEqual(fireNumber * Math.pow(1 + g, years) - 1);
+
+    // …and `yearsAtCurrent` inverts the SAME race.
+    const t = drifted.yearsAtCurrent(drifted.coastCorpus);
+    expect(t).toBeCloseTo(years, 6);
+  });
+
+  it("ADR-0006: drift 0 is byte-identical to the pre-ADR-0006 constant-target result", () => {
+    const args = { fireNumber: 10_000_000, yearsToRetirement: 20, realReturn: 0.06 };
+    expect(calculateCoastFire({ ...args, targetDriftRate: 0 }).coastCorpus).toBe(
+      calculateCoastFire(args).coastCorpus,
+    );
+  });
+
+  it("ADR-0006: when the target outruns the return, you need the DRIFTED number today", () => {
+    // netRate <= 0 — no amount of compounding gains on the target.
+    const r = calculateCoastFire({
+      fireNumber: 5_000_000,
+      yearsToRetirement: 10,
+      realReturn: 0.01,
+      targetDriftRate: 0.02,
+    });
+    expect(r.coastCorpus).toBeCloseTo(5_000_000 * Math.pow(1.02, 10), 6);
+    expect(r.yearsAtCurrent(1_000_000)).toBe(Infinity);
+  });
+
   it("coast corpus = 0 when target is 0", () => {
     const result = calculateCoastFire({
       fireNumber: 0,
@@ -190,12 +231,27 @@ describe("coastTrajectory (A21.1)", () => {
     expect(pts.every((p) => p.fireTarget === 30_000_000)).toBe(true);
   });
 
-  it("a corpus at/above Coast reaches the FIRE number by retirement", () => {
-    // Coast corpus today = fire / (1+r)^years
+  it("a corpus at/above Coast reaches the FIRE number AS IT WILL BE by retirement", () => {
+    // This used to RE-DERIVE `fire / (1+r)^years` here, which is the pre-ADR-0006 constant-target
+    // formula — so it would have kept passing even after the library started discounting a
+    // drifting target, and the two would have silently disagreed. Take the coast corpus from the
+    // library, and assert the property that actually matters: coasting lands on the target as it
+    // WILL be at retirement, `fire x (1+g)^Y`, not as it is today.
     const fire = 30_000_000;
     const years = 15;
     const r = 0.06;
-    const coastCorpus = fire / Math.pow(1 + r, years);
+    const g = 0.0023;
+    const { coastCorpus } = calculateCoastFire({
+      fireNumber: fire,
+      yearsToRetirement: years,
+      realReturn: r,
+      targetDriftRate: g,
+    });
+    expect(
+      coastCorpus * Math.pow(1 + r, years),
+      "coastCorpus x (1+r)^Y must clear fireNumber x (1+g)^Y",
+    ).toBeGreaterThanOrEqual(fire * Math.pow(1 + g, years) - 1);
+
     const pts = coastTrajectory({
       currentCorpus: coastCorpus,
       fireNumber: fire,

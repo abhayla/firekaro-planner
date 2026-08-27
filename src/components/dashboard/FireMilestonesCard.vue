@@ -73,6 +73,11 @@ const coast = computed(() =>
     fireNumber: fire.fireNumber.value,
     yearsToRetirement: yearsToRetirement.value,
     realReturn: realReturn.value,
+    // ADR-0006 Phase 1b — the FIRE number this card discounts is NOT constant in today's rupees:
+    // it rises at `realTargetDriftRate` because the household's spending basket outruns the CPI
+    // the return above is deflated by. Discounting a flat target under-stated the coast corpus
+    // and told the user they could stop saving earlier than they can.
+    targetDriftRate: fire.realTargetDriftRate.value,
   }),
 );
 
