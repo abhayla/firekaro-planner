@@ -127,6 +127,9 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 
 ## §3 — Decision log (append-only, newest first)
 
+### 2026-08-27 (14:16 IST)
+- **D-2026-08-27-09 — ADR-0006 ACCEPTED (Option E) by Abhay: honest nominal frame + re-grounded basket (healthcare 9%, education out, weights 74/8/0/18 ≈ 6.24%) + 2% real step-up default tapering at 50 + an "unreachable" hero state; closes #167 and #180 together.** Built in-session via Opus subagents in two phases (kernel/inputs/tests → UI/copy/coherence), each independently reviewed (code + FinTech end-to-end) before the single PR. Frame + inputs + step-up land in ONE commit.
+
 ### 2026-08-27 (14:10 IST)
 - **D-2026-08-27-08 — #167 is NOT the bug it says it is; decision escalated to Abhay (needs-Abhay B10).** ADR-0006 DRAFT (Opus research, FinTech-validated SOUND-WITH-CHANGES): growing the real target at the basket while deflating at CPI is algebraically the #20 model and reproduces FIRE-at-71/93 for ordinary seeds; the root cause is the 4-bucket household basket — non-disjoint buckets (the `general` bucket is all-items CPI, which already contains health/education/housing) and a 14% healthcare CLAIMS-COST trend used as a PRICE rate (CPI-Health ≈ 4–7%). The model also carries a matched pessimism (contributions grow at CPI = zero real wage growth). FinTech's Option E (honest frame + re-grounded basket ≈ 6.24% + 2% real step-up default + an "unreachable" state) moves every persona ≤ 1 year and needReal +0.5–3.9%; Option F is the time-boxed single-rate fallback. Filed the live Coast-card frame contradiction as its own must-have issue (the Coast/Barista card already deflates at the basket on the default dashboard — CRITICAL-2). Nothing built until Abhay picks.
 
