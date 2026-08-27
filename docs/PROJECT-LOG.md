@@ -155,8 +155,10 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
   monthly amount that gets them to the age they actually want. QN-2 flips the headline to **the age
   the user WANTS** ("To retire at 47 you'll need ₹10.60 Cr in today's money · ₹28.54 Cr in 2043") and
   adds the four numbers that make it actionable — need · you'll-have-by-then · gap · **do this
-  ₹/month** — plus a live 40–70 retirement-age slider so the trade-off is felt, not explained
-  (Sharmas: retire at 47 → ₹3.11 L/month; drag to 52 → ₹1.94 L/month).
+  ₹/month** — plus a live 40–75 retirement-age slider (dynamic floor `max(40, anchor+1)`, shared
+  with WhatIf's pre-existing ceiling — #64 class) so the trade-off is felt, not explained
+  (Sharmas: retire at 47 → "Move the age" — unreachable within the feasible living-floor ceiling;
+  drag to 52 → ₹1.94 L/month).
   - **How the number is computed (the load-bearing decision):** `src/lib/required-contribution.ts`
     **binary-searches the household real monthly contribution through the REAL `derive()` kernel** —
     NOT a closed-form annuity formula. Every candidate is a full kernel run, so step-up (ADR-0004),
@@ -192,7 +194,7 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
     so "the age must differ per member" had stopped testing lensing. Re-pointed at the hero **need**
     figure (the member's own individual FIRE number) — the figure that actually carries the lens
     now. 22/22 PASS after the fix. Evidence: `e2e/t377-gap-hero-verify.spec.ts` (slider recomputes
-    47→52 = ₹3.11 L→₹1.94 L; rule-26 hero need ₹10.6 Cr matched the Goals screen exactly; 1280 +
+    47→52 = "Move the age"→₹1.94 L; rule-26 hero need ₹10.6 Cr matched the Goals screen exactly; 1280 +
     390 screenshots; zero new console errors).
   - **Design SSOT:** `docs/design/2026-08-27-quick-number-gap-hero/option-c-merged.html`;
     `SCREEN-STANDARD.md` v1.3 records the pattern. Contract: `docs/goals/2026-08-27-quick-number-front-door.md` §3.
