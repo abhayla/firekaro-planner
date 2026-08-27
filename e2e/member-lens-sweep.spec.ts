@@ -62,10 +62,12 @@ const WORKING = [
 // T-378 (QN-1) — `/quick` is ENUMERATED here and deliberately NOT swept, so its absence is a
 // recorded decision rather than a silent omission (member-landscape-verification.md: never a
 // subset by accident). Reason: `/quick` is a layout-LESS pre-setup intake route — it renders no
-// AppBar, so it carries no "Viewing as <member>" control to drive, and a household that has only
-// just answered ten questions has no second member to switch to. Its result screen embeds the
-// SAME `<FireHero />` the dashboard uses, and `/fire-goals/dashboard` IS swept below — so the
-// lensed surface the quick path exposes is covered where the control actually exists.
+// AppBar, so it carries no "Viewing as <member>" control to drive, REGARDLESS of how many members
+// the household ends up with (the express path can create a spouse and kids — cards 6/7 — so
+// "no second member" is not the reason). Its result screen embeds the SAME `<FireHero />` the
+// dashboard uses, and `/fire-goals/dashboard` IS swept below — so the lensed surface the quick
+// path exposes is covered where the control actually exists. (T-378C finding F6: an earlier
+// version of this comment also claimed no second member exists, which is false — corrected here.)
 
 // (empty) — tax-planning, the only screen ever genuinely broken, is FIXED (commit 15c08e8) and moved to
 // WORKING above. This list is the home for any future test.fixme'd regression.

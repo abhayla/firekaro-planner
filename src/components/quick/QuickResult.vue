@@ -7,7 +7,8 @@
  * shows (T-377). That is what makes "the quick result and the dashboard agree" true by construction
  * rather than by a test (rule 26) — there is exactly one hero in the product.
  *
- * The lever card ("how to get there — pick your moves") is stage QN-5 and lands in this slot next.
+ * The real lever card ("how to get there — pick your moves") is stage QN-5 and lands in this slot
+ * next; a visible placeholder card holds the spot until then (T-378C finding F7).
  */
 import { computed } from "vue";
 import { RouterLink } from "vue-router";
@@ -59,7 +60,10 @@ const CHART_POINTS = 6;
 const chart = computed(() => {
   const anchor = req.value.anchorAgeUsed;
   const target = fire.heroTargetAge.value;
-  const from = Math.max(anchor + 1, Math.min(target - 6, 70));
+  // T-378C finding F5: the window used to clamp its start to `target - 6`, cutting the whole
+  // accumulation run-up (current age -> target) off-canvas and flattening the "have" line the
+  // explainer had just talked about. Start at the user's actual current age instead.
+  const from = anchor;
   const to = Math.max(from + 5, target + 6);
   const lens = {
     isFamilyView: ui.isFamilyView,
@@ -144,91 +148,109 @@ const answerRows = computed(() => {
       {{ overCommitted }}
     </v-alert>
 
-    <FireHero />
-
-    <p class="text-caption text-medium-emphasis mt-3 mb-4" data-testid="quick-honesty-line">
-      {{ PLAN_HONESTY_LINE }}
-    </p>
-
-    <!-- The express path collapses every holding into one equity line to stay at ten cards. That
-         makes the projection optimistic for anyone holding PF/PPF/FD money, so it is stated on the
-         screen rather than buried (FinTech review HIGH 3/4). -->
-    <v-alert
-      type="info"
-      variant="tonal"
-      density="comfortable"
-      class="mb-4"
-      data-testid="quick-portfolio-caveat"
-    >
-      {{ QUICK_PORTFOLIO_CAVEAT }}
-    </v-alert>
-
-    <QuickExplainer />
-
-    <v-card v-if="showChart" variant="outlined" class="pa-6 mt-4" data-testid="quick-chart-card">
-      <h3 class="text-subtitle-1 font-weight-bold font-display mb-3">
-        What you'll have vs what you'll need · today's money
-      </h3>
-      <svg
-        class="quick-chart"
-        :viewBox="`0 0 ${chart.W} ${chart.H}`"
-        preserveAspectRatio="none"
-        role="img"
-        aria-label="Projected corpus against the FIRE number, by retirement age"
-      >
-        <polyline :points="chart.need" fill="none" stroke="#b45309" stroke-width="2.5" />
-        <polyline :points="chart.have" fill="none" stroke="#2F5BFF" stroke-width="2.5" />
-        <line
-          :x1="chart.targetX"
-          :x2="chart.targetX"
-          :y1="chart.P"
-          :y2="chart.H - chart.P"
-          stroke="#94a3b8"
-          stroke-dasharray="4 4"
-        />
-      </svg>
-      <div class="text-caption text-medium-emphasis d-flex justify-space-between">
-        <span>age {{ chart.first }}</span>
-        <span>
-          <span style="color: #2f5bff">■</span> have ·
-          <span style="color: #b45309">■</span> need · dashed = your target
-        </span>
-        <span>age {{ chart.last }}</span>
+    <div class="result-grid">
+      <div class="hero">
+        <FireHero />
       </div>
-    </v-card>
 
-    <v-card variant="outlined" class="pa-6 mt-4">
-      <h3 class="text-subtitle-1 font-weight-bold font-display mb-3">What the full planner adds</h3>
-      <ul class="quick-result__list">
-        <li v-for="(line, i) in FULL_PLANNER_ADDS" :key="i" class="text-body-2 mb-2">{{ line }}</li>
-      </ul>
-    </v-card>
+      <p class="text-caption text-medium-emphasis mt-3 mb-4" data-testid="quick-honesty-line">
+        {{ PLAN_HONESTY_LINE }}
+      </p>
 
-    <v-card variant="outlined" class="pa-4 mt-4">
-      <v-expansion-panels variant="accordion" flat>
-        <v-expansion-panel data-testid="quick-answers-panel">
-          <v-expansion-panel-title>Your answers — tap to change</v-expansion-panel-title>
-          <v-expansion-panel-text>
-            <div class="quick-result__rows">
-              <template v-for="[k, v] in answerRows" :key="k">
-                <span class="text-body-2 text-medium-emphasis">{{ k }}</span>
-                <b class="text-body-2 text-currency">{{ v }}</b>
-              </template>
-            </div>
-            <v-btn
-              variant="outlined"
-              class="mt-4"
-              data-testid="quick-edit-answers"
-              @click="$emit('edit')"
-            >
-              Edit answers
-            </v-btn>
-          </v-expansion-panel-text>
-        </v-expansion-panel>
-      </v-expansion-panels>
-    </v-card>
+      <!-- The express path collapses every holding into one equity line to stay at ten cards. That
+           makes the projection optimistic for anyone holding PF/PPF/FD money, so it is stated on
+           the screen rather than buried (FinTech review HIGH 3/4). -->
+      <v-alert
+        type="info"
+        variant="tonal"
+        density="comfortable"
+        class="mb-4"
+        data-testid="quick-portfolio-caveat"
+      >
+        {{ QUICK_PORTFOLIO_CAVEAT }}
+      </v-alert>
 
-    <v-card variant="outlined" class="pa-6 mt-4 quick-result__cta">
+      <QuickExplainer />
+
+      <v-card v-if="showChart" variant="outlined" class="pa-6 mt-4" data-testid="quick-chart-card">
+        <h3 class="text-subtitle-1 font-weight-bold font-display mb-3">
+          What you'll have vs what you'll need · today's money
+        </h3>
+        <svg
+          class="quick-chart"
+          :viewBox="`0 0 ${chart.W} ${chart.H}`"
+          preserveAspectRatio="none"
+          role="img"
+          aria-label="Projected corpus against the FIRE number, by retirement age"
+        >
+          <polyline :points="chart.need" fill="none" stroke="#b45309" stroke-width="2.5" />
+          <polyline :points="chart.have" fill="none" stroke="#2F5BFF" stroke-width="2.5" />
+          <line
+            :x1="chart.targetX"
+            :x2="chart.targetX"
+            :y1="chart.P"
+            :y2="chart.H - chart.P"
+            stroke="#94a3b8"
+            stroke-dasharray="4 4"
+          />
+        </svg>
+        <div class="text-caption text-medium-emphasis d-flex justify-space-between">
+          <span>age {{ chart.first }}</span>
+          <span>
+            <span style="color: #2f5bff">■</span> have ·
+            <span style="color: #b45309">■</span> need · dashed = your target
+          </span>
+          <span>age {{ chart.last }}</span>
+        </div>
+      </v-card>
+
+      <!-- T-378C finding F7: the lever card (QN-5, "how to get there — pick your moves") is not
+           built yet. The only trace used to be a source comment — invisible to the user. This is
+           the honest, visible placeholder until QN-5 lands. -->
+      <v-card
+        variant="outlined"
+        class="pa-6 mt-4"
+        data-testid="quick-levers-placeholder"
+      >
+        <h3 class="text-subtitle-1 font-weight-bold font-display mb-2">How to get there</h3>
+        <p class="text-body-2 text-medium-emphasis mb-0">
+          Coming soon: pick your moves — step up savings, trim spend, retire later — and see the
+          date move. For now, make those changes in the full planner.
+        </p>
+      </v-card>
+
+      <v-card variant="outlined" class="pa-6 mt-4">
+        <h3 class="text-subtitle-1 font-weight-bold font-display mb-3">What the full planner adds</h3>
+        <ul class="quick-result__list">
+          <li v-for="(line, i) in FULL_PLANNER_ADDS" :key="i" class="text-body-2 mb-2">{{ line }}</li>
+        </ul>
+      </v-card>
+
+      <v-card variant="outlined" class="pa-4 mt-4">
+        <v-expansion-panels variant="accordion" flat>
+          <v-expansion-panel data-testid="quick-answers-panel">
+            <v-expansion-panel-title>Your answers — tap to change</v-expansion-panel-title>
+            <v-expansion-panel-text>
+              <div class="quick-result__rows">
+                <template v-for="[k, v] in answerRows" :key="k">
+                  <span class="text-body-2 text-medium-emphasis">{{ k }}</span>
+                  <b class="text-body-2 text-currency">{{ v }}</b>
+                </template>
+              </div>
+              <v-btn
+                variant="outlined"
+                class="mt-4"
+                data-testid="quick-edit-answers"
+                @click="$emit('edit')"
+              >
+                Edit answers
+              </v-btn>
+            </v-expansion-panel-text>
+          </v-expansion-panel>
+        </v-expansion-panels>
+      </v-card>
+
+      <v-card variant="outlined" class="pa-6 mt-4 quick-result__cta">
       <div>
         <b>Happy with the shape?</b>
         <div class="text-caption text-medium-emphasis">
@@ -244,12 +266,13 @@ const answerRows = computed(() => {
         Open full planner
         <v-icon icon="mdi-arrow-right" class="ml-1" />
       </v-btn>
-    </v-card>
+      </v-card>
 
-    <div class="text-center mt-4">
-      <RouterLink class="text-caption" :to="{ name: 'wizard', params: { step: 'profile' } }">
-        Refine your plan in the seven-step wizard
-      </RouterLink>
+      <div class="text-center mt-4 quick-result__refine">
+        <RouterLink class="text-caption" :to="{ name: 'wizard', params: { step: 'profile' } }">
+          Refine your plan in the seven-step wizard
+        </RouterLink>
+      </div>
     </div>
   </div>
 </template>
@@ -273,5 +296,28 @@ const answerRows = computed(() => {
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
+}
+
+/*
+ * T-378C finding F4 — design SSOT (option-c-merged.html) pins a two-column desktop layout at
+ * >=1024px: `#result{display:grid;grid-template-columns:1.15fr 1fr;gap:16px;align-items:start}`
+ * with the hero spanning the full height of the right column's content. Below 1024px this block
+ * has no effect and the result stays a single column (unchanged from before this fix).
+ */
+@media (min-width: 1024px) {
+  .result-grid {
+    display: grid;
+    grid-template-columns: 1.15fr 1fr;
+    gap: 16px;
+    align-items: start;
+  }
+  .result-grid .hero {
+    grid-column: 1;
+    /* Span the full height of the grid so everything else flows in column 2. */
+    grid-row: 1 / -1;
+  }
+  .result-grid > :not(.hero) {
+    grid-column: 2;
+  }
 }
 </style>
