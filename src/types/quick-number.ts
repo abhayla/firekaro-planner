@@ -63,8 +63,39 @@ export type QuickAnswers = z.infer<typeof quickAnswersSchema>;
  * anchor the user on our guess and quietly become "their" answer (the honesty mandate). Only the
  * structural defaults (a target age, "no loan", "no big purchase") are set.
  */
-export function emptyQuickAnswers(currentAge = 35): QuickAnswers {
+/**
+ * The shape the intake screen edits: every field present, so `v-model` never has to reason about
+ * `undefined`. `QuickAnswersDraft` is assignable to `QuickAnswers` — the optionality exists for the
+ * persisted/consumed side, not for the form.
+ */
+export type QuickAnswersDraft = QuickAnswers &
+  Required<
+    Pick<
+      QuickAnswers,
+      | "guess"
+      | "income"
+      | "corpus"
+      | "sip"
+      | "includeSpouse"
+      | "spouseCorpus"
+      | "kids"
+      | "kidsAge"
+      | "education"
+      | "postgrad"
+      | "wedding"
+      | "includeHouse"
+      | "house"
+      | "houseInYears"
+      | "hasLoan"
+      | "emi"
+      | "loanRate"
+      | "loanYearsLeft"
+    >
+  >;
+
+export function emptyQuickAnswers(currentAge = 35): QuickAnswersDraft {
   return {
+    guess: 0,
     age: currentAge,
     targetAge: 50,
     spend: 0,

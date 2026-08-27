@@ -53,6 +53,12 @@ export interface ApplyQuickAnswersOptions {
   now?: Date;
   /** `ui.quick.createdIds` from a previous run — those rows are replaced, never duplicated. */
   previousCreatedIds?: string[];
+  /**
+   * Set false for the intake screen's live "so far…" preview, which only needs the FIRE NUMBER
+   * (income-independent). The salary bisection is ~60 kernel runs and has no business firing on
+   * every keystroke; the real submit always runs it.
+   */
+  solveSalary?: boolean;
 }
 
 export interface ApplyQuickAnswersResult {
@@ -384,6 +390,13 @@ export function applyQuickAnswers(
   // ---- 6. the salary solve (see the module header for why this exists) ----
   let salaryAnnualCTC = 0;
   let solvedContributionMonthly = 0;
+  const wantsSalarySolve = options.solveSalary !== false;
+  if (!wantsSalarySolve) {
+    hh.profileComplete = true;
+    hh.wizardCompleted = true;
+    if (!hh.name) hh.name = "My household";
+    return { household: hh, createdIds, salaryAnnualCTC: 0, solvedContributionMonthly: 0 };
+  }
   if (sip > 0) {
     const solved = solveSalary(hh, self.id, assumptions, sip, (k) => k.monthlyContribution);
     salaryAnnualCTC = solved.ctc;
