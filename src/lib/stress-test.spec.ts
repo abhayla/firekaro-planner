@@ -73,16 +73,34 @@ describe("runStressScenarios (A27.3)", () => {
  * kernel path reproduces the headline solver exactly on an un-shifted baseline.
  */
 describe("runStressScenarios — the kernel triple (ADR-0006 Phase 1b)", () => {
-  it("baselineYearsToFire == the kernel's own solve when the triple is supplied", async () => {
+  /**
+   * ADR-0006 Phase 1d re-baseline, and it is a TIGHTENING, not a relaxation.
+   *
+   * This ran on the Sharmas alone at a `<= 1 year` bound, and the Sharmas sat at EXACTLY 1.000 —
+   * on the boundary, with the assertion passing by equality. Measured across all four seeds the
+   * old basket-grown target was out by 1.000 / 0.583 / 1.167 / 0.750 years, so the Iyers were
+   * already BREACHING the bound and no one could see it, because the lock only ever ran one
+   * persona. Growing the target at `effectiveTargetGrowthNominal` — the rate the headline was
+   * actually solved at, instead of the base leg's spending basket — brings the four to
+   * 0.000 / 0.167 / 0.250 / 0.250. So the case now runs every persona and the bound comes DOWN
+   * to 0.5, which the old model fails on two of them.
+   */
+  const AGREEMENT_BOUND_YEARS = 0.5;
+
+  it.each([
+    ["sharmas", async () => (await import("@/lib/seed-persona")).loadSeedPersona],
+    ["mehtas", async () => (await import("@/seeds/mehtas")).loadMehtasSeed],
+    ["iyers", async () => (await import("@/seeds/iyers")).loadIyersSeed],
+    ["mauryas", async () => (await import("@/seeds/mauryas")).loadMauryasSeed],
+  ])("%s: baselineYearsToFire == the kernel's own solve when the triple is supplied", async (name, getLoader) => {
     const { setActivePinia, createPinia } = await import("pinia");
     const { useHouseholdStore } = await import("@/stores/household");
     const { useAssumptionsStore } = await import("@/stores/assumptions");
-    const { loadSeedPersona } = await import("@/lib/seed-persona");
     const { derive } = await import("@/lib/derive");
     setActivePinia(createPinia());
     const h = useHouseholdStore();
     const a = useAssumptionsStore();
-    loadSeedPersona(h, a);
+    (await getLoader())(h, a);
     const k = derive(h.data, a.values, {
       isFamilyView: false,
       viewingMemberId: null,
@@ -96,21 +114,31 @@ describe("runStressScenarios — the kernel triple (ADR-0006 Phase 1b)", () => {
       totalCorpus: k.totalCorpus,
       annualIncomeTotal: k.annualIncome.total,
       fireNumberToday: k.fireNumber,
-      targetInflation: k.householdInflation,
+      targetGrowthNominal: k.effectiveTargetGrowthNominal,
       contributionSchedule: k.nominalContributionSchedule,
       expectedReturnSchedule: k.expectedReturnSchedule,
     };
 
     // The stress page starts from `totalCorpus` while the kernel solves from the
     // annuity-excluded `fireWithdrawableCorpus`, so allow that one documented difference —
-    // but the two must now be within a year of each other, not the many years the legacy
+    // but the two must now be within half a year of each other, not the many years the legacy
     // scalar model was out by.
+    const gap = Math.abs(baselineYearsToFire(args) - k.corpusOnlyYearsToRegular);
     expect(
-      Math.abs(baselineYearsToFire(args) - k.corpusOnlyYearsToRegular),
-      "the stress baseline must agree with the headline solver it sits beside",
-    ).toBeLessThanOrEqual(1);
+      gap,
+      `${name}: the stress baseline must agree with the headline solver it sits beside (gap ${gap.toFixed(3)} y)`,
+    ).toBeLessThanOrEqual(AGREEMENT_BOUND_YEARS);
 
-    // …and the LEGACY path (no triple) is measurably further away — the thing that was wrong.
+    // …and growing the target at the raw spending BASKET — the base leg alone, which is what this
+    // page did before Phase 1d — is measurably further out. This is the regression lock: pointing
+    // the page back at `householdInflation` goes red here.
+    const baseLegOnly = Math.abs(
+      baselineYearsToFire({ ...args, targetGrowthNominal: k.householdInflation }) -
+        k.corpusOnlyYearsToRegular,
+    );
+    expect(baseLegOnly, `${name}: the base-leg rate must be strictly worse`).toBeGreaterThan(gap);
+
+    // …and the LEGACY path (no triple at all) is further away still — the original Phase-1b bug.
     const legacy = baselineYearsToFire({
       annualExpenses: args.annualExpenses,
       swr: args.swr,
@@ -125,7 +153,7 @@ describe("runStressScenarios — the kernel triple (ADR-0006 Phase 1b)", () => {
     const withUndefined = runStressScenarios({
       ...base,
       fireNumberToday: undefined,
-      targetInflation: undefined,
+      targetGrowthNominal: undefined,
       contributionSchedule: undefined,
       expectedReturnSchedule: undefined,
     });

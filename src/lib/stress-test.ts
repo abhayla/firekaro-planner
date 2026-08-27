@@ -136,8 +136,18 @@ export interface StressRunArgs extends StressBaseline {
    */
   /** `derive().fireNumber` — the headline target in today's rupees (base + family layer + reservation). */
   fireNumberToday?: number;
-  /** `derive().householdInflation` — the NOMINAL household expense basket the target grows at. */
-  targetInflation?: number;
+  /**
+   * `derive().effectiveTargetGrowthNominal` — the NOMINAL rate the headline target actually grows
+   * at over the horizon the headline was solved at.
+   *
+   * ADR-0006 Phase 1d: this used to be `derive().householdInflation`, the scalar spending basket,
+   * and was named `targetInflation` to match. That is only the BASE leg's rate: it is blind to the
+   * medical reservation compounding at medical inflation and to every dated goal's due-year cap,
+   * so the stress page's own baseline FIRE age drifted away from the dashboard's for the same
+   * household. Renamed as well as re-pointed — a field called "inflation" invites the next caller
+   * to hand it an inflation rate, which is exactly how the base-leg mistake keeps recurring.
+   */
+  targetGrowthNominal?: number;
   /** `derive().nominalContributionSchedule` — the real inflow grown at CPI, incl. the step-up. */
   contributionSchedule?: ContributionSchedule;
   /** `derive().expectedReturnSchedule` — NOMINAL, glide-tapered. */
@@ -166,12 +176,14 @@ function yearsToFireFor(args: StressRunArgs, shifted: StressBaseline): number {
     return calculateYearsToTarget(args.totalCorpus, target, monthlyReal, shifted.expectedReturn);
   }
 
-  // Proportional expense/SWR shock on the headline target, then grown at the basket.
+  // Proportional expense/SWR shock on the headline target, then grown at the rate the headline
+  // itself was solved at (`effectiveTargetGrowthNominal`) — not at the raw spending basket, which
+  // is only one of the target's three legs.
   const expenseScale = args.annualExpenses > 0 ? shifted.annualExpenses / args.annualExpenses : 1;
   const swrScale = shifted.swr > 0 ? args.swr / shifted.swr : 1;
   const targetToday = (args.fireNumberToday as number) * expenseScale * swrScale;
-  const basket = Number.isFinite(args.targetInflation) ? (args.targetInflation as number) : 0;
-  const target = (yearIndex: number) => targetToday * Math.pow(1 + basket, yearIndex);
+  const growth = Number.isFinite(args.targetGrowthNominal) ? (args.targetGrowthNominal as number) : 0;
+  const target = (yearIndex: number) => targetToday * Math.pow(1 + growth, yearIndex);
 
   const returnDelta = shifted.expectedReturn - args.expectedReturn;
   const baseReturns = args.expectedReturnSchedule as ReturnSchedule;

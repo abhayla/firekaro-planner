@@ -36,12 +36,14 @@ const runArgs = computed(() => ({
   totalCorpus: fire.totalCorpus.value,
   annualIncomeTotal: fire.annualIncome.value.total,
   // ADR-0006 Phase 1b — the kernel triple, so the scenarios run the SAME nominal model as the
-  // headline (headline target incl. family layer + reservation, basket-grown, nominal returns,
-  // the step-up inflow). Without it the absolute years-to-FIRE here contradicted the hero.
+  // headline (headline target incl. family layer + reservation, nominal returns, the step-up
+  // inflow). Without it the absolute years-to-FIRE here contradicted the hero.
+  // Phase 1d — and the target grows at `effectiveTargetGrowthNominal`, the rate the headline was
+  // actually solved at, not at the raw spending basket (only the base leg's rate).
   fireNumberToday: fire.fireNumber.value,
-    targetInflation: fire.householdInflation.value,
-    contributionSchedule: fire.nominalContributionSchedule.value,
-    expectedReturnSchedule: fire.expectedReturnSchedule.value,
+  targetGrowthNominal: fire.effectiveTargetGrowthNominal.value,
+  contributionSchedule: fire.nominalContributionSchedule.value,
+  expectedReturnSchedule: fire.expectedReturnSchedule.value,
 }));
 
 const baselineYears = computed(() => baselineYearsToFire(runArgs.value));
