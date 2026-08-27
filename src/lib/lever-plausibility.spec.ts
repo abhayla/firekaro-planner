@@ -24,6 +24,7 @@ import {
   solvePlan,
   lessToFindFor,
   leverEffectFor,
+  marginalEffectFor,
   type PlanInputs,
   type PlanLeverKey,
 } from "@/lib/lever-catalog";
@@ -164,5 +165,53 @@ describe("rule 31 — Amit lands in the 'clearly doable' band with three realist
         `${lever.key} alone erases the whole shortfall (${saved} of ${baseFind}) — too good to be true`,
       ).toBeLessThanOrEqual(baseFind);
     }
+  });
+});
+
+/**
+ * The per-row metric on an UNREACHABLE baseline (the screenshot review, T-379).
+ *
+ * Measuring each lever ALONE is the mockup's semantics and is right when the baseline is
+ * reachable. On Amit it is not: no single move reaches age 50 either, so every row reported the
+ * same non-answer and the card rendered five identical "−₹0/mo" cells — which reads as "nothing
+ * you do matters", the exact message this feature exists to disprove. The marginal view answers
+ * the question actually being asked at the checkbox: what does adding THIS change, given my picks?
+ */
+describe("per-row effect on an unreachable baseline (marginal contribution)", () => {
+  beforeEach(() => setActivePinia(createPinia()));
+
+  it("a single lever alone reports 'not-enough-alone', never a ₹0 saving", () => {
+    const plan = amitPlan();
+    const levers = buildPlanLevers({ plan, directPlans: AMIT.directPlans });
+    const solo = marginalEffectFor(plan, levers, "step-up-10", []);
+    expect(solo.kind).toBe("not-enough-alone");
+    expect(solo.lessToFind).toBe(0);
+  });
+
+  it("adding the move that TIPS the plan into reach reports a rescue", () => {
+    const plan = amitPlan();
+    const levers = buildPlanLevers({ plan, directPlans: AMIT.directPlans });
+    // step-up alone is not enough; delay-3 on top of it is what makes the target reachable.
+    const marginal = marginalEffectFor(plan, levers, "delay-3", ["step-up-10"]);
+    expect(marginal.kind).toBe("rescue");
+    expect(Number.isFinite(marginal.requiredWith)).toBe(true);
+  });
+
+  it("once reachable, a further move reports a real ₹ saving on top of the picks", () => {
+    const plan = amitPlan();
+    const levers = buildPlanLevers({ plan, directPlans: AMIT.directPlans });
+    const marginal = marginalEffectFor(plan, levers, "direct-plans", ["step-up-10", "delay-3"]);
+    expect(["saving", "none"]).toContain(marginal.kind);
+    expect(marginal.lessToFind).toBeGreaterThanOrEqual(0);
+    expect(Number.isFinite(marginal.requiredWith)).toBe(true);
+  });
+
+  it("a lever already in the selection is not double-counted", () => {
+    const plan = amitPlan();
+    const levers = buildPlanLevers({ plan, directPlans: AMIT.directPlans });
+    const a = marginalEffectFor(plan, levers, "delay-3", ["step-up-10"]);
+    const b = marginalEffectFor(plan, levers, "delay-3", ["step-up-10", "delay-3"]);
+    expect(b.kind).toBe(a.kind);
+    expect(b.lessToFind).toBe(a.lessToFind);
   });
 });

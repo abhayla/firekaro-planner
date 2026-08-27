@@ -465,7 +465,16 @@ export type LeverEffectKind =
   | "rescue"
   /** Both reachable: the moves cut the monthly shortfall by `lessToFind`. */
   | "saving"
-  /** Nothing selected, still unreachable, or no measurable change. */
+  /**
+   * Baseline is unreachable and these moves do not fix it on their own.
+   * Distinct from "none" because "-Rs0/mo less to find" would be a LIE BY FRAMING: the move does
+   * help (it is one of a set that together rescue the plan), it just cannot carry the plan alone.
+   * On the reference persona EVERY lever taken singly falls here, so collapsing this into "none"
+   * renders a card of five "-Rs0/mo" rows - reading as "nothing you do matters", the exact
+   * message this feature exists to disprove (rule 31, caught in the T-379 screenshot review).
+   */
+  | "not-enough-alone"
+  /** Nothing selected, or both sides reachable with no measurable change. */
   | "none";
 
 export interface LeverEffect {
@@ -488,11 +497,58 @@ export function leverEffectFor(
   const withFind = toFindMonthly(withSolved);
   const requiredWith = withSolved.requiredMonthlyReal;
 
-  // Still out of reach even with the moves - no claim of any kind.
-  if (!Number.isFinite(withFind)) return { kind: "none", lessToFind: 0, requiredWith };
+  // Still out of reach even with the moves. If the BASELINE was reachable this is genuinely
+  // nothing; if it was not, the move is a real contributor that simply cannot do it alone.
+  if (!Number.isFinite(withFind)) {
+    return {
+      kind: Number.isFinite(baseFind) ? "none" : "not-enough-alone",
+      lessToFind: 0,
+      requiredWith,
+    };
+  }
   // Was out of reach, now is not: the honest headline is the rescue, not a rupee delta.
   if (!Number.isFinite(baseFind)) return { kind: "rescue", lessToFind: 0, requiredWith };
 
   const lessToFind = Math.max(0, Math.round(baseFind - withFind));
+  return { kind: lessToFind > 0 ? "saving" : "none", lessToFind, requiredWith };
+}
+
+/**
+ * What ONE lever adds on top of a set already switched on — its MARGINAL contribution.
+ *
+ * The card's default reading ("what would this move save me?") measures each lever ALONE against
+ * the baseline. That is the right question when the baseline is reachable. When it is NOT (the
+ * reference persona: no feasible monthly amount reaches age 50), every lever taken singly also
+ * fails to reach it, so every row reports the same non-answer and the card ranks nothing.
+ *
+ * The marginal view fixes that without ever over-claiming: it asks "given what is already ticked,
+ * what does adding THIS one change?" — which is exactly the decision the user is making at that
+ * checkbox. `others` is the currently-selected set; the lever itself is ignored if already in it.
+ */
+export function marginalEffectFor(
+  plan: PlanInputs,
+  levers: PlanLever[],
+  lever: PlanLeverKey,
+  others: readonly PlanLeverKey[],
+): LeverEffect {
+  const rest = others.filter((k) => k !== lever);
+  const withLever = [...rest, lever];
+  const withoutSolved = rest.length === 0 ? solvePlan(plan) : solvePlan(applyPlanLevers(plan, levers, rest));
+  const withSolved = solvePlan(applyPlanLevers(plan, levers, withLever));
+  const withoutFind = toFindMonthly(withoutSolved);
+  const withFind = toFindMonthly(withSolved);
+  const requiredWith = withSolved.requiredMonthlyReal;
+
+  if (!Number.isFinite(withFind)) {
+    return {
+      kind: Number.isFinite(withoutFind) ? "none" : "not-enough-alone",
+      lessToFind: 0,
+      requiredWith,
+    };
+  }
+  // Adding this lever is what tips the plan from impossible to possible.
+  if (!Number.isFinite(withoutFind)) return { kind: "rescue", lessToFind: 0, requiredWith };
+
+  const lessToFind = Math.max(0, Math.round(withoutFind - withFind));
   return { kind: lessToFind > 0 ? "saving" : "none", lessToFind, requiredWith };
 }

@@ -26,6 +26,7 @@ import {
   buildPlanLevers,
   applyPlanLevers,
   leverEffectFor,
+  marginalEffectFor,
   solvePlan,
   toFindMonthly,
   STEP_UP_LEVER_PERCENT,
@@ -75,22 +76,34 @@ function toggle(key: PlanLeverKey) {
   );
 }
 
+/** The baseline and the with-moves solve — the two numbers the summary line compares. */
+const baseSolve = computed(() => solvePlan(basePlan.value));
+/** True when today's plan cannot reach the target at ANY feasible monthly amount. */
+const baselineUnreachable = computed(() => !Number.isFinite(baseSolve.value.requiredMonthlyReal));
+
 /**
- * Per-lever "less to find" — each computed ALONE against the baseline (the mockup's semantics:
- * "what would THIS move save me?"), independent of what else is ticked. The stacked figure lives
- * in the plan summary below.
+ * Per-lever effect.
+ *
+ * When the baseline is REACHABLE we use the mockup's semantics — each move measured ALONE against
+ * the baseline ("what would THIS move save me?"), independent of what else is ticked.
+ *
+ * When it is NOT reachable that reading collapses: no single move gets there either, so every row
+ * would report the same non-answer and the card would rank nothing (caught in the T-379 screenshot
+ * review — five identical rows reading as "nothing you do matters"). There we show the MARGINAL
+ * contribution instead: what adding this move changes on top of what is already ticked, which is
+ * precisely the decision being made at that checkbox.
  */
 const perLever = computed(() =>
   levers.value.map((lever) => ({
     lever,
-    effect: lever.available
-      ? leverEffectFor(basePlan.value, levers.value, [lever.key])
-      : ({ kind: "none", lessToFind: 0, requiredWith: Number.NaN } as const),
+    effect: !lever.available
+      ? ({ kind: "none", lessToFind: 0, requiredWith: Number.NaN } as const)
+      : baselineUnreachable.value
+        ? marginalEffectFor(basePlan.value, levers.value, lever.key, selected.value)
+        : leverEffectFor(basePlan.value, levers.value, [lever.key]),
   })),
 );
 
-/** The baseline and the with-moves solve — the two numbers the summary line compares. */
-const baseSolve = computed(() => solvePlan(basePlan.value));
 const planSolve = computed(() =>
   solvePlan(applyPlanLevers(basePlan.value, levers.value, selected.value)),
 );
@@ -109,8 +122,6 @@ const stackedLessToFind = computed(() => stackedEffect.value.lessToFind);
  * so it gets its own line rather than being flattened to a misleading "-Rs0/mo".
  */
 const isRescue = computed(() => stackedEffect.value.kind === "rescue");
-/** True when even the ticked moves leave the target out of reach — the card makes NO claim. */
-const baselineUnreachable = computed(() => !Number.isFinite(baseSolve.value.requiredMonthlyReal));
 /** Lower-cased short labels, as the mockup joins them ("with X + Y + Z"). */
 const selectedNames = computed(() =>
   levers.value
@@ -212,7 +223,17 @@ function openPreferences() {
                 class="lever__amount lever__amount--win"
                 :data-testid="`lever-effect-${row.lever.key}`"
               >makes it reachable</b>
-              <span class="lever__fxnote">on its own</span>
+              <span class="lever__fxnote">{{ anyOn ? "added to your picks" : "on its own" }}</span>
+            </template>
+            <!-- The target is out of reach and THIS move alone does not fix it. Showing
+                 "−₹0/mo less to find" here would read as "this move is worthless" when it is
+                 in fact one of a set that together rescue the plan (rule 31). -->
+            <template v-else-if="row.effect.kind === 'not-enough-alone'">
+              <b
+                class="lever__amount lever__amount--flat"
+                :data-testid="`lever-effect-${row.lever.key}`"
+              >helps, not alone</b>
+              <span class="lever__fxnote">combine with others</span>
             </template>
             <template v-else>
               <b
