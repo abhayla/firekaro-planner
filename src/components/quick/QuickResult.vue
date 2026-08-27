@@ -172,8 +172,9 @@ const answerRows = computed(() => {
              sampled age (`r.needReal` / `r.haveAtTargetReal`), so the rise is the kernel's own
              target drift — your spending basket outrunning general CPI — not a drawing choice. -->
         <p class="text-caption text-medium-emphasis mb-2" data-testid="quick-chart-frame-note">
-          Both lines are in today's rupees. The need still rises: your spending basket grows a
-          little faster than general inflation, so retiring later costs more even in today's rupees.
+          Both lines are in today's rupees. Retiring later needs a smaller pot — fewer years to
+          fund — though your spending basket, growing a little faster than general inflation,
+          keeps the need from falling as much as you'd expect.
         </p>
         <svg
           class="quick-chart"
@@ -197,7 +198,7 @@ const answerRows = computed(() => {
           <span>age {{ chart.first }}</span>
           <span>
             <span style="color: #2f5bff">■</span> have ·
-            <span style="color: #b45309">■</span> need (rises with your basket) · dashed = your target
+            <span style="color: #b45309">■</span> need · dashed = your target
           </span>
           <span>age {{ chart.last }}</span>
         </div>
