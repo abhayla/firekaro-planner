@@ -1,6 +1,6 @@
 ---
 description: Hono route conventions for the v6 document API in server/src/routes/ (5 route files) — mount pattern, envelope, validation, logging, auth placement.
-globs: ["server/src/routes/**/*.ts", "server/src/index.ts"]
+paths: ["server/src/routes/**/*.ts", "server/src/index.ts"]
 ---
 
 # Hono Route Conventions

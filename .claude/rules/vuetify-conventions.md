@@ -1,6 +1,6 @@
 ---
 description: Vuetify 3 component usage patterns, theme conventions, and UI patterns
-globs: ["src/**/*.vue", "src/plugins/vuetify.ts"]
+paths: ["src/**/*.vue", "src/plugins/vuetify.ts"]
 ---
 
 # Vuetify Conventions

@@ -1,6 +1,6 @@
 ---
 description: Server-side logging MUST use the pino logger from server/lib/logger.ts. console.log is blocked by ESLint.
-globs: ["server/**/*.ts"]
+paths: ["server/**/*.ts"]
 version: "1.0.0"
 synthesized: true
 private: false

@@ -1,6 +1,6 @@
 ---
 description: Vuetify-specific wait strategies and timing conventions for Playwright E2E tests
-globs: ["e2e/**/*.ts"]
+paths: ["e2e/**/*.ts"]
 ---
 
 # E2E Vuetify Timing

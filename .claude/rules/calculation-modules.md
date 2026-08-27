@@ -1,6 +1,6 @@
 ---
 description: Frontend pure calculation modules and India-specific financial constants
-globs: ["src/lib/**/*.ts"]
+paths: ["src/lib/**/*.ts"]
 ---
 
 # Calculation Module Conventions

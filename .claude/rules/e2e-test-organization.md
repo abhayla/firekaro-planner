@@ -1,6 +1,6 @@
 ---
 description: E2E test file organization, numbering, cross-page consistency, and fixture conventions
-globs: ["e2e/tests/**/*.spec.ts", "e2e/fixtures/**/*.ts"]
+paths: ["e2e/tests/**/*.spec.ts", "e2e/fixtures/**/*.ts"]
 ---
 
 # E2E Test Organization

@@ -1,6 +1,6 @@
 ---
 description: Rate-limit tiers for OTP, auth, and general API endpoints. In-memory Map-based, with stricter prod thresholds.
-globs: ["server/src/index.ts", "server/src/middleware/rate-limit.ts", "server/src/routes/**/*.ts"]
+paths: ["server/src/index.ts", "server/src/middleware/rate-limit.ts", "server/src/routes/**/*.ts"]
 version: "1.0.0"
 synthesized: true
 private: false

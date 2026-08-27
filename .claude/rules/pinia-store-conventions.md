@@ -1,6 +1,6 @@
 ---
 description: Pinia store patterns for client-side state management
-globs: ["src/stores/**/*.ts"]
+paths: ["src/stores/**/*.ts"]
 ---
 
 # Pinia Store Conventions

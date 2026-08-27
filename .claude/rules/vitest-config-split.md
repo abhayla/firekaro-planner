@@ -1,6 +1,6 @@
 ---
 description: One vitest config per tree (root src/, server/). Integration specs that need a live DB are gated IN-SPEC on DATABASE_URL and auto-skip when it is unset — never via a separate config.
-globs: ["vitest.config.ts", "server/vitest.config.ts", "server/src/**/*.spec.ts", "src/**/*.spec.ts"]
+paths: ["vitest.config.ts", "server/vitest.config.ts", "server/src/**/*.spec.ts", "src/**/*.spec.ts"]
 version: "2.0.0"
 synthesized: true
 private: false

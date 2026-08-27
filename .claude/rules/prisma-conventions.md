@@ -1,6 +1,6 @@
 ---
 description: Prisma ORM model and query conventions for the PostgreSQL database layer
-globs: ["prisma/**", "server/**/*.ts"]
+paths: ["prisma/**", "server/**/*.ts"]
 ---
 
 # Prisma Conventions

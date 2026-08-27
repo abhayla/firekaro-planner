@@ -1,6 +1,6 @@
 ---
 description: Server must validate required env vars at boot via server/lib/validate-env.ts. Placeholder secrets are rejected.
-globs: ["server/**/*.ts"]
+paths: ["server/**/*.ts"]
 version: "1.0.0"
 synthesized: true
 private: false

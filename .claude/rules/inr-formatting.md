@@ -1,6 +1,6 @@
 ---
 description: Indian Rupee currency formatting conventions across the application
-globs: ["src/**/*.ts", "src/**/*.vue", "server/**/*.ts"]
+paths: ["src/**/*.ts", "src/**/*.vue", "server/**/*.ts"]
 ---
 
 # INR Formatting Conventions

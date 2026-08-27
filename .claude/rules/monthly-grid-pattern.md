@@ -1,6 +1,6 @@
 ---
 description: 12-column monthly grid (Apr-Mar) used for salary and investment data entry
-globs: ["src/components/salary/**/*.vue", "src/components/investments/**/*.vue"]
+paths: ["src/components/salary/**/*.vue", "src/components/investments/**/*.vue"]
 ---
 
 # Monthly Grid Pattern (Apr-Mar Financial Year)

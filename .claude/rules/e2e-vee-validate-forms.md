@@ -1,6 +1,6 @@
 ---
 description: How to drive Vue forms that use vee-validate + defineField from Playwright (pressSequentially + blur, not fill).
-globs: ["e2e/**"]
+paths: ["e2e/**"]
 ---
 
 # E2E Driving Forms That Use VeeValidate + defineField

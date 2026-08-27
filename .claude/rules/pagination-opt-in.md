@@ -1,6 +1,6 @@
 ---
 description: List endpoints MUST paginate only when ?page= is present. Unpaginated by default to preserve existing clients. Use parsePagination + apiPaginated.
-globs: ["server/routes/**/*.ts", "src/composables/**/*.ts"]
+paths: ["server/routes/**/*.ts", "src/composables/**/*.ts"]
 version: "1.0.0"
 synthesized: true
 private: false

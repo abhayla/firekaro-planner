@@ -1,6 +1,6 @@
 ---
 description: URL query parameter synchronization for tabs and financial year selection
-globs: ["src/pages/**/*.vue"]
+paths: ["src/pages/**/*.vue"]
 ---
 
 # URL Query Parameter Sync

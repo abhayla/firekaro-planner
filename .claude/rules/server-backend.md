@@ -1,6 +1,6 @@
 ---
 description: Backend (`server/`) architecture — Supabase/pooler, the /api/planner document endpoints, the household diff engine, auth + dev-bypass, prod smoke, owner alerts. Extracted from CLAUDE.md (T-349, 2026-08-26) to fit the ≤80-line project-root budget; CLAUDE.md keeps a 3-line pointer.
-globs: ["server/**"]
+paths: ["server/**"]
 ---
 
 # Backend (`server/`) — Hono + Prisma + Better Auth → Supabase
