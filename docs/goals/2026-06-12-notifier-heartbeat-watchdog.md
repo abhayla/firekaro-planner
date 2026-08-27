@@ -147,11 +147,11 @@ do NOT build a parallel send path.
 ### ⚠️ Live-delivery confirmation is ABHAY-GATED, NOT auto-run (spend + outward-facing)
 A real missed-heartbeat producing a real WhatsApp/Telegram message is a **spend + outward-facing send → an
 escalation gate** (`decision-authority.md`), and the fail-closed allowlist limits real WhatsApp to
-`<owner-test-number — see D:AbhayGLOBAL.md>`. The autonomous run **MUST NOT trigger real sends** — it proves the watchdog with mock
+`<owner-test-number — see GLOBAL.md>`. The autonomous run **MUST NOT trigger real sends** — it proves the watchdog with mock
 adapters. The channels themselves were already proven live yesterday for `/notify` (the heartbeat reuses the
 SAME pipeline, so the only new risk surface is the tick/store logic, fully covered by mocks). Add a final
 **MANUAL VERIFICATION (Abhay-run)** note to the final report: "to confirm end-to-end live delivery, register a
-1-min heartbeat for a throwaway project, stop pinging, and confirm one real alert arrives to <owner-test-number — see D:AbhayGLOBAL.md> —
+1-min heartbeat for a throwaway project, stop pinging, and confirm one real alert arrives to <owner-test-number — see GLOBAL.md> —
 Abhay's call, not auto-run."
 
 ---
@@ -210,7 +210,7 @@ live-delivery note. Plus **LEARNINGS TO FOLD BACK** (proposals only; route per `
 - **`Notifier` repo only.** Never write into firekaro-planner, the hub, a consumer repo, or `D:\Abhay\VibeCoding\5Wealths\`.
 - **No new dependencies** (use the existing Hono/TS/vitest stack + `state/*.json` persistence — NO database).
 - **Reuse, don't reinvent:** the watchdog dispatches through the EXISTING notify/router/dedupe/adapter pipeline — never a parallel send path.
-- **No real sends in the autonomous run** — mock adapters only; live-delivery is Abhay-gated (spend + outward, `decision-authority.md`). The fail-closed WhatsApp allowlist (`<owner-test-number — see D:AbhayGLOBAL.md>`) is NEVER widened by this run.
+- **No real sends in the autonomous run** — mock adapters only; live-delivery is Abhay-gated (spend + outward, `decision-authority.md`). The fail-closed WhatsApp allowlist (`<owner-test-number — see GLOBAL.md>`) is NEVER widened by this run.
 - **No fabrication (rule 20):** no clock-magic literals in logic (inject the clock); don't invent a `.githooks` lock or a config key that isn't there.
 - **Stop only on a true blocker;** context-budget is not a blocker — hand off via a one-line note.
 - **Strategic/portfolio items are `TODO(5W):` notes.**

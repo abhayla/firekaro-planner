@@ -35,7 +35,7 @@ submitted all 7 (#2–8) from the manifest `docs/wati-templates.json` via the gl
   `server/src/lib/comms-templates.ts` (`DEFAULTS`), so the sender resolves the right name with NO
   `COMMS_TEMPLATE_*` override — locally AND on the VPS (which already runs that code from A4). The
   override env vars remain available if a future template ever approves under a different name.
-- **End-to-end proven:** sent `firekaro_milestone` (UTILITY, 3 vars) to the test number `<owner-test-number — see D:AbhayGLOBAL.md>`
+- **End-to-end proven:** sent `firekaro_milestone` (UTILITY, 3 vars) to the test number `<owner-test-number — see GLOBAL.md>`
   → Wati terminal status `DELIVERED` confirmed. The approved-template → send → deliver path works.
 - Remaining for full lifecycle: the MARKETING three (`monthly_digest`/`winback`/`salary_update`) only
   *send* once `marketingOptIn` consent + broadcast (A6) are on; UTILITY four are usable now (gated by
@@ -142,7 +142,7 @@ carries ONLY the `whatsappMessageId`; fixed to correlate by that id (commit `996
   done. Number capture (`CommsConsent.whatsappNumber`, Preferences UI), welcome-on-consent (D3), the
   server-side `lifecycle-evaluator` + token-guarded `POST /api/internal/lifecycle/run`, and per-period
   send-log dedupe (`whatsapp_send_log.dedupeKey`) all ship. **Live-verified end-to-end:** `welcome` +
-  `annual_review` both reached **DELIVERED** to the test number `<owner-test-number — see D:AbhayGLOBAL.md>`; a second endpoint run
+  `annual_review` both reached **DELIVERED** to the test number `<owner-test-number — see GLOBAL.md>`; a second endpoint run
   sent nothing (dedup). Two additive Supabase migrations applied (`whatsappNumber`, `dedupeKey`). Phase 2
   (marketing digest / winback / salary-update + `lastSeenAt`) stays deferred behind `marketingOptIn` + A6.
   Full unit coverage; both trees green. **Needs Abhay (to take it live on prod):**

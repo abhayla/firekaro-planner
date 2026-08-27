@@ -18,7 +18,7 @@ const p2002 = () =>
 
 const input = (over: Partial<RecordSendInput> = {}): RecordSendInput => ({
   userId: "u1",
-  toNumber: "917972672473",
+  toNumber: "919999900001",
   templateName: "welcome",
   category: "utility",
   status: "SENT",

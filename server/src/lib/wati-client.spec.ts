@@ -57,7 +57,7 @@ describe("getWatiConfig / isWhatsAppEnabled", () => {
 describe("normalizeWhatsAppNumber", () => {
   it("strips '+', spaces, and dashes to digits only", () => {
     expect(normalizeWhatsAppNumber("+91 98765-43210")).toBe("919876543210");
-    expect(normalizeWhatsAppNumber("(91) 79726 72473")).toBe("917972672473");
+    expect(normalizeWhatsAppNumber("(91) 79726 72473")).toBe("919999900001");
   });
   it("handles empty/undefined", () => {
     expect(normalizeWhatsAppNumber("")).toBe("");
@@ -197,11 +197,11 @@ describe("sendTemplateMessage", () => {
 });
 
 describe("recipient safety allowlist (feedback_whatsapp_test_recipient)", () => {
-  const ABHAY = "917972672473"; // the ONLY approved test recipient
+  const ABHAY = "919999900001"; // the ONLY approved test recipient
 
   it("parseTestRecipients parses + normalizes a comma list", () => {
     const env = { WATI_TEST_RECIPIENTS: "+91 79726-72473, 919999988888" } as NodeJS.ProcessEnv;
-    expect(parseTestRecipients(env)).toEqual(["917972672473", "919999988888"]);
+    expect(parseTestRecipients(env)).toEqual(["919999900001", "919999988888"]);
   });
 
   it("parseTestRecipients is empty (fail-closed) when unset", () => {

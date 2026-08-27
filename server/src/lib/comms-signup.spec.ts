@@ -54,13 +54,13 @@ describe("maybeSendWelcome (D3)", () => {
       ...over,
     };
   }
-  const target = { userId: "u1", whatsappNumber: "917972672473", revoked: false, firstName: "Abhay" };
+  const target = { userId: "u1", whatsappNumber: "919999900001", revoked: false, firstName: "Abhay" };
 
   it("fires the welcome the first time a number is saved with un-revoked consent", async () => {
     const d = wdeps();
     const r = await maybeSendWelcome(target, d);
     expect(r).toEqual({ fired: true, reason: "sent" });
-    expect(d.fireWelcome).toHaveBeenCalledWith({ userId: "u1", toNumber: "917972672473", firstName: "Abhay" });
+    expect(d.fireWelcome).toHaveBeenCalledWith({ userId: "u1", toNumber: "919999900001", firstName: "Abhay" });
   });
 
   it("does NOT fire when there is no number", async () => {

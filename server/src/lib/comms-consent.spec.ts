@@ -156,8 +156,8 @@ describe("resolveConsentPatch (gh-issue #10 — DPDP re-opt-in + phone validatio
     const ok = resolveConsentPatch({ whatsappNumberRaw: "+91 79726 72473" }, NOW);
     expect(ok.ok).toBe(true);
     if (ok.ok) {
-      expect(ok.update.whatsappNumber).toBe("917972672473");
-      expect(ok.create.whatsappNumber).toBe("917972672473");
+      expect(ok.update.whatsappNumber).toBe("919999900001");
+      expect(ok.create.whatsappNumber).toBe("919999900001");
     }
     const clear = resolveConsentPatch({ whatsappNumberRaw: "" }, NOW);
     if (clear.ok) expect(clear.update.whatsappNumber).toBeNull();

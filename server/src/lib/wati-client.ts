@@ -64,7 +64,7 @@ export function normalizeWhatsAppNumber(raw: string): string {
 /**
  * SAFETY RAIL (feedback_whatsapp_test_recipient): the comma-separated allowlist
  * of numbers permitted to receive messages while broadcast is OFF. Set in
- * server/.env as WATI_TEST_RECIPIENTS (Abhay's number 917972672473 during dev).
+ * server/.env as WATI_TEST_RECIPIENTS (Abhay's number 919999900001 during dev).
  * Empty list + broadcast off ⇒ fail-closed: NO message goes out.
  */
 export function parseTestRecipients(env: NodeJS.ProcessEnv = process.env): string[] {
