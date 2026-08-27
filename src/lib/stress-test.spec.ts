@@ -61,3 +61,80 @@ describe("runStressScenarios (A27.3)", () => {
     expect(baselineYearsToFire({ annualExpenses: 0, swr: 0.035, expectedReturn: 0.12, totalCorpus: 0, annualIncomeTotal: 0 })).toBe(0);
   });
 });
+
+/**
+ * ADR-0006 Phase 1b (MEDIUM-7) — the KERNEL-TRIPLE path.
+ *
+ * Before this, the stress page ran a pre-ADR-0006 model of its own: an `expenses / swr` target
+ * (no family layer, no medical reservation) held CONSTANT in today's rupees, a flat real return
+ * and no savings step-up. Its per-scenario DELTA was still meaningful, but its ABSOLUTE
+ * years-to-FIRE contradicted the FIRE age the dashboard printed for the same household. These
+ * cases lock the migration: the legacy path is untouched when the triple is absent, and the
+ * kernel path reproduces the headline solver exactly on an un-shifted baseline.
+ */
+describe("runStressScenarios — the kernel triple (ADR-0006 Phase 1b)", () => {
+  it("baselineYearsToFire == the kernel's own solve when the triple is supplied", async () => {
+    const { setActivePinia, createPinia } = await import("pinia");
+    const { useHouseholdStore } = await import("@/stores/household");
+    const { useAssumptionsStore } = await import("@/stores/assumptions");
+    const { loadSeedPersona } = await import("@/lib/seed-persona");
+    const { derive } = await import("@/lib/derive");
+    setActivePinia(createPinia());
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    loadSeedPersona(h, a);
+    const k = derive(h.data, a.values, {
+      isFamilyView: false,
+      viewingMemberId: null,
+      currentFY: "2025-26",
+    });
+
+    const args: StressRunArgs = {
+      annualExpenses: k.annualExpensesToday,
+      swr: k.effectiveSWR,
+      expectedReturn: k.blendedReturn,
+      totalCorpus: k.totalCorpus,
+      annualIncomeTotal: k.annualIncome.total,
+      fireNumberToday: k.fireNumber,
+      targetInflation: k.householdInflation,
+      contributionSchedule: k.nominalContributionSchedule,
+      expectedReturnSchedule: k.expectedReturnSchedule,
+    };
+
+    // The stress page starts from `totalCorpus` while the kernel solves from the
+    // annuity-excluded `fireWithdrawableCorpus`, so allow that one documented difference —
+    // but the two must now be within a year of each other, not the many years the legacy
+    // scalar model was out by.
+    expect(
+      Math.abs(baselineYearsToFire(args) - k.corpusOnlyYearsToRegular),
+      "the stress baseline must agree with the headline solver it sits beside",
+    ).toBeLessThanOrEqual(1);
+
+    // …and the LEGACY path (no triple) is measurably further away — the thing that was wrong.
+    const legacy = baselineYearsToFire({
+      annualExpenses: args.annualExpenses,
+      swr: args.swr,
+      expectedReturn: args.expectedReturn,
+      totalCorpus: args.totalCorpus,
+      annualIncomeTotal: args.annualIncomeTotal,
+    });
+    expect(Math.abs(legacy - k.corpusOnlyYearsToRegular)).toBeGreaterThan(1);
+  });
+
+  it("omitting the triple is byte-identical to the pre-Phase-1b behaviour", () => {
+    const withUndefined = runStressScenarios({
+      ...base,
+      fireNumberToday: undefined,
+      targetInflation: undefined,
+      contributionSchedule: undefined,
+      expectedReturnSchedule: undefined,
+    });
+    const plain = runStressScenarios(base);
+    expect(withUndefined.results.map((r) => r.yearsToFire)).toEqual(
+      plain.results.map((r) => r.yearsToFire),
+    );
+    expect(withUndefined.results.map((r) => r.fireNumber)).toEqual(
+      plain.results.map((r) => r.fireNumber),
+    );
+  });
+});

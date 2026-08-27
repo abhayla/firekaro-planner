@@ -384,6 +384,11 @@ export function useFireDerive() {
     // ADR-0006: the REAL (today's-₹) corpus-inflow schedule the headline was solved with.
     householdContributionSchedule: computed(() => d.value.householdContributionSchedule),
     bandContributionSchedule: computed(() => d.value.bandContributionSchedule),
+    // ADR-0006: the NOMINAL triple the headline solver actually ran on. Exposed so the stress
+    // scenarios (and any other consumer) re-use it instead of rebuilding a second, differently-
+    // framed model of the same plan.
+    nominalContributionSchedule: computed(() => d.value.nominalContributionSchedule),
+    expectedReturnSchedule: computed(() => d.value.expectedReturnSchedule),
     portfolioVolatility: computed(() => d.value.portfolioVolatility),
     // Canonical per-bucket corpus weights (₹) backing blendedReturn/portfolioVolatility — the basis
     // the obj-2 acceleration composable must use for risk-notch equity headroom + perturbed σ (gh-48).
