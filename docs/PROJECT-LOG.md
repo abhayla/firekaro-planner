@@ -127,6 +127,9 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 
 ## §3 — Decision log (append-only, newest first)
 
+### 2026-08-27 (10:15 IST)
+- **D-2026-08-27-05 — Quick Number wave: #166 (QN-3), #168 (QN-2), #175 (T-377 doc fixes) and #173 (QN-1+QN-4, the `/quick` front door) are ALL on `main`**, each behind an independent checker (evidence in `GetWorkDone/evidence/2026-08-27-T-37x/`). T-378's checker PASS-WITH-FINDINGS → fix-round T-378F running (card-3 EMI copy contradiction; loan balance must be the PV annuity via `amortization.ts`, not emi×12×years; sanity line on the result; the Option-C two-column desktop result layout; chart window from current age; QN-5 placeholder; server-mode rule-25 proof now possible with a local `server/.env`). Real-kernel Amit: need ₹19.05 Cr today's money, "Move the age" at 50 — re-derived exactly by the checker; the mock's ₹13.35 Cr was the simplified frame. T-379 (levers) is sequenced behind T-378F; T-380 (gh #167) after that. Costs so far: ≈$23 + $80 + $5 + $93 = **≈$200**; lessons logged (stage sizing, cap-death harvest, haiku context, trust-file race). Needs-Abhay B9 added (Supabase password rotation, low urgency).
+
 ### 2026-08-27 (08:30 IST)
 - **D-2026-08-27-04 — Repo made PUBLIC (Abhay: "make this repo public hence github billing won't be needed").**
   Unblocks CI for the whole Quick Number wave (B8 resolved). Pre-flip: 555-commit secret scan clean, no `.env`
