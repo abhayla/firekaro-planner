@@ -27,7 +27,12 @@ describe("requiredMonthlyContributionFor — solves through the REAL derive() pa
     const h = useHouseholdStore();
     const a = useAssumptionsStore();
     loadSeedPersona(h, a);
-    const targetAge = 50;
+    // ADR-0006 Phase 1c: 52, not 50. With the healthcare reservation drifting at medical
+    // inflation, the Sharmas' need at 50 (₹12.00 Cr in today's ₹) sits above what their
+    // take-home can fund net of the living floor, so the honest answer there is Infinity —
+    // "move the age", not a number. 52 is the first reachable age, and the re-feed proof this
+    // test exists for needs a reachable one. The unreachable branch is covered separately.
+    const targetAge = 52;
 
     const r = requiredMonthlyContributionFor({
       snapshot: h.data,
@@ -401,11 +406,28 @@ describe("requiredMonthlyContributionFor — solves through the REAL derive() pa
       targetRetirementAge: 55,
     });
     const adultAtTarget = atTarget.individualFireByMember.find((m) => m.memberId === adult.memberId)!;
-    expect(member.needReal).toBe(Math.round(adultAtTarget.individualFireNumber));
+    // ADR-0006: `needReal` is the today's-₹ number AT THE TARGET AGE, so it carries the target's
+    // real drift over the today's-₹ figure the kernel reports for age 0. Asserting against the
+    // undrifted figure would re-assert the very optimism gh #167 removed.
+    //
+    // Phase 1c: that drift is NOT `(1+g)^T` — the reservation rides medical inflation and each
+    // dated goal stops rising on its due year — so it is read off the kernel's own component
+    // schedule at the same horizon. Re-deriving it from a scalar here would assert a model the
+    // kernel no longer implements (and would silently pass again the day the goal legs vanish).
+    const driftFactor = (
+      k: { regularTargetComponentsRealAt: (t: number) => { total: number }; fireNumber: number },
+      anchor: number,
+    ) => k.regularTargetComponentsRealAt(Math.max(0, 55 - anchor)).total / k.fireNumber;
+    expect(member.needReal).toBe(
+      Math.round(adultAtTarget.individualFireNumber * driftFactor(atTarget, adultAtTarget.anchorAge)),
+    );
     // (rounded — every monetary output of the solver is an integer rupee, per the
     // calculation-module convention.)
+    const householdAtTarget = derive(h.data, a.values, LENS, { targetRetirementAge: 55 });
     expect(household.needReal).toBe(
-      Math.round(derive(h.data, a.values, LENS, { targetRetirementAge: 55 }).fireNumber),
+      Math.round(
+        householdAtTarget.fireNumber * driftFactor(householdAtTarget, householdAtTarget.anchorAge),
+      ),
     );
     // Household stays the PRIMARY, bigger claim — the individual view funds only that adult.
     expect(member.needReal).not.toBe(household.needReal);

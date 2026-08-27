@@ -16,6 +16,38 @@ import { getAuthProvider } from "@/lib/auth-provider";
 // resolver was retired in Stage-T0b — see ADR-0002).
 const ENTITY_KEY = "assumptions";
 
+/**
+ * The migration version stamped into every hydrated assumptions document. Bump ONLY when adding
+ * a new one-shot migration below, and give that migration its own `< N` guard.
+ */
+export const ASSUMPTIONS_MIGRATION_VERSION = 1;
+
+/**
+ * ADR-0006 migration-on-hydrate: `householdSavingsStepUpPercent`'s default moved 0 → 2.
+ *
+ * Every household persisted before 2026-08-27 carries a stored `0` that was never a CHOICE —
+ * it is the old default, written out by the store's deep `watch` the first time anything in
+ * `/preferences` was touched. Merging it verbatim would pin the entire existing user base to
+ * zero real wage growth forever, i.e. exactly the pessimism ADR-0006 corrects, while every new
+ * signup got the corrected default — two different products from one kernel.
+ *
+ * ONE-SHOT (Phase 1b). The first version of this sniffed the VALUE (`=== 0`) on EVERY hydrate,
+ * so a user who deliberately set the step-up to 0 in /preferences got 2 back on the next reload —
+ * a setting the product refused to let them keep, and a silent, repeating override of an explicit
+ * choice. The document now carries `assumptionsMigratedV`: the lift runs only while that stamp is
+ * absent, and the stamp is written on every hydrate (including a first-run document that had
+ * nothing stored), so a later deliberate 0 survives set → persist → re-hydrate indefinitely.
+ *
+ * Pure + exported so the idempotence is unit-testable without a storage round-trip.
+ */
+export function migrateStepUpDefault(parsed: Partial<Assumptions>): Partial<Assumptions> {
+  const alreadyMigrated = (parsed.assumptionsMigratedV ?? 0) >= 1;
+  const stamped = { ...parsed, assumptionsMigratedV: ASSUMPTIONS_MIGRATION_VERSION };
+  if (alreadyMigrated || parsed.householdSavingsStepUpPercent !== 0) return stamped;
+  const { householdSavingsStepUpPercent: _legacyZero, ...rest } = stamped;
+  return rest;
+}
+
 export const useAssumptionsStore = defineStore("assumptions", () => {
   const values = ref<Assumptions>({ ...DEFAULT_ASSUMPTIONS });
   const hydrated = ref(false);
@@ -24,9 +56,10 @@ export const useAssumptionsStore = defineStore("assumptions", () => {
   function hydrate() {
     if (hydrated.value) return;
     const parsed = adapter.get<Partial<Assumptions>>(ENTITY_KEY);
-    if (parsed) {
-      values.value = { ...DEFAULT_ASSUMPTIONS, ...parsed };
-    }
+    // The stamp is written even when NOTHING was stored: a brand-new user who types 0 into the
+    // /preferences step-up field must have that 0 survive their next reload, and it only can if
+    // the document they are about to persist already carries the stamp.
+    values.value = { ...DEFAULT_ASSUMPTIONS, ...migrateStepUpDefault(parsed ?? {}) };
     hydrated.value = true;
   }
 

@@ -524,3 +524,68 @@ describe("A7.1 withdrawal-rule invariants — free-form (fast-check)", () => {
     );
   });
 });
+
+/**
+ * ADR-0006 Phase 1b (MEDIUM-5) — a BRIDGE-CONSTRAINED monotonicity witness.
+ *
+ * The four seeds are all corpus-limited, so the property tests above exercise the leg whose
+ * monotonicity has an easy proof (`corpus_t` rises in `C`, `target_t` does not depend on it). The
+ * headline is `max(corpusOnlyYears, bridge.effectiveFireAge − anchor)`, and the BRIDGE leg has no
+ * such proof: `derive.ts` scales holdings by `driftedTargetReal / totalCorpus` at the ADEQUACY AGE,
+ * and that age moves with `C`. A larger contribution therefore reaches adequacy earlier, at a
+ * different scale, over a different bridge window — so the solver's bisection precondition needs a
+ * witness on a household where the BRIDGE actually binds, not only where it is slack.
+ *
+ * The fixture parks almost the whole corpus in PPF + NPS, which unlock late, leaving very little
+ * liquid runway for the early retirement years.
+ */
+describe("T-377/QN-2 — the precondition holds where the BRIDGE binds, not just the corpus leg", () => {
+  beforeEach(() => setActivePinia(createPinia()));
+
+  function loadBridgeConstrained(h: H, a: A) {
+    loadSeedPersona(h, a); // Sharmas
+    // Park the whole corpus in PPF + NPS (both unlock at 60) and make it large enough that the
+    // ADEQUACY leg is satisfied immediately — so the headline is driven ENTIRELY by the bridge,
+    // which is the leg with no target-independence argument behind it. Measured on this fixture:
+    // corpusOnlyYearsToRegular = 0 while yearsToRegular = 26 (effective FIRE age 56, uncovered).
+    h.data.investments = h.data.investments.map((inv, i) => ({
+      ...inv,
+      type: i % 2 === 0 ? ("PPF" as const) : ("NPS" as const),
+      value: inv.value * 6,
+    }));
+  }
+
+  it("the fixture really is bridge-constrained (else this witness proves nothing)", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    loadBridgeConstrained(h, a);
+    const k = derive(h.data, a.values, LENS);
+    expect(
+      k.yearsToRegular,
+      "the bridge must PUSH the headline past the corpus-only leg for this fixture to be a witness",
+    ).toBeGreaterThan(k.corpusOnlyYearsToRegular + EPS);
+  });
+
+  it("headline yearsToFire is still non-increasing in the monthly contribution", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    loadBridgeConstrained(h, a);
+    const base = a.values;
+    const current = derive(h.data, base, LENS).monthlyContribution;
+    const hi = Math.max(10 * current, 500_000);
+    fc.assert(
+      fc.property(
+        fc.double({ min: 0, max: hi, noNaN: true }),
+        fc.double({ min: 0, max: hi, noNaN: true }),
+        (c1, c2) => {
+          const lo = Math.min(c1, c2);
+          const up = Math.max(c1, c2);
+          const kLo = derive(h.data, base, LENS, { monthlyContributionReal: lo });
+          const kUp = derive(h.data, base, LENS, { monthlyContributionReal: up });
+          expect(kUp.yearsToRegular).toBeLessThanOrEqual(kLo.yearsToRegular + EPS);
+        },
+      ),
+      { numRuns: 60 },
+    );
+  });
+});

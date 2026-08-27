@@ -20,13 +20,14 @@ import { useHouseholdStore } from "@/stores/household";
 import { useAssumptionsStore } from "@/stores/assumptions";
 import { useUiStore, SHARED_TARGET_AGE_MIN, SHARED_TARGET_AGE_MAX } from "@/stores/ui";
 import { usePlanBaseline } from "@/composables/usePlanBaseline";
-import { computePlanVariance } from "@/lib/plan-variance";
+import { computePlanVariance, isBaselineFrameCurrent } from "@/lib/plan-variance";
 import { useAcceleration } from "@/composables/useAcceleration";
 import { useLifecycleDigest } from "@/composables/useLifecycleDigest";
 import { resolveHeroTone, resolveGapTone } from "@/lib/dashboard-verdict";
 import { describeFireConfidenceBand } from "@/lib/fire-confidence-band";
 import { MAX_PROJECTION_YEARS } from "@/lib/monte-carlo";
 import { formatINRCompact } from "@/lib/formatters";
+import { DEFAULT_ASSUMPTIONS } from "@/types/assumptions";
 import InfoTip from "@/components/shared/InfoTip.vue";
 import QuickExplainer from "@/components/quick/QuickExplainer.vue";
 
@@ -118,7 +119,15 @@ const { baseline, lockBaseline } = usePlanBaseline();
 // A baseline whose stored yearsToFire is not a finite number can't support ANY verdict: an
 // Infinity captured pre-guard JSON-round-trips to null, and (null − current)×12 coerces to a
 // finite-but-FABRICATED "behind" claim (code-review H1, 2026-06-10). Validate at the seam.
-const baselineUsable = computed(() => !!baseline.value && Number.isFinite(baseline.value.yearsToFire));
+// ADR-0006 — a baseline captured under the OLD modelling frame cannot support a verdict either.
+// Differencing it against today's plan would report the frame change as the user falling behind:
+// a fabricated "N months behind" for every existing user on their first visit after deploy. We say
+// so and offer the re-lock instead. Never a number, and never a silent re-lock (that would erase
+// the starting point the user consciously chose).
+const baselineFrameStale = computed(() => !!baseline.value && !isBaselineFrameCurrent(baseline.value));
+const baselineUsable = computed(
+  () => !!baseline.value && Number.isFinite(baseline.value.yearsToFire) && !baselineFrameStale.value,
+);
 const variance = computed(() => {
   if (!baseline.value || !baselineUsable.value) return null;
   return computePlanVariance({
@@ -127,6 +136,8 @@ const variance = computed(() => {
     currentAssumptions: a.values,
     lens: { isFamilyView: ui.isFamilyView, viewingMemberId: ui.viewingMemberId, currentFY: ui.currentFY },
     nowMs: Date.now(),
+    // ADR-0006 Phase 1d — the wall clock enters at the component boundary; the kernel is pure.
+    currentYear: new Date().getFullYear(),
   });
 });
 // Non-finite delta (e.g. the plan became unprojectable) → null → the no-claim tone; never
@@ -152,20 +163,29 @@ const lockedOn = computed(() =>
 );
 const planSlot = computed(() => {
   if (!baseline.value) return null;
+  // Stale frame → no verdict at all, just the honest reason (the re-lock button renders beside it).
+  if (baselineFrameStale.value) {
+    return {
+      cls: "",
+      value: "—",
+      sub: `your plan was locked under the old model — re-lock to compare`,
+      relock: true,
+    };
+  }
   const d = variance.value?.fireDateDeltaMonths;
   // Guarded for display: heroTone already falls back to "no-baseline" (the "—" branch below)
   // whenever d is non-finite, so m is only ever rendered for a real, finite claim.
   const m = d != null && Number.isFinite(d) ? Math.abs(Math.round(d)) : 0;
   switch (heroTone.value) {
     case "ahead":
-      return { cls: "text-success", value: `▲ ${m} mo ahead`, sub: `vs the plan you locked ${lockedOn.value}` };
+      return { cls: "text-success", value: `▲ ${m} mo ahead`, sub: `vs the plan you locked ${lockedOn.value}`, relock: false };
     case "behind":
-      return { cls: "text-warning", value: `▼ ${m} mo behind`, sub: `vs the plan you locked ${lockedOn.value}` };
+      return { cls: "text-warning", value: `▼ ${m} mo behind`, sub: `vs the plan you locked ${lockedOn.value}`, relock: false };
     case "on-track":
-      return { cls: "text-success", value: "✓ On track", sub: `right on the plan you locked ${lockedOn.value}` };
+      return { cls: "text-success", value: "✓ On track", sub: `right on the plan you locked ${lockedOn.value}`, relock: false };
     default:
       // Baseline exists but the delta is indeterminate — make no claim (rule 20/31).
-      return { cls: "", value: "—", sub: `plan locked ${lockedOn.value}` };
+      return { cls: "", value: "—", sub: `plan locked ${lockedOn.value}`, relock: false };
   }
 });
 
@@ -245,7 +265,45 @@ const sliderMoved = computed(
   () => ui.whatIfTargetAge != null && ui.whatIfTargetAge !== fire.targetRetirementAge.value,
 );
 
+/**
+ * The two rates the frame note names, guarded so a non-finite assumption can never render as "NaN%"
+ * (rule 31 / defensive-coding). Both are read live from the kernel — hard-coding either would let
+ * the copy drift from a user who edited their buckets.
+ */
+const basketPct = computed(() => {
+  const v = fire.householdInflation.value;
+  return (Number.isFinite(v) ? v * 100 : DEFAULT_ASSUMPTIONS.inflation * 100).toFixed(1);
+});
+const generalPct = computed(() => {
+  const v = a.values.inflation;
+  return (Number.isFinite(v) ? v * 100 : DEFAULT_ASSUMPTIONS.inflation * 100).toFixed(0);
+});
+
 const requiredFinite = computed(() => Number.isFinite(req.value.requiredMonthlyReal));
+
+/**
+ * ADR-0006 item 4 — the first-class "unreachable at these assumptions" state.
+ *
+ * The #20 mistake this exists to prevent was bending the kernel until it printed a reachable
+ * number. The kernel is now allowed to say "no monthly amount closes this", and the hero has to
+ * carry that honestly instead of leaving the user with a bare "Move the age" tile and a headline
+ * that still reads like a plan.
+ *
+ * Two independent honest signals, either of which means the target age is not achievable on the
+ * assumptions in force:
+ *   - `requiredMonthlyReal` is Infinity — the solver found no feasible monthly amount, either
+ *     because the target is beyond the ceiling or because there is no take-home headroom left
+ *     (`required-contribution.ts`, the `!reaches(hi)` and `hi <= 0` branches);
+ *   - `paceFireAge` is null — today's pace never reaches the number inside the plan horizon.
+ * `solved` gates both: on a `solve: false` run `requiredMonthlyReal` is Infinity by construction
+ * and is explicitly NOT a verdict, so treating it as one would fabricate the state.
+ */
+const unreachableAtAssumptions = computed(
+  () =>
+    req.value.hasTarget &&
+    req.value.solved &&
+    (!requiredFinite.value || req.value.paceFireAge == null),
+);
 /** The action question: does the user have to put MORE in every month than they do today? */
 const mustInvestMore = computed(
   () => !requiredFinite.value || req.value.requiredMonthlyReal > req.value.currentMonthlyReal,
@@ -359,9 +417,38 @@ function yearsLabel(years: number): string {
         <RouterLink to="/expenses">add your monthly spending</RouterLink> and your FIRE number appears here.
       </div>
       <div v-else class="fire-hero__when" data-testid="fire-hero-need">
-        you'll need <b class="text-currency">{{ formatINRCompact(req.needReal) }}</b> in today's money
+        you'll need <b class="text-currency">{{ formatINRCompact(req.needReal) }}</b> in today's rupees
         <span class="fire-hero__sep">·</span> that's
         <b class="text-currency">{{ formatINRCompact(req.needNominal) }}</b> in {{ needYear }}
+      </div>
+      <!-- ADR-0006: the today's-rupee figure is the target AT {{ targetAge }}, not today's target.
+           It is larger than today's number because your spending basket grows a little faster than
+           general inflation, so the target creeps up even after deflating. Saying "today's money"
+           without that read as a target standing still — the optimism gh #167 removed. -->
+      <p v-if="req.hasTarget" class="fire-hero__frame-note" data-testid="fire-hero-frame-note">
+        today's rupees, at age {{ targetAge }} — the target rises with your
+        <RouterLink to="/preferences#pref-section-inflation">spending basket</RouterLink>
+        ({{ basketPct }}%/yr), a little faster than the {{ generalPct }}% general inflation we
+        deflate by.
+      </p>
+
+      <!-- ADR-0006 item 4 — the honest headline-level state when no monthly amount closes the gap.
+           It prints NO figure of its own (that is the whole point): it names the two things that
+           can move, the plan and the assumptions behind it. The "Move the age" tile below stays as
+           the tile-level version; this is the headline-level one. -->
+      <div v-if="unreachableAtAssumptions" class="fire-hero__unreachable" data-testid="fire-hero-unreachable">
+        <div class="fire-hero__unreachable-title">
+          At these assumptions you don't get there by {{ targetAge }}.
+        </div>
+        <p class="fire-hero__unreachable-body">
+          There is no honest monthly amount that closes this — so we're not going to invent one.
+          Two things can change it: the <b>plan</b> (drag the age above, or switch on a move below),
+          and the <b>assumptions</b> underneath it — your spending basket, your expected returns and
+          your savings step-up.
+          <RouterLink to="/preferences#pref-section-inflation" data-testid="fire-hero-unreachable-assumptions">
+            Review your assumptions
+          </RouterLink>.
+        </p>
       </div>
 
       <!-- Gut-feel comparison (only when the /quick path recorded a guess). -->
@@ -375,7 +462,7 @@ function yearsLabel(years: number): string {
             {{ formatINRCompact(req.haveAtTargetReal) }}
           </div>
           <div class="gap-tile__s">
-            at {{ formatINRCompact(req.currentMonthlyReal) }}/month, today's money
+            at {{ formatINRCompact(req.currentMonthlyReal) }}/month, today's rupees
           </div>
         </div>
         <div class="gap-tile">
@@ -535,6 +622,19 @@ function yearsLabel(years: number): string {
         <template v-if="planSlot">
           <div class="kpi__value" :class="planSlot.cls" data-testid="hero-kpi-plan">{{ planSlot.value }}</div>
           <div class="kpi__sub">{{ planSlot.sub }}</div>
+          <!-- ADR-0006: the re-lock is the user's call, offered here rather than taken silently. -->
+          <v-btn
+            v-if="planSlot.relock"
+            size="small"
+            color="primary"
+            variant="flat"
+            prepend-icon="mdi-lock-reset"
+            class="mt-1"
+            data-testid="plan-variance-relock-frame"
+            @click="lockBaseline"
+          >
+            Re-lock my plan
+          </v-btn>
         </template>
         <!-- Lock only when there is a projectable plan to lock — capturing an Infinity
              yearsToFire seeds the fabricated-claim class (code-review M4/H1). -->
@@ -573,11 +673,15 @@ function yearsLabel(years: number): string {
             rounded
             color="fire-orange"
             bg-color="surface-variant"
-            :aria-label="`FIRE progress: ${hh.progressPercent}% of target corpus reached`"
+            :aria-label="`FIRE progress: ${hh.progressPercent}% of the target corpus you'll need at age ${targetAge}`"
           />
         </div>
-        <div class="kpi__sub">
-          {{ hh.progressPercent }}% of target ·
+        <!-- ADR-0006 Phase 1d: the denominator is the SAME need the headline above quotes (the
+             solver's `needReal` at the target age), so the label says WHICH target it is. Two
+             unlabelled targets on one card is what this replaced. Under a member lens the figure
+             is that member's own number, so the label stays generic there. -->
+        <div class="kpi__sub" data-testid="hero-kpi-corpus-sub">
+          {{ hh.progressPercent }}% of {{ hh.isMember ? "their target" : `what you'll need at ${targetAge}` }} ·
           <InfoTip term="savings-rate">saving</InfoTip>&nbsp;{{ savingsRateDisplay }}%<template v-if="!hh.isMember"> ·
           <InfoTip term="swr">SWR</InfoTip>&nbsp;{{ (fire.effectiveSWR.value * 100).toFixed(2) }}%</template>
         </div>
@@ -671,6 +775,32 @@ function yearsLabel(years: number): string {
 }
 .fire-hero__when b {
   color: var(--text-primary);
+}
+.fire-hero__frame-note {
+  font-size: var(--type-xs, 12px);
+  color: var(--text-muted);
+  margin: 2px 0 0;
+}
+/* ADR-0006 — the unreachable state. Warning-toned, never red: it is an honest limit of the
+   current assumptions, not a failure (contract 2.3 — red is never a hero state). */
+.fire-hero__unreachable {
+  margin: 12px auto 0;
+  max-width: 640px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  text-align: left;
+  background: rgba(var(--v-theme-warning), 0.08);
+  border: 1px solid rgba(var(--v-theme-warning), 0.35);
+}
+.fire-hero__unreachable-title {
+  font-weight: var(--weight-semibold);
+  font-size: var(--type-sm);
+  color: var(--text-primary);
+}
+.fire-hero__unreachable-body {
+  font-size: var(--type-sm);
+  color: var(--text-secondary);
+  margin: 4px 0 0;
 }
 .fire-hero__sep {
   margin: 0 4px;

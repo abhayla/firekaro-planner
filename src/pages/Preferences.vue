@@ -30,6 +30,7 @@ import { useDismissedNudges } from "@/composables/useDismissedNudges";
 import { useCommsConsent } from "@/composables/useCommsConsent";
 import { useFireDerive } from "@/lib/useFireDerive";
 import { DEFAULT_ASSUMPTIONS } from "@/types/assumptions";
+import { basketSanity, BASKET_SANITY_MAX_EXCESS_BP } from "@/lib/assumption-math";
 
 interface PrefSection {
   id: string;
@@ -95,8 +96,17 @@ function resetComms() {
 const v = computed(() => assumptions.values);
 const fire = useFireDerive();
 
-// A3.2 — live household-blended inflation (4-bucket weighted) shown under §Inflation.
+// A3.2 / ADR-0006 — the live household SPENDING BASKET (4-bucket weighted). This is the rate the
+// FIRE target grows at; general CPI (`v.inflation`) is only the display deflator. The two are
+// deliberately shown as different numbers here — collapsing them is gh #167.
 const blendedInflationPct = computed(() => (assumptions.householdInflation() * 100).toFixed(2));
+// ADR-0006 Phase 1b (LOW-10) — the basket is now a HEADLINE-MOVING knob, and two settings are
+// incoherent rather than merely aggressive: below general CPI (the FIRE target would FALL in
+// today's rupees — the optimistic direction) and more than 300 bp above it (the target more than
+// doubles in real terms over a 25-year horizon — the "FIRE at 115" regime #20 panicked over).
+// The predicate is pure and lives in `assumption-math.ts`; nothing is clamped, it is disclosed.
+const basket = computed(() => basketSanity(assumptions.values));
+const generalInflationPct = computed(() => (v.value.inflation * 100).toFixed(2));
 
 // A3.2 — editable 4-bucket inflation WEIGHTS (default 60/20/10/10). Stored as
 // percentages; blendedInflation() normalizes by their sum, but the UI validates
@@ -113,20 +123,33 @@ const weightSum = computed(() => {
 });
 const weightsValid = computed(() => Math.round(weightSum.value) === 100);
 
-// A4.2/A4.9 — weighted nominal + real expected return. Real = nominal − blended
-// inflation; a negative real return is highlighted as an erosion warning.
+// A4.2/A4.9 + ADR-0006 — weighted nominal and the TWO real returns, kept distinct.
+//
+// The plan's real return is the kernel's ONE `realBlendedReturn` = (1+nominal)/(1+general CPI) − 1
+// (gh #180): the same figure the headline solver, the Coast card, the Monte Carlo band and the
+// projection chart use. This readout used to show `nominal − basket` and flag it red — a warning
+// on a number the product does not plan with, which could fire while the actual plan was healthy.
+// The basket-relative figure is still worth seeing (it answers "does my portfolio out-earn my own
+// spending?"), so it is shown as INFORMATION beside the plan figure, and only the plan figure
+// drives the warning.
 const weightedNominalPct = computed(() => (fire.blendedReturn.value * 100).toFixed(2));
-const weightedRealPct = computed(
-  () => ((fire.blendedReturn.value - assumptions.householdInflation()) * 100).toFixed(2),
+const realVsCpi = computed(() => fire.realBlendedReturn.value);
+const realVsBasket = computed(
+  () => (1 + fire.blendedReturn.value) / (1 + assumptions.householdInflation()) - 1,
 );
-const realReturnNegative = computed(
-  () => fire.blendedReturn.value - assumptions.householdInflation() < 0,
-);
+const weightedRealPct = computed(() => (realVsCpi.value * 100).toFixed(2));
+const weightedRealVsBasketPct = computed(() => (realVsBasket.value * 100).toFixed(2));
+const realReturnNegative = computed(() => realVsCpi.value < 0);
+const realBelowBasket = computed(() => realVsBasket.value < 0 && realVsCpi.value >= 0);
 
 // Per-section reset handlers.
 function resetSection(id: string) {
   if (id === "core") {
     assumptions.set("equityReturn", DEFAULT_ASSUMPTIONS.equityReturn);
+    assumptions.set(
+      "householdSavingsStepUpPercent",
+      DEFAULT_ASSUMPTIONS.householdSavingsStepUpPercent,
+    );
   } else if (id === "inflation") {
     assumptions.set("inflation", DEFAULT_ASSUMPTIONS.inflation);
     assumptions.set("healthcareInflation", DEFAULT_ASSUMPTIONS.healthcareInflation);
@@ -275,8 +298,8 @@ const featuresBySection = computed(() => {
         <section id="pref-section-core" class="pref-section">
           <SectionHeader title="Core FIRE assumptions" :on-reset="() => resetSection('core')" />
           <p class="text-body-2 text-medium-emphasis mb-3">
-            Safe Withdrawal Rate (SWR) and Plan-to age. Research-grounded
-            defaults per Ch 04 §4.3. Per-member Plan-to age lives on
+            Safe Withdrawal Rate (SWR), Plan-to age and how fast your savings grow.
+            Research-grounded defaults per Ch 04 §4.3. Per-member Plan-to age lives on
             <router-link to="/profile">Profile</router-link>.
           </p>
           <v-row>
@@ -292,17 +315,58 @@ const featuresBySection = computed(() => {
                 @update:model-value="(val: string) => assumptions.set('swrOverride', val ? Number(val) / 100 : undefined as never)"
               />
             </v-col>
+            <!-- ADR-0006 — the savings step-up became a defaulted assumption (0 -> 2% real), so it
+                 needs a home where a user can see it and deliberately set it back to 0. -->
+            <v-col cols="12" md="6">
+              <v-text-field
+                label="Savings step-up (% real per year)"
+                type="number"
+                :model-value="v.householdSavingsStepUpPercent"
+                hint="Default: 2% a year above inflation, tapering to 0 by age 50. Set 0 if you expect your savings to just keep pace with inflation."
+                persistent-hint
+                variant="outlined"
+                density="comfortable"
+                data-testid="pref-savings-stepup"
+                @update:model-value="(val: string) => assumptions.set('householdSavingsStepUpPercent', Math.min(15, Math.max(0, Number(val) || 0)))"
+              />
+            </v-col>
           </v-row>
+          <v-alert type="info" variant="tonal" density="compact" class="mt-2">
+            <strong>Why 2%, and why it stops at 50.</strong> The plan used to assume your savings only
+            ever kept pace with inflation — zero real growth for 25 to 40 years — while your expenses
+            grew at your spending basket. For a salaried accumulator that is not caution, it is a
+            mismatch: Indian salary growth has run roughly 3–4% above inflation. We use a deliberately
+            conservative 2% real, and taper it to nothing by age 50, because promotions and job moves
+            slow down late-career and a step-up that ran to retirement would flatter the number.
+          </v-alert>
         </section>
 
         <!-- §Inflation (4-bucket) -->
         <section id="pref-section-inflation" class="pref-section">
           <SectionHeader title="Inflation (4-bucket model)" :on-reset="() => resetSection('inflation')" />
           <p class="text-body-2 text-medium-emphasis mb-3">
-            Per-bucket inflation rates per audit Entry #3 (research Ch 02 §2.6).
-            Recurring expense lines route to one of these buckets via the
-            <code>inflationBucket</code> field.
+            Four rates, one blend. Recurring expense lines route to a bucket via the
+            <code>inflationBucket</code> field, and the weighted blend below is
+            <strong>the rate your FIRE target grows at</strong> — the single most important
+            assumption on this page after your returns. Defaults (ADR-0006):
+            general CPI <strong>6%</strong> · healthcare <strong>9%</strong> ·
+            education <strong>9%</strong> · housing <strong>6%</strong>.
           </p>
+          <v-alert type="info" variant="tonal" density="compact" class="mb-3">
+            <div class="mb-1">
+              <strong>Why 9% healthcare, not 14%?</strong> India's CPI-Health runs about 4–7%. We add
+              3–4 points for private-hospital tariffs and the older, heavier-using mix a retiree
+              actually has. The 13–14% figure you see quoted is the <em>insurers' claims-cost trend</em>
+              — it belongs to your <strong>premium</strong>, and your premium is already a line in your
+              expenses, so counting it twice would inflate the target for no reason.
+            </div>
+            <div>
+              <strong>Why education carries 0% weight here.</strong> Education spending ends; a
+              retirement basket is perpetual. Your children's fees, post-grad and weddings are costed
+              as dated goals in the family layer, where the 9% rate above still applies to them. Giving
+              education a permanent slice of the retirement basket charged you for it forever.
+            </div>
+          </v-alert>
           <v-row>
             <v-col cols="12" md="6">
               <v-text-field
@@ -351,9 +415,13 @@ const featuresBySection = computed(() => {
           </v-row>
           <!-- A3.2 — editable per-bucket WEIGHTS (sum-to-100 validated). -->
           <p class="text-body-2 text-medium-emphasis mt-4 mb-2">
-            <strong>Bucket weights (%)</strong> — how much each bucket counts toward
-            your household blend. Research default is 60/20/10/10 (audit Entry #3); a
-            healthcare-heavy or education-heavy household can re-weight here.
+            <strong>Bucket weights (%)</strong> — how much each bucket counts toward your household
+            blend. Default is <strong>74 / 8 / 0 / 18</strong> (general / healthcare / education /
+            housing): disjoint shares of an urban household's spending. They used to be 60/20/10/10,
+            which double-counted — "general CPI" is the <em>all-items</em> index and already contains
+            health, education and housing, so giving those their own slices on top pushed the blend
+            to 7.9% and quietly made your target grow faster than the model could justify. A
+            healthcare-heavy or renting household can still re-weight here.
           </p>
           <v-row>
             <v-col cols="6" md="3">
@@ -414,11 +482,37 @@ const featuresBySection = computed(() => {
             sum, so the rate below is always valid.)
           </v-alert>
           <v-alert type="info" variant="tonal" density="compact" class="mt-2">
-            Household-blended inflation
+            Your <strong>spending basket</strong>
             ({{ v.inflationWeights.general }}/{{ v.inflationWeights.healthcare }}/{{ v.inflationWeights.education }}/{{ v.inflationWeights.housing }}
             weighting):
-            <strong data-testid="pref-inflation-blend">{{ blendedInflationPct }}%</strong>.
-            This is the rate your projection grows expenses at.
+            <strong data-testid="pref-inflation-blend">{{ blendedInflationPct }}%</strong>
+            a year — the rate your expenses, and therefore your FIRE target, grow at.
+            General CPI ({{ generalInflationPct }}%) is a different number: it is only what we deflate
+            by to show you figures in today's rupees. Because your basket runs a little above it, the
+            target creeps up even in today's money.
+          </v-alert>
+          <v-alert
+            v-if="!basket.ok"
+            type="warning"
+            variant="tonal"
+            density="compact"
+            class="mt-2"
+            data-testid="pref-basket-sanity-warning"
+          >
+            <template v-if="basket.verdict === 'below-cpi'">
+              Your basket is <strong>{{ Math.abs(basket.excessBasisPoints) }} bp BELOW</strong>
+              general CPI, which means your FIRE target would shrink every year in today's money.
+              General CPI is the all-items index and the other three buckets are parts of it, so a
+              household basket can sit level with it or a little above — not below. Planning on
+              this makes your number look smaller than it is.
+            </template>
+            <template v-else>
+              Your basket is <strong>{{ basket.excessBasisPoints }} bp above</strong> general CPI
+              — beyond the {{ BASKET_SANITY_MAX_EXCESS_BP }} bp we consider usable. At that excess
+              your FIRE target more than doubles in today's money over a 25-year horizon, which is
+              the regime the old 7.9% basket produced before it was re-grounded. Check the bucket
+              rates and the weights above.
+            </template>
           </v-alert>
         </section>
 
@@ -458,9 +552,18 @@ const featuresBySection = computed(() => {
             <strong data-testid="pref-return-nominal">{{ weightedNominalPct }}% nominal</strong>
             ·
             <strong data-testid="pref-return-real">{{ weightedRealPct }}% real</strong>
-            (after {{ blendedInflationPct }}% blended inflation).
+            after {{ generalInflationPct }}% general inflation — <em>this is the real return your
+            plan is solved with</em>, and the same one the Coast card and the projection chart use.
+            <br />
+            For information: against your own {{ blendedInflationPct }}% spending basket it is
+            <strong data-testid="pref-return-real-basket">{{ weightedRealVsBasketPct }}%</strong>.
             <template v-if="realReturnNegative">
               Your real return is negative — inflation is currently eroding this mix.
+            </template>
+            <template v-else-if="realBelowBasket">
+              Your portfolio out-earns general inflation but not your own spending basket, so the
+              target rises faster than that gap closes on its own — the plan leans on your monthly
+              contributions rather than on returns.
             </template>
           </v-alert>
         </section>

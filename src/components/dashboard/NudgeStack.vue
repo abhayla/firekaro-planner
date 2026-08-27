@@ -52,17 +52,22 @@ const nudges = computed(() => {
   // Re-read snapshot-derived analyses when a snapshot is captured (P2 nudges
   // A29.2/A30.2 depend on real history). Pure-engine purity: compute here, pass in.
   void household.snapshotVersion;
-  const lifestyleInflation = analyzeLifestyleInflation(assumptions.householdInflation());
+  // ADR-0006: the household spending BASKET, read from the kernel (`derive().householdInflation`)
+  // so there is ONE basket on screen. Correct input here — the nudge asks whether ACTUAL spend
+  // growth outruns the basket the plan assumes, which is a basket question, not a CPI one.
+  const lifestyleInflation = analyzeLifestyleInflation(fire.householdInflation.value);
   const goalPostShift = detectGoalPostShift();
   // Affordability (over-committed SIPs) is a WHOLE-household property — compute the
   // surplus from the unlensed household so it matches the whole-household SIP total
   // the engine sums. Using the lensed `fire.annualSavings` here would false-fire in
   // a member-lens view (one earner's surplus vs the household's total SIPs).
-  const wholeHousehold = derive(household.data, assumptions.values, {
-    isFamilyView: true,
-    viewingMemberId: null,
-    currentFY: ui.currentFY,
-  });
+  const wholeHousehold = derive(
+    household.data,
+    assumptions.values,
+    { isFamilyView: true, viewingMemberId: null, currentFY: ui.currentFY },
+    // ADR-0006 Phase 1d — the wall clock enters at the composable boundary, not in the kernel.
+    { currentYear: new Date().getFullYear() },
+  );
   const all = evaluateNudges({
     household: household.data,
     family: derivedFamilyLayer(household.data),
@@ -107,6 +112,15 @@ const stressSummary = computed(() =>
     expectedReturn: fire.blendedReturn.value,
     totalCorpus: fire.totalCorpus.value,
     annualIncomeTotal: fire.annualIncome.value.total,
+    // ADR-0006 Phase 1b — the kernel triple, so the scenarios run the SAME nominal model as the
+    // headline (headline target incl. family layer + reservation, nominal returns, the step-up
+    // inflow). Without it the absolute years-to-FIRE here contradicted the hero.
+    // Phase 1d — and the target grows at `effectiveTargetGrowthNominal`, the rate the headline was
+    // actually solved at, not at the raw spending basket (only the base leg's rate).
+    fireNumberToday: fire.fireNumber.value,
+    targetGrowthNominal: fire.effectiveTargetGrowthNominal.value,
+    contributionSchedule: fire.nominalContributionSchedule.value,
+    expectedReturnSchedule: fire.expectedReturnSchedule.value,
   }).summary,
 );
 

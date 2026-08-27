@@ -189,7 +189,13 @@ export interface LifestyleInflationResult {
  * Requires at least 2 snapshots; returns zero-growth when fewer.
  */
 export function analyzeLifestyleInflation(
-  generalInflation: number = 0.06,
+  /**
+   * ADR-0006: the household SPENDING BASKET (`derive().householdInflation`, ~6.2% on defaults) —
+   * the rate the plan assumes the household's own expenses grow at. It was named
+   * `generalInflation` while every caller passed the basket; the name is corrected so the next
+   * reader does not "fix" the call sites to CPI and quietly change what the nudge measures.
+   */
+  expectedBasketInflation: number = 0.06,
 ): LifestyleInflationResult {
   const snapshots = loadAllSnapshots();
   if (snapshots.length < 2) {
@@ -226,7 +232,7 @@ export function analyzeLifestyleInflation(
 
   return {
     averageYoYGrowth,
-    isLifestyleInflating: averageYoYGrowth > generalInflation + 0.02,
+    isLifestyleInflating: averageYoYGrowth > expectedBasketInflation + 0.02,
     byBucket,
   };
 }

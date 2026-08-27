@@ -52,7 +52,10 @@ const input = computed<ExplainerInput>(() => ({
   currentCorpus: fire.totalCorpus.value,
   monthlyContributionReal: req.value.currentMonthlyReal,
   expectedReturn: fire.blendedReturn.value,
+  // ADR-0006 — two DIFFERENT rates, and the copy names both: general CPI is only the display
+  // deflator; the household basket is what the target itself grows at. Both come from the kernel.
   inflation: a.values.inflation,
+  householdInflation: fire.householdInflation.value,
   yearsToTarget: req.value.yearsToTarget,
   haveAtTargetReal: req.value.haveAtTargetReal,
   needReal: req.value.needReal,

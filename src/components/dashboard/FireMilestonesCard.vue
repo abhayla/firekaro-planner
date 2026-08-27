@@ -16,7 +16,7 @@ import { useHouseholdStore } from "@/stores/household";
 import { useAssumptionsStore } from "@/stores/assumptions";
 import { useFireDerive } from "@/lib/useFireDerive";
 import { useFeaturesStore } from "@/stores/features";
-import { calculateCoastFire, calculateBaristaFire, realReturnForCoast } from "@/lib/coast-fire";
+import { calculateCoastFire, calculateBaristaFire } from "@/lib/coast-fire";
 import { formatINRCompact } from "@/lib/formatters";
 import { coastFireBlurb, baristaFireBlurb } from "@/lib/fire-milestone-copy";
 import CoastTrajectoryChart from "@/components/charts/CoastTrajectoryChart.vue";
@@ -55,10 +55,17 @@ const yearsToRetirement = computed(() => {
 });
 
 const realReturn = computed(() => {
-  // real = nominal - household blended inflation (4-bucket, audit Entry #3).
-  // A1 (gh-issue #9 L2): NO positive clamp — a negative real return must flow
-  // through so coast-fire returns coastCorpus = fireNumber (you cannot coast).
-  return realReturnForCoast(fire.blendedReturn.value, assumptions.householdInflation());
+  // ADR-0006 / gh #180 — the ONE real return, read straight off the kernel.
+  //
+  // This used to be `realReturnForCoast(blendedReturn, householdInflation())`, i.e. the nominal
+  // return deflated at the household EXPENSE BASKET, while the hero six inches above deflated at
+  // GENERAL CPI. Two real returns for one household on one dashboard — the live two-rate
+  // contradiction #180 was filed for. `realBlendedReturn` is the kernel's `(1+r)/(1+CPI) − 1`,
+  // the same figure the headline solver, the Monte Carlo band and the projection chart use.
+  //
+  // A1 (gh-issue #9 L2): NO positive clamp — a negative real return must flow through so
+  // coast-fire returns coastCorpus = fireNumber (you cannot coast).
+  return fire.realBlendedReturn.value;
 });
 
 const coast = computed(() =>
@@ -66,8 +73,28 @@ const coast = computed(() =>
     fireNumber: fire.fireNumber.value,
     yearsToRetirement: yearsToRetirement.value,
     realReturn: realReturn.value,
+    // ADR-0006 Phase 1b — the FIRE number this card discounts is NOT constant in today's rupees:
+    // it rises because the household's spending basket outruns the CPI the return above is
+    // deflated by. Discounting a flat target under-stated the coast corpus and told the user they
+    // could stop saving earlier than they can.
+    //
+    // Phase 1c: at the EFFECTIVE drift. `realTargetDriftRate` is now only the BASE leg's rate —
+    // it misses the medical reservation running at 9% (and the goal caps running the other way),
+    // so it under-states the target this card discounts, i.e. it errs optimistic. Coast-FIRE
+    // takes one rate, so it gets the one rate that reproduces the kernel's own target curve.
+    targetDriftRate: fire.effectiveTargetDriftRate.value,
   }),
 );
+
+/**
+ * ADR-0006 Phase 1c — the today's-₹ FIRE target at year `t`, handed to the trajectory chart so
+ * its target line is the kernel's own curve (rising, and bending as dated goals fall due) rather
+ * than a flat line the corpus can meet years early.
+ */
+const targetRealAt = computed(() => {
+  const componentsAt = fire.regularTargetComponentsRealAt.value;
+  return (t: number) => componentsAt(t).total;
+});
 
 const baristaIncome = computed(() => {
   // Assume half of current household income as barista income — a useful
@@ -198,6 +225,7 @@ const baristaProgress = computed(() => {
           :years-to-retirement="yearsToRetirement"
           :real-return="realReturn"
           :start-year="startYear"
+          :target-real-at="targetRealAt"
         />
       </div>
 

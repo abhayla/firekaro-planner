@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { lifeCoverAdequacy, healthCoverAdequacy, allocationByAge, educationAdequacy, retireByAgeRequiredSIP } from "./adequacy";
+import { lifeCoverAdequacy, healthCoverAdequacy, allocationByAge, educationAdequacy } from "./adequacy";
 
 describe("lifeCoverAdequacy", () => {
   it("returns advisory for non-earner (zero income)", () => {
@@ -140,52 +140,35 @@ describe("educationAdequacy (Sharma S1 — education goal funding)", () => {
   });
 });
 
-describe("retireByAgeRequiredSIP (gh-issue #30 — reverse FIRE solver)", () => {
-  const base = {
-    targetRetirementAge: 50,
-    currentAge: 35,
-    fireNumber: 50_000_000, // ₹5 Cr target (real)
-    currentCorpus: 5_000_000, // ₹50 L today
-    expectedReturn: 0.08, // 8% real
-    currentMonthlySIP: 50_000,
-  };
+/*
+ * The `retireByAgeRequiredSIP` block (6 cases) was DELETED with the function it tested
+ * (ADR-0006 Phase 1b HIGH-2). It locked the behaviour of a SECOND reverse-FIRE solver — constant
+ * today's-₹ target, `rate/12`, no step-up — that disagreed with the dashboard hero for the same
+ * household. Its consumer (`/fire-goals/what-if`) now calls the ONE solver, whose own coverage
+ * lives in `required-contribution.spec.ts` (incl. the re-feed round trip these cases mirrored).
+ * The `educationAdequacy` cases above stay: that function is still live on `FamilyLayerCard`.
+ */
 
-  it("ROUND-TRIP: investing the solved SIP reaches the target (inverse matches the forward)", () => {
-    const r = retireByAgeRequiredSIP(base);
-    expect(r.yearsToTarget).toBe(15);
-    // FV(today's corpus) + FV(required-SIP annuity) must ≈ fireNumber — the coherence invariant.
-    const months = r.yearsToTarget * 12;
-    const rM = base.expectedReturn / 12;
-    const annuityFactor = (Math.pow(1 + rM, months) - 1) / rM;
-    const reached = r.projectedCorpusFromCurrent + r.requiredMonthlySIP * annuityFactor;
-    expect(reached).toBeGreaterThan(base.fireNumber * 0.999);
-    expect(reached).toBeLessThan(base.fireNumber * 1.01); // within monthly-SIP rounding
-  });
+describe("requiredSIP compounding (ADR-0006 Phase 1b) — the true monthly equivalent, not r/12", () => {
+  it("a goal needs MORE per month under (1+r)^(1/12)−1 than under the over-compounding r/12", () => {
+    // `r/12` grows to `(1+r/12)^12 > 1+r`, so it credits the saver with returns they will not
+    // earn and quotes too small a SIP — optimistic, on a prescription.
+    const goals = [{ label: "UG", todayAmount: 5_000_000, targetYear: 2040 }];
+    const r = educationAdequacy({
+      goals,
+      educationInflation: 0.09,
+      expectedReturn: 0.11,
+      currentYear: 2026,
+      availableMonthlySIP: 0,
+    });
+    const months = 14 * 12;
+    const naive = 0.11 / 12;
+    const naiveSip = r.rows[0].futureValue / ((Math.pow(1 + naive, months) - 1) / naive);
+    expect(r.rows[0].requiredMonthlySIP).toBeGreaterThan(naiveSip);
 
-  it("retiring EARLIER needs a strictly HIGHER monthly SIP (the get-there-faster trade-off)", () => {
-    const at50 = retireByAgeRequiredSIP(base).requiredMonthlySIP;
-    const at45 = retireByAgeRequiredSIP({ ...base, targetRetirementAge: 45 }).requiredMonthlySIP;
-    expect(at45).toBeGreaterThan(at50);
-  });
-
-  it("flags on-track + zero additional SIP when today's saving already suffices", () => {
-    // A modest target the current ₹50k SIP comfortably clears.
-    const r = retireByAgeRequiredSIP({ ...base, fireNumber: 20_000_000, targetRetirementAge: 55 });
-    expect(r.requiredMonthlySIP).toBeLessThanOrEqual(base.currentMonthlySIP);
-    expect(r.onTrack).toBe(true);
-    expect(r.additionalMonthlySIP).toBe(0);
-  });
-
-  it("if today's corpus alone already reaches the target, gap + required SIP are zero", () => {
-    const r = retireByAgeRequiredSIP({ ...base, currentCorpus: 60_000_000, fireNumber: 50_000_000 });
-    expect(r.gap).toBe(0);
-    expect(r.requiredMonthlySIP).toBe(0);
-    expect(r.onTrack).toBe(true);
-  });
-
-  it("surfaces the actionable shortfall beyond today's SIP", () => {
-    const r = retireByAgeRequiredSIP({ ...base, targetRetirementAge: 45 }); // earlier → needs more
-    expect(r.additionalMonthlySIP).toBe(Math.max(0, r.requiredMonthlySIP - base.currentMonthlySIP));
-    expect(r.additionalMonthlySIP).toBeGreaterThan(0);
+    // …and it agrees with the kernel's own convention to the rupee.
+    const eff = Math.pow(1.11, 1 / 12) - 1;
+    const exact = r.rows[0].futureValue / ((Math.pow(1 + eff, months) - 1) / eff);
+    expect(r.rows[0].requiredMonthlySIP).toBe(Math.round(exact));
   });
 });

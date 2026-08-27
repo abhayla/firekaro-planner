@@ -8,8 +8,16 @@ import { apiSuccess, apiError, ErrorCode } from "../lib/api-utils";
 import { logger } from "../lib/logger";
 import { prisma } from "../lib/prisma";
 import { readHousehold, applyHouseholdPlan } from "../lib/household-repo";
-import { mapAssumptionsRow } from "../lib/planner-read";
+import { mapAssumptionsRow, buildAssumptionsWriteData } from "../lib/planner-read";
 import { diffHousehold } from "../lib/household-diff";
+import {
+  scenariosBodySchema,
+  featuresBodySchema,
+  uiBodySchema,
+  quickPrefsSchema,
+  expenseHistoryBodySchema,
+  planBaselineSchema,
+} from "../lib/planner-schemas";
 
 /**
  * /api/planner — DOCUMENT endpoints (GET+PUT per entityKey), mirroring
@@ -24,81 +32,12 @@ import { diffHousehold } from "../lib/household-diff";
 const app = new Hono();
 app.use("*", authMiddleware);
 
-// ---------- Inline Zod for the shapes that aren't Zod in mvp/src/types ----------
-
-const scenarioSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  leverValues: z.record(z.unknown()),
-  createdAt: z.number(),
-});
-const scenariosBodySchema = z.array(scenarioSchema);
-
-const featuresBodySchema = z.object({
-  flags: z.record(z.boolean()),
-  wizardCompleted: z.boolean(),
-  userId: z.string().optional(), // ignored — server uses the session userId
-});
-
-// "Since you were away" lifecycle digest baseline — rides inside the `ui` prefs
-// Json blob (no migration). Additive + nullable so older ServerAdapter writes and
-// the frontend's null default both validate, and the snapshot isn't stripped on PUT.
-const lifecycleSnapshotSchema = z.object({
-  capturedAt: z.string(),
-  fireAge: z.number(),
-  fireYear: z.number(),
-  currentCorpus: z.number(),
-  fireNumber: z.number(),
-  savingsRatePct: z.number(),
-  milestoneBand: z.number(),
-  activeNudgeIds: z.array(z.string()),
-  monteCarloP50Age: z.number().nullable(),
-});
-
-// T-377 (QN-2) — the Quick-Number metadata blob (frontend SSOT: src/stores/ui.ts QuickPrefs).
-// It rides the EXISTING userUiPrefs.prefs JSON row (like lifecycleSnapshot / planBaseline) — no
-// Prisma change. It MUST be declared here: uiBodySchema is a strip-mode z.object, so an unknown
-// `quick` key would be silently dropped on PUT and the user's gut-feel guess would vanish.
-export const quickPrefsSchema = z.object({
-  guess: z.number().min(0).optional(),
-  completedAt: z.string().optional(),
-  createdIds: z.array(z.string()).optional(),
-  directPlans: z.boolean().optional(),
-});
-
-export const uiBodySchema = z.object({
-  isFamilyView: z.boolean().optional(),
-  viewingMemberId: z.string().nullable().optional(),
-  currentFY: z.string().optional(),
-  lifecycleSnapshot: lifecycleSnapshotSchema.nullable().optional(),
-  quick: quickPrefsSchema.nullable().optional(),
-});
-
-const expenseSnapshotSchema = z.object({
-  period: z.string(),
-  fy: z.string(),
-  capturedAt: z.string(),
-  totalAnnual: z.number(),
-  byBucket: z.record(z.number()),
-  fireTargetYear: z.number().optional(),
-  fireNumber: z.number().optional(),
-  netWorth: z.number().optional(),
-});
-const expenseHistoryBodySchema = z.array(expenseSnapshotSchema);
-
-// #138 — the locked plan baseline (a dedicated entity; SRP, NOT an ExpenseSnapshot extension).
-// Stored as a JSON blob inside the userUiPrefs.prefs row under the `planBaseline` key — NO new
-// Prisma table / migration (the lifecycleSnapshot precedent), so it never touches the shared schema.
-const planBaselineSchema = z.object({
-  capturedAt: z.string(),
-  fireNumber: z.number(),
-  fireAge: z.number(),
-  yearsToFire: z.number(),
-  netWorth: z.number(),
-  monthlyContribution: z.number(),
-  annualExpenses: z.number(),
-  assumptions: assumptionsSchema, // a copy of the assumptions in force at lock time
-});
+// ---------- Zod schemas ----------
+// The document-body schemas live in ../lib/planner-schemas.ts (pure, no Hono/Prisma
+// imports) so a no-DB, no-app consumer (src/lib/server-schema-parity.spec.ts at the
+// repo root) can import them directly. Re-export the two that other modules already
+// import from this file (uiBodySchema, quickPrefsSchema — see ui-quick-schema.spec.ts).
+export { uiBodySchema, quickPrefsSchema };
 
 // ---------- ownerId refinement (the "Joint" sentinel; NO FK) ----------
 
@@ -183,28 +122,7 @@ app.put("/assumptions", async (c) => {
   if (!parsed.success) {
     return apiError(c, `Invalid assumptions: ${parsed.error.message}`, 422, ErrorCode.VALIDATION_ERROR);
   }
-  const a = parsed.data;
-  const data = {
-    inflation: a.inflation,
-    equityReturn: a.equityReturn,
-    debtReturn: a.debtReturn,
-    realEstateReturn: a.realEstateReturn,
-    goldReturn: a.goldReturn,
-    npsReturn: a.npsReturn,
-    ppfReturn: a.ppfReturn,
-    epfReturn: a.epfReturn,
-    internationalReturn: a.internationalReturn,
-    reitReturn: a.reitReturn,
-    cryptoReturn: a.cryptoReturn,
-    healthcareInflation: a.healthcareInflation,
-    educationInflation: a.educationInflation,
-    housingInflation: a.housingInflation,
-    inflationWeights: a.inflationWeights as unknown as Prisma.InputJsonValue,
-    swrOverride: a.swrOverride ?? null,
-    leanMultiplier: a.leanMultiplier,
-    fatMultiplier: a.fatMultiplier,
-    withdrawalRule: a.withdrawalRule,
-  };
+  const data = buildAssumptionsWriteData(parsed.data);
   try {
     const saved = await prisma.userAssumptions.upsert({
       where: { userId },

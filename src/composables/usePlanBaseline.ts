@@ -46,6 +46,9 @@ export function usePlanBaseline() {
       a.values,
       { isFamilyView: ui.isFamilyView, viewingMemberId: ui.viewingMemberId, currentFY: ui.currentFY },
       new Date().toISOString(),
+      {},
+      // ADR-0006 Phase 1d — the wall clock enters at the composable boundary; the kernel is pure.
+      new Date().getFullYear(),
     );
     sharedBaseline.value = snapshot;
     adapter.set(PLAN_BASELINE_KEY, snapshot);

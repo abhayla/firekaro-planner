@@ -13,6 +13,32 @@
  * assumed. If that property ever fails, this module must fall back to a monotone scan; shipping a
  * silently-wrong "do this" number is the optimism error the honesty mandate exists to prevent.
  *
+ * ADR-0006 RE-STATEMENT OF THAT CONTRACT FOR A MOVING TARGET. The target is no longer a constant:
+ * it now grows at the household expense basket while the corpus grows at the nominal return. For
+ * the CORPUS-ONLY leg the monotonicity argument is easy: for any fixed year `t`, `corpus_t` is
+ * strictly increasing in the contribution `C`, while `target_t` depends only on today's expenses
+ * and the basket — it is INDEPENDENT of `C`. So the set of years at which `corpus_t >= target_t`
+ * can only grow as `C` grows, and its first element is non-increasing.
+ *
+ * THAT ARGUMENT IS NOT SUFFICIENT FOR THE HEADLINE, and the difference is worth naming rather than
+ * glossed. The headline is
+ *     yearsToRegular = max(corpusOnlyYears, bridge.effectiveFireAge − anchorAge)
+ * and the BRIDGE leg is contribution-dependent: `derive.ts` scales every holding by
+ * `corpusScale = driftedTargetReal / totalCorpus` at the ADEQUACY AGE, and that age moves when `C`
+ * moves. So a larger `C` reaches adequacy earlier, at a DIFFERENT scale, over a DIFFERENT bridge
+ * window — there is no target-independence argument to lean on, and in principle a larger
+ * contribution could land on a worse liquidity profile. The soundness of the bisection therefore
+ * rests on the BEHAVIOURAL property test `kernel-invariants.property.spec.ts` (which asserts
+ * monotonicity on the HEADLINE `yearsToRegular`, bridge included, across fast-check perturbations
+ * of every seed AND a deliberately bridge-CONSTRAINED fixture), not on the argument above. If that
+ * property ever goes red the solver must fall back to a monotone scan; the test is not the thing
+ * to relax.
+ *
+ * FRAME. `needReal`/`haveAtTargetReal`/`requiredMonthlyReal` are TODAY's rupees at the TARGET AGE
+ * — i.e. the nominal figure at T deflated at general CPI. `needNominal` is the nominal target at T
+ * read directly off the same basket growth, never a separate `(1+CPI)^T` multiplication of the
+ * real figure (which was the pre-ADR-0006 shape and understated it by `((1+b)/(1+CPI))^T`).
+ *
  * HONESTY (rule 31): an unreachable target returns `Infinity` — never a fabricated finite amount —
  * and `paceFireAge` is `null` when the current pace never reaches the number within the horizon.
  * No field is ever NaN.
@@ -37,6 +63,12 @@ export interface RequiredContributionInput {
   targetAge: number;
   /** QN-5: extra ADR-0004 segments summed onto the savings residual (the roll-the-EMI lever). */
   extraContributionSegments?: ContributionSegments;
+  /**
+   * ADR-0006 Phase 1d — the calendar year to evaluate dated goals against, threaded straight into
+   * every `derive()` run below so the four runs this solver makes cannot disagree about how far
+   * away a goal is. Callers supply the wall clock; specs pin it. See `DeriveOverrides.currentYear`.
+   */
+  currentYear?: number;
   /**
    * `false` skips the bisection (the expensive part) and returns `requiredMonthlyReal = Infinity`
    * with `solved: false` — for callers that only need need / have-by-target / gap (the QN-4 chart
@@ -111,7 +143,14 @@ export function requiredMonthlyContributionFor(
 ): RequiredContributionResult {
   const { snapshot, assumptions, lens } = input;
   const extra = input.extraContributionSegments ?? [];
-  const extraOverride = extra.length > 0 ? { extraContributionSegments: extra } : {};
+  // ADR-0006 Phase 1d: `currentYear` rides along with the extra segments so EVERY derive() call in
+  // this solver — baseline, at-target, and each bisection probe — evaluates dated goals against the
+  // same year. A solver whose probes disagreed with its own baseline about a goal's due date would
+  // bisect against a moving target.
+  const extraOverride = {
+    ...(extra.length > 0 ? { extraContributionSegments: extra } : {}),
+    ...(input.currentYear != null ? { currentYear: input.currentYear } : {}),
+  };
   // A non-finite target age can never produce an honest answer — reject it before it can
   // silently fall back to the stored target while the predicate always fails (code-review L6).
   if (!Number.isFinite(input.targetAge)) {
@@ -166,7 +205,7 @@ export function requiredMonthlyContributionFor(
       : null
     : atTarget.householdFireAge;
 
-  const needReal = atTargetAdult ? atTargetAdult.individualFireNumber : atTarget.fireNumber;
+  const needRealToday = atTargetAdult ? atTargetAdult.individualFireNumber : atTarget.fireNumber;
   const swrUsed = safe(atTarget.effectiveSWR, 0.035);
   // The lensed adult's OWN age — `derive().anchorAge` is deliberately the primary earner's
   // (the #23 household-invariance guardrail), so using it under a lens would project an older
@@ -174,19 +213,56 @@ export function requiredMonthlyContributionFor(
   const anchorAge = safe(atTargetAdult ? atTargetAdult.anchorAge : atTarget.anchorAge, 30);
   const yearsToTarget = Math.max(0, targetAge - anchorAge);
   const inflation = safe(assumptions.inflation, 0.06);
-  const inflator = Math.pow(1 + inflation, yearsToTarget);
+  // ADR-0006. The FIRE number the household must actually hit AT the target age is today's number
+  // re-priced along the kernel's COMPONENT TARGET SCHEDULE for `yearsToTarget` years — NOT grown at
+  // one rate. The target is a sum of legs that move differently:
+  //
+  //   target(T) = (base + contingency)·(1+b)^T          the perpetual ongoing spend, at the basket
+  //             + reservation·(1+healthcareInflation)^T  the medical-shock buffer, at medical inflation
+  //             + Σ goal_i·(1+rate_i)^min(T, due_i)      each dated lump, at ITS bucket, capped on its due year
+  //
+  // and the two figures the hero prints are that one schedule read in two frames:
+  //   needReal    = regularTargetComponentsRealAt(T).total   (today's rupees — already CPI-deflated)
+  //   needNominal = needReal × (1+CPI)^T                     (target-year rupees)
+  //
+  // Before ADR-0006 the real figure was the UNDRIFTED needToday and the nominal one was
+  // `needToday × (1+CPI)^T`, so both were short — an optimistic prescription (gh #167). Phase 1b
+  // then grew the whole target at a single scalar `(1+g)^T` where `g = realTargetDriftRate`; Phase
+  // 1c retired that, because a scalar OVER-states the need for any household whose goals fall due
+  // inside the horizon (their legs stop rising and the scalar does not), and because the three
+  // narrated components would stop summing to the headline the moment one goal's due year landed
+  // inside T. `realTargetDriftRate` survives only as the fallback below, for the degenerate case
+  // where the kernel could not produce a component total at all.
+  const atTargetComponents = atTarget.regularTargetComponentsRealAt(yearsToTarget);
+  const componentDriftFactor =
+    atTarget.fireNumber > 0 && Number.isFinite(atTargetComponents.total)
+      ? atTargetComponents.total / atTarget.fireNumber
+      : Math.pow(1 + safe(atTarget.realTargetDriftRate, 0), yearsToTarget);
+  const cpiInflator = Math.pow(1 + inflation, yearsToTarget);
+  // Household scope: `needRealToday` IS `atTarget.fireNumber`, so this is exactly the component
+  // total. Member lens: the individual number carries the same household drift it always has.
+  const needReal = needRealToday * componentDriftFactor;
 
   // "You'll have by <target>" — the CURRENT pace projected in the REAL frame with the SAME
   // inflow schedule + real return schedule the kernel just used (no re-built parallel math).
   // Under a member lens the individual path has no projection of its own, so the adult's
   // attributable corpus is grown with their own scalar contribution through the same primitive.
   const startCorpus = atTargetAdult ? atTargetAdult.attributableCorpus : atTarget.fireWithdrawableCorpus;
-  const inflow = atTargetAdult ? currentMonthlyReal : atTarget.householdContributionSchedule;
+  const inflowReal = atTargetAdult ? currentMonthlyReal : atTarget.householdContributionSchedule;
+  const inflow: typeof inflowReal =
+    typeof inflowReal === "number" && inflowReal <= 0
+      ? inflowReal
+      : (yearIndex: number) =>
+          (typeof inflowReal === "function" ? inflowReal(yearIndex) : inflowReal) *
+          Math.pow(1 + inflation, yearIndex);
   // The return must match the one the SAME scope's FIRE age was solved at: the household's
   // glide-aware schedule for the household, the member's OWN scalar real return under a lens.
   // Growing a debt-heavy spouse's corpus at the household blend over-states it (up to ~1.7x
   // across 25 years) — FinTech HIGH-1 / code-review M1.
-  const returns = atTargetAdult ? atTargetAdult.realReturn : atTarget.realReturnSchedule;
+  // ADR-0006: NOMINAL returns + a CPI-grown inflow, then deflate the endpoint at CPI — the exact
+  // path the kernel's own solver walks, so "what you'll have" cannot drift from "when you get
+  // there" through a second, differently-framed projection.
+  const returns = atTargetAdult ? atTargetAdult.nominalReturn : atTarget.expectedReturnSchedule;
   const wholeYears = Math.max(0, Math.round(yearsToTarget));
   // horizonYears 0 means "today" — projectCorpus would still run a full year of growth if we
   // forced a minimum of 1, inventing returns that have not happened (code-review H1).
@@ -197,14 +273,19 @@ export function requiredMonthlyContributionFor(
           currentCorpus: safe(startCorpus),
           monthlyContribution: inflow,
           expectedReturns: returns,
-          inflation: 0, // REAL frame: only the corpus line is read, never the target/expense lines
+          inflation: 0, // only the corpus line is read here, never the target/expense lines
           annualExpensesToday: safe(atTarget.annualExpensesToday),
           startAge: anchorAge,
           swr: swrUsed,
           horizonYears: wholeYears,
         });
   const atTargetPoint = points.find((pt) => pt.ageYears >= anchorAge + wholeYears) ?? points[points.length - 1];
-  const haveAtTargetReal = Math.max(0, Math.round(safe(atTargetPoint?.corpus ?? startCorpus)));
+  // Nominal corpus at T, deflated at general CPI → today's rupees, the frame `needReal` is in.
+  const haveAtTargetNominal = safe(atTargetPoint?.corpus ?? startCorpus);
+  const haveAtTargetReal = Math.max(
+    0,
+    Math.round(haveAtTargetNominal / Math.pow(1 + inflation, wholeYears)),
+  );
 
   // ---- binary search on the real monthly contribution ----
   const reaches = (monthly: number): boolean => {
@@ -290,18 +371,32 @@ export function requiredMonthlyContributionFor(
     needReal: needRealRounded,
     haveAtTargetReal,
     paceFireAge: paceFireAgeRaw != null && Number.isFinite(paceFireAgeRaw) ? paceFireAgeRaw : null,
-    needNominal: Math.max(0, Math.round(safe(needRealRounded * inflator, needRealRounded))),
+    // The SAME component total, quoted in target-year rupees: `needReal × (1+CPI)^T`. It is not
+    // `needToday × (1+b)^T` — that single-rate form was retired in Phase 1c because the basket is
+    // only the perpetual leg's rate (see the derivation above). Grown from the ROUNDED real figure
+    // so the two numbers the hero prints side by side reconcile exactly for a user who checks them.
+    needNominal: Math.max(0, Math.round(safe(needRealRounded * cpiInflator, needRealRounded))),
     swrUsed,
     anchorAgeUsed: anchorAge,
     yearsToTarget: wholeYears,
     hasTarget: needRealRounded > 0,
     solved: solve,
-    needBaseReal: Math.max(0, Math.round(safe(atTarget.baseFireNumber))),
-    needPlannedGoalsReal: Math.max(0, Math.round(safe(atTarget.familyLayerCorpus))),
-    needHealthcareReservationReal: Math.max(0, Math.round(safe(atTarget.healthcareReservation))),
+    // ADR-0006: the three narrated components are at the SAME target age as `needReal`, so they
+    // carry the SAME real drift — otherwise base + goals + reservation would stop summing to the
+    // headline the moment the slider moved (the desync T-378 fixed, re-opened by the drift).
+    // ADR-0006 Phase 1c: each component carries its OWN drift, read straight off the kernel's
+    // component schedule at the target horizon — the base and contingency at the household
+    // basket, the reservation at medical inflation, each dated goal capped at its due year.
+    // They sum to `needReal` by construction for the household scope.
+    needBaseReal: Math.max(0, Math.round(safe(atTargetComponents.base))),
+    needPlannedGoalsReal: Math.max(0, Math.round(safe(atTargetComponents.plannedGoals))),
+    needHealthcareReservationReal: Math.max(
+      0,
+      Math.round(safe(atTargetComponents.healthcareReservation)),
+    ),
     netAnnualExpensesReal: Math.max(
       0,
-      Math.round(safe(atTarget.baseFireNumber * safe(atTarget.effectiveSWR, 0.035))),
+      Math.round(safe(atTargetComponents.base * safe(atTarget.effectiveSWR, 0.035))),
     ),
   };
 }

@@ -18,9 +18,34 @@
 
 import type {
   Household,
+  InflationBucket,
+  PlannedFutureKind,
   RecurringExpenseLine,
   PlannedFutureLine,
 } from "@/types/household";
+
+/**
+ * ADR-0006 Phase 1d — the ONE kind -> price-index map for a dated goal.
+ *
+ * `PlannedFutureLine.inflationBucket` is optional, and a line that reaches the kernel without one
+ * used to fall straight through to all-items CPI: a ₹50 L college fund priced at 6% instead of 9%,
+ * i.e. a FIRE target that is too SMALL, which is the optimistic direction. `kind` is the field the
+ * user actually picks in the goal form, so it is what the bucket falls back to.
+ *
+ * "marriage" maps to general on purpose: it is a general-consumption event with no price index of
+ * its own, and inventing one would be a number nobody can defend. Exported so the kernel, the
+ * store's legacy backfill and the goal form share one answer instead of three copies.
+ */
+export function plannedGoalInflationBucket(kind: PlannedFutureKind | undefined): InflationBucket {
+  switch (kind) {
+    case "education":
+      return "education";
+    case "medical":
+      return "healthcare";
+    default:
+      return "general";
+  }
+}
 
 export interface DerivedFamilyLayer {
   /** Parents bucket lines (recurring expenses kind='parents'). */

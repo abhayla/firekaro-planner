@@ -9,7 +9,12 @@
  * expected return) and the runner re-computes years-to-FIRE. A scenario passes
  * when it adds ≤ 5 years to the baseline FIRE date (A27.3 tolerance).
  */
-import { calculateFIRENumber, calculateYearsToTarget } from "@/lib/fire-math";
+import {
+  calculateFIRENumber,
+  calculateYearsToTarget,
+  type ContributionSchedule,
+  type ReturnSchedule,
+} from "@/lib/fire-math";
 
 export interface StressBaseline {
   annualExpenses: number;
@@ -118,13 +123,97 @@ export interface StressSummary {
 export interface StressRunArgs extends StressBaseline {
   totalCorpus: number;
   annualIncomeTotal: number;
+  /**
+   * ADR-0006 Phase 1b — the KERNEL TRIPLE. Supply all four and this module runs the SAME nominal
+   * model the headline does, so its absolute `yearsToFire` agrees with the FIRE age on the hero
+   * instead of contradicting it. Omit them and the legacy scalar path runs, byte-identical.
+   *
+   * Why it matters: without them the target here is `annualExpenses / swr` — no family layer, no
+   * medical reservation — held CONSTANT in today's rupees, the corpus grows at a flat real return
+   * and the savings step-up does not exist. That is the pre-ADR-0006 model, and it produced a
+   * baseline FIRE date years apart from the one the dashboard prints for the same household. The
+   * per-scenario DELTA (what this page is really about) survived either way; the absolutes did not.
+   */
+  /** `derive().fireNumber` — the headline target in today's rupees (base + family layer + reservation). */
+  fireNumberToday?: number;
+  /**
+   * `derive().effectiveTargetGrowthNominal` — the NOMINAL rate the headline target actually grows
+   * at over the horizon the headline was solved at.
+   *
+   * ADR-0006 Phase 1d: this used to be `derive().householdInflation`, the scalar spending basket,
+   * and was named `targetInflation` to match. That is only the BASE leg's rate: it is blind to the
+   * medical reservation compounding at medical inflation and to every dated goal's due-year cap,
+   * so the stress page's own baseline FIRE age drifted away from the dashboard's for the same
+   * household. Renamed as well as re-pointed — a field called "inflation" invites the next caller
+   * to hand it an inflation rate, which is exactly how the base-leg mistake keeps recurring.
+   */
+  targetGrowthNominal?: number;
+  /** `derive().nominalContributionSchedule` — the real inflow grown at CPI, incl. the step-up. */
+  contributionSchedule?: ContributionSchedule;
+  /** `derive().expectedReturnSchedule` — NOMINAL, glide-tapered. */
+  expectedReturnSchedule?: ReturnSchedule;
+}
+
+/**
+ * Years-to-FIRE for one (possibly shifted) baseline. Uses the kernel triple when the caller
+ * supplies it, else the legacy scalar model.
+ *
+ * A scenario shifts `annualExpenses`, `swr` and/or `expectedReturn`. In kernel mode those shifts
+ * are applied PROPORTIONALLY to the headline target (the shift is a shock to the expense line, and
+ * the family layer + reservation scale with it exactly as `derive()` builds them) and ADDITIVELY to
+ * the nominal return schedule — so a scenario means the same thing in both modes.
+ */
+function yearsToFireFor(args: StressRunArgs, shifted: StressBaseline): number {
+  const monthlyReal = Math.max(0, (args.annualIncomeTotal - shifted.annualExpenses) / 12);
+  const kernelMode =
+    args.fireNumberToday != null &&
+    Number.isFinite(args.fireNumberToday) &&
+    args.contributionSchedule != null &&
+    args.expectedReturnSchedule != null;
+
+  if (!kernelMode) {
+    const target = calculateFIRENumber(shifted.annualExpenses, shifted.swr);
+    return calculateYearsToTarget(args.totalCorpus, target, monthlyReal, shifted.expectedReturn);
+  }
+
+  // Proportional expense/SWR shock on the headline target, then grown at the rate the headline
+  // itself was solved at (`effectiveTargetGrowthNominal`) — not at the raw spending basket, which
+  // is only one of the target's three legs.
+  const expenseScale = args.annualExpenses > 0 ? shifted.annualExpenses / args.annualExpenses : 1;
+  const swrScale = shifted.swr > 0 ? args.swr / shifted.swr : 1;
+  const targetToday = (args.fireNumberToday as number) * expenseScale * swrScale;
+  const growth = Number.isFinite(args.targetGrowthNominal) ? (args.targetGrowthNominal as number) : 0;
+  const target = (yearIndex: number) => targetToday * Math.pow(1 + growth, yearIndex);
+
+  const returnDelta = shifted.expectedReturn - args.expectedReturn;
+  const baseReturns = args.expectedReturnSchedule as ReturnSchedule;
+  const returns: ReturnSchedule =
+    returnDelta === 0
+      ? baseReturns
+      : (yearIndex: number) =>
+          (typeof baseReturns === "function" ? baseReturns(yearIndex) : baseReturns) + returnDelta;
+
+  // The kernel's inflow already carries CPI + the step-up. A scenario that lifts expenses eats
+  // into the savings residual, so scale the schedule by the residual's own shift.
+  const baseMonthlyReal = Math.max(0, (args.annualIncomeTotal - args.annualExpenses) / 12);
+  const inflowScale = baseMonthlyReal > 0 ? monthlyReal / baseMonthlyReal : 0;
+  const baseInflow = args.contributionSchedule as ContributionSchedule;
+  const inflow: ContributionSchedule =
+    inflowScale <= 0
+      ? 0
+      : (yearIndex: number) =>
+          (typeof baseInflow === "function" ? baseInflow(yearIndex) : baseInflow) * inflowScale;
+
+  return calculateYearsToTarget(args.totalCorpus, target, inflow, returns);
 }
 
 /** Baseline years-to-FIRE before any scenario shift. */
 export function baselineYearsToFire(args: StressRunArgs): number {
-  const target = calculateFIRENumber(args.annualExpenses, args.swr);
-  const monthly = (args.annualIncomeTotal - args.annualExpenses) / 12;
-  return calculateYearsToTarget(args.totalCorpus, target, monthly, args.expectedReturn);
+  return yearsToFireFor(args, {
+    annualExpenses: args.annualExpenses,
+    swr: args.swr,
+    expectedReturn: args.expectedReturn,
+  });
 }
 
 export function runStressScenarios(args: StressRunArgs): {
@@ -140,9 +229,13 @@ export function runStressScenarios(args: StressRunArgs): {
 
   const results: StressResult[] = STRESS_SCENARIOS.map((s) => {
     const shifted = s.apply(base);
-    const target = calculateFIRENumber(shifted.annualExpenses, shifted.swr);
-    const monthly = Math.max(0, (args.annualIncomeTotal - shifted.annualExpenses) / 12);
-    const years = calculateYearsToTarget(args.totalCorpus, target, monthly, shifted.expectedReturn);
+    const years = yearsToFireFor(args, shifted);
+    const expenseScale = args.annualExpenses > 0 ? shifted.annualExpenses / args.annualExpenses : 1;
+    const swrScale = shifted.swr > 0 ? args.swr / shifted.swr : 1;
+    const target =
+      args.fireNumberToday != null && Number.isFinite(args.fireNumberToday)
+        ? (args.fireNumberToday as number) * expenseScale * swrScale
+        : calculateFIRENumber(shifted.annualExpenses, shifted.swr);
     const delta = years - baselineYears;
     return {
       scenario: s,

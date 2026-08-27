@@ -12,11 +12,41 @@ import { useAssumptionsStore } from "@/stores/assumptions";
 import { useUiStore } from "@/stores/ui";
 import { loadSeedPersona } from "@/lib/seed-persona";
 import { useFireDerive } from "@/lib/useFireDerive";
-import { derive, bridgeRentalPostTaxAnnual, SEC_24A_DEDUCTION_RATE, SEC_71_HP_LOSS_SETOFF_CAP } from "@/lib/derive";
+import {
+  derive as deriveKernel,
+  bridgeRentalPostTaxAnnual,
+  SEC_24A_DEDUCTION_RATE,
+  SEC_71_HP_LOSS_SETOFF_CAP,
+  type DeriveLens,
+} from "@/lib/derive";
+import type { DeriveOverrides } from "@/lib/derive-overrides";
+import type { Household } from "@/types/household";
+import type { Assumptions } from "@/types/assumptions";
 import type { OtherIncomeLine } from "@/types/household";
 import { calculateNpsWithdrawal, postTaxAnnuityIncome } from "@/lib/nps-withdrawal";
 import { calculateYearsToTarget, calculateFIRENumber } from "@/lib/fire-math";
 import { toMonthly } from "@/lib/cashflow";
+
+/**
+ * ADR-0006 Phase 1d — the calendar year every `derive()` call in this file is evaluated in.
+ *
+ * The kernel no longer reads the wall clock (it used to, at `derive.ts`'s dated-goal handling), so
+ * a pinned year is what makes these baselines DETERMINISTIC: without it they would silently shift
+ * on 1 January, every dated goal a year nearer, hence a year less inflation, hence FIRE earlier —
+ * the optimistic direction, arriving unannounced. 2026 is the year the current baselines were
+ * measured in, so pinning it keeps them byte-identical and frozen from here on.
+ */
+const PINNED_CURRENT_YEAR = 2026;
+
+/** Every `derive()` below runs through here, so no call in this file can forget the pin. */
+function derive(
+  household: Household,
+  assumptions: Assumptions,
+  lens: DeriveLens,
+  overrides: DeriveOverrides = {},
+) {
+  return deriveKernel(household, assumptions, lens, { currentYear: PINNED_CURRENT_YEAR, ...overrides });
+}
 
 describe("derive() — pure kernel", () => {
   beforeEach(() => setActivePinia(createPinia()));
@@ -911,13 +941,32 @@ describe("seed-anchor regression locks (gh-issue #17 — catch silent adequacy-l
     // Pinned to the known-good values (re-anchored 2026-08-27, T-376/gh-#165). The byte-identical
     // wrapper/kernel test only proves the two agree with EACH OTHER; this anchors the ACTUAL headline
     // so a future adequacy-leg refactor (#23) that silently drifts it is a CI failure. FIRE age ≈ 59
-    // (anchor 33 + ~25.67y), comfortably under the #22 sanity ceiling.
+    // (anchor 30 + ~24.42y), comfortably under the #22 sanity ceiling.
     // Re-anchor note: this moved from 25.58y/₹105,482,068 → 25.67y/₹105,982,068 (a +₹5,00,000 shift)
     // when T-376 fixed the Tier-0 honesty bug (gh-#165): the Sharmas seed's kind-less "Foreign
     // vacation" plannedFuture line (`seed-persona.ts`, no `kind` set → defaults to 'general') now
-    // correctly enters the FIRE-number family-layer lump, matching every other planned goal. This is
-    // the EXPECTED, intended effect of the fix, not drift.
-    expect(k.yearsToRegular).toBeCloseTo(25.67, 2);
+    // correctly enters the FIRE-number family-layer lump, matching every other planned goal.
+    //
+    // RE-ANCHORED 2026-08-27 (ADR-0006): 25.67y → 24.42y. `fireNumber` is UNCHANGED (₹10.60 Cr —
+    // it is a today's-rupee figure and no inflation input can move it), which is itself the proof
+    // that the target, not the target's SIZE, is what changed. Four effects net out:
+    //   + later  — the target now drifts up at g ≈ 0.23%/yr instead of standing still
+    //   + later  — (1+r)^(1/12) replaces r/12, removing the over-compounding
+    //   + later  — the target is resolved continuously, not frozen at the year's start
+    //   − earlier— the 2%-real step-up (tapering at 50) now defaults ON, and the re-grounded
+    //              basket cut the drift from 1.79%/yr to 0.23%/yr
+    // The frame leg ALONE (old inputs, new kernel) moves this persona to 36.67y / age 67 — locked
+    // separately in `inflation-frame-invariant.spec.ts` assertion 4.
+    //
+    // RE-ANCHORED AGAIN 2026-08-27 (ADR-0006 Phase 1c): 24.42y → 25.42y, FIRE age 30 + 25.42 =
+    // 55.42. `fireNumber` is AGAIN unchanged at ₹10.60 Cr — the target's size never moves, only
+    // its trajectory. The +1.00y is the healthcare corpus reservation: it is 20% of the base and
+    // now drifts at `healthcareInflation` (9%) rather than the household basket (6.24%), because
+    // it buffers medical SHOCKS priced at medical inflation while the basket's healthcare bucket
+    // covers recurring healthcare spend inside the base. Over 25 years that leg roughly doubles
+    // relative to the basket path, and the honest FIRE date moves LATER by a year. The Sharmas'
+    // dated goals are small, so decision (b)'s goal cap (which pushes earlier) barely registers.
+    expect(k.yearsToRegular).toBeCloseTo(25.42, 2);
     expect(Math.round(k.fireNumber)).toBe(105_982_068);
   });
 });

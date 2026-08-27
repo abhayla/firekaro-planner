@@ -13,7 +13,7 @@ import {
   requiredMonthlyContributionFor,
   type RequiredContributionResult,
 } from "@/lib/required-contribution";
-import { runMonteCarloFire, INDIA_EQUITY_ANNUAL_RETURNS } from "@/lib/monte-carlo";
+import { runMonteCarloFire, headlineBandInputs } from "@/lib/monte-carlo";
 import { isEmergencyFundEligible } from "@/lib/investment-traits";
 import type { ProjectionPoint } from "@/lib/fire-math";
 import { DEFAULT_ASSUMPTIONS } from "@/types/assumptions";
@@ -31,11 +31,16 @@ import { DEFAULT_ASSUMPTIONS } from "@/types/assumptions";
  * where `yearIndex = point.year − year0` and `year0` = the projection's first year (the
  * SAME origin the kernel uses).
  *
- * Deflator MUST be GENERAL CPI (`assumptions.inflation` ≈6%), NEVER the 4-bucket
- * `householdInflation` (~7.9%) — re-using the healthcare-weighted basket here re-creates
- * the #20 "FIRE-at-115" bug (FinTech-validated 2026-06-03). Because the kernel already
- * inflated the targets at the same general CPI, dividing both corpus and targets by one
- * shared factor PRESERVES the crossover year — a real-terms view never moves the FIRE date.
+ * Deflator MUST be GENERAL CPI (`assumptions.inflation` = 6%), NEVER the 4-bucket
+ * `householdInflation` (≈6.24% since ADR-0006; it was 7.90% under the non-disjoint 60/20/10/10
+ * weights and a 14% healthcare rate) — re-using the household EXPENSE basket as a RETURN deflator
+ * is the #20 "FIRE-at-115" bug (FinTech-validated 2026-06-03), and re-grounding the basket makes
+ * it smaller, not correct.
+ *
+ * ADR-0006: the kernel now grows the target at the BASKET while this deflates at CPI, so the
+ * deflated target line SLOPES UP at `g = (1+b)/(1+CPI) − 1` instead of being flat. The crossover
+ * year is still preserved — corpus and targets are divided by the same factor — but "the real
+ * target is a flat line" is no longer true and must not be re-asserted anywhere.
  */
 export function deflateProjectionPoints(
   points: ProjectionPoint[],
@@ -102,11 +107,19 @@ export function useFireDerive() {
   // one is EXPLICITLY selected — gh-issue #22 root fix), so no per-consumer flag is
   // needed: every consumer gets the coherent household FIRE number by default.
   const d = computed(() =>
-    derive(h.data, a.values, {
-      isFamilyView: ui.isFamilyView,
-      viewingMemberId: ui.viewingMemberId,
-      currentFY: ui.currentFY,
-    }),
+    derive(
+      h.data,
+      a.values,
+      {
+        isFamilyView: ui.isFamilyView,
+        viewingMemberId: ui.viewingMemberId,
+        currentFY: ui.currentFY,
+      },
+      // ADR-0006 Phase 1d: the wall clock enters HERE, at the composable boundary. The kernel is
+      // pure and never calls Date, so a dated goal's "years from now" cannot silently change under
+      // a golden master on 1 January (see DeriveOverrides.currentYear).
+      { currentYear: new Date().getFullYear() },
+    ),
   );
 
   // #81 Phase 3 — the SAME-SCOPE Financial-Health resolver. When an adult is selected in "Viewing
@@ -208,6 +221,28 @@ export function useFireDerive() {
   //     (attributed corpus/expenses, per-member SWR, the reachability cap intact). An
   //     unreachable individual FIRE yields fireAge null — the hero renders the honest "—",
   //     never a sentinel/absurd age (rule 31 / fire-confidence-band discipline).
+  /**
+   * ADR-0006 Phase 1d — the household progress pair (target + percent), sourced from the SOLVER so
+   * the KPI denominator is the number the headline quotes.
+   *
+   * Falls back to the kernel's anchor-year `fireNumber` when the solver has no target to report
+   * (`hasTarget` false, or a non-finite/zero need) — a progress bar divided by 0 or NaN is the
+   * fabricated-claim class, and the honest fallback is the figure the kernel is sure of.
+   */
+  const householdProgressTarget = computed<{ target: number; percent: number }>(() => {
+    const k = d.value;
+    const solved = requiredContribution.value;
+    const target =
+      solved.hasTarget && Number.isFinite(solved.needReal) && solved.needReal > 0
+        ? solved.needReal
+        : k.fireNumber;
+    if (!(target > 0)) return { target: k.fireNumber, percent: 0 };
+    return {
+      target,
+      percent: Math.min(100, Math.max(0, Math.round((k.fireWithdrawableCorpus / target) * 100))),
+    };
+  });
+
   const heroHeadline = computed<HeroHeadline>(() => {
     const k = d.value;
     const r = k.individualFireByMember.find((m) => m.memberId === ui.viewingMemberId) ?? null;
@@ -220,8 +255,15 @@ export function useFireDerive() {
         yearsToFire: k.yearsToRegular,
         fireNumber: k.fireNumber,
         corpusForProgress: k.totalCorpus,
-        fireTargetForProgress: k.fireNumber,
-        progressPercent: k.progressPercent,
+        // ADR-0006 Phase 1d — the progress denominator is the SAME need the headline six inches
+        // above quotes: the solver's `needReal` at the hero's own target age. It used to be
+        // `k.fireNumber`, the ANCHOR-year target, so the card read "₹1.10 Cr / ₹10.60 Cr" directly
+        // under "you'll need ₹12.17 Cr" — two different unlabelled targets on one card, and the
+        // smaller one flattering the progress bar. `fireNumber` has not moved and is still exposed
+        // as `fireNumber` for anything that genuinely wants today's target; what changed is that
+        // the PROGRESS pair now shares one target with the sentence it sits under.
+        fireTargetForProgress: householdProgressTarget.value.target,
+        progressPercent: householdProgressTarget.value.percent,
         annualSavings: k.annualSavings,
         monthlyTakeHome: k.monthlyTakeHome,
         reachable: Number.isFinite(k.yearsToRegular),
@@ -309,6 +351,8 @@ export function useFireDerive() {
       lens: solverLens.value,
       targetAge: activePlan.value.targetAge,
       extraContributionSegments: activePlan.value.extraSegments,
+      // ADR-0006 Phase 1d — the wall clock enters at the composable boundary; the kernel is pure.
+      currentYear: new Date().getFullYear(),
     }),
   );
 
@@ -320,6 +364,7 @@ export function useFireDerive() {
       lens: solverLens.value,
       targetAge: activePlan.value.targetAge + 3,
       extraContributionSegments: activePlan.value.extraSegments,
+      currentYear: new Date().getFullYear(),
     }),
   );
 
@@ -375,8 +420,30 @@ export function useFireDerive() {
     healthcareReservationPercent: computed(() => d.value.healthcareReservationPercent),
     variants: computed(() => d.value.variants),
     blendedReturn: computed(() => d.value.blendedReturn),
+    // ADR-0006: the household 4-bucket expense basket the FIRE target grows at.
+    householdInflation: computed(() => d.value.householdInflation),
     realBlendedReturn: computed(() => d.value.realBlendedReturn),
     realReturnSchedule: computed(() => d.value.realReturnSchedule),
+    // ADR-0006: the REAL drift of the FIRE target ((1+basket)/(1+CPI) − 1). This is the BASE
+    // leg's drift only — see the component schedule below for the whole target.
+    realTargetDriftRate: computed(() => d.value.realTargetDriftRate),
+    // ADR-0006 Phase 1c: the whole target as a curve, not a rate. `regularTargetComponentsRealAt(t)`
+    // is the today's-₹ target at year `t` split into base / planned-goals / medical reservation
+    // (summing to `total`); `effectiveTargetDriftRate` is the single rate that reproduces that
+    // curve over the SOLVED horizon, for the few consumers that need one number. Any consumer
+    // drawing or perturbing "the target over time" reads one of these — never `realTargetDriftRate`,
+    // which now describes only one of the three legs.
+    regularTargetComponentsRealAt: computed(() => d.value.regularTargetComponentsRealAt),
+    effectiveTargetDriftRate: computed(() => d.value.effectiveTargetDriftRate),
+    effectiveTargetGrowthNominal: computed(() => d.value.effectiveTargetGrowthNominal),
+    // ADR-0006: the REAL (today's-₹) corpus-inflow schedule the headline was solved with.
+    householdContributionSchedule: computed(() => d.value.householdContributionSchedule),
+    bandContributionSchedule: computed(() => d.value.bandContributionSchedule),
+    // ADR-0006: the NOMINAL triple the headline solver actually ran on. Exposed so the stress
+    // scenarios (and any other consumer) re-use it instead of rebuilding a second, differently-
+    // framed model of the same plan.
+    nominalContributionSchedule: computed(() => d.value.nominalContributionSchedule),
+    expectedReturnSchedule: computed(() => d.value.expectedReturnSchedule),
     portfolioVolatility: computed(() => d.value.portfolioVolatility),
     // Canonical per-bucket corpus weights (₹) backing blendedReturn/portfolioVolatility — the basis
     // the obj-2 acceleration composable must use for risk-notch equity headroom + perturbed σ (gh-48).
@@ -392,17 +459,13 @@ export function useFireDerive() {
     // REAL return shape + serial structure (mean-reversion) of Indian equity since 1991 —
     // measured tighter-or-equal to IID, not heavier (the lognormal's fat tail was an
     // artifact); surfaced as the "history-informed" disclosure.
-    monteCarlo: computed(() =>
-      runMonteCarloFire({
-        currentCorpus: d.value.fireWithdrawableCorpus,
-        targetCorpus: d.value.fireNumber,
-        monthlySavings: d.value.monthlyContribution,
-        meanReturn: d.value.realBlendedReturn,
-        meanReturnSchedule: d.value.realReturnSchedule,
-        volatility: d.value.portfolioVolatility,
-        historicalReturns: INDIA_EQUITY_ANNUAL_RETURNS,
-      }),
-    ),
+    //
+    // ADR-0006 Phase 1d: the argument object is built by `headlineBandInputs` — the ONE builder
+    // the digest's MC age and the plausibility lock also use. Three hand-assembled copies of the
+    // same call had already drifted apart (the digest was a whole leg behind, the "mirrors
+    // production" spec was mirroring nothing); a shared builder makes that impossible rather than
+    // re-detectable. The rationale for each field lives on the builder.
+    monteCarlo: computed(() => runMonteCarloFire(headlineBandInputs(d.value))),
     annualEpfVpfContribution: computed(() => d.value.annualEpfVpfContribution),
     householdMarginalRate: computed(() => d.value.householdMarginalRate),
     epfAfterTaxReturn: computed(() => d.value.epfAfterTaxReturn),

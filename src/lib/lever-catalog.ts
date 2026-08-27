@@ -36,8 +36,8 @@ export interface AccelerationContext {
   currentEquityPct: number;
   /** The household's realistic equity ceiling (0..100). At/above ⇒ the risk-notch lever is locked. */
   maxEquityPct: number;
-  /** Expected REAL-return delta per +1 percentage-point of equity (the equity−debt real-return spread ÷ 100). */
-  realReturnPerEquityPoint: number;
+  /** Expected NOMINAL-return delta per +1 percentage-point of equity (the equity−debt nominal-return spread ÷ 100; ADR-0006). */
+  nominalReturnPerEquityPoint: number;
   /** ₹/yr already claimed under the ₹50k 80CCD(1B) NPS sub-limit. Headroom = cap − this. */
   currentNps80ccd1bUsed: number;
   /** Household top marginal tax rate (0..1, incl. cess in the real wiring) — the rate the 80CCD headroom saves. */
@@ -108,7 +108,7 @@ export function buildAccelerationLevers(ctx: AccelerationContext): Lever[] {
   // 2) Shift one realistic risk notch toward equity (bounded by the household's ceiling).
   const equityNotch = Math.min(EQUITY_NOTCH_POINTS, ctx.maxEquityPct - ctx.currentEquityPct);
   if (equityNotch > 0) {
-    const returnDelta = equityNotch * ctx.realReturnPerEquityPoint;
+    const returnDelta = equityNotch * ctx.nominalReturnPerEquityPoint;
     levers.push({
       key: "risk-notch",
       label: "Shift one risk notch to equity",
@@ -117,7 +117,7 @@ export function buildAccelerationLevers(ctx: AccelerationContext): Lever[] {
       // the risk-neutral surplus/trim levers. The years-saved here is the EXPECTED case only; the
       // added volatility/sequence risk (a wider range of FIRE dates, worse left tail) is real and is
       // disclosed in the note until per-lever confidence bands land (gh-48 follow-on).
-      note: `Raise equity ${ctx.currentEquityPct}% → ${ctx.currentEquityPct + equityNotch}% (+${(returnDelta * 100).toFixed(1)}% expected real return) — adds market risk: a wider range of outcomes, not a guaranteed gain`,
+      note: `Raise equity ${ctx.currentEquityPct}% → ${ctx.currentEquityPct + equityNotch}% (+${(returnDelta * 100).toFixed(1)}% expected return) — adds market risk: a wider range of outcomes, not a guaranteed gain`,
       apply: (b) => ({ ...b, expectedReturn: b.expectedReturn + returnDelta }),
     });
   }
@@ -142,7 +142,14 @@ export function buildAccelerationLevers(ctx: AccelerationContext): Lever[] {
       key: "nps-80ccd1b",
       label: "Fill your 80CCD(1B) NPS headroom",
       note: `Invest ${formatINRCompact(npsHeadroom)}/yr in NPS under 80CCD(1B) → save ${formatINRCompact(annualTaxSaved)}/yr tax, redirected to investing`,
-      apply: (b) => ({ ...b, monthlySavings: b.monthlySavings + monthlyTaxSaved }),
+      // ADR-0006 Phase 1b: the tax saving is a FLAT extra inflow, not part of the savings
+      // residual — a fixed statutory headroom times a slab rate does not grow with the
+      // household's real wage curve. Adding it to `monthlySavings` handed it the 2% real
+      // step-up and compounded a constant into a rising series, over-stating the lever.
+      apply: (b) => ({
+        ...b,
+        flatExtraMonthlySavings: (b.flatExtraMonthlySavings ?? 0) + monthlyTaxSaved,
+      }),
     });
   }
 

@@ -26,12 +26,29 @@ describe("FireHero binding locks — T-377 QN-2 gap hero", () => {
     );
   });
 
-  it("shows BOTH today's money and the nominal figure — exactly once each (honesty guardrail)", () => {
-    expect(template).toMatch(/formatINRCompact\(req\.needReal\)[\s\S]{0,80}in today's money/);
+  it("shows BOTH today's rupees and the nominal figure — exactly once each (honesty guardrail)", () => {
+    expect(template).toMatch(/formatINRCompact\(req\.needReal\)[\s\S]{0,80}in today's rupees/);
     expect(template).toMatch(/formatINRCompact\(req\.needNominal\)[\s\S]{0,40}in \{\{ needYear \}\}/);
     // Exactly once each — a second render of the same figure is the "shown once" violation.
     expect((template.match(/req\.needReal/g) ?? []).length).toBe(1);
     expect((template.match(/req\.needNominal/g) ?? []).length).toBe(1);
+  });
+
+  it("ADR-0006: the today's-rupee figure is qualified — it is the target AT the target age", () => {
+    // "today's money" alone read as a target standing still. It does not: the FIRE number rises
+    // with the household spending basket even after deflating at general CPI, so needReal at 50 is
+    // NOT today's FIRE number. The note must say so, name the basket, and show it LIVE.
+    expect(template).toContain('data-testid="fire-hero-frame-note"');
+    expect(template).toMatch(/today's rupees, at age \{\{ targetAge \}\}/);
+    expect(template, "both rates render through the guarded computeds").toMatch(/\{\{ basketPct \}\}/);
+    expect(template).toMatch(/\{\{ generalPct \}\}/);
+    // ...which must read the kernel live — a hard-coded 6.2% would lie to anyone who edits a bucket.
+    expect(src).toMatch(/fire\.householdInflation\.value/);
+    expect(src).toMatch(/a\.values\.inflation/);
+    // ...and never emit NaN% if an assumption is ever non-finite (rule 31 / defensive-coding).
+    expect(src).toMatch(/const basketPct = computed[\s\S]{0,200}Number\.isFinite/);
+    expect(src).toMatch(/const generalPct = computed[\s\S]{0,200}Number\.isFinite/);
+    expect(template).toMatch(/\/preferences#pref-section-inflation/);
   });
 
   it("renders all four solver numbers: need · have-by-target · gap · do-this", () => {
@@ -50,6 +67,39 @@ describe("FireHero binding locks — T-377 QN-2 gap hero", () => {
   it("an unreachable target renders 'Move the age', never a fabricated amount", () => {
     expect(template).toMatch(/v-if="!requiredFinite">Move the age/);
     expect(src).toMatch(/Number\.isFinite\(req\.value\.requiredMonthlyReal\)/);
+  });
+
+  it("ADR-0006: an unreachable plan gets a FIRST-CLASS headline state, not just a tile", () => {
+    expect(template, "the headline-level state must exist").toContain(
+      'data-testid="fire-hero-unreachable"',
+    );
+    expect(template).toMatch(/At these assumptions you don't get there by \{\{ targetAge \}\}/);
+    // The tile-level version stays — this is an addition, not a replacement (contract: zero data loss).
+    expect(template).toMatch(/v-if="!requiredFinite">Move the age/);
+  });
+
+  it("the unreachable state is gated on the solver's OWN honest signals, never inferred", () => {
+    // Infinity from a `solve: false` run is explicitly NOT a verdict — reading it as one would
+    // fabricate the state on the six-point QN-4 chart's sampled runs.
+    expect(src).toMatch(/const unreachableAtAssumptions = computed/);
+    expect(src).toMatch(/req\.value\.solved/);
+    expect(src).toMatch(/req\.value\.paceFireAge == null/);
+  });
+
+  it("the unreachable state prints NO number and points at BOTH the moves and the assumptions", () => {
+    const block = template.slice(
+      template.indexOf('data-testid="fire-hero-unreachable"'),
+      template.indexOf('data-testid="fire-hero-guess"'),
+    );
+    expect(block.length, "the unreachable block must precede the guess line").toBeGreaterThan(0);
+    // Rule 31 / the fire-confidence-band rule: a sentinel is never rendered as a figure.
+    expect(block, "no money figure may be rendered inside the unreachable state").not.toMatch(
+      /formatINRCompact/,
+    );
+    expect(block, "must name the levers below / the age slider above").toMatch(/drag the age|move below/i);
+    expect(block, "must deep-link to the assumptions that drive it").toMatch(
+      /\/preferences#pref-section-inflation/,
+    );
   });
 
   it("the retirement-age slider is bounded by the SHARED range and commits to the SHARED ui field", () => {
@@ -114,6 +164,40 @@ describe("FireHero binding locks — T-377 QN-2 gap hero", () => {
     }
     // The plan-variance tone resolver is untouched by QN-2 — two signals, two types.
     expect(src).toMatch(/resolveHeroTone\(\{/);
+  });
+
+  it("ADR-0006 Phase 1d: the corpus-progress KPI names WHICH target it is measuring against", () => {
+    // The card printed "₹1.10 Cr / ₹10.60 Cr" (the anchor-year `fireNumber`) directly under the
+    // headline "you'll need ₹12.17 Cr" (the need AT the target age). Two different targets on one
+    // card, both unlabelled, the smaller one flattering the progress bar. The denominator is now
+    // the headline's own figure, and the caption says so.
+    expect(template).toContain('data-testid="hero-kpi-corpus-sub"');
+    expect(template, "the caption must name the target age, not just say 'of target'").toMatch(
+      /what you'll need at \$\{targetAge\}/,
+    );
+    // …and the member lens must keep its own generic wording (that figure is the member's own).
+    expect(template).toMatch(/hh\.isMember \? "their target"/);
+    // The denominator itself comes from the shared selector, never a component-local formula.
+    expect(template).toMatch(/formatINRCompact\(hh\.fireTargetForProgress\)/);
+    expect(src, "no parallel progress math in the component").not.toMatch(
+      /corpusForProgress\s*\/\s*/,
+    );
+  });
+
+  it("ADR-0006: a baseline locked under the OLD model makes NO verdict — it offers a re-lock", () => {
+    // Differencing across a frame change reports the model's move as the user's slippage: a
+    // fabricated "N months behind" for every user who had ever locked a plan.
+    expect(src).toMatch(/isBaselineFrameCurrent/);
+    expect(src).toMatch(/const baselineFrameStale = computed/);
+    // The staleness must actually gate the verdict path, not merely exist.
+    expect(src).toMatch(/baselineUsable = computed\([\s\S]{0,220}!baselineFrameStale\.value/);
+    expect(src).toMatch(/your plan was locked under the old model — re-lock to compare/);
+    // The re-lock is OFFERED, never taken for the user — the baseline is their chosen starting point.
+    expect(template).toContain('data-testid="plan-variance-relock-frame"');
+    expect(template).toMatch(/v-if="planSlot\.relock"/);
+    expect(src, "no auto-relock may be wired to a watcher or mount hook").not.toMatch(
+      /baselineFrameStale[\s\S]{0,80}lockBaseline\(\)/,
+    );
   });
 
   it("'Set as my target' writes only the LENSED member when a lens is on (never both spouses)", () => {

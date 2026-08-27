@@ -18,7 +18,7 @@
  * `ui` storage blob unchanged.
  */
 import type { DerivedFinancials } from "@/lib/derive";
-import { runMonteCarloFire, MAX_PROJECTION_YEARS, INDIA_EQUITY_ANNUAL_RETURNS } from "@/lib/monte-carlo";
+import { runMonteCarloFire, headlineBandInputs, MAX_PROJECTION_YEARS } from "@/lib/monte-carlo";
 
 /**
  * Milestone bands, ascending. Mirrors `lifecycle-evaluator.ts` MILESTONE_BANDS
@@ -37,6 +37,19 @@ export type MilestoneBand = (typeof MILESTONE_BANDS)[number];
 export const UNREACHABLE_FIRE_AGE = -1;
 
 /**
+ * ADR-0006 — the modelling frame a stored snapshot was captured under.
+ *
+ * Bump this ONLY when a kernel change moves every user's headline for reasons unrelated to their
+ * own behaviour. "Since you were away" is a claim about what the USER did; diffing across a frame
+ * change would attribute the model's move to them ("your FIRE date moved 2 years later") on every
+ * existing user's first visit after deploy. Unlike the plan baseline — which the user consciously
+ * locked and must therefore be asked before replacing — the digest baseline is an internal marker
+ * captured silently in the first place, so silently re-capturing it is the honest behaviour, not a
+ * loss: the next visit then reports only genuine, post-change movement.
+ */
+export const FRAME_VERSION = "adr-0006";
+
+/**
  * The exact `derive()` fields the snapshot is built from. Typed as a Pick so the
  * dashboard can pass an object assembled from `useFireDerive()` computeds (reading
  * derive() output via the wrapper — NOT re-calling the math), while the full
@@ -51,6 +64,13 @@ export type SnapshotInputs = Pick<
   | "savingsRate"
   | "realBlendedReturn"
   | "realReturnSchedule"
+  | "realTargetDriftRate"
+  // ADR-0006 Phase 1d: the band's drift is the EFFECTIVE (whole-target) rate, never the base
+  // leg's `realTargetDriftRate` — see `headlineBandInputs`. `realTargetDriftRate` stays in the
+  // Pick because other snapshot consumers still read it.
+  | "effectiveTargetDriftRate"
+  | "householdContributionSchedule"
+  | "bandContributionSchedule"
   | "portfolioVolatility"
   | "monthlyContribution"
 >;
@@ -79,6 +99,16 @@ export interface LifecycleSnapshot {
   activeNudgeIds: string[];
   /** Monte-Carlo median FIRE age (anchorAge + p50 years), or null when off the chart. */
   monteCarloP50Age: number | null;
+  /**
+   * The modelling frame this snapshot was captured under. ABSENT on every snapshot written before
+   * ADR-0006 — which is how a pre-frame-change baseline is recognised.
+   */
+  frameVersion?: string;
+}
+
+/** True when a stored snapshot can honestly be differenced against a live one. */
+export function isSnapshotFrameCurrent(snapshot: LifecycleSnapshot | null | undefined): boolean {
+  return !!snapshot && snapshot.frameVersion === FRAME_VERSION;
 }
 
 export interface LifecycleDigest {
@@ -157,6 +187,7 @@ export function captureSnapshot(
 
   return {
     capturedAt: now.toISOString(),
+    frameVersion: FRAME_VERSION,
     fireAge,
     fireYear,
     currentCorpus,
@@ -171,20 +202,12 @@ export function captureSnapshot(
 /** MC median FIRE age (anchorAge + p50 years), or null when off the chart / skipped. */
 function computeMonteCarloP50Age(derived: SnapshotInputs, skip: boolean): number | null {
   if (skip) return null;
-  const mc = runMonteCarloFire({
-    currentCorpus: derived.fireWithdrawableCorpus,
-    targetCorpus: derived.fireNumber,
-    monthlySavings: derived.monthlyContribution,
-    meanReturn: derived.realBlendedReturn,
-    // #24 Part 1: taper the MC per-year MEAN along the glide schedule so the digest's MC
-    // p50 age converges to the headline for glide-ON households (same as useFireDerive).
-    meanReturnSchedule: derived.realReturnSchedule,
-    volatility: derived.portfolioVolatility,
-    // #24 Part 2: MUST pass the SAME history-fed series the dashboard band uses
-    // (useFireDerive) — else the digest's MC FIRE age (IID) would diverge from the
-    // FireHero band's p50 (bootstrap) for the same household. One model, both surfaces.
-    historicalReturns: INDIA_EQUITY_ANNUAL_RETURNS,
-  });
+  // ADR-0006 Phase 1d: the digest's MC age and the FireHero band are now the SAME call, built by
+  // the SAME function (`headlineBandInputs`) — they cannot diverge again. They had: this site was
+  // still passing `realTargetDriftRate` (the base leg alone, so the 9% medical reservation and the
+  // goal due-year caps were invisible to it), which under-stated the target the band chases and
+  // put the digest's FIRE age ahead of the dashboard's for the same household.
+  const mc = runMonteCarloFire(headlineBandInputs(derived));
   return Number.isFinite(mc.p50Years) && mc.p50Years < MAX_PROJECTION_YEARS
     ? Math.round(derived.anchorAge + mc.p50Years)
     : null;
@@ -199,7 +222,11 @@ export function computeLifecycleDigest(
   current: LifecycleSnapshot,
   baseline: LifecycleSnapshot | null,
 ): LifecycleDigest {
-  if (!baseline) {
+  // ADR-0006: a baseline from an older modelling frame is treated exactly like NO baseline — the
+  // delta across a frame change is the model's, not the user's, and reporting it as "since you were
+  // away" would be a fabricated claim about their behaviour. `useLifecycleDigest.ensureBaseline()`
+  // then re-captures silently, so the NEXT visit diffs genuine movement.
+  if (!baseline || !isSnapshotFrameCurrent(baseline)) {
     return {
       hasMeaningfulChange: false,
       fireAgeDeltaYears: 0,

@@ -12,7 +12,12 @@
  * whole household; specific member + family-view OFF → that member's slice +
  * the always-visible joint pool.
  */
-import { isAdultRole, type Household, type OtherIncomeLine } from "@/types/household";
+import {
+  isAdultRole,
+  type Household,
+  type OtherIncomeLine,
+  type PlannedFutureLine,
+} from "@/types/household";
 import { isEarningMember } from "@/lib/member-earning";
 import { expenseOwnerMatches, EXPENSE_OWNER_HOUSEHOLD } from "@/lib/expense-attribution";
 import { computeIndividualFire } from "@/lib/individual-fire";
@@ -26,8 +31,9 @@ import {
   findCrossovers,
   calculateFamilyLayerCorpus,
   calculateFireTarget,
+  type TargetSchedule,
 } from "@/lib/fire-math";
-import { derivedFamilyLayer } from "@/lib/derived-records";
+import { derivedFamilyLayer, plannedGoalInflationBucket } from "@/lib/derived-records";
 import { computeTax, recommendRegime, marginalSlabRate, getTaxConfigForFY } from "@/lib/tax";
 import { epfBucketAfterTaxReturn } from "@/lib/epf-vpf";
 import { ageFromDOB } from "@/lib/age";
@@ -47,6 +53,14 @@ import { deriveEpsPensionForMember, EPS_NORMAL_START_AGE } from "@/lib/eps-pensi
 import { deriveGratuityForMember } from "@/lib/gratuity";
 import type { ReturnSchedule, ContributionSchedule } from "@/lib/fire-math";
 import { buildContributionResolver } from "@/lib/contribution-schedule";
+
+/**
+ * ADR-0006: the age at which the household savings step-up stops compounding. The contribution
+ * HOLDS at the level it reached (in real terms) — it never drops. Chosen as a conservative proxy
+ * for where salaried real wage growth flattens; a plan must not compound a promotion curve into
+ * a household's sixties.
+ */
+export const STEP_UP_TAPER_AGE = 50;
 import {
   resolveHouseholdInflation,
   resolveEffectiveSWRByHorizon,
@@ -82,13 +96,32 @@ export function bridgeRentalPostTaxAnnual(
     }, 0);
 }
 
-import { usableOverride, type DeriveOverrides } from "@/lib/derive-overrides";
+import { usableOverride, financialYearStartYear, type DeriveOverrides } from "@/lib/derive-overrides";
 export type { DeriveOverrides } from "@/lib/derive-overrides";
 
 export interface DeriveLens {
   isFamilyView: boolean;
   viewingMemberId: string | null;
   currentFY: string;
+}
+
+/**
+ * ADR-0006 Phase 1b/1d — the within-year CPI re-index factor.
+ *
+ * The nominal kernel steps the contribution ONCE a year, so the amount paid in month `j` of year
+ * `y` is worth `C_real(y)·(1+CPI)^−(j+1)/12` in today's rupees — strictly less than `C_real(y)` in
+ * every month of the year. A CPI-real engine (the Monte Carlo band, `lever-bands`) handed the
+ * un-discounted figure is credited with purchasing power the nominal kernel never gives, which put
+ * the band's p50 ~0.4 years AHEAD of the headline it exists to bracket.
+ *
+ * This is the mean of those twelve monthly discounts: exact for the year's contribution TOTAL, and
+ * independent of `y`, so it is one scalar. At 6% CPI it is 0.969067.
+ */
+export function cpiWithinYearReindexFactor(inflation: number): number {
+  const cpi = Number.isFinite(inflation) ? inflation : 0;
+  let sum = 0;
+  for (let k = 1; k <= 12; k++) sum += Math.pow(1 + cpi, -k / 12);
+  return sum / 12;
 }
 
 export function derive(
@@ -451,6 +484,23 @@ export function derive(
   // Note: householdMarginalRate is the bare slab rate (no 4% cess/surcharge) by
   // design — do NOT "fix" it to the effective rate; the slab-proxy above already
   // over-taxes the annuity, and adding cess would double-stack the conservatism.
+  //
+  // ADR-0006 Phase 1d — STATED SIMPLIFICATION (the frame). The annuity is credited as a LEVEL
+  // NOMINAL income: PFRDA annuities are overwhelmingly level-payout, so this is the product, not
+  // an approximation. But `netAnnualExpenses` — the difference it is subtracted from — is a
+  // TODAY's-rupee figure that the kernel then grows at the household basket. Netting a level
+  // nominal stream against a growing one and then growing the REMAINDER at the basket lets the
+  // annuity keep its full purchasing power for the whole horizon, when in reality it decays at
+  // CPI. The effect is to slightly UNDERSTATE the gap the corpus must fund, i.e. slightly
+  // optimistic, bounded by how large the annuity is relative to expenses (zero for any household
+  // below the ₹5 L NPS threshold, which is most of them, and a few percent otherwise).
+  //
+  // The conservative alternative, named so the next reader does not have to re-derive it: credit
+  // the annuity as a DECAYING real stream — `npsAnnuityIncome / (1 + CPI)^t` — inside the target
+  // schedule rather than as a one-off subtraction from today's expenses. Not done here because it
+  // turns `netAnnualExpenses` from a scalar into a schedule, which touches the variants, the
+  // family layer and the bridge's "annuity-once" contract; it belongs in its own change with its
+  // own per-persona numbers, not as a rider.
   const npsAnnuityIncome = postTaxAnnuityIncome(npsSplit.annuityIncomeAnnual, householdMarginalRate);
   const npsAnnuityCorpus = npsSplit.annuityCorpus;
   const netAnnualExpenses = Math.max(0, annualExpensesToday - npsAnnuityIncome);
@@ -476,9 +526,30 @@ export function derive(
     extendedContingencyAnnual,
     swr: effectiveSWR,
   });
+  // ADR-0006 Phase 1c — the two HALVES of the family layer drift differently, so they are kept
+  // apart here (their sum is `familyLayerCorpus` by construction — same clamps, same order as
+  // `calculateFamilyLayerCorpus`). The extended-family contingency is a PERPETUAL expense
+  // capitalised at SWR, so it rises with the household basket like the base. The planned goals are
+  // DATED lumps, so each one rises at its OWN bucket rate and stops on its due year (below).
+  const extendedContingencyCorpusToday = Math.max(
+    0,
+    effectiveSWR > 0 ? extendedContingencyAnnual / effectiveSWR : 0,
+  );
 
   // Healthcare corpus reservation (A10.5).
   const healthcareReservationPercent = household.healthcareCorpusReservationPercent ?? 0.2;
+  // ADR-0006 Phase 1c (FinTech Phase-1b fork 1, DECIDED): the reservation is SIZED off the base
+  // today, but it DRIFTS at `healthcareInflation` (9%), not at the household basket.
+  //
+  // It buffers MEDICAL SHOCKS — a hospitalisation, a surgery, a long-term-care episode — whose
+  // price rises at medical inflation, not at the household's all-items basket. The basket's own
+  // 8%-weighted healthcare bucket covers RECURRING healthcare SPEND (premiums, consultations,
+  // medicines) inside the ongoing-expenses corpus. Different rupees, so no double count.
+  //
+  // The consequence is the mechanism, not a bug: a buffer that is 20% of the base today grows
+  // toward ~44% of it by year 30. That IS "the healthcare weight of a household rises with age"
+  // (FinTech ADR review), and it is bounded — the weight can never exceed the buffer's own price
+  // path, because both legs are explicit schedules rather than one blended rate.
   const healthcareReservation = baseFireNumber * healthcareReservationPercent;
 
   // Headline FIRE target = base + family layer + healthcare reservation.
@@ -541,21 +612,35 @@ export function derive(
       }
     : blendedReturn;
 
-  // #20 (Tier-0 honesty): the headline grows TODAY's corpus to a TODAY's-rupee
-  // `fireNumber`, so it MUST compound at a REAL return. Growing a NOMINAL return
-  // against a non-inflating target reaches optimistically EARLY (#20). The deflator
-  // MUST be GENERAL CPI (`assumptions.inflation` ≈6%) — the rate at which a rupee
-  // loses economy-wide purchasing power — NOT the 4-bucket household EXPENSE blend
-  // (~7.9%, lifted by 14% healthcare). Deflating MARKET RETURNS by the
-  // healthcare-weighted expense basket is a modeling error: it crushed the real
-  // return to ~0.9% and made FIRE look unreachable (~age 115) for the seed personas
-  // (#20, FinTech-validated 2026-06-03). The same general CPI grows the FIRE target
-  // in projectCorpus below, so the headline and the chart crossover AGREE. Assumes
-  // savings keep pace with general inflation (constant REAL contribution).
-  // `householdInflation` (the 4-bucket blend) is retained ONLY for the retiree's
-  // decumulation withdrawal-floor growth — an INTENTIONAL asymmetry (a retiree's
-  // own spending DOES rise at their personal basket rate; a saver's corpus return
-  // deflates at CPI). Do NOT "consistency-fix" these to the same rate.
+  // ===== ADR-0006 — ONE FRAME (supersedes the #20 "collapse both sides to CPI" decision) =====
+  //
+  // The projection runs in NOMINAL rupees end-to-end and is deflated at GENERAL CPI only for
+  // DISPLAY (`useFireDerive.deflateProjectionPoints`) and for the today's-₹ figures the hero
+  // quotes (`required-contribution.ts`). Concretely, every year:
+  //   expenses / target  grow at the household EXPENSE BASKET `householdInflation` (b ≈ 6.24%)
+  //   corpus             grows at the NOMINAL `expectedReturnSchedule` (glide-tapered)
+  //   contributions      grow at general CPI × the REAL step-up (ADR-0004 semantics preserved)
+  //
+  // WHY THIS REPLACES #20. #20 fixed a real bug (a NOMINAL return against a FIXED target reaches
+  // optimistically early) by collapsing BOTH sides to general CPI. That left the same run asserting
+  // two contradictory things about one household: the retiree's spending grows at the 4-bucket
+  // basket (the Floor/Ceiling overlay below) while the saver's target grows at CPI. Since the
+  // target is expenses ÷ SWR, the REAL target actually drifts up at
+  //   g = (1+b)/(1+CPI) − 1
+  // and every prescriptive figure — needReal, needNominal, requiredMonthlyReal, householdFireAge —
+  // was short by (1+g)^T. That error is OPTIMISTIC, so it makes the salaried accumulator
+  // UNDER-SAVE: Tier-0 (gh #167, `goal-anchored-decisions.md`).
+  //
+  // WHY IT IS SAFE NOW. #20's counter-example (real return crushed to ~0.9%, FIRE at ~115) came
+  // from a 7.90% basket built on NON-DISJOINT weights and a 14% healthcare claims-cost trend
+  // mis-used as a price index. ADR-0006 re-grounds both (`types/assumptions.ts`): the basket is
+  // ≈ 6.24%, so g ≈ 0.23%/yr — a real drift the corpus comfortably out-earns. The frame is now
+  // honest AND reachable, and it is honest for the RIGHT reason (the inputs), not because the
+  // kernel was bent to print a number.
+  //
+  // `realReturnSchedule` / `realBlendedReturn` REMAIN exported. They are no longer the headline
+  // solver's return, but they are the ONE real return every display surface and the Monte Carlo
+  // band must read (ADR-0006 item 5 / gh #180) — deflated at GENERAL CPI, never at the basket.
   const householdInflation = resolveHouseholdInflation(assumptions);
   const generalInflation = assumptions.inflation;
   const toRealReturn = (nominal: number) => (1 + nominal) / (1 + generalInflation) - 1;
@@ -563,6 +648,15 @@ export function derive(
     typeof expectedReturnSchedule === "function"
       ? (yearIndex: number) => toRealReturn(expectedReturnSchedule(yearIndex))
       : toRealReturn(expectedReturnSchedule);
+  // The REAL drift of the FIRE target: how fast the target rises in TODAY's rupees. 0 exactly
+  // when all four buckets equal general CPI (the positive control in
+  // `inflation-frame-invariant.spec.ts`), in which case every headline field collapses to the
+  // single-rate model. Exported so the Monte Carlo band and the solver share one drift.
+  const realTargetDriftRate = (1 + householdInflation) / (1 + generalInflation) - 1;
+  /** Nominal-frame growth factor applied to the target/expense line at `yearIndex`. */
+  const basketFactor = (yearIndex: number) => Math.pow(1 + householdInflation, yearIndex);
+  /** Nominal-frame growth factor applied to a REAL contribution at `yearIndex`. */
+  const cpiFactor = (yearIndex: number) => Math.pow(1 + generalInflation, yearIndex);
 
   // #18 Monte Carlo inputs — the confidence band runs lazily in useFireDerive on
   // the SAME real frame as the corrected headline: a scalar real blended return
@@ -583,20 +677,35 @@ export function derive(
   // real step-up is net-of-inflation growth on top of the constant-real baseline). The flattening
   // lives in lib/contribution-schedule.ts (single-kernel rule), not inline here.
   const householdSavingsStepUpPct = assumptions.householdSavingsStepUpPercent ?? 0;
-  const baseContributionSchedule: ContributionSchedule =
-    householdSavingsStepUpPct > 0 && monthlyContribution > 0
-      ? buildContributionResolver(
-          [
-            {
-              amount: monthlyContribution,
-              startAtAge: anchorAge,
-              stepUpPercentPerYear: householdSavingsStepUpPct,
-            },
-          ],
-          anchorAge,
-        )
-      : monthlyContribution; // scalar ⇒ byte-identical (default path; also preserves the
-  // `monthlyContribution <= 0 → Infinity` empty-state guard in calculateYearsToTarget).
+  // ADR-0006: the step-up TAPERS TO ZERO at 50. A real step-up is a wage-growth proxy, and
+  // Indian salaried real wage growth flattens well before retirement; compounding 2%/yr real
+  // from 30 to 65 would inflate the inflow ~2x and pull the FIRE date in optimistically. Two
+  // segments do it without ever DROPPING the contribution: the first steps up to age 50, the
+  // second starts at 50 from the level the first REACHED and holds it flat (real) thereafter.
+  const stepUpApplies = householdSavingsStepUpPct > 0 && monthlyContribution > 0;
+  const taperYears = Math.max(0, STEP_UP_TAPER_AGE - anchorAge);
+  const baseContributionSchedule: ContributionSchedule = !stepUpApplies
+    ? monthlyContribution // scalar ⇒ preserves the `monthlyContribution <= 0 → Infinity`
+    : // empty-state guard in calculateYearsToTarget.
+      buildContributionResolver(
+        taperYears <= 0
+          ? // Already at/over the taper age — no step-up left to apply.
+            [{ amount: monthlyContribution, startAtAge: anchorAge }]
+          : [
+              {
+                amount: monthlyContribution,
+                startAtAge: anchorAge,
+                endAtAge: STEP_UP_TAPER_AGE,
+                stepUpPercentPerYear: householdSavingsStepUpPct,
+              },
+              {
+                amount:
+                  monthlyContribution * Math.pow(1 + householdSavingsStepUpPct / 100, taperYears),
+                startAtAge: STEP_UP_TAPER_AGE,
+              },
+            ],
+        anchorAge,
+      );
   // QN-5 (T-379): optional EXTRA segments from the override seam (the "roll the EMI into
   // investing when the loan ends" lever) are SUMMED onto the base inflow — each segment gets
   // its own resolver because `buildContributionResolver` picks the latest-starting segment on
@@ -629,14 +738,160 @@ export function derive(
   // savings" and the crossovers show "not within horizon". A genuine achiever has
   // fireNumber > 0 (real expenses) and is unaffected.
   const hasFireTarget = fireNumber > 0;
+
+  // ADR-0006 nominal frame. `householdContributionSchedule` is REAL (today's ₹/month, ADR-0004);
+  // the nominal inflow is that amount grown at general CPI. A NON-POSITIVE SCALAR is passed
+  // through UNCHANGED so `calculateYearsToTarget`'s `monthlySavings <= 0 → Infinity` empty-state
+  // sentinel still fires (a function schedule is never eagerly rejected — it may ramp up).
+  const toNominalContribution = (real: ContributionSchedule): ContributionSchedule => {
+    if (typeof real === "number" && real <= 0) return real;
+    return (yearIndex: number) =>
+      (typeof real === "function" ? real(yearIndex) : real) * cpiFactor(yearIndex);
+  };
+  const nominalContributionSchedule = toNominalContribution(householdContributionSchedule);
+
+  // ADR-0006 Phase 1b (MEDIUM-4) — the CPI-RE-INDEXED real inflow, for engines that work in the
+  // CPI-real frame (the Monte Carlo band, `lever-bands`) rather than the nominal one the headline
+  // solves in. Deflating the nominal path reproduces the real path exactly for RETURNS but NOT for
+  // contributions: the nominal inflow steps once a year, so the amount paid in month `j` of year
+  // `y` is worth `C_real(y)·(1+CPI)^−(j+1)/12` in today's rupees — strictly less than `C_real(y)`
+  // in every month. Handing a real-frame engine the un-discounted `C_real(y)` credits the
+  // household with purchasing power the nominal kernel never gives them, which put the band's p50
+  // ~0.4 years AHEAD of the headline it exists to bracket. The factor is the mean of those twelve
+  // monthly discounts — exact for the year's contribution TOTAL, and independent of `y`, so it is
+  // one scalar.
+  // ADR-0006 Phase 1d: hoisted to an exported function so a spec fixture can COMPUTE it instead
+  // of hard-coding a rounded copy — the first hard-coded copy (0.96766) was simply wrong, and a
+  // wrong constant in a test is a lock on the wrong behaviour. At 6% CPI it is 0.969067.
+  const CPI_WITHIN_YEAR_REINDEX = cpiWithinYearReindexFactor(generalInflation);
+  const bandContributionSchedule: ContributionSchedule =
+    typeof householdContributionSchedule === "number" && householdContributionSchedule <= 0
+      ? householdContributionSchedule
+      : (yearIndex: number) =>
+          (typeof householdContributionSchedule === "function"
+            ? householdContributionSchedule(yearIndex)
+            : householdContributionSchedule) * CPI_WITHIN_YEAR_REINDEX;
+  /** Today's-₹ target → the nominal target in year `yearIndex`, growing at the basket. */
+  const toNominalTarget = (todayTarget: number) => (yearIndex: number) =>
+    todayTarget * basketFactor(yearIndex);
+
+  // ---------------- ADR-0006 Phase 1c: the REGULAR target is a SUM OF COMPONENT SCHEDULES -------
+  // Phase 1 grew the WHOLE target at one rate (the household basket). That is right for the
+  // perpetual legs and wrong for the dated ones: an education goal must rise at education
+  // inflation, and it must STOP rising once it has been paid.
+  //
+  //   target(t) = (base + contingency)·(1+b)^t
+  //             + reservation·(1+healthcareInflation)^t
+  //             + Σ goal_i.todayAmount·(1+rate_i)^min(t, dueYears_i)
+  //
+  // At t = 0 this is EXACTLY `fireNumber`, so the headline SIZE does not move — only its
+  // TRAJECTORY. Each goal is held FLAT IN NOMINAL RUPEES after its due year: the money was spent
+  // then, so growing it for another twenty years is fiction. Holding it flat rather than removing
+  // it is still conservative (the corpus must have carried the full amount to the due date and is
+  // never credited back), and it never grows past the due year.
+  /**
+   * ADR-0006 Phase 1d — the price index for one dated goal.
+   *
+   * `inflationBucket` is OPTIONAL on a planned line and most real entries never carry one: the
+   * goal forms and `derived-records.ts` classify by `kind` ("education", "marriage", "medical",
+   * "general"), which is the field the user actually chooses. Routing on the bucket alone and
+   * falling straight through to general CPI therefore inflated a ₹50 L college fund at 6% instead
+   * of 9% for anyone who had not hand-set a bucket — the target came out too small, which is the
+   * optimistic direction and the one this ADR exists to remove.
+   *
+   * So the bucket wins when it is set (an explicit override stays an override), and otherwise the
+   * `kind` decides — via `plannedGoalInflationBucket`, the one shared map, so the kernel, the
+   * store's legacy backfill and the goal form cannot answer this differently.
+   */
+  const goalInflationRate = (goal: PlannedFutureLine): number => {
+    const bucket = goal.inflationBucket ?? plannedGoalInflationBucket(goal.kind);
+    switch (bucket) {
+      case "healthcare":
+        return assumptions.healthcareInflation;
+      case "education":
+        return assumptions.educationInflation;
+      case "housing":
+        return assumptions.housingInflation;
+      // `general`, and a line with neither a bucket nor a price-distinct kind, mean all-items CPI.
+      default:
+        return generalInflation;
+    }
+  };
+  // ADR-0006 Phase 1d: injected, never read from the wall clock here — `derive()` is a pure
+  // kernel and a golden master that shifts on 1 January (goals one year nearer ⇒ one year less
+  // inflation ⇒ FIRE optimistically earlier) is not a golden master. See `DeriveOverrides.currentYear`.
+  const currentCalendarYear =
+    // Last resort (an unparseable FY): year 0, which puts every dated goal beyond the horizon so
+    // it inflates throughout — the conservative reading, never a goal treated as already paid.
+    usableOverride(overrides?.currentYear, 1900) ?? financialYearStartYear(lens.currentFY) ?? 0;
+  /** One dated lump: its today's-₹ size, its own price index, and when it stops rising. */
+  const plannedGoalComponents = familyLayer.allPlannedGoals.map((g) => ({
+    todayAmount: Math.max(0, g.todayAmount ?? 0),
+    rate: goalInflationRate(g),
+    // Same origin as `derived-records.ts` / `adequacy.ts` — a calendar targetYear, floored at now.
+    dueYears: Math.max(0, g.targetYear - currentCalendarYear),
+  }));
+  /** The perpetual ONGOING-SPEND legs, which ride the household basket. */
+  const perpetualTargetToday = baseFireNumber + extendedContingencyCorpusToday;
+  /** Nominal ₹ in the healthcare-shock reservation at `t` — its own medical price path. */
+  const healthcareReservationNominalAt = (t: number): number =>
+    healthcareReservation * Math.pow(1 + assumptions.healthcareInflation, Math.max(0, t));
+  /** Nominal ₹ in the planned-goal leg at fractional year `t`. */
+  const plannedGoalsNominalAt = (t: number): number =>
+    plannedGoalComponents.reduce(
+      (sum, g) => sum + g.todayAmount * Math.pow(1 + g.rate, Math.min(Math.max(0, t), g.dueYears)),
+      0,
+    );
+  /**
+   * The headline REGULAR target in NOMINAL rupees at fractional year `t`. This is the schedule the
+   * solver, the bridge, the projection and the Monte Carlo band all read — one target, one place.
+   */
+  const regularTargetSchedule: TargetSchedule = (t: number) =>
+    perpetualTargetToday * basketFactor(t) +
+    healthcareReservationNominalAt(t) +
+    plannedGoalsNominalAt(t);
+  /**
+   * The same target split into the three components the QN-4 explainer narrates, in TODAY's rupees
+   * at year `t` (nominal ÷ CPI^t). They sum to `total` exactly — "the steps add up" is an e2e
+   * contract, so the split must never be re-derived from a single scalar drift.
+   */
+  const regularTargetComponentsRealAt = (t: number) => {
+    const deflator = Math.pow(1 + generalInflation, Math.max(0, t));
+    const basket = basketFactor(Math.max(0, t)) / deflator;
+    const base = baseFireNumber * basket;
+    const healthcareReservationReal = healthcareReservationNominalAt(Math.max(0, t)) / deflator;
+    const plannedGoals = extendedContingencyCorpusToday * basket + plannedGoalsNominalAt(t) / deflator;
+    return {
+      base,
+      plannedGoals,
+      healthcareReservation: healthcareReservationReal,
+      total: base + plannedGoals + healthcareReservationReal,
+    };
+  };
+
   const corpusOnlyYearsToRegular = hasFireTarget
-    ? calculateYearsToTarget(fireWithdrawableCorpus, fireNumber, householdContributionSchedule, realReturnSchedule)
+    ? calculateYearsToTarget(
+        fireWithdrawableCorpus,
+        regularTargetSchedule,
+        nominalContributionSchedule,
+        expectedReturnSchedule,
+      )
     : Number.POSITIVE_INFINITY;
   const yearsToLean = hasFireTarget
-    ? calculateYearsToTarget(fireWithdrawableCorpus, variants.leanFIRE, householdContributionSchedule, realReturnSchedule)
+    ? calculateYearsToTarget(
+        fireWithdrawableCorpus,
+        toNominalTarget(variants.leanFIRE),
+        nominalContributionSchedule,
+        expectedReturnSchedule,
+      )
     : Number.POSITIVE_INFINITY;
   const yearsToFat = hasFireTarget
-    ? calculateYearsToTarget(fireWithdrawableCorpus, variants.fatFIRE, householdContributionSchedule, realReturnSchedule)
+    ? calculateYearsToTarget(
+        fireWithdrawableCorpus,
+        toNominalTarget(variants.fatFIRE),
+        nominalContributionSchedule,
+        expectedReturnSchedule,
+      )
     : Number.POSITIVE_INFINITY;
 
   // ----- #15 accumulation bridge: corpus-adequate ≠ FIRE-ready -----
@@ -698,7 +953,16 @@ export function derive(
     // totalCorpus, not the annuity-excluded withdrawable corpus (using the
     // smaller denominator would over-scale NPS and over-credit its annuity income
     // — an optimistic error).
-    const corpusScale = totalCorpus > 0 ? fireNumber / totalCorpus : 1;
+    // ADR-0006: the corpus at the adequacy age equals the NOMINAL target there; the bridge runs
+    // in TODAY's rupees, so the scale is that target deflated at general CPI — i.e. the REAL
+    // target DRIFTED at g. Using the un-drifted `fireNumber` would under-scale every holding and
+    // understate the liquid runway (which happens to be conservative, but it is the wrong frame
+    // and it silently disagrees with the adequacy leg the bridge is layered on).
+    // ADR-0006 Phase 1c: read the COMPONENT schedule, not a single-rate drift — the goal legs stop
+    // rising on their due years, so a scalar (1+g)^t over-scales every holding for a goal-heavy
+    // household and over-states the liquid runway (the optimistic direction).
+    const driftedTargetReal = regularTargetComponentsRealAt(adequacyAge - anchorAge).total;
+    const corpusScale = totalCorpus > 0 ? driftedTargetReal / totalCorpus : 1;
 
     return computeBridgeCoverage({
       holdings,
@@ -713,6 +977,19 @@ export function derive(
       // Tier-0 honesty error). The adequacy leg separately uses netAnnualExpenses for the
       // FIRE number — locked by derive.spec's "annuity-once" magnitude test.
       annualExpenses: annualExpensesToday,
+      // ADR-0006 Phase 1d: …and the SAME expenses re-priced year by year, so the bridge stops
+      // being a mixed frame. `corpusScale` above already scales the holdings by the DRIFTED
+      // target; leaving the bill flat meant a rising target made the bridge look BETTER covered,
+      // which is optimistic in the one layer whose whole job is to be pessimistic.
+      //
+      // The drift is the BASE leg's alone — `regularTargetComponentsRealAt(t).base / baseFireNumber`
+      // — because the base leg IS the perpetual ongoing-spend the retiree lives on. Dated goals
+      // are lumps paid on their own dates and the medical reservation is a shock buffer; neither
+      // is bridge spending, and folding either in would inflate the retiree's grocery bill at
+      // education or medical inflation.
+      annualExpensesAt: (t: number) =>
+        annualExpensesToday *
+        (baseFireNumber > 0 ? regularTargetComponentsRealAt(t).base / baseFireNumber : 1),
       income: {
         rentalAnnualPostTax: Math.round(rentalAnnualPostTax),
         // EPS pension is fully taxable (no Sec 24a) — postTax() taxes the full gross, correct here.
@@ -724,6 +1001,28 @@ export function derive(
       corpusScale,
     });
   }
+
+  // ADR-0006 Phase 1c — the component target's EFFECTIVE scalar drift, for the few consumers that
+  // genuinely need one number rather than a curve (`lever-impact`'s perturbable baseline, any
+  // display of "how fast is my target rising"). It is the constant real rate that reproduces the
+  // component schedule at the horizon the headline was actually SOLVED at:
+  //     (targetReal(T) / targetReal(0))^(1/T) − 1
+  // Anchoring it on the STORED target age instead of the solved horizon put the Monte Carlo p50
+  // ~5 years behind the headline (measured, Phase 1b) — the horizon must be the one the number
+  // being reproduced was computed over. Falls back to the pure basket drift when no horizon is
+  // solvable, where the two coincide anyway.
+  const effectiveDriftHorizon = Number.isFinite(yearsToRegular)
+    ? yearsToRegular
+    : Math.max(0, targetRetirementAge - anchorAge);
+  const effectiveTargetDriftRate =
+    effectiveDriftHorizon > 0 && fireNumber > 0
+      ? Math.pow(
+          regularTargetComponentsRealAt(effectiveDriftHorizon).total / fireNumber,
+          1 / effectiveDriftHorizon,
+        ) - 1
+      : realTargetDriftRate;
+  /** The same effective drift quoted in the NOMINAL frame, for nominal-triple callers. */
+  const effectiveTargetGrowthNominal = (1 + effectiveTargetDriftRate) * (1 + generalInflation) - 1;
 
   const yfat = Number.isFinite(yearsToFat) ? yearsToFat : 30;
   const projectionHorizonYears = Math.min(60, Math.max(20, Math.ceil(yfat) + 5));
@@ -740,11 +1039,20 @@ export function derive(
 
   const projection = projectCorpus({
     currentCorpus: fireWithdrawableCorpus,
-    monthlyContribution: householdContributionSchedule,
+    // ADR-0006: the chart runs the SAME nominal frame as the headline — nominal inflow (real ×
+    // CPI), nominal returns, and the expense/target line grown at the household BASKET. Before
+    // ADR-0006 this line grew at general CPI to make the two frames agree by collapsing both;
+    // now they agree because they are the same frame.
+    monthlyContribution: nominalContributionSchedule,
     expectedReturns: expectedReturnSchedule,
-    // #20: grow the FIRE target at GENERAL CPI (not the healthcare-weighted blend)
-    // so the chart crossover and the real-frame headline agree and FIRE is reachable.
-    inflation: generalInflation,
+    inflation: householdInflation,
+    // The chart's REGULAR target must be the headline FIRE number (base + family layer +
+    // healthcare reservation), not expenses ÷ SWR — otherwise the crossover sits 4–8 years
+    // earlier than the headline (measured on all four seeds before ADR-0006).
+    regularTargetToday: fireNumber,
+    // ADR-0006 Phase 1c: and its per-year COMPONENT curve, so the chart's target line kinks
+    // where the goal legs stop rising instead of riding one basket rate forever.
+    regularTargetSchedule,
     annualExpensesToday,
     startAge: anchorAge,
     swr: effectiveSWR,
@@ -819,6 +1127,10 @@ export function derive(
     healthcareReservationPercent,
     variants,
     blendedReturn,
+    // ADR-0006: the glide-tapered NOMINAL per-year return the headline solver + the projection
+    // both compound at. Exposed so the QN-2 solver's "what you'll have by N" grows the corpus on
+    // the SAME schedule the FIRE age was solved with, in the same frame.
+    expectedReturnSchedule,
     realBlendedReturn,
     // The glide-tapered REAL per-year return the deterministic corpusOnlyYearsToRegular
     // uses — exposed so the #18 Monte Carlo band can taper its per-year MEAN identically
@@ -828,6 +1140,26 @@ export function derive(
     // step-up-resolved when householdSavingsStepUpPercent > 0). Exposed so the solver projects
     // "what you will have" with the SAME inflow the kernel used, never a parallel schedule.
     householdContributionSchedule,
+    // ADR-0006: the REAL drift of the FIRE target, (1+basket)/(1+CPI) − 1. Exposed so the Monte
+    // Carlo band (which stays in the CPI-real frame) can drift its target at the same rate the
+    // headline does, and so the solver quotes a today's-₹ need for the RIGHT year. 0 exactly when
+    // all four inflation buckets equal general CPI.
+    realTargetDriftRate,
+    // ADR-0006 Phase 1c: the REGULAR target as a per-year NOMINAL schedule (perpetual legs at the
+    // basket, each dated goal at its own bucket rate, held flat after its due year), the same
+    // curve split into today's-₹ components, and the effective scalar drift that reproduces it
+    // over the SOLVED horizon. Every consumer of "the target over time" reads one of these —
+    // never a re-derived single rate.
+    regularTargetSchedule,
+    regularTargetComponentsRealAt,
+    effectiveTargetDriftRate,
+    effectiveTargetGrowthNominal,
+    // ADR-0006: the NOMINAL corpus inflow the headline was actually solved with (the real
+    // schedule above grown at general CPI). Exposed so no consumer rebuilds it.
+    nominalContributionSchedule,
+    // ADR-0006 Phase 1b: the same inflow for CPI-REAL-frame engines (the Monte Carlo band), with
+    // the within-year CPI step the nominal frame imposes already applied. Never rebuild it.
+    bandContributionSchedule,
     portfolioVolatility,
     // The canonical per-bucket corpus weights (₹, from fireCorpusInvestments — whole-household,
     // primary-residence excluded) that back blendedReturn + portfolioVolatility. Exposed so the

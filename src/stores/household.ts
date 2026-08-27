@@ -16,6 +16,7 @@ import { dobFromAge } from "@/lib/age";
 import { isEarningMember } from "@/lib/member-earning";
 import { autoFlowOwnerId, EXPENSE_OWNER_HOUSEHOLD } from "@/lib/expense-attribution";
 import { toMonthly, toAnnual, legacyFreqToPeriod } from "@/lib/cashflow";
+import { plannedGoalInflationBucket } from "@/lib/derived-records";
 import { makeAdapter } from "@/lib/storage-adapter";
 import { getAuthProvider } from "@/lib/auth-provider";
 import {
@@ -242,9 +243,15 @@ export const useHouseholdStore = defineStore("household", () => {
         }));
         // Phase 1 Stage B — backfill inflationBucket + kind on planned-future lines
         // (audit Entry #3 A3.6 + #6 A6.2 + #10 A10.3).
+        // ADR-0006 Phase 1d: a bucket-less line takes the bucket its KIND implies, not a blanket
+        // "general". Stamping "general" on a legacy education goal permanently priced it at
+        // all-items CPI instead of education inflation — a FIRE target too small, which is the
+        // optimistic direction — and it did so INVISIBLY, because the value then looked like a
+        // deliberate user choice. The goal form already routes kind -> bucket; this makes the
+        // legacy path agree with it, through the same shared map the kernel reads.
         data.value.expenses.plannedFuture = data.value.expenses.plannedFuture.map((p) => ({
           ...p,
-          inflationBucket: p.inflationBucket ?? "general",
+          inflationBucket: p.inflationBucket ?? plannedGoalInflationBucket(p.kind),
           kind: p.kind ?? "general",
           // #81 Phase 1 — planned-future lines default to Household (no auto-flow source).
           ownerId: p.ownerId ?? EXPENSE_OWNER_HOUSEHOLD,

@@ -183,7 +183,19 @@ export const TERM_GLOSSARY = {
   "inflation-bucket": {
     label: "4-bucket Inflation",
     explanation:
-      "Different expense classes grow at different rates: general CPI ~6%, healthcare ~8%, education ~10%, housing ~5%. Routing each expense line to its bucket avoids the v4 single-rate undercount.",
+      "Different expense classes grow at different rates: general CPI 6%, healthcare 9%, education 9%, housing 6%. Each expense line routes to its bucket, and the weighted blend is your spending basket. Education carries 0% weight in the perpetual retirement basket because education spending ends — its 9% rate still applies to your dated education goals.",
+    formula: "Basket = (6%×74 + 9%×8 + 9%×0 + 6%×18) ÷ 100 ≈ 6.24%",
+  },
+  "spending-basket": {
+    label: "Your Spending Basket",
+    explanation:
+      "The weighted blend of your four inflation buckets — the rate YOUR expenses, and therefore your FIRE target, grow at. It is not the same number as general inflation: general CPI (6%) is only what we deflate by to show figures in today's rupees, and because your basket runs a little above it, your target creeps up even in today's money. Editable in Preferences → Inflation.",
+    formula: "Real drift of the target = (1 + basket) ÷ (1 + general CPI) − 1 ≈ 0.23%/yr on defaults",
+  },
+  "savings-step-up": {
+    label: "Savings Step-up",
+    explanation:
+      "How much more you invest each year ABOVE inflation. Default 2% real per year, tapering to zero by age 50. Without it the plan assumes your savings merely keep pace with inflation for decades while your expenses grow at your basket — a mismatch, since Indian salary growth has historically run 3-4% above inflation. The taper reflects that promotions and job moves slow down late-career.",
   },
   "family-layer": {
     label: "Family Layer",
@@ -193,7 +205,7 @@ export const TERM_GLOSSARY = {
   "parents-bucket": {
     label: "Parents Bucket",
     explanation:
-      "Dedicated expense line for aging-parent costs (medical, support, in-home care). Routes to healthcare inflation (8%). A 4-5% buffer of annual expenses is the audit-grounded floor.",
+      "Dedicated expense line for aging-parent costs (medical, support, in-home care). Routes to healthcare inflation (9%). A 4-5% buffer of annual expenses is the audit-grounded floor.",
   },
   "extended-contingency": {
     label: "Extended-family Contingency",
@@ -431,6 +443,8 @@ export const GLOSSARY_CATEGORY: Record<TermKey, GlossaryCategory> = {
   "swr-horizon": "Strategy",
   "variant-multiplier": "Strategy",
   "inflation-bucket": "Strategy",
+  "spending-basket": "Strategy",
+  "savings-step-up": "Strategy",
   "family-layer": "Strategy",
   "parents-bucket": "Strategy",
   "extended-contingency": "Strategy",

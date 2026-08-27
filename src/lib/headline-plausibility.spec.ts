@@ -35,7 +35,7 @@ import { calculateYearsToTarget } from "@/lib/fire-math";
 import { computeRunway } from "@/lib/runway";
 import { toMonthly } from "@/lib/cashflow";
 import { buildContributionResolver } from "@/lib/contribution-schedule";
-import { runMonteCarloFire } from "@/lib/monte-carlo";
+import { runMonteCarloFire, headlineBandInputs } from "@/lib/monte-carlo";
 import { captureSnapshot, milestoneBandFor } from "@/lib/lifecycle-digest";
 
 type Loader = (h: ReturnType<typeof useHouseholdStore>, a: ReturnType<typeof useAssumptionsStore>) => void;
@@ -64,8 +64,31 @@ describe("headline plausibility — DEFAULT product lens (#22 foolproof gate)", 
 
       // (1) FIRE must be REACHABLE within a human lifetime — and not absurdly late.
       // The #22 bug produced age 81 (household target ÷ one earner). 70 is the ceiling.
+      //
+      // ADR-0006 Phase 1d (F6) — UNITS. `fireAge` above is the RAW fractional age
+      // (`anchorAge + yearsToRegular`, e.g. 68.92). What a user actually reads is
+      // `householdFireAge`, the CEILED figure (`anchorAge + ceil(yearsToRegular)`, e.g. 69). The
+      // raw measurement is kept because it is the sharper signal, but the bound is now asserted on
+      // BOTH — a raw 69.6 passes a raw-only `<= 70` while the screen prints 70, and the whole point
+      // of this gate is what reaches a user.
+      //
+      // PER-PERSONA EXPECTATION, named so a future reader does not "fix" it by moving the bound:
+      // sharmas 56, mehtas 51, iyers 58, mauryas 68–69 DISPLAYED. The Mauryas are the tight one —
+      // single income, age 44, a ~₹11.9 Cr target, an 8.7% portfolio and a 3.25% SWR over a
+      // 48-year drawdown. If they ever cross 70, the answer is the ADR item-4 "unreachable at
+      // these assumptions" state on the hero, NOT a re-baseline of this bound.
       expect(Number.isFinite(k.yearsToRegular), `${ctx} — yearsToRegular finite`).toBe(true);
-      expect(fireAge, `${ctx} — FIRE age must be ≤ 70 (caught the #22 age-81 bug)`).toBeLessThanOrEqual(70);
+      expect(fireAge, `${ctx} — RAW FIRE age must be ≤ 70 (caught the #22 age-81 bug)`).toBeLessThanOrEqual(70);
+      expect(
+        k.householdFireAge,
+        `${ctx} — DISPLAYED FIRE age (anchor + ceil(years)) must exist for a reachable plan`,
+      ).not.toBeNull();
+      expect(
+        k.householdFireAge!,
+        `${ctx} — DISPLAYED FIRE age ${k.householdFireAge} must be ≤ 70 — this is the number on screen`,
+      ).toBeLessThanOrEqual(70);
+      // The two must be the same statement, not two independent locks that could drift apart.
+      expect(k.householdFireAge!, `${ctx} — displayed == ceil(raw)`).toBe(Math.ceil(fireAge));
       // …and not earlier than the retirement TARGET (that would be optimistic nonsense).
       expect(fireAge, `${ctx} — FIRE age not absurdly early`).toBeGreaterThanOrEqual(
         Math.min(k.targetRetirementAge, k.anchorAge + 1),
@@ -99,14 +122,13 @@ describe("headline plausibility — DEFAULT product lens (#22 foolproof gate)", 
       // The residual gap is just IID-vs-headline discretization noise (the glide-OFF
       // personas show the same ~0.8–1.4y), NOT the glide asymmetry — so the bound is now
       // TIGHT (≤ 2.5y across all personas). It trips RED if the convergence ever regresses.
-      const mc = runMonteCarloFire({
-        currentCorpus: k.fireWithdrawableCorpus,
-        targetCorpus: k.fireNumber,
-        monthlySavings: k.monthlyContribution,
-        meanReturn: k.realBlendedReturn,
-        meanReturnSchedule: k.realReturnSchedule,
-        volatility: k.portfolioVolatility,
-      });
+      // ADR-0006 Phase 1d: this block no longer hand-copies the production call — it BUILDS the
+      // production call, via the same `headlineBandInputs` the FireHero band and the digest use.
+      // Hand-copying is why the mirror had rotted twice: it was passing the base-leg
+      // `realTargetDriftRate` (blind to the 9% medical reservation and the goal due-year caps) and
+      // omitting the history-fed series production passes. A lock that runs different inputs from
+      // production locks nothing, so the fix is structural, not another copied field.
+      const mc = runMonteCarloFire(headlineBandInputs(k));
       expect(mc.p10Years, `${ctx} — MC ordered p10≤p50≤p90`).toBeLessThanOrEqual(mc.p50Years);
       expect(mc.p50Years).toBeLessThanOrEqual(mc.p90Years);
       expect(
@@ -117,13 +139,11 @@ describe("headline plausibility — DEFAULT product lens (#22 foolproof gate)", 
       // #24 directional lock: the taper de-risks, so the tapered p50 is LATER (≥) than the scalar
       // pre-glide p50. Glide-OFF personas are equal (scalar schedule); glide-ON (Iyers) is strictly
       // later — pins the #24 intent without depending on the synthetic monte-carlo.spec inputs.
-      const mcScalar = runMonteCarloFire({
-        currentCorpus: k.fireWithdrawableCorpus,
-        targetCorpus: k.fireNumber,
-        monthlySavings: k.monthlyContribution,
-        meanReturn: k.realBlendedReturn,
-        volatility: k.portfolioVolatility,
-      });
+      // The scalar control differs from the production band in EXACTLY ONE field — the glide
+      // taper — because that is the one thing this lock is about. Building it off the same
+      // `headlineBandInputs` is what guarantees that (the old hand-built copy also silently
+      // dropped the history-fed series, so it was comparing two different samplers).
+      const mcScalar = runMonteCarloFire({ ...headlineBandInputs(k), meanReturnSchedule: undefined });
       expect(
         mc.p50Years,
         `${ctx} — tapered p50 ${mc.p50Years.toFixed(1)} ≥ scalar p50 ${mcScalar.p50Years.toFixed(1)} (de-risking)`,
@@ -301,17 +321,34 @@ describe("headline plausibility — temporal contributions (#46 locks, DEFAULT l
   beforeEach(() => setActivePinia(createPinia()));
 
   for (const persona of PERSONAS) {
-    it(`${persona.name}: 0% household step-up is a NO-OP (default-path byte-identity)`, () => {
+    it(`${persona.name}: 0% household step-up is the SCALAR path (no schedule resolver in play)`, () => {
       const h = useHouseholdStore();
       const a = useAssumptionsStore();
       persona.load(h, a);
-      const base = derive(h.data, a.values, DEFAULT_PRODUCT_LENS);
+      // RE-BASELINED (ADR-0006): `householdSavingsStepUpPercent`'s default moved 0 → 2, so a run
+      // with an explicit 0 can no longer equal the DEFAULT run — the old assertion compared the
+      // default against an override that is now a different plan, and asserting they match would
+      // assert the new default does nothing. The #46 content that survives is the one that was
+      // ever load-bearing: at 0% the schedule mechanism is INERT — the kernel falls back to a plain
+      // scalar inflow (which is also what preserves the `<= 0 → Infinity` empty-state sentinel) —
+      // and a positive step-up may only pull FIRE earlier.
       const zero = derive(h.data, { ...a.values, householdSavingsStepUpPercent: 0 }, DEFAULT_PRODUCT_LENS);
-      expect(zero.yearsToRegular, `${persona.name}: 0% step-up must not move yearsToRegular`).toBe(
-        base.yearsToRegular,
+      expect(
+        typeof zero.householdContributionSchedule,
+        `${persona.name}: 0% step-up must leave the inflow a scalar, not a resolver`,
+      ).toBe("number");
+      expect(zero.householdContributionSchedule).toBe(zero.monthlyContribution);
+
+      const base = derive(h.data, a.values, DEFAULT_PRODUCT_LENS);
+      expect(zero.fireNumber, `${persona.name}: a step-up may never move the FIRE NUMBER`).toBe(
+        base.fireNumber,
       );
-      expect(zero.corpusOnlyYearsToRegular).toBe(base.corpusOnlyYearsToRegular);
-      expect(zero.fireNumber).toBe(base.fireNumber);
+      if (Number.isFinite(zero.corpusOnlyYearsToRegular)) {
+        expect(
+          base.corpusOnlyYearsToRegular,
+          `${persona.name}: the default 2% step-up must be earlier-or-equal to 0%`,
+        ).toBeLessThanOrEqual(zero.corpusOnlyYearsToRegular);
+      }
     });
 
     it(`${persona.name}: per-investment contributionSchedule does NOT leak into corpus (#11 coherence)`, () => {
@@ -461,8 +498,25 @@ describe("member-lensed FIRE headline (heroHeadline) — D-2026-06-13-02 locks",
       expect(hh.yearsToFire).toBe(fire.yearsToRegular.value);
       expect(hh.fireNumber).toBe(fire.fireNumber.value);
       expect(hh.corpusForProgress).toBe(fire.totalCorpus.value);
-      expect(hh.fireTargetForProgress).toBe(fire.fireNumber.value);
-      expect(hh.progressPercent).toBe(fire.progressPercent.value);
+      // ADR-0006 Phase 1d — the progress pair is NO LONGER the kernel's anchor-year `fireNumber`.
+      // It is the SAME need the hero's headline sentence quotes, `requiredContribution.needReal`
+      // at the hero's target age. The card used to print "₹1.10 Cr / ₹10.60 Cr" directly under
+      // "you'll need ₹12.17 Cr": two different unlabelled targets, the smaller one flattering the
+      // bar. Re-pointed, not relaxed — the assertion is still an exact identity, just against the
+      // figure a user can actually reconcile with the sentence above it.
+      const req = fire.requiredContribution.value;
+      expect(req.hasTarget, "every seed persona must have a solved target").toBe(true);
+      expect(hh.fireTargetForProgress).toBe(req.needReal);
+      // …and that need is the DRIFTED target, so it can never be smaller than today's figure.
+      expect(hh.fireTargetForProgress).toBeGreaterThanOrEqual(fire.fireNumber.value);
+      expect(hh.progressPercent).toBe(
+        Math.min(100, Math.max(0, Math.round((fire.fireWithdrawableCorpus.value / req.needReal) * 100))),
+      );
+      // The kernel's own anchor-year progress stays available and unchanged for consumers that
+      // genuinely want "of today's target" — it is just no longer what the hero KPI shows.
+      expect(fire.progressPercent.value).toBe(
+        Math.min(100, Math.round((fire.fireWithdrawableCorpus.value / fire.fireNumber.value) * 100)),
+      );
       expect(hh.annualSavings).toBe(fire.annualSavings.value);
       expect(hh.monthlyTakeHome).toBe(fire.monthlyTakeHome.value);
       expect(hh.reachable).toBe(Number.isFinite(fire.yearsToRegular.value));

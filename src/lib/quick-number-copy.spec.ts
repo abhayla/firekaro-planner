@@ -34,6 +34,7 @@ const explainer: ExplainerInput = {
   monthlyContributionReal: 1_75_000,
   expectedReturn: 0.12,
   inflation: 0.06,
+  householdInflation: 0.0624,
   yearsToTarget: 12,
   haveAtTargetReal: 6_10_00_000,
   needReal: BASE_CORPUS + GOALS_CORPUS + HEALTHCARE,
@@ -122,6 +123,15 @@ describe("quick-number copy — QN-4 explainers", () => {
     expect(all).toContain("4–6×");
   });
 
+  it("the healthcare bullet names the RATE it actually uses, not a vibe (ADR-0006)", () => {
+    const bullet = whySoBigBullets(explainer)[2];
+    expect(bullet, "the medical slice inflates at 9%, the re-grounded bucket rate").toContain("9%");
+    expect(bullet, "the 20% shock reserve is a separate, disjoint thing").toContain("20%");
+    // The 13-14% figure is an insurer claims-cost trend, not a price index — it must not be quoted
+    // here as the rate we inflate spending at (FinTech HIGH-3).
+    expect(bullet).not.toMatch(/1[34]%/);
+  });
+
   it("echoes the user's own guess in the survey bullet when one was given", () => {
     expect(whySoBigBullets(explainer)[5]).toContain("₹10.00 Cr");
     // No guess → no fabricated echo (rule 31: never invent the user's answer).
@@ -141,18 +151,31 @@ describe("quick-number copy — QN-4 explainers", () => {
     expect(steps[1]).toContain("₹3.78 Cr");
     // Step 3: the medical reservation — without it the steps do not add up to the headline.
     expect(steps[2]).toContain("₹1.16 Cr");
-    // Step 4: corpus + monthly, growth, and inflation removed.
+    // Step 4: corpus + monthly, the growth rate, AND — ADR-0006 — the fact that the target
+    // itself keeps rising at the household BASKET while figures are shown deflated at general CPI.
+    // The old wording ("we remove 6% inflation so you compare like with like") described a target
+    // that stood still, which is precisely the model gh #167 removed.
     expect(steps[3]).toContain("12.0%");
-    expect(steps[3]).toContain("6%");
+    expect(steps[3], "must name the basket the target grows at").toContain("6.2%");
+    expect(steps[3], "must name the general-CPI deflator separately").toContain("6% general inflation");
     expect(steps[3]).toContain("₹6.10 Cr");
-    // Step 5: the same number in future rupees, shown once.
+    // The two rates must be distinguishable in the sentence — conflating them is the bug.
+    expect(steps[3]).toMatch(/spending basket/);
+    // Step 5: the same number in future rupees, shown once, grown at the basket (not at CPI).
     expect(steps[4]).toContain("₹18.29 Cr");
     expect(steps[4]).toContain("2038");
+    expect(steps[4]).toMatch(/grown at your basket/);
+    expect(steps[4], "the retired 'plan in today's' claim must be gone").not.toMatch(
+      /plan in today's/,
+    );
   });
 
   it("the assumptions line names the horizon the SWR was chosen for", () => {
     const line = assumptionsLine(explainer);
-    expect(line).toContain("6.0% inflation");
+    // ADR-0006: the strip must show BOTH rates and label which is which — a bare "6.0% inflation"
+    // reads as the one rate that drives everything, which stopped being true.
+    expect(line).toContain("6.0% general inflation");
+    expect(line).toContain("your spending basket 6.2%");
     expect(line).toContain("12.0% return");
     expect(line).toContain("3.70% safe withdrawal");
     expect(line).toContain("40-yr drawdown");

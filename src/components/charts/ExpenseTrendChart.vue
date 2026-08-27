@@ -27,12 +27,21 @@ const points = computed(() => {
 
 const isEmpty = computed(() => points.value.length <= 1);
 
+// Names the rate on screen (ADR-0006): "your spending basket", never the bare word "inflation" —
+// the app also shows a general-CPI figure and the two must never read as the same thing.
+const basketLabel = computed(
+  () => `At your spending basket (${(assumptions.householdInflation() * 100).toFixed(1)}%)`,
+);
+
 // Inflation trajectory: anchor on the first snapshot's total and compound the
 // household blended inflation per elapsed month.
 const inflationLine = computed(() => {
   const snaps = points.value;
   if (snaps.length === 0) return [];
   const base = snaps[0];
+  // ADR-0006: the household spending BASKET (4-bucket blend, ~6.2% on defaults) — the same rate
+  // the kernel grows the FIRE target at. Correct here (this line is about EXPENSES), and now
+  // labelled as such: the general-CPI figure is a different number and is never used on this chart.
   const annual = assumptions.householdInflation();
   const monthly = Math.pow(1 + annual, 1 / 12) - 1;
   return snaps.map((s) => {
@@ -56,7 +65,7 @@ const chartData = computed(() => ({
       tension: 0.25,
     },
     {
-      label: "At blended inflation",
+      label: basketLabel.value,
       data: inflationLine.value,
       borderColor: "#71717a",
       borderDash: [5, 4],

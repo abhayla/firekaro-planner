@@ -186,7 +186,11 @@ const crossoverChips = computed(() => {
     </div>
     <p class="frame-note" data-testid="fire-projection-frame-note">
       <v-icon icon="mdi-cash-clock" size="14" class="mr-1" />Showing <strong>{{ frameLabel }}</strong>
-      <template v-if="showRealTerms"> — corpus &amp; targets deflated to today's purchasing power (general inflation).</template>
+      <template v-if="showRealTerms">
+        — corpus &amp; targets deflated to today's purchasing power at general inflation. The target
+        line still rises: your spending basket grows faster than general inflation, so the number
+        you're chasing creeps up even in today's rupees (ADR-0006).
+      </template>
       <template v-else> — nominal future rupees; ₹1 in {{ labels[labels.length - 1] }} buys far less than today.</template>
     </p>
     <div class="chart-wrap" role="img" aria-label="FIRE corpus projection chart showing your path to financial independence">

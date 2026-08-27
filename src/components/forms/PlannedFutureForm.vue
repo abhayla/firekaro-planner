@@ -6,6 +6,7 @@ import { useFireDerive } from "@/lib/useFireDerive";
 import { formatINRCompact } from "@/lib/formatters";
 import type { PlannedFutureLine, PlannedFutureKind, InflationBucket } from "@/types/household";
 import { expenseOwnerLabel, EXPENSE_OWNER_HOUSEHOLD } from "@/lib/expense-attribution";
+import { plannedGoalInflationBucket } from "@/lib/derived-records";
 import EmptyState from "@/components/shared/EmptyState.vue";
 import PanelCard from "@/components/shared/PanelCard.vue";
 import EntityRow from "@/components/shared/EntityRow.vue";
@@ -24,12 +25,16 @@ const ownerLabelFor = (p: PlannedFutureLine): string =>
 // v5 P4 (A6.5/A10.3) — goal kind → inflation-bucket routing (mirrors
 // RecurringExpenseForm). Selecting a non-general kind auto-routes the bucket so
 // the goal inflates at the correct rate; user can still override.
-const PLANNED_KIND_OPTIONS: { value: PlannedFutureKind; label: string; defaultBucket: InflationBucket }[] = [
-  { value: "general", label: "General", defaultBucket: "general" },
-  { value: "education", label: "Education", defaultBucket: "education" },
-  { value: "marriage", label: "Marriage", defaultBucket: "general" },
-  { value: "medical", label: "Medical", defaultBucket: "healthcare" },
-];
+// ADR-0006 Phase 1d: `defaultBucket` reads `plannedGoalInflationBucket`, the same map the kernel
+// and the store's legacy backfill use — this table used to be a fourth hand-written copy of it.
+const PLANNED_KIND_OPTIONS: { value: PlannedFutureKind; label: string; defaultBucket: InflationBucket }[] = (
+  [
+    { value: "general", label: "General" },
+    { value: "education", label: "Education" },
+    { value: "marriage", label: "Marriage" },
+    { value: "medical", label: "Medical" },
+  ] as const
+).map((o) => ({ ...o, defaultBucket: plannedGoalInflationBucket(o.value) }));
 
 const plannedDraft = ref<{
   label: string;

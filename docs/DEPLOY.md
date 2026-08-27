@@ -39,6 +39,7 @@ Copy `server/.env.example` → `server/.env` and set **real** values:
 | `NODE_ENV` | `production` (PM2 also forces this) |
 | `DEV_BYPASS_AUTH` | `false` — never `true` in prod (boot guard refuses otherwise) |
 | `DATABASE_URL` | Supabase **session pooler** URI (`aws-1-ap-south-1.pooler.supabase.com:5432`) |
+| `DIRECT_URL` | Supabase **direct** (non-pooled) connection URI — `schema.prisma`'s `directUrl`, used ONLY by `prisma migrate deploy`/`db push`, not by the runtime client. Without it, `npm run prisma:migrate:deploy` (§3) fails fast with Prisma P1012 "Environment variable not found: DIRECT_URL" — set it BEFORE running that command. |
 | `BETTER_AUTH_SECRET` | a real secret — `openssl rand -base64 32` (NOT the placeholder) |
 | `BETTER_AUTH_URL` | `https://firekaro.com` |
 | `ALLOWED_ORIGINS` | `https://firekaro.com,https://www.firekaro.com` |
@@ -73,6 +74,15 @@ cd /var/www/firekaro/server && npm run prisma:migrate:deploy
 > (currently **B7** — gh-46 `Investment.contributionSchedule`) is applied by the command above,
 > but is schema-changing → **take a Supabase PITR backup first** (per §Rollback) and confirm the
 > column post-deploy (§8 smoke + an `Investment` read).
+>
+> **THIS RELEASE REQUIRES `prisma:migrate:deploy` BEFORE the app restart:** migration
+> `20260827120000_adr0006_assumptions_columns` adds three nullable columns to `user_assumptions`
+> (`householdSavingsStepUpPercent`, `householdSplitPercent`, `assumptionsMigratedV`). The new
+> server code writes them on every `PUT /api/planner/assumptions`, so restarting the app before
+> the migration is applied makes that endpoint 500 on every save. Additive + nullable → no
+> backfill, and pre-migration rows keep today's behaviour (the read mapper falls back to the
+> research defaults). **Order is not optional: run `prisma:migrate:deploy` (with `DIRECT_URL`
+> set — see §1) BEFORE `pm2 reload`/restart, every time — never restart-then-migrate.**
 
 ## 4. Build the SPA
 
@@ -179,6 +189,11 @@ of the login/splash page (the "Sign in with Google" control present + interactiv
 NEW console errors beyond the expected unauth `401 /api/planner/me` + the
 `[boot] not authenticated` warning). Non-destructive only. A green smoke endpoint is NOT
 a substitute — a deploy can ship a broken bundle the health check never exercises.
+
+**Post-deploy checks (this release, ADR-0006):** the Tier-1.5 UI check MUST additionally confirm
+(a) the dashboard hero (`FireHero.vue`) renders the "today's rupees, at age N" frame note next to
+the FIRE-number figure, and (b) saving a Preferences edit does NOT return 500 (the migration-order
+regression this release is most likely to reintroduce — see §3).
 
 Tier 2 — on-demand (significant releases / incident verification): in a browser
 `https://firekaro.com` → bounced to `/login` → "Sign in with Google" → Google

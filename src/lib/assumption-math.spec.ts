@@ -1,7 +1,13 @@
 import { describe, it, expect } from "vitest";
-import { blendPortfolioReturn, blendPortfolioVolatility, type PortfolioReturnWeights } from "@/lib/assumption-math";
+import {
+  blendPortfolioReturn,
+  blendPortfolioVolatility,
+  basketSanity,
+  resolveHouseholdInflation,
+  type PortfolioReturnWeights,
+} from "@/lib/assumption-math";
 import { RETURN_BUCKET_VOLATILITY } from "@/lib/monte-carlo";
-import { DEFAULT_ASSUMPTIONS } from "@/types/assumptions";
+import { DEFAULT_ASSUMPTIONS, type Assumptions } from "@/types/assumptions";
 
 const v = DEFAULT_ASSUMPTIONS;
 const zero: PortfolioReturnWeights = {
@@ -51,5 +57,59 @@ describe("blendPortfolioVolatility (#18) — value-weighted portfolio σ for the
     expect(mix).toBeGreaterThan(RETURN_BUCKET_VOLATILITY.ppf);
     expect(mix).toBeLessThan(RETURN_BUCKET_VOLATILITY.equity);
     expect(mix).toBeCloseTo((RETURN_BUCKET_VOLATILITY.equity + RETURN_BUCKET_VOLATILITY.ppf) / 2, 6);
+  });
+});
+
+/**
+ * ADR-0006 Phase 1b (LOW-10) — the basket sanity band.
+ *
+ * The four inflation knobs became headline-moving when the FIRE target started growing at the
+ * basket, and /preferences lets a user edit all of them. `basketSanity` is the pure predicate the
+ * Preferences disclosure fires on; it must CLAMP NOTHING.
+ */
+describe("basketSanity (ADR-0006 Phase 1b)", () => {
+  const at = (o: Partial<Assumptions>): Assumptions => ({ ...DEFAULT_ASSUMPTIONS, ...o });
+
+  it("the live defaults are inside the band (basket ~6.24% vs CPI 6%)", () => {
+    const s = basketSanity(DEFAULT_ASSUMPTIONS);
+    expect(s.ok).toBe(true);
+    expect(s.verdict).toBeNull();
+    expect(s.excessBasisPoints).toBe(24);
+  });
+
+  it("flags a basket BELOW general CPI — the real target would fall, the optimistic direction", () => {
+    const s = basketSanity(at({ healthcareInflation: 0.01, educationInflation: 0.01, housingInflation: 0.01 }));
+    expect(s.excessBasisPoints).toBeLessThan(0);
+    expect(s.verdict).toBe("below-cpi");
+    expect(s.ok).toBe(false);
+  });
+
+  it("flags a basket more than 300 bp above CPI — the FIRE-at-115 regime", () => {
+    // The pre-ADR-0006 inputs sat 190 bp above and were already double-counting; push further.
+    const s = basketSanity(
+      at({
+        healthcareInflation: 0.2,
+        inflationWeights: { general: 60, healthcare: 20, education: 10, housing: 10 },
+      }),
+    );
+    expect(s.excessBasisPoints).toBeGreaterThan(300);
+    expect(s.verdict).toBe("far-above-cpi");
+  });
+
+  it("clamps nothing — the reported basket is exactly the resolver's", () => {
+    const a = at({ healthcareInflation: 0.45 });
+    expect(basketSanity(a).basket).toBe(resolveHouseholdInflation(a));
+  });
+
+  it("the boundary is inclusive at both ends", () => {
+    expect(basketSanity(at({ healthcareInflation: 0.06, educationInflation: 0.06, housingInflation: 0.06 })).ok).toBe(true);
+    // 300 bp exactly: general 0% weight would be needed; use a blend engineered to land on +300.
+    const exact = at({
+      healthcareInflation: 0.09,
+      housingInflation: 0.06,
+      inflationWeights: { general: 0, healthcare: 100, education: 0, housing: 0 },
+    });
+    expect(basketSanity(exact).excessBasisPoints).toBe(300);
+    expect(basketSanity(exact).ok).toBe(true);
   });
 });

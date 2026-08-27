@@ -57,6 +57,25 @@
  *      frame. For FIRE, pass a REAL return (≈ nominal − inflation) with today's
  *      (un-inflated) target, OR inflate the target each year. Passing a NOMINAL
  *      return against a non-inflating target reaches too fast = optimistic (H3).
+ *      ADR-0006 CHOICE: the band stays in the CPI-REAL frame (real return + today's-₹
+ *      target) and satisfies the precondition via `targetGrowthRate` — the REAL drift
+ *      `g = (1+basket)/(1+CPI) − 1` at which the today's-₹ target rises, because the
+ *      household's spending basket outruns general CPI. The alternative (moving the band to
+ *      the nominal frame like the deterministic headline) was rejected: the volatility, the
+ *      historical bootstrap series and every consumer of `realBlendedReturn` are REAL-frame,
+ *      so nominalising here would have meant re-grounding σ and the return history too — a
+ *      much larger, un-validated change for an algebraically identical result. Divide the
+ *      nominal crossing condition through by (1+CPI)^t and you get exactly this model.
+ *
+ *      ADR-0006 Phase 1b — "algebraically identical" holds for RETURNS and for the TARGET, but
+ *      NOT for CONTRIBUTIONS, and the caller must correct for it. The nominal kernel steps the
+ *      inflow once a year, so in today's rupees the amount paid in month j of year y is worth
+ *      `C_real(y)·(1+CPI)^−(j+1)/12`, i.e. ~3.2% less on average at 6% CPI. Passing the
+ *      un-discounted real schedule here ran p50 ~0.4 years AHEAD of the deterministic headline
+ *      this band exists to bracket. `monthlySavingsSchedule` MUST therefore be
+ *      `derive().bandContributionSchedule` (already re-indexed) — never
+ *      `householdContributionSchedule`. This module does not apply the factor itself: it has no
+ *      CPI input, and a second place that knows the factor is a second place to get it wrong.
  *   3. GLIDE PATH: the per-year MEAN now tapers via the optional `meanReturnSchedule`
  *      (#24 Part 1 — p50 converges to the glide-tapered headline). The VOLATILITY is
  *      still a single scalar (a per-year vol taper needs a per-year ALLOCATION schedule
@@ -64,7 +83,12 @@
  *   4. Headline MUST use a conservative percentile + honest disclosure, never p50
  *      alone, and surface P(never reach FIRE).
  */
-import { calculateYearsToTarget, type ReturnSchedule } from "./fire-math";
+import {
+  calculateYearsToTarget,
+  type ContributionSchedule,
+  type ReturnSchedule,
+  type TargetSchedule,
+} from "./fire-math";
 
 /** calculateYearsToTarget caps the horizon at 1200 months (100 yrs). Exported so
  *  UI can treat any percentile >= this as "off the chart" and never render the
@@ -165,7 +189,24 @@ const RETURN_FLOOR = -0.95;
 export interface MonteCarloFireInput {
   currentCorpus: number;
   targetCorpus: number;
+  /**
+   * ADR-0006. Annual REAL growth of `targetCorpus`, i.e. how fast the FIRE number rises in
+   * TODAY's rupees because the household's expense basket outruns general CPI
+   * (`derive().realTargetDriftRate`). Omitted or 0 ⇒ a fixed target, byte-identical to the
+   * pre-ADR-0006 path. MUST be a REAL rate — it shares the frame of `meanReturn`.
+   */
+  targetGrowthRate?: number;
   monthlySavings: number;
+  /**
+   * ADR-0006. Optional per-year contribution schedule in the SAME frame as `meanReturn`. For the
+   * CPI-real FIRE band this MUST be `derive().bandContributionSchedule` (CPI-re-indexed), not the
+   * raw real schedule — see note 2 in the header. Used
+   * instead of the flat `monthlySavings` when present. Required once a household has a savings
+   * step-up (the default since ADR-0006): with a flat scalar the band's p50 ran ~2 years behind
+   * the deterministic headline it is supposed to bracket. `monthlySavings` is still the value the
+   * `<= 0 → never reaches FIRE` guard reads, so pass both.
+   */
+  monthlySavingsSchedule?: ContributionSchedule;
   /** Expected annual return. MUST share an inflation frame with targetCorpus (see header).
    *  Used as the per-year MEAN when `meanReturnSchedule` is absent (the v1 scalar path). */
   meanReturn: number;
@@ -199,6 +240,54 @@ export interface MonteCarloFireInput {
   paths?: number;
   /** PRNG seed (default 1) — fixed ⇒ reproducible output. */
   seed?: number;
+}
+
+/**
+ * ADR-0006 Phase 1d — the exact `derive()` fields the HEADLINE confidence band is built from.
+ *
+ * Structural (not a `Pick<DerivedFinancials>`) so this module keeps its zero-dependency purity;
+ * the full kernel return, and `lifecycle-digest`'s `SnapshotInputs`, are both assignable to it.
+ */
+export interface HeadlineBandKernelInputs {
+  fireWithdrawableCorpus: number;
+  fireNumber: number;
+  effectiveTargetDriftRate: number;
+  monthlyContribution: number;
+  bandContributionSchedule: ContributionSchedule;
+  realBlendedReturn: number;
+  realReturnSchedule: ReturnSchedule;
+  portfolioVolatility: number;
+}
+
+/**
+ * ADR-0006 Phase 1d — the ONE place the headline band's inputs are assembled.
+ *
+ * WHY THIS EXISTS. The same band is run from three places — `useFireDerive.monteCarlo` (the
+ * FireHero band), `lifecycle-digest.computeMonteCarloP50Age` (the "since you were away" MC age),
+ * and `headline-plausibility.spec` (the lock that asserts the band tracks the deterministic
+ * headline). Each assembled its own argument object, and they DRIFTED: the digest was still
+ * handing the band `realTargetDriftRate` — the BASE leg's drift, which ignores the medical
+ * reservation compounding at 9% and every dated goal's due-year cap — while the spec that claims
+ * to "mirror production" was ALSO on the base leg AND omitted the history-fed series production
+ * passes. A lock that does not run production's inputs locks nothing.
+ *
+ * So the inputs are built here, once. `effectiveTargetDriftRate` is the constant real rate that
+ * reproduces the kernel's own component target curve over the horizon the headline was solved at
+ * (`derive.ts`) — the band takes one scalar, and this is the only honest one. Under-stating the
+ * target's drift makes the band optimistic, which is the Tier-0 direction.
+ */
+export function headlineBandInputs(k: HeadlineBandKernelInputs): MonteCarloFireInput {
+  return {
+    currentCorpus: k.fireWithdrawableCorpus,
+    targetCorpus: k.fireNumber,
+    targetGrowthRate: k.effectiveTargetDriftRate,
+    monthlySavings: k.monthlyContribution,
+    monthlySavingsSchedule: k.bandContributionSchedule,
+    meanReturn: k.realBlendedReturn,
+    meanReturnSchedule: k.realReturnSchedule,
+    volatility: k.portfolioVolatility,
+    historicalReturns: INDIA_EQUITY_ANNUAL_RETURNS,
+  };
 }
 
 export interface MonteCarloFireResult {
@@ -350,6 +439,14 @@ export function runMonteCarloFire(input: MonteCarloFireInput): MonteCarloFireRes
   // standardized series is precomputed ONCE; each path draws fresh circular blocks. The
   // IID lognormal path is the fallback (and the byte-identical backward-compat path when
   // no series is passed — its rng draw sequence is untouched).
+  // ADR-0006: the today's-₹ target rises at the REAL basket drift. A 0/absent rate resolves to
+  // the constant scalar ⇒ byte-identical to the pre-ADR-0006 fixed-target path.
+  const targetDrift = Number.isFinite(input.targetGrowthRate) ? (input.targetGrowthRate as number) : 0;
+  const targetSchedule: TargetSchedule =
+    targetDrift === 0
+      ? input.targetCorpus
+      : (yearIndex: number) => input.targetCorpus * Math.pow(1 + targetDrift, yearIndex);
+
   const useBootstrap = !!input.historicalReturns && input.historicalReturns.length > 0 && input.volatility > 0;
   const stdSeries = useBootstrap ? standardizeSeries(input.historicalReturns!) : null;
   const blockLen = Math.max(1, Math.floor(input.blockYears ?? BOOTSTRAP_BLOCK_YEARS));
@@ -373,7 +470,14 @@ export function runMonteCarloFire(input: MonteCarloFireInput): MonteCarloFireRes
     }
     const schedule = (yearIndex: number): number => yearly[Math.min(yearIndex, MAX_PROJECTION_YEARS - 1)];
 
-    const raw = calculateYearsToTarget(input.currentCorpus, input.targetCorpus, input.monthlySavings, schedule);
+    const raw = calculateYearsToTarget(
+      input.currentCorpus,
+      targetSchedule,
+      input.monthlySavings > 0 && input.monthlySavingsSchedule != null
+        ? input.monthlySavingsSchedule
+        : input.monthlySavings,
+      schedule,
+    );
     // Reached only if finite AND inside the cap; raw === 100 means the loop hit the
     // month-cap without reaching ⇒ never-reached, must sort to the worst end (M2).
     const reached = Number.isFinite(raw) && raw < MAX_PROJECTION_YEARS;

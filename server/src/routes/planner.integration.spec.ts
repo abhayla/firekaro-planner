@@ -52,6 +52,31 @@ const RUN_LIVE =
   !!process.env.DATABASE_URL && !/placeholder|PASTE_/.test(process.env.DATABASE_URL);
 const dlive = RUN_LIVE ? describe : describe.skip;
 
+/**
+ * ADR-0006 migration guard for the assumptions WRITE path.
+ *
+ * `PUT /api/planner/assumptions` now persists `householdSavingsStepUpPercent`,
+ * `householdSplitPercent` and `assumptionsMigratedV` (migration
+ * `20260827120000_adr0006_assumptions_columns`). Against a dev DB that has not had
+ * `npm run prisma:migrate:deploy` run, the upsert fails on the absent columns — which is a
+ * DEPLOY gap, not a code regression. Tests that write assumptions therefore self-skip LOUDLY
+ * on such a DB, and assert for real everywhere the migration IS applied.
+ */
+async function adr0006ColumnsPresent(): Promise<boolean> {
+  const cols = await prisma.$queryRaw<{ column_name: string }[]>`
+    SELECT column_name FROM information_schema.columns
+    WHERE table_name = 'user_assumptions'
+      AND column_name IN ('assumptionsMigratedV', 'householdSavingsStepUpPercent', 'householdSplitPercent')`;
+  if (cols.length < 3) {
+    console.warn(
+      "[SKIPPED] assumptions write-path test: migration 20260827120000_adr0006_assumptions_columns " +
+        `is NOT applied to this DB (found ${cols.length}/3 columns). Run \`npm run prisma:migrate:deploy\`.`,
+    );
+    return false;
+  }
+  return true;
+}
+
 dlive("/api/planner integration (live DB — Supabase firekaro-planner)", () => {
   beforeAll(async () => {
     // Clean slate for the dev-bypass user.
@@ -99,6 +124,7 @@ dlive("/api/planner integration (live DB — Supabase firekaro-planner)", () => 
   });
 
   it("PUT+GET /assumptions round-trips", async () => {
+    if (!(await adr0006ColumnsPresent())) return;
     const assumptions = {
       inflation: 0.06, equityReturn: 0.12, debtReturn: 0.07, realEstateReturn: 0.06, goldReturn: 0.07,
       npsReturn: 0.1, ppfReturn: 0.071, epfReturn: 0.0825, internationalReturn: 0.1, reitReturn: 0.08,
@@ -355,5 +381,83 @@ dlive("/api/planner integration (live DB — Supabase firekaro-planner)", () => 
       body: JSON.stringify({ capturedAt: "2026-06-10T00:00:00.000Z", fireNumber: 1, fireAge: 50, yearsToFire: 10, netWorth: 1, monthlyContribution: 1, annualExpenses: 1 }),
     });
     expect(res.status).toBe(422);
+  });
+
+  // ===================== ADR-0006 frameVersion round-trip (T-379-fix) =====================
+  // Regression lock for the HIGH bug the server-schema-parity spec catches at the no-DB layer
+  // (src/lib/server-schema-parity.spec.ts): `frameVersion` was declared on the frontend
+  // PlanBaseline/LifecycleSnapshot types and persisted client-side, but the server's strip-mode
+  // Zod schemas never declared it — every ServerAdapter round-trip silently lost it. This proves
+  // the fix end-to-end through the real Hono route -> Prisma -> Supabase path.
+
+  it("PUT+GET /plan-baseline round-trips frameVersion (ADR-0006)", async () => {
+    const baselineWithFrame = { ...sampleBaseline, frameVersion: "adr-0006" };
+    const put = await app.request("/api/planner/plan-baseline", {
+      method: "PUT", headers: H, body: JSON.stringify(baselineWithFrame),
+    });
+    expect(put.status).toBe(200);
+
+    const body: any = await (await app.request("/api/planner/plan-baseline", { headers: H })).json();
+    expect(body.data.frameVersion, "frameVersion survived the plan-baseline round-trip").toBe("adr-0006");
+  });
+
+  it("PUT+GET /ui round-trips lifecycleSnapshot.frameVersion AND quick.directPlans together", async () => {
+    const lifecycleSnapshot = {
+      capturedAt: "2026-08-27T00:00:00.000Z",
+      fireAge: 52.4,
+      fireYear: 2044,
+      currentCorpus: 6200000,
+      fireNumber: 34285714,
+      savingsRatePct: 42,
+      milestoneBand: 25,
+      activeNudgeIds: ["milestone-25"],
+      monteCarloP50Age: 53,
+      frameVersion: "adr-0006",
+    };
+    const quick = { directPlans: true };
+    const put = await app.request("/api/planner/ui", {
+      method: "PUT",
+      headers: H,
+      body: JSON.stringify({ isFamilyView: false, currentFY: "2025-26", lifecycleSnapshot, quick }),
+    });
+    expect(put.status).toBe(200);
+
+    const got: any = await (await app.request("/api/planner/ui", { headers: H })).json();
+    expect(got.data.lifecycleSnapshot?.frameVersion, "lifecycleSnapshot.frameVersion survived").toBe("adr-0006");
+    expect(got.data.quick?.directPlans, "quick.directPlans survived alongside lifecycleSnapshot").toBe(true);
+  });
+
+  // ADR-0006: `assumptionsMigratedV`, `householdSavingsStepUpPercent` and `householdSplitPercent`
+  // are declared on `assumptionsSchema` (so PUT validated and 200-accepted them) but used to have
+  // NO Prisma column on `UserAssumptions` — the upsert silently discarded them and GET always
+  // returned the research default. A DIFFERENT bug class from the `frameVersion` gap above:
+  // frameVersion was dropped by a strip-mode Zod schema that never declared the field; these three
+  // were dropped one layer deeper, at the Prisma WRITE. Fixed by migration
+  // `20260827120000_adr0006_assumptions_columns` + `buildAssumptionsWriteData`/`mapAssumptionsRow`.
+  //
+  // Double-gated: on a live DB (the dlive gate) AND on the columns existing, so a checkout whose
+  // dev DB has not yet had `prisma migrate deploy` run stays green instead of failing on absent
+  // columns — while still PROVING the fix everywhere the migration is applied. The skip is LOUD.
+  it("PUT+GET /assumptions persists assumptionsMigratedV + householdSavingsStepUpPercent + householdSplitPercent", async () => {
+    if (!(await adr0006ColumnsPresent())) return;
+
+    const assumptionsWithStamp = {
+      ...sampleAssumptions,
+      householdSavingsStepUpPercent: 0, // a DELIBERATE user choice — must not be lifted to the default
+      householdSplitPercent: 40,
+      assumptionsMigratedV: 1,
+    };
+    const put = await app.request("/api/planner/assumptions", {
+      method: "PUT", headers: H, body: JSON.stringify(assumptionsWithStamp),
+    });
+    expect(put.status).toBe(200);
+
+    const got: any = await (await app.request("/api/planner/assumptions", { headers: H })).json();
+    expect(got.data.assumptionsMigratedV, "the ADR-0006 migration stamp persists").toBe(1);
+    expect(
+      got.data.householdSavingsStepUpPercent,
+      "a deliberate 0 step-up survives the round-trip (not overwritten by the research default 2)",
+    ).toBe(0);
+    expect(got.data.householdSplitPercent, "a non-default split % persists").toBe(40);
   });
 });

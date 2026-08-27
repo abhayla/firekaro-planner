@@ -61,6 +61,12 @@ export default app;
   SERIALIZABLE transaction — never wholesale-replace it (it shares a row with `plan-baseline`).
 - **Uncaught errors are already enveloped** by `app.onError` in `server/src/index.ts` (logged with
   `traceId`). Catch in a route only to return a *more specific* message/code; never to swallow.
+- **Server Zod schemas are STRIP mode.** Every optional field a frontend document type gains MUST be
+  declared in `server/src/lib/planner-schemas.ts` AND persisted by the Prisma write layer — a schema
+  that doesn't know a field silently strips it out of the request before it ever reaches the DB. The
+  locks are `src/lib/server-schema-parity.spec.ts` (frontend/server schema-shape parity) and
+  `server/src/lib/planner-assumptions-mapping.spec.ts` (mapping round-trip) — red-then-green proven
+  2026-08-27. This class has recurred twice already (`ui.quick`, `frameVersion`).
 
 ## Mounting (`server/src/index.ts`)
 

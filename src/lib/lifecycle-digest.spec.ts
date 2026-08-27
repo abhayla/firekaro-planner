@@ -16,6 +16,8 @@ import { setActivePinia, createPinia } from "pinia";
 import {
   captureSnapshot,
   computeLifecycleDigest,
+  isSnapshotFrameCurrent,
+  FRAME_VERSION,
   MILESTONE_BANDS,
   type LifecycleSnapshot,
 } from "@/lib/lifecycle-digest";
@@ -24,14 +26,16 @@ import { useAssumptionsStore } from "@/stores/assumptions";
 import { loadSeedPersona } from "@/lib/seed-persona";
 import { loadMehtasSeed } from "@/seeds/mehtas";
 import { loadIyersSeed } from "@/seeds/iyers";
-import { derive } from "@/lib/derive";
-import { runMonteCarloFire, MAX_PROJECTION_YEARS, INDIA_EQUITY_ANNUAL_RETURNS } from "@/lib/monte-carlo";
+import { derive, cpiWithinYearReindexFactor } from "@/lib/derive";
+import { runMonteCarloFire, headlineBandInputs, MAX_PROJECTION_YEARS } from "@/lib/monte-carlo";
 import { evaluateNudges } from "@/lib/nudge-engine";
 import { derivedFamilyLayer } from "@/lib/derived-records";
 
 // A minimal sane baseline used by the unit-level diff tests.
 const base: LifecycleSnapshot = {
   capturedAt: "2026-01-01T00:00:00.000Z",
+  // Same frame on both sides, so the diff tests below exercise the DIFF and not the frame gate.
+  frameVersion: FRAME_VERSION,
   fireAge: 56,
   fireYear: 2052,
   currentCorpus: 10_000_000,
@@ -159,15 +163,11 @@ describe("captureSnapshot — pure builder (Stage A)", () => {
     // inputs useFireDerive feeds the headline band — incl. the #24-Part-1 glide schedule
     // AND the #24-Part-2 history-fed series — never an independent recompute. Mirroring
     // the production call EXACTLY guards the cross-consumer divergence (digest vs band).
-    const mc = runMonteCarloFire({
-      currentCorpus: k.fireWithdrawableCorpus,
-      targetCorpus: k.fireNumber,
-      monthlySavings: k.monthlyContribution,
-      meanReturn: k.realBlendedReturn,
-      meanReturnSchedule: k.realReturnSchedule,
-      volatility: k.portfolioVolatility,
-      historicalReturns: INDIA_EQUITY_ANNUAL_RETURNS,
-    });
+    // ADR-0006 Phase 1d: "mirror the production call EXACTLY" is now structural — both sides build
+    // their arguments with `headlineBandInputs`, so a hand-copied field can no longer rot out of
+    // sync (it had: this mirror was passing the base-leg `realTargetDriftRate` while production
+    // passed the effective whole-target rate).
+    const mc = runMonteCarloFire(headlineBandInputs(k));
     const expectedP50Age =
       mc.p50Years < MAX_PROJECTION_YEARS ? Math.round(k.anchorAge + mc.p50Years) : null;
     expect(snap.monteCarloP50Age).toBe(expectedP50Age);
@@ -292,4 +292,72 @@ describe("lifecycle-digest substance — reconciliation vs derive() (Stage D, ru
       expect(defSnap.milestoneBand).toBe(famSnap.milestoneBand);
     });
   }
+});
+
+/**
+ * ADR-0006 — the frame gate. Every stored snapshot predates the frame change on deploy day, and the
+ * headline moved for every user for reasons that have nothing to do with what they did. Reporting
+ * that as "your FIRE date moved 2 years later since you were away" is a fabricated claim about the
+ * user's behaviour — rule 31, and the exact class this ADR exists to remove from the product.
+ */
+describe("lifecycle-digest — frame-change migration (ADR-0006)", () => {
+  it("captureSnapshot stamps the current frame", () => {
+    const snap = captureSnapshot(
+      {
+        anchorAge: 35,
+        yearsToRegular: 20,
+        fireWithdrawableCorpus: 10_000_000,
+        fireNumber: 40_000_000,
+        savingsRate: 40,
+        realBlendedReturn: 0.04,
+        realReturnSchedule: 0.04,
+        realTargetDriftRate: 0.0023,
+        // ADR-0006 Phase 1d: the WHOLE-target drift the band actually runs on. Same value here
+        // because this synthetic fixture has no dated goals and no medical reservation — on a real
+        // household the two differ, which is exactly why the band must not read the base leg.
+        effectiveTargetDriftRate: 0.0023,
+        householdContributionSchedule: 100_000,
+        // ADR-0006 Phase 1b: the CPI-re-indexed band inflow (≈ 96.9% of the real amount at 6% CPI).
+        // Phase 1d: COMPUTED from the kernel's own factor, not hard-coded. The literal that used to
+        // sit here (96_766) was arithmetically wrong — the factor is 0.969067, not 0.96766 — and a
+        // wrong constant in a fixture is a lock on the wrong behaviour.
+        bandContributionSchedule: 100_000 * cpiWithinYearReindexFactor(0.06),
+        portfolioVolatility: 0.15,
+        monthlyContribution: 100_000,
+      },
+      [],
+      new Date("2026-08-27T00:00:00.000Z"),
+      { skipMonteCarlo: true },
+    );
+    expect(snap.frameVersion).toBe(FRAME_VERSION);
+    expect(isSnapshotFrameCurrent(snap)).toBe(true);
+  });
+
+  it("a snapshot with NO frame tag is recognised as pre-frame-change", () => {
+    const legacy: LifecycleSnapshot = { ...base };
+    delete legacy.frameVersion;
+    expect(isSnapshotFrameCurrent(legacy)).toBe(false);
+    expect(isSnapshotFrameCurrent(null)).toBe(false);
+  });
+
+  it("a stale-framed baseline is treated exactly like NO baseline — no delta is claimed", () => {
+    const legacy: LifecycleSnapshot = { ...base };
+    delete legacy.frameVersion;
+    // A move that WOULD be loudly reported within one frame: 4 years later + a corpus jump.
+    const current = withChange({ fireAge: 60, currentCorpus: 20_000_000 });
+
+    const acrossFrames = computeLifecycleDigest(current, legacy);
+    expect(acrossFrames.hasMeaningfulChange, "no claim may survive a frame change").toBe(false);
+    expect(acrossFrames.fireAgeDeltaYears).toBe(0);
+    expect(acrossFrames.fireDirection).toBe("same");
+    expect(acrossFrames.corpusDelta).toBe(0);
+    expect(acrossFrames.sinceCapturedAt).toBeNull();
+
+    // ...and the SAME diff inside one frame is still reported in full — the gate is scoped to the
+    // frame change, it does not quietly mute the digest.
+    const withinFrame = computeLifecycleDigest(current, base);
+    expect(withinFrame.hasMeaningfulChange).toBe(true);
+    expect(withinFrame.fireDirection).toBe("later");
+    expect(withinFrame.fireAgeDeltaYears).toBeCloseTo(-4, 6);
+  });
 });

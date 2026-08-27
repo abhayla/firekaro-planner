@@ -16,6 +16,17 @@ import type { Household } from "@/types/household";
 import type { Assumptions } from "@/types/assumptions";
 import { DEFAULT_ASSUMPTIONS } from "@/types/assumptions";
 
+/**
+ * ADR-0006 — the modelling frame a stored document was captured under.
+ *
+ * Bump this ONLY when a kernel change moves every user's headline for reasons that have nothing to
+ * do with their own behaviour. A baseline locked under an older frame cannot be differenced against
+ * today's plan: the delta would be almost entirely the model change, rendered as if the user had
+ * fallen behind. The honest answer is to say so and offer a re-lock — never to fabricate a number,
+ * and never to silently re-lock (that would erase the user's chosen starting point without asking).
+ */
+export const FRAME_VERSION = "adr-0006";
+
 /** The locked plan snapshot — a dedicated entity (NOT an extension of ExpenseSnapshot; SRP). */
 export interface PlanBaseline {
   capturedAt: string; // ISO timestamp the plan was locked
@@ -27,6 +38,20 @@ export interface PlanBaseline {
   annualExpenses: number;
   /** A copy of the assumptions in force at lock time — required to isolate the goalpost effect. */
   assumptions: Assumptions;
+  /**
+   * The modelling frame this baseline was captured under. ABSENT on every baseline written before
+   * ADR-0006 — which is exactly how a pre-frame-change document is recognised.
+   */
+  frameVersion?: string;
+}
+
+/**
+ * True when a stored baseline was captured under the CURRENT modelling frame, i.e. when differencing
+ * it against today's plan measures the user rather than the model. A missing tag means "written
+ * before frames were tracked", which is necessarily an older frame.
+ */
+export function isBaselineFrameCurrent(baseline: PlanBaseline | null | undefined): boolean {
+  return !!baseline && baseline.frameVersion === FRAME_VERSION;
 }
 
 export interface PlanVarianceAttribution {
@@ -92,10 +117,14 @@ export function captureBaselineFrom(
   lens: Lens,
   capturedAt: string,
   overrides: Partial<PlanBaseline> = {},
+  /** ADR-0006 Phase 1d — the calendar year dated goals are measured from; the kernel never reads
+   *  the wall clock itself. Omitted ⇒ the kernel falls back to `lens.currentFY`'s start year. */
+  currentYear?: number,
 ): PlanBaseline {
-  const d = derive(household, assumptions, lens);
+  const d = derive(household, assumptions, lens, currentYear != null ? { currentYear } : undefined);
   return {
     capturedAt,
+    frameVersion: FRAME_VERSION,
     fireNumber: d.fireNumber,
     fireAge: d.householdFireAge ?? d.anchorAge + Math.ceil(d.yearsToRegular),
     yearsToFire: d.yearsToRegular,
@@ -113,14 +142,18 @@ export function computePlanVariance(args: {
   currentAssumptions: Assumptions;
   lens: Lens;
   nowMs: number;
+  /** ADR-0006 Phase 1d — see `captureBaselineFrom`. Both runs below MUST share it, else the
+   *  counterfactual and the live run would disagree about a goal's due date. */
+  currentYear?: number;
 }): PlanVarianceResult {
   const { baseline, household, currentAssumptions, lens, nowMs } = args;
+  const yearOverride = args.currentYear != null ? { currentYear: args.currentYear } : undefined;
 
-  const current = derive(household, currentAssumptions, lens);
+  const current = derive(household, currentAssumptions, lens, yearOverride);
   // Counterfactual: the CURRENT household under the BASELINE assumptions. The gap between this and
   // `current` is the pure ASSUMPTION (goalpost) effect on the target; the gap between this and the
   // stored baseline is the pure EXPENSE/household (reality) effect.
-  const underBaselineAssumptions = derive(household, baseline.assumptions, lens);
+  const underBaselineAssumptions = derive(household, baseline.assumptions, lens, yearOverride);
 
   const inf = Number.isFinite(currentAssumptions.inflation)
     ? currentAssumptions.inflation
