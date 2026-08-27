@@ -14,7 +14,9 @@ test.describe("02 — Fresh wizard: Profile → Income → Dashboard", () => {
     });
     await page.reload();
 
-    await page.getByRole("button", { name: /Begin wizard/i }).click();
+    // T-378: the splash CTA now opens the /quick express path; the seven-step wizard moved to
+    // the explicit "prefer the detailed wizard" link beneath it.
+    await page.locator('[data-testid="splash-detailed-wizard"]').click();
     await expect(page).toHaveURL(/\/wizard\/profile/);
 
     // Profile step header. v5 may render the heading copy in two places

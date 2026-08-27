@@ -38,7 +38,7 @@ test.describe("v5 — wizard walkthrough", () => {
     await screenshot(page, "00-splash");
 
     // Begin wizard
-    await page.getByRole("button", { name: /Begin wizard/i }).click();
+    await page.locator('[data-testid="splash-detailed-wizard"]').click();
     await expect(page).toHaveURL(/\/wizard\/profile/);
     await page.waitForTimeout(500);
     await screenshot(page, "01-profile");

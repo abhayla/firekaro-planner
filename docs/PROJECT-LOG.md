@@ -149,6 +149,52 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
   shipping an understated "do this" to real users. Nothing merges until B8 (GitHub billing) is fixed.
 
 ### 2026-08-27
+- **D-2026-08-27-04 — T-378 (QN-1 + QN-4) BUILT: `/quick`, the ten-card front door, and the
+  explainer that has to add up.** A first-time user could not get a FIRE number out of FireKaro in
+  three minutes: the seven-step wizard is the right tool for refinement and the wrong one for a
+  first answer. `/quick` asks ten conversational questions (money in lakh, rough is fine), then shows
+  the T-377 gap hero — and the wizard becomes the explicit "refine your plan" path, still one link
+  down on the splash. Design SSOT `docs/design/2026-08-27-quick-number-gap-hero/option-c-merged.html`;
+  contract `docs/goals/2026-08-27-quick-number-front-door.md` §4 + §5.
+  - **The answers become REAL household data, never a side store** (`src/lib/quick-number.ts`
+    `applyQuickAnswers`): adult(s) + kids as members, one "All investments (quick estimate)" line per
+    adult, planned goals dated from the kids' ages (education 18 · post-grad 22 · weddings 30 — the
+    transcript's own figures), the home loan as a Liability whose auto-flow adds the EMI once. Every
+    row carries a stable `quick-` id, so a re-run updates instead of duplicating. Zero Prisma
+    changes: the one new field (`quickSource`) rides the server's existing `subtypeData` JSONB.
+  - **The load-bearing honesty decision — anchoring the pace on what the user INVESTS.** `derive()`
+    grows the corpus from the savings RESIDUAL (income − tax − expenses), not from
+    `investments[].monthlyContribution` (gh #11). So the mapping bisects the salary CTC **through the
+    real kernel** until that residual equals the monthly investing the user stated. Recording their
+    take-home verbatim instead would assume every unspent rupee reaches the market — ~26% optimism in
+    the pace for the reference household.
+  - **…and its second half, which the first review caught: the unaccounted rupee was SPENT.** Take-home,
+    spend, EMI and investing over-determine each other; anchoring on investing alone also implied the
+    leftover was neither invested NOR spent — deleting real spending from the one figure the FIRE
+    number multiplies by ~30× (1/SWR). It is now a VISIBLE "Unaccounted spending" expense line
+    (₹45,000/month for the reference household, ≈₹2 Cr on the number), and card 3's sanity line counts
+    the EMI so three impossible answers can no longer be blessed with "sounds right?".
+  - **QN-4 explainers must reconcile.** "How we got this" is five steps (base corpus · goals layer ·
+    the 20% medical reservation · what you'll have · the same number in future rupees) that ADD UP to
+    the headline beside them — an earlier four-step draft explained only ~83% of it. The same
+    component renders on the quick result and collapsed inside the dashboard hero. Copy that claimed
+    mechanisms the kernel does not run (14% healthcare inflation, a withdrawal-tax engine) was
+    rewritten to describe what the number actually contains.
+  - **Stated, not buried:** the express path books the whole corpus as ONE equity line to stay at ten
+    cards, which is optimistic for anyone holding EPF/PPF/FD money — so the result screen says so and
+    points at the full planner. Tracked for QN-6/portfolio work rather than silently shipped.
+  - **Verification:** 1358 unit tests green (40 new across `quick-number`, `quick-number-copy`,
+    `quick-route`); `e2e/quick-number.spec.ts` walks all ten cards filling every optional field and
+    asserts the dashboard shows the same need afterwards (rule 26) with zero console errors and no
+    critical/serious axe violations; `e2e/t378-quick-path-verify.spec.ts` captures all ten cards at
+    390 and 1280 plus the result, dashboard and planner screens. Both rule-29 reviews
+    (`code-reviewer-agent` + `fintech-domain-analyst`) ran and every BLOCKER/HIGH was either fixed or
+    recorded here with its reason. `/quick` is enumerated in the member-lens sweep as a documented
+    non-participant (it is a layout-less pre-setup route with no "Viewing as" control).
+  - **Out of scope, deliberately:** QN-5 levers (the "how to get there" card slot is left for it),
+    #167 (the real-frame target grown at 6% CPI rather than the 7.9% basket — pre-existing kernel
+    decision, so the "do this" amounts here are understated for the same reason the dashboard's are).
+
 - **D-2026-08-27-03 — T-377 (QN-2) BUILT: the dashboard answers "what must I DO", not just "when
   will it happen".** Until now the FIRE hero made one claim — "you'll FIRE at age 56" — which is a
   *prediction*, not a *plan*. It never told the accumulator the one number they can act on: the

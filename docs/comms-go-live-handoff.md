@@ -124,6 +124,11 @@ carries ONLY the `whatsappMessageId`; fixed to correlate by that id (commit `996
   local reproduction already proves current `main` passes every CI step. T-350 closed as
   `BLOCKED-awaiting-billing`; worktree `C:\Abhay\Ventures\firekaro-planner-t350` (no commits, nothing
   to land) kept for reference until this is resolved.
+  **UPDATE 2026-08-27 08:50 IST (T-378):** the wave is now three PRs deep and all of them wait on this
+  one billing fix — **#166 (T-376), #168 (T-377), #173 (T-378)**. Each was verified locally (unit +
+  type-check + E2E + two independent rule-29 reviews) but none can show a green check, so none can be
+  merged on green. Every later stage stacks on the same branch, so the diff a reviewer sees grows with
+  each one. Nothing else about this is blocked — the fix is entirely on the billing page.
 
 ---
 

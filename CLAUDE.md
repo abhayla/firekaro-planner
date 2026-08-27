@@ -136,7 +136,7 @@ The full per-module inventory (every pure `src/lib/*.ts` module, the later-lifec
 
 ## Routing (`src/router/index.ts`)
 
-Top-level routes mirror the 8 sections (income, tax-planning, expenses, investments, liabilities, insurance, financial-health, fire-goals) + `/profile`, `/preferences`, `/estate-planning`, `/glossary`. Lazy-load via `import()`, `meta: { layout: "sidebar" }`. `/preferences` is the canonical home for editable assumptions (deep-link `#pref-section-*`). Two `beforeEach` guards: feature-gate (NEW routes only) + onboarding (empty→splash, incomplete→wizard, completed→dashboard). Keep legacy aliases.
+Top-level routes mirror the 8 sections (income, tax-planning, expenses, investments, liabilities, insurance, financial-health, fire-goals) + `/profile`, `/preferences`, `/estate-planning`, `/glossary`, and the layout-less `/quick` express front door (T-378 QN-1 — ten cards → one honest number → real household data; the 7-step wizard is now the "refine" path). Lazy-load via `import()`, `meta: { layout: "sidebar" }`. `/preferences` is the canonical home for editable assumptions (deep-link `#pref-section-*`). Two `beforeEach` guards: feature-gate (NEW routes only) + onboarding (empty→splash, incomplete→wizard, completed→dashboard). Keep legacy aliases.
 
 ## Design system
 
