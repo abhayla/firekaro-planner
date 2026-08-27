@@ -55,11 +55,24 @@ export const assumptionsSchema = z.object({
   //
   // ADR-0006: default 0 → 2. A flat real contribution for 25–40 years asserts ZERO real wage
   // growth for a salaried accumulator, which is the matched PESSIMISM to the old inflated
-  // expense basket (FinTech MEDIUM-10; Aon India salary growth ≈ 3–4% real). 2 is deliberately
-  // BELOW that band, and `derive.ts` TAPERS it to 0 at age 50 (`STEP_UP_TAPER_AGE`) so no plan
-  // compounds a promotion curve into a household's sixties. On hydrate a stored value of exactly
-  // 0 (the pre-ADR-0006 default) is treated as UNSET and takes the new default —
-  // `src/stores/assumptions.ts`; a deliberate 0 is re-settable in /preferences.
+  // expense basket (FinTech MEDIUM-10).
+  //
+  // GROUNDING. Aon's India Salary Increase Survey has reported nominal increments of ~9.0–9.5%
+  // p.a. across 2023–2025 against RBI/CPI headline inflation of ~5–6%, i.e. a REAL salary-growth
+  // band of roughly 3–4% for the organised urban salaried workforce this product serves. The
+  // default is deliberately set BELOW that band, at 2, for three reasons: (a) an increment survey
+  // measures the average increase GIVEN to a continuing employee at surveyed firms, which is a
+  // survivorship-biased upper bound on a household's lifetime path; (b) the SAVINGS residual is
+  // what steps up here, not salary, and lifestyle creep absorbs part of every raise; (c) an
+  // over-stated step-up pulls the FIRE date in, which is the optimistic direction and Tier-0 for
+  // this persona. `derive.ts` additionally TAPERS it to 0 at age 50 (`STEP_UP_TAPER_AGE`) —
+  // Indian salaried real wage growth flattens well before retirement, so no plan compounds a
+  // promotion curve into a household's sixties.
+  //
+  // On hydrate a stored value of exactly 0 (the pre-ADR-0006 default) is treated as UNSET and
+  // takes the new default — ONCE, gated on the `assumptionsMigratedV` stamp
+  // (`src/stores/assumptions.ts`), so a 0 the user deliberately sets in /preferences survives
+  // every later reload.
   householdSavingsStepUpPercent: z.number().min(0).max(15).default(2),
   // #81 Phase 2 — the unified "household split" %: the share of SHARED costs/assets (ring-2
   // expenses + "Joint" corpus/debt + joint income streams) attributed to EACH adult when
@@ -69,6 +82,21 @@ export const assumptionsSchema = z.object({
   // intentional simplification (each adult bears `split%` of shared); the household − Σ(adults)
   // gap surfaces whatever is unsplit (dependents + remainder).
   householdSplitPercent: z.number().min(0).max(100).default(50),
+  /**
+   * ADR-0006 Phase 1b — the one-shot migration STAMP for this document.
+   *
+   * `src/stores/assumptions.ts` needs to lift a stored `householdSavingsStepUpPercent` of exactly
+   * 0 (the pre-ADR-0006 default) to the new default of 2. Phase 1 did that by SNIFFING THE VALUE
+   * on every hydrate, which meant a user who deliberately chose 0 in /preferences got 2 back on
+   * the next reload — a setting the product would not let them keep. A version stamp is the field
+   * the store previously "had no way to distinguish choice from default" with: the migration runs
+   * only while the stamp is absent, writes the stamp, and never runs again.
+   *
+   * Optional on purpose — every document persisted before this change lacks it, and that ABSENCE
+   * is precisely the signal that the migration has not run. Declared here (rather than kept out of
+   * the schema) so the server's shared strip-mode Zod keeps it on the round-trip.
+   */
+  assumptionsMigratedV: z.number().int().min(0).optional(),
 });
 
 export type Assumptions = z.infer<typeof assumptionsSchema>;

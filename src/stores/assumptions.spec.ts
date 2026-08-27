@@ -7,6 +7,9 @@ import { loadMehtasSeed } from "@/seeds/mehtas";
 import { loadIyersSeed } from "@/seeds/iyers";
 import { loadMauryasSeed } from "@/seeds/mauryas";
 import { derive } from "@/lib/derive";
+import { migrateStepUpDefault, ASSUMPTIONS_MIGRATION_VERSION } from "@/stores/assumptions";
+import { setAdapter } from "@/lib/storage-adapter";
+import { DEFAULT_ASSUMPTIONS, type Assumptions } from "@/types/assumptions";
 
 describe("assumptions store — householdInflation (A3.2 editable weights)", () => {
   beforeEach(() => setActivePinia(createPinia()));
@@ -89,4 +92,69 @@ describe("householdInflation is the SAME basket the kernel plans with (ADR-0006)
       );
     });
   }
+});
+
+/**
+ * ADR-0006 Phase 1b (HIGH-3) — the step-up migration must be ONE-SHOT.
+ *
+ * The Phase-1 version sniffed the VALUE on every hydrate, so a user who deliberately chose 0 got
+ * 2 back on the next reload: the product silently refused to let them keep an explicit setting.
+ * The previous test in this file only asserted the DEFAULT and so locked that bug in — these
+ * assert the actual contract (idempotence across repeated hydrates + a real storage round-trip).
+ */
+describe("assumptions store — the step-up migration is ONE-SHOT (ADR-0006 Phase 1b)", () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    setAdapter(null);
+  });
+
+  it("lifts a legacy 0 exactly once and stamps the document", () => {
+    // A pre-ADR-0006 document: a stored 0, no stamp.
+    const first = migrateStepUpDefault({ householdSavingsStepUpPercent: 0 });
+    expect(first.householdSavingsStepUpPercent, "the legacy 0 must be dropped so the new default wins").toBeUndefined();
+    expect(first.assumptionsMigratedV).toBe(ASSUMPTIONS_MIGRATION_VERSION);
+  });
+
+  it("a DELIBERATE 0 written after the stamp survives every later hydrate", () => {
+    const chose0 = { ...DEFAULT_ASSUMPTIONS, householdSavingsStepUpPercent: 0, assumptionsMigratedV: 1 };
+    let doc: Partial<Assumptions> = chose0;
+    for (let reload = 0; reload < 3; reload++) {
+      doc = migrateStepUpDefault(doc);
+      expect(
+        doc.householdSavingsStepUpPercent,
+        `reload ${reload + 1}: a stamped, deliberate 0 must never be lifted back to the default`,
+      ).toBe(0);
+    }
+  });
+
+  it("stamps even a FIRST-RUN document, so a 0 typed in /preferences survives reloads", () => {
+    // The exact Preferences §Core scenario: brand-new user, nothing stored, types 0 into the
+    // "Savings step-up (% real per year)" field, then reloads twice.
+    const store = new Map<string, string>();
+    setAdapter({
+      get: <T,>(k: string): T | null => (store.has(k) ? (JSON.parse(store.get(k)!) as T) : null),
+      set: (k: string, v: unknown) => void store.set(k, JSON.stringify(v)),
+      remove: (k: string) => void store.delete(k),
+      clearForCurrentUser: () => store.clear(),
+    });
+
+    const a = useAssumptionsStore();
+    a.hydrate();
+    expect(a.values.householdSavingsStepUpPercent, "fresh user gets the new default").toBe(2);
+    a.set("householdSavingsStepUpPercent", 0);
+    // The deep watch persists asynchronously; write the document the way the watch would.
+    store.set("assumptions", JSON.stringify(a.values));
+
+    for (let reload = 0; reload < 2; reload++) {
+      setActivePinia(createPinia());
+      const reloaded = useAssumptionsStore();
+      reloaded.hydrate();
+      expect(
+        reloaded.values.householdSavingsStepUpPercent,
+        `reload ${reload + 1}: the 0 the user typed in /preferences must still be 0`,
+      ).toBe(0);
+      store.set("assumptions", JSON.stringify(reloaded.values));
+    }
+    setAdapter(null);
+  });
 });
