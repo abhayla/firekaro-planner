@@ -36,9 +36,9 @@ Source of truth for the left column: `D:\Abhay\Ventures\transcripts\FbYnFUwdODQ.
 | B1 | Inflation 8% compounded to retirement | 6% general / 14% health / 9% edu | ✓ 6% shown | ✓ | QN-4 |
 | B2 | Live to 90 → 40-yr drawdown | `planToAge` | ✓ | ✓ | QN-4 |
 | B3 | Return 14% ("a little aggressive") | 12% | ✓ 12% + "not sales defaults" | ✓ | QN-4 |
-| B4 | Step-up 10%/yr baked in | step-up assumption default 0 | ✓ as an opt-in lever | ✓ | QN-5 |
+| B4 | Step-up 10%/yr baked in | step-up assumption default 0 | ✓ as an opt-in lever | ✓ | QN-5 ✅ shipped 2026-08-27 (in-session, `LeverPicker.vue`) |
 | B5 | Survey story: people under-estimate 4–6× (1986/2006), lifestyle creep, taxes, healthcare, longevity | #119 education hub (open) | **✗** | ✓ "Why is the number so big?" explainer card (5 lines) | QN-4 |
-| B6 | Don't prepay a 7.2% loan; invest instead | — | ◐ placeholder | ✓ lever uses the real EMI/rate from Q10 | QN-5 |
+| B6 | Don't prepay a 7.2% loan; invest instead | — | ◐ placeholder | ✓ lever uses the real EMI/rate from Q10 | QN-5 ✅ shipped 2026-08-27 (in-session, `LeverPicker.vue`) |
 
 ## C. Outputs shown (Part 3)
 
@@ -49,15 +49,15 @@ Source of truth for the left column: `D:\Abhay\Ventures\transcripts\FbYnFUwdODQ.
 | C3 | Gap | ✓ | ✓ | QN-2 |
 | C4 | Required SIP at target (₹3.8 L, rejected) | ✓ "Do this" | ✓ | QN-2 |
 | C5 | Change age 50→53, required SIP → ₹2.1 L live | ✓ slider + hint | ✓ | QN-2 |
-| C6 | Closing: "₹35 Cr in 15 years" with 2 L + 10% step-up + direct | ✓ levers card (added after Abhay's correction) | ✓ | QN-5 |
-| C7 | "It's mathematics — what can go wrong is your discipline" honesty framing | ◐ | ✓ line under the plan summary | QN-5 |
+| C6 | Closing: "₹35 Cr in 15 years" with 2 L + 10% step-up + direct | ✓ levers card (added after Abhay's correction) | ✓ | QN-5 ✅ shipped 2026-08-27 (in-session, `LeverPicker.vue`) |
+| C7 | "It's mathematics — what can go wrong is your discipline" honesty framing | ◐ | ✓ line under the plan summary | QN-5 ✅ shipped 2026-08-27 (in-session, `LeverPicker.vue`) |
 
 ## D. Portfolio review — ASAR (Part 4)
 
 | # | Video item | FireKaro today | Mockup now | Plan |
 |---|---|---|---|---|
 | D1 | XIRR vs benchmark (13.3 vs 13.4) | #146 open | listed in "What the full planner adds" | — (#146, separate) |
-| D2 | Access: direct vs regular TER (+80 bps) | none | ✓ lever (+0.8%) gated by the Direct/Regular/Not-sure chip on the investments card | QN-5 (household-level toggle) ; per-holding flag → #NEW |
+| D2 | Access: direct vs regular TER (+80 bps) | none | ✓ lever (+0.8%) gated by the Direct/Regular/Not-sure chip on the investments card | QN-5 ✅ shipped 2026-08-27 (in-session, `LeverPicker.vue`) (household-level toggle) ; per-holding flag → #NEW |
 | D3 | Selection: 72/18/9 vs 60/25–27/13–15 | none | listed | — (#141) |
 | D4 | Allocation: 65% funds underperform; 20 funds = index; keep 5–10 | none | listed ("we'll count your funds") | #NEW fund-count warning (good-to-have) |
 | D5 | Gold ~7% = ideal uncorrelated asset | goldReturn 7% | listed | — |
@@ -72,8 +72,8 @@ Source of truth for the left column: `D:\Abhay\Ventures\transcripts\FbYnFUwdODQ.
 | E3 | One headline + one gap + one action | ✓ (fixed after review 1) | QN-2 |
 | E4 | Live what-if on retirement age | ✓ | QN-2 |
 | E5 | Opinionated defaults explained with a story | ✓ B5 explainer | QN-4 |
-| E6 | Shock then reassure | ✓ hero → levers | QN-5 |
-| E7 | Three concrete fixes | ✓ levers + full-planner list | QN-5 |
+| E6 | Shock then reassure | ✓ hero → levers | QN-5 ✅ shipped 2026-08-27 (in-session, `LeverPicker.vue`) |
+| E7 | Three concrete fixes | ✓ levers + full-planner list | QN-5 ✅ shipped 2026-08-27 (in-session, `LeverPicker.vue`) |
 
 ## F. Cross-check recommendation items (FbYnFUwdODQ-firekaro-crosscheck.md)
 
@@ -84,7 +84,7 @@ Source of truth for the left column: `D:\Abhay\Ventures\transcripts\FbYnFUwdODQ.
 | F3 | Solve-for-required-monthly + gap hero + slider | ✓ | QN-2 |
 | F4 | Explain defaults | ✓ | QN-4 |
 | F5 | Simplify `InvestmentForm` (55 fields → fast add) | — (full planner, not the front door) | QN-6 |
-| F6 | TER lever / fund-count / benchmark / drift | ◐ D2 in; rest listed | QN-5 + issues |
+| F6 | TER lever / fund-count / benchmark / drift | ◐ D2 in; rest listed | QN-5 ✅ shipped 2026-08-27 (in-session, `LeverPicker.vue`) + issues |
 
 ## Process lesson (2026-08-27)
 The first mockup pass was built from memory of the capture, not against this matrix — the whole "how to

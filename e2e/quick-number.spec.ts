@@ -109,6 +109,79 @@ test.describe("QN-1 — the /quick express path", () => {
     expect(noisy, `console errors: ${noisy.join(" | ")}`).toHaveLength(0);
   });
 
+  test("QN-5: every 'how to get there' move toggles, moves the hero, and survives into the dashboard", async ({ page }) => {
+    const consoleErrors: string[] = [];
+    page.on("console", (m) => {
+      if (m.type() === "error") consoleErrors.push(m.text());
+    });
+    await page.setViewportSize({ width: 1280, height: 1400 });
+    await page.goto("/", { waitUntil: "networkidle" });
+    await page.getByText("Start my own plan").click();
+    await expect(page).toHaveURL(/\/quick/, { timeout: 20000 });
+    await fillQuickPath(page);
+    await expect(page.locator('[data-testid="quick-result"]')).toBeVisible({ timeout: 20000 });
+
+    const picker = page.locator('[data-testid="lever-picker"]');
+    await expect(picker).toBeVisible();
+    // The placeholder is gone; the honesty line now sits under the plan summary.
+    await expect(page.locator('[data-testid="quick-levers-placeholder"]')).toHaveCount(0);
+    await expect(page.locator('[data-testid="quick-honesty-line"]')).toContainText("arithmetic");
+    await expect(page.locator('[data-testid="lever-plan-summary"]')).toContainText("Switch on a few moves");
+
+    const KEYS = ["step-up-10", "delay-3", "trim-expenses", "direct-plans", "no-prepay-roll-emi"] as const;
+    // Amit: a 7.2% loan below the 12% equity return, funds "not sure" → every move is available.
+    for (const k of KEYS) {
+      await expect(page.locator(`[data-testid="lever-toggle-${k}"]`), k).toBeEnabled();
+      await expect(page.locator(`[data-testid="lever-effect-${k}"]`), k).toContainText(/less to find|makes it reachable|no change|still out of reach/);
+    }
+
+    const requiredText = () => page.locator('[data-testid="hero-required-monthly"]').innerText();
+    const before = await requiredText();
+
+    // Toggle each move ON in turn — the hero must re-solve (its text changes) and the summary names it.
+    let previous = before;
+    for (const k of KEYS) {
+      await page.locator(`[data-testid="lever-toggle-${k}"]`).check();
+      await page.waitForTimeout(900);
+      const now = await requiredText();
+      expect(now, `${k} must move the hero (was "${previous}")`).not.toBe(previous);
+      previous = now;
+      await expect(page.locator('[data-testid="lever-plan-summary"]')).toContainText("With ");
+    }
+    // "Retire 3 years later" lifts the headline age by exactly 3 while the slider stays put.
+    const sliderAge = Number(await page.locator('[data-testid="hero-target-age"]').innerText());
+    const headlineAge = Number(await page.locator('[data-testid="fire-hero-age"]').innerText());
+    expect(headlineAge).toBe(sliderAge + 3);
+
+    // The stacked plan lands in the "clearly doable" band for Amit (rule 31): required ≤ 1.5× current.
+    const stacked = await requiredText();
+    if (/\/ month/.test(stacked)) {
+      const required = parseCompact(stacked);
+      const currentText = await page.locator('[data-testid="hero-have"]').locator("..").innerText();
+      const current = parseCompact(currentText.match(/at (₹[\d.]+ (?:Cr|L|K))/)?.[1] ?? "₹0 L");
+      expect(required, `stacked required ${required} vs current ${current}`).toBeLessThanOrEqual(current * 1.5 + 1);
+    }
+
+    // Toggle everything back OFF — the hero returns to its untouched number.
+    for (const k of KEYS) await page.locator(`[data-testid="lever-toggle-${k}"]`).uncheck();
+    await page.waitForTimeout(900);
+    expect(await requiredText()).toBe(before);
+
+    // A move switched on here is still on in the full planner (same session-only what-if).
+    await page.locator('[data-testid="lever-toggle-step-up-10"]').check();
+    await page.waitForTimeout(600);
+    await page.locator('[data-testid="quick-open-planner"]').click();
+    await expect(page).toHaveURL(/\/fire-goals\/dashboard/, { timeout: 20000 });
+    await page.waitForTimeout(1200);
+    const dashPicker = page.locator('[data-testid="acceleration-card"] [data-testid="lever-picker"]');
+    await expect(dashPicker).toBeVisible();
+    await expect(dashPicker.locator('[data-testid="lever-toggle-step-up-10"]')).toBeChecked();
+    await expect(page.locator('[data-testid="accel-savemore-slider"]')).toHaveCount(0);
+
+    const noisy = consoleErrors.filter((e) => !/favicon|ResizeObserver/i.test(e));
+    expect(noisy, `console errors: ${noisy.join(" | ")}`).toHaveLength(0);
+  });
+
   test("the express path has no critical or serious accessibility violations", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await page.goto("/quick", { waitUntil: "networkidle" });

@@ -10,11 +10,22 @@
  * unless finite and in range — a NaN/±Infinity can never poison the kernel (rule 31). Omitting the
  * object leaves every kernel output byte-identical to the pre-T-377 kernel.
  */
+import type { ContributionSegments } from "@/lib/contribution-schedule";
+
 export interface DeriveOverrides {
   /** Replace the real monthly corpus inflow (₹/month, today's ₹). Must be finite and ≥ 0. */
   monthlyContributionReal?: number;
   /** Evaluate the plan as if retirement were targeted at this age (the hero slider). */
   targetRetirementAge?: number;
+  /**
+   * QN-5 — ADDITIONAL real contribution segments layered ON TOP of the household savings
+   * residual (ADR-0004 segments, age-relative, REAL ₹/month). The "roll the EMI into investing
+   * when the loan ends" lever is the one caller: a segment starting at the loan's end age. The
+   * segments are SUMMED with the base inflow (never replace it) and are ignored when empty, so
+   * omitting the field leaves every kernel output byte-identical. Household scope only — the
+   * individual-FIRE path does not read it.
+   */
+  extraContributionSegments?: ContributionSegments;
 }
 
 /** Finite, in-range guard shared by both override fields (never trusts a caller's number). */

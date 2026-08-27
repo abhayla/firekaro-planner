@@ -63,6 +63,12 @@ export const useUiStore = defineStore("ui", () => {
   // what-if, not a plan change. Persisting the target is the explicit "Set as my target" action,
   // which writes the household member's targetRetirementAge instead. null = follow the household.
   const whatIfTargetAge = ref<number | null>(null);
+  /**
+   * QN-5 (T-379): the "How to get there" moves the user has switched ON. Session-only like
+   * whatIfTargetAge — the hero's solver re-solves with them applied; nothing is saved until
+   * "Make this my plan" writes the persistable ones through the household/assumptions stores.
+   */
+  const whatIfLevers = ref<string[]>([]);
   const adapter = makeAdapter(getAuthProvider());
 
   function hydrate() {
@@ -123,6 +129,15 @@ export const useUiStore = defineStore("ui", () => {
     const lo = Math.max(SHARED_TARGET_AGE_MIN, Math.round(floor));
     whatIfTargetAge.value = Math.min(SHARED_TARGET_AGE_MAX, Math.max(lo, Math.round(age)));
   }
+  /** QN-5: switch one "how to get there" move on/off (session-only what-if). */
+  function toggleWhatIfLever(key: string) {
+    whatIfLevers.value = whatIfLevers.value.includes(key)
+      ? whatIfLevers.value.filter((k) => k !== key)
+      : [...whatIfLevers.value, key];
+  }
+  function clearWhatIfLevers() {
+    whatIfLevers.value = [];
+  }
   /** T-377: merge a partial Quick-Number blob (QN-1 writes; QN-2 only reads). */
   function setQuickPrefs(next: QuickPrefs | null) {
     quick.value = next == null ? null : { ...(quick.value ?? {}), ...next };
@@ -139,6 +154,9 @@ export const useUiStore = defineStore("ui", () => {
     lifecycleSnapshot,
     quick,
     whatIfTargetAge,
+    whatIfLevers,
+    toggleWhatIfLever,
+    clearWhatIfLevers,
     hydrate,
     setWhatIfTargetAge,
     setQuickPrefs,

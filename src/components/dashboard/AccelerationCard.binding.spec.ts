@@ -45,3 +45,21 @@ describe("AccelerationCard template-binding honesty lock (gh-48, rule 31)", () =
     );
   });
 });
+
+describe("AccelerationCard — QN-5 lever picker embedding (T-379, extends the gh-48 lock)", () => {
+  it("embeds the shared LeverPicker as its body (the same card the /quick result shows)", () => {
+    expect(src).toMatch(/import LeverPicker from "@\/components\/quick\/LeverPicker\.vue"/);
+    expect(src).toMatch(/<LeverPicker\s+embedded/);
+  });
+
+  it("the fixed-extra-amount save-more slider is gone — the picker's ₹/month view replaces it", () => {
+    expect(src).not.toContain("accel-savemore-slider");
+  });
+
+  it("RETAINS the ranked years-saved surface + both bridge guards (the picker adds, never replaces)", () => {
+    expect(src).toContain("WinsImpactBars");
+    expect(src).toContain("baselineReachable");
+    expect(src).toContain("bridgeBinding");
+    expect(src).toContain("useAcceleration");
+  });
+});

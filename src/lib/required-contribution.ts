@@ -22,6 +22,7 @@ import type { Assumptions } from "@/types/assumptions";
 import { derive, type DeriveLens } from "@/lib/derive";
 import { projectCorpus } from "@/lib/fire-math";
 import { toMonthly } from "@/lib/cashflow";
+import type { ContributionSegments } from "@/lib/contribution-schedule";
 
 /** Bisection stops once the bracket is this tight (rupees/month). */
 export const REQUIRED_CONTRIBUTION_TOLERANCE = 100;
@@ -34,6 +35,8 @@ export interface RequiredContributionInput {
   lens: DeriveLens;
   /** The age the user wants to retire at (the hero slider). */
   targetAge: number;
+  /** QN-5: extra ADR-0004 segments summed onto the savings residual (the roll-the-EMI lever). */
+  extraContributionSegments?: ContributionSegments;
 }
 
 export interface RequiredContributionResult {
@@ -98,10 +101,12 @@ export function requiredMonthlyContributionFor(
   input: RequiredContributionInput,
 ): RequiredContributionResult {
   const { snapshot, assumptions, lens } = input;
+  const extra = input.extraContributionSegments ?? [];
+  const extraOverride = extra.length > 0 ? { extraContributionSegments: extra } : {};
   // A non-finite target age can never produce an honest answer — reject it before it can
   // silently fall back to the stored target while the predicate always fails (code-review L6).
   if (!Number.isFinite(input.targetAge)) {
-    const k = derive(snapshot, assumptions, lens);
+    const k = derive(snapshot, assumptions, lens, extraOverride);
     return {
       requiredMonthlyReal: Number.POSITIVE_INFINITY,
       currentMonthlyReal: Math.max(0, Math.round(safe(k.monthlyContribution))),
@@ -123,7 +128,7 @@ export function requiredMonthlyContributionFor(
   const targetAge = Math.round(input.targetAge);
 
   // ---- baseline: today's pace, today's target (the slider must not move these) ----
-  const base = derive(snapshot, assumptions, lens);
+  const base = derive(snapshot, assumptions, lens, extraOverride);
   // `individualFireByMember` is computed for EVERY adult regardless of the lens, so keying off
   // `viewingMemberId` alone would switch a SOLO household (single parent) onto the individual
   // number — which excludes the dependants' costs. Honour the kernel's own lens gate instead.
@@ -141,7 +146,7 @@ export function requiredMonthlyContributionFor(
   // "your current amount is enough for 55" and "at today's pace: 56" (FinTech MEDIUM-HIGH-5).
 
   // ---- the plan AS IF retirement were at `targetAge` (moves SWR, glide, bridge window) ----
-  const atTarget = derive(snapshot, assumptions, lens, { targetRetirementAge: targetAge });
+  const atTarget = derive(snapshot, assumptions, lens, { ...extraOverride, targetRetirementAge: targetAge });
   const atTargetAdult =
     atTarget.individualFireByMember.find((m) => m.memberId === lensedMemberId) ?? null;
 
@@ -194,6 +199,7 @@ export function requiredMonthlyContributionFor(
   // ---- binary search on the real monthly contribution ----
   const reaches = (monthly: number): boolean => {
     const k = derive(snapshot, assumptions, lens, {
+      ...extraOverride,
       monthlyContributionReal: monthly,
       targetRetirementAge: targetAge,
     });
