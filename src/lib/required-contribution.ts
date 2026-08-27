@@ -61,6 +61,24 @@ export interface RequiredContributionResult {
   yearsToTarget: number;
   /** False when there is no FIRE target yet (no expenses entered) — the card must make NO claim. */
   hasTarget: boolean;
+  /**
+   * T-378: the three components of `needReal`, taken from the SAME at-target kernel run.
+   *
+   * The QN-4 explainer narrates need as base + goals layer + medical reservation, and those steps
+   * have to keep summing to the headline when the slider moves. Reading the components off the
+   * STORED-target `derive()` while `needReal` comes from the AT-target one desynced them the moment
+   * the user dragged the age, because all three are built on the horizon-driven SWR (blind
+   * verification finding 2). One run, one set of parts.
+   */
+  needBaseReal: number;
+  needPlannedGoalsReal: number;
+  needHealthcareReservationReal: number;
+  /**
+   * The expense base the kernel actually capitalises — today's expenses NET of post-tax NPS annuity
+   * income (`derive.ts`). Quoting the gross figure over-sums the steps for any household with NPS
+   * (blind verification finding 3).
+   */
+  netAnnualExpensesReal: number;
 }
 
 /**
@@ -98,6 +116,10 @@ export function requiredMonthlyContributionFor(
       anchorAgeUsed: safe(k.anchorAge, 30),
       yearsToTarget: 0,
       hasTarget: false,
+      needBaseReal: 0,
+      needPlannedGoalsReal: 0,
+      needHealthcareReservationReal: 0,
+      netAnnualExpensesReal: 0,
     };
   }
   const targetAge = Math.round(input.targetAge);
@@ -256,5 +278,12 @@ export function requiredMonthlyContributionFor(
     anchorAgeUsed: anchorAge,
     yearsToTarget: wholeYears,
     hasTarget: needRealRounded > 0,
+    needBaseReal: Math.max(0, Math.round(safe(atTarget.baseFireNumber))),
+    needPlannedGoalsReal: Math.max(0, Math.round(safe(atTarget.familyLayerCorpus))),
+    needHealthcareReservationReal: Math.max(0, Math.round(safe(atTarget.healthcareReservation))),
+    netAnnualExpensesReal: Math.max(
+      0,
+      Math.round(safe(atTarget.baseFireNumber * safe(atTarget.effectiveSWR, 0.035))),
+    ),
   };
 }
