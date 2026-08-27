@@ -384,8 +384,18 @@ export function useFireDerive() {
     householdInflation: computed(() => d.value.householdInflation),
     realBlendedReturn: computed(() => d.value.realBlendedReturn),
     realReturnSchedule: computed(() => d.value.realReturnSchedule),
-    // ADR-0006: the REAL drift of the FIRE target ((1+basket)/(1+CPI) − 1).
+    // ADR-0006: the REAL drift of the FIRE target ((1+basket)/(1+CPI) − 1). This is the BASE
+    // leg's drift only — see the component schedule below for the whole target.
     realTargetDriftRate: computed(() => d.value.realTargetDriftRate),
+    // ADR-0006 Phase 1c: the whole target as a curve, not a rate. `regularTargetComponentsRealAt(t)`
+    // is the today's-₹ target at year `t` split into base / planned-goals / medical reservation
+    // (summing to `total`); `effectiveTargetDriftRate` is the single rate that reproduces that
+    // curve over the SOLVED horizon, for the few consumers that need one number. Any consumer
+    // drawing or perturbing "the target over time" reads one of these — never `realTargetDriftRate`,
+    // which now describes only one of the three legs.
+    regularTargetComponentsRealAt: computed(() => d.value.regularTargetComponentsRealAt),
+    effectiveTargetDriftRate: computed(() => d.value.effectiveTargetDriftRate),
+    effectiveTargetGrowthNominal: computed(() => d.value.effectiveTargetGrowthNominal),
     // ADR-0006: the REAL (today's-₹) corpus-inflow schedule the headline was solved with.
     householdContributionSchedule: computed(() => d.value.householdContributionSchedule),
     bandContributionSchedule: computed(() => d.value.bandContributionSchedule),
@@ -413,9 +423,16 @@ export function useFireDerive() {
       runMonteCarloFire({
         currentCorpus: d.value.fireWithdrawableCorpus,
         targetCorpus: d.value.fireNumber,
-        // ADR-0006: the band stays CPI-real; the today's-₹ target DRIFTS at the household
-        // basket's excess over CPI so it shares the deterministic headline's frame.
-        targetGrowthRate: d.value.realTargetDriftRate,
+        // ADR-0006: the band stays CPI-real; the today's-₹ target DRIFTS so it shares the
+        // deterministic headline's frame.
+        //
+        // Phase 1c: at the EFFECTIVE drift, not the basket's excess over CPI. The target is now a
+        // sum of legs with different rates (medical reservation at 9%, each dated goal capped at
+        // its due year), and the band takes one scalar. `effectiveTargetDriftRate` is the constant
+        // real rate that reproduces the component curve over the horizon the headline was actually
+        // solved at — handing the band `realTargetDriftRate` instead left p50 years away from the
+        // deterministic figure it is supposed to bracket (measured: mauryas 3.25 y).
+        targetGrowthRate: d.value.effectiveTargetDriftRate,
         monthlySavings: d.value.monthlyContribution,
         // ADR-0006: the REAL (today's-₹) inflow schedule, incl. the step-up and its age-50 taper —
         // the same frame as `realBlendedReturn`. A flat scalar left the band's p50 behind the

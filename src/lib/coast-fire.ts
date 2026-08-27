@@ -180,11 +180,21 @@ export function calculateBaristaFire(input: BaristaFireInput): BaristaFireResult
  * Coast-trajectory series (audit Entry #21 A21.1) — the corpus-vs-Coast chart.
  *
  * Plots how the EXISTING corpus, compounding at the real return with NO further
- * contributions, tracks toward the (today's-rupees) FIRE number over the years
- * to retirement. Where the no-contribution curve crosses the flat FIRE line is
- * the Coast crossover: if it crosses on or before retirement, the user has
- * reached Coast FIRE. Both series are in today's rupees (real return used), so
- * the FIRE target is a flat line.
+ * contributions, tracks toward the FIRE number over the years to retirement.
+ * Where the no-contribution curve crosses the target line is the Coast
+ * crossover: if it crosses on or before retirement, the user has reached Coast
+ * FIRE. Both series are in TODAY's rupees (a real return is used).
+ *
+ * ADR-0006 Phase 1c — THE TARGET LINE IS NOT FLAT. Even in today's rupees the
+ * FIRE number rises, because the household's spending basket outruns general
+ * CPI and the medical reservation outruns both. Drawing it flat made Coast look
+ * reached years before it is — the corpus curve met a line that was standing
+ * still. Callers pass `fireTargetRealAt`, the kernel's own today's-₹ target at
+ * year `t` (`derive().regularTargetComponentsRealAt(t).total`), and the line
+ * follows it kink for kink, including the flattening as dated goals fall due.
+ * Omit it and the series falls back to the flat `fireNumber` — the legacy shape,
+ * kept only so a caller with no kernel handle still renders something honest at
+ * t = 0.
  */
 export interface CoastTrajectoryPoint {
   /** Calendar year at this step. */
@@ -193,7 +203,7 @@ export interface CoastTrajectoryPoint {
   yearsFromNow: number;
   /** Existing corpus grown at the real return with no new contributions. */
   corpusNoContribution: number;
-  /** The FIRE number (flat — today's rupees). */
+  /** The FIRE target at this step, today's rupees — RISING unless the caller omitted the schedule. */
   fireTarget: number;
 }
 
@@ -203,17 +213,25 @@ export function coastTrajectory(args: {
   yearsToRetirement: number;
   realReturn: number;
   startYear: number;
+  /**
+   * ADR-0006 Phase 1c. The kernel's today's-₹ FIRE target at year `t`. Supply it and the target
+   * line drifts exactly as the headline solver's does; omit it for the legacy flat line.
+   */
+  fireTargetRealAt?: (t: number) => number;
 }): CoastTrajectoryPoint[] {
-  const { currentCorpus, fireNumber, yearsToRetirement, realReturn, startYear } = args;
+  const { currentCorpus, fireNumber, yearsToRetirement, realReturn, startYear, fireTargetRealAt } = args;
   const horizon = Math.max(0, Math.ceil(yearsToRetirement));
   const points: CoastTrajectoryPoint[] = [];
   for (let t = 0; t <= horizon; t++) {
     const grown = realReturn > 0 ? currentCorpus * Math.pow(1 + realReturn, t) : currentCorpus;
+    // A non-finite or negative reading from the caller's schedule falls back to the flat number
+    // rather than putting a NaN on a chart axis (rule 31 — no field is ever NaN).
+    const targetAtT = fireTargetRealAt ? fireTargetRealAt(t) : fireNumber;
     points.push({
       year: startYear + t,
       yearsFromNow: t,
       corpusNoContribution: Math.round(grown),
-      fireTarget: Math.round(fireNumber),
+      fireTarget: Math.round(Number.isFinite(targetAtT) && targetAtT > 0 ? targetAtT : fireNumber),
     });
   }
   return points;

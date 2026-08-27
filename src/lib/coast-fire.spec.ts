@@ -228,7 +228,54 @@ describe("coastTrajectory (A21.1)", () => {
     expect(pts[0].corpusNoContribution).toBe(10_000_000);
     expect(pts[0].year).toBe(2026);
     expect(pts[15].corpusNoContribution).toBeGreaterThan(pts[0].corpusNoContribution);
+    // No schedule supplied → the legacy flat line (the fallback, not the product path).
     expect(pts.every((p) => p.fireTarget === 30_000_000)).toBe(true);
+  });
+
+  it("ADR-0006 Phase 1c: with a target schedule the FIRE line RISES and bends where a goal falls due", () => {
+    // The exact shape the kernel hands it: a perpetual leg drifting in real terms, plus a dated
+    // ₹40 L goal that stops inflating at year 5 and therefore DECAYS in real terms after it.
+    const g = 0.004;
+    const perpetual = 26_000_000;
+    const goalToday = 4_000_000;
+    const cpi = 0.06;
+    const educationInflation = 0.09;
+    const targetRealAt = (t: number) =>
+      perpetual * Math.pow(1 + g, t) +
+      (goalToday * Math.pow(1 + educationInflation, Math.min(t, 5))) / Math.pow(1 + cpi, t);
+
+    const pts = coastTrajectory({
+      currentCorpus: 10_000_000,
+      fireNumber: perpetual + goalToday,
+      yearsToRetirement: 15,
+      realReturn: 0.06,
+      startYear: 2026,
+      fireTargetRealAt: targetRealAt,
+    });
+
+    // t = 0 is the headline number itself — the SIZE never moves, only the trajectory.
+    expect(pts[0].fireTarget).toBe(perpetual + goalToday);
+    // It follows the schedule exactly, not an approximation of it.
+    for (const p of pts) {
+      expect(p.fireTarget, `year +${p.yearsFromNow}`).toBe(Math.round(targetRealAt(p.yearsFromNow)));
+    }
+    // The line is NOT flat — the substance the flat-line bug hid.
+    expect(pts[15].fireTarget).toBeGreaterThan(pts[0].fireTarget);
+    // …and the goal leg's real decay after year 5 is visible as a shrinking year-on-year step.
+    const step = (i: number) => pts[i + 1].fireTarget - pts[i].fireTarget;
+    expect(step(2), "still rising fast while the goal inflates at 9%").toBeGreaterThan(step(8));
+  });
+
+  it("falls back to the flat number rather than putting NaN on the axis (rule 31)", () => {
+    const pts = coastTrajectory({
+      currentCorpus: 1_000_000,
+      fireNumber: 20_000_000,
+      yearsToRetirement: 5,
+      realReturn: 0.05,
+      startYear: 2026,
+      fireTargetRealAt: () => Number.NaN,
+    });
+    expect(pts.every((p) => p.fireTarget === 20_000_000)).toBe(true);
   });
 
   it("a corpus at/above Coast reaches the FIRE number AS IT WILL BE by retirement", () => {

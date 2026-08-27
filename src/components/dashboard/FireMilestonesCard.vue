@@ -74,12 +74,27 @@ const coast = computed(() =>
     yearsToRetirement: yearsToRetirement.value,
     realReturn: realReturn.value,
     // ADR-0006 Phase 1b — the FIRE number this card discounts is NOT constant in today's rupees:
-    // it rises at `realTargetDriftRate` because the household's spending basket outruns the CPI
-    // the return above is deflated by. Discounting a flat target under-stated the coast corpus
-    // and told the user they could stop saving earlier than they can.
-    targetDriftRate: fire.realTargetDriftRate.value,
+    // it rises because the household's spending basket outruns the CPI the return above is
+    // deflated by. Discounting a flat target under-stated the coast corpus and told the user they
+    // could stop saving earlier than they can.
+    //
+    // Phase 1c: at the EFFECTIVE drift. `realTargetDriftRate` is now only the BASE leg's rate —
+    // it misses the medical reservation running at 9% (and the goal caps running the other way),
+    // so it under-states the target this card discounts, i.e. it errs optimistic. Coast-FIRE
+    // takes one rate, so it gets the one rate that reproduces the kernel's own target curve.
+    targetDriftRate: fire.effectiveTargetDriftRate.value,
   }),
 );
+
+/**
+ * ADR-0006 Phase 1c — the today's-₹ FIRE target at year `t`, handed to the trajectory chart so
+ * its target line is the kernel's own curve (rising, and bending as dated goals fall due) rather
+ * than a flat line the corpus can meet years early.
+ */
+const targetRealAt = computed(() => {
+  const componentsAt = fire.regularTargetComponentsRealAt.value;
+  return (t: number) => componentsAt(t).total;
+});
 
 const baristaIncome = computed(() => {
   // Assume half of current household income as barista income — a useful
@@ -210,6 +225,7 @@ const baristaProgress = computed(() => {
           :years-to-retirement="yearsToRetirement"
           :real-return="realReturn"
           :start-year="startYear"
+          :target-real-at="targetRealAt"
         />
       </div>
 
