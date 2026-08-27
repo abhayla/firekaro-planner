@@ -127,6 +127,27 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 
 ## §3 — Decision log (append-only, newest first)
 
+### 2026-08-27 (08:30 IST)
+- **D-2026-08-27-04 — Repo made PUBLIC (Abhay: "make this repo public hence github billing won't be needed").**
+  Unblocks CI for the whole Quick Number wave (B8 resolved). Pre-flip: 555-commit secret scan clean, no `.env`
+  ever committed, owner phone number redacted from HEAD (`server/scripts/*` now require `WATI_TEST_RECIPIENTS`,
+  spec fixtures use a fake number) — the number still exists in older commits; a history rewrite was NOT done
+  (destructive, owner's call). `main` now has branch protection requiring both CI jobs; auto-merge enabled.
+  Fleet note: the registry's "PRIVATE ⇒ never arm auto-merge" trap no longer applies; the worker-never-merges
+  guard is unchanged.
+
+### 2026-08-27 (fleet, 07:30 IST)
+- **D-2026-08-27-03 — Quick Number wave: T-376 (QN-3, PR #166) CHECKED PASS; T-377 (QN-2, PR #168) delivered;
+  gh #167 (Tier-0, real target grown at 6% CPI vs the 7.9% basket) sequenced as the wave's last stage.**
+  T-376: independent checker re-ran both gates from scratch and re-derived the kernel claim — PASS, evidence
+  `GetWorkDone/evidence/2026-08-27-T-376/`. T-377: worker died at its 200-turn cap ($67.89, opus) with the
+  deliverable complete on #168 (solver + one-number hero + slider; both rule-29 reviews acted on — three
+  optimistic errors killed; monotonicity property held); checker T-377C dispatched. Its FinTech review found a
+  PRE-EXISTING optimistic kernel decision (the #20 "collapse both frames to CPI" block) → **gh #167**, queued as
+  a dependent contract after T-379 so the persona re-baseline happens once. **Why:** optimistic errors for the
+  target user are Tier-0 (`goal-anchored-decisions.md`); fixing before the `/quick` front door is public avoids
+  shipping an understated "do this" to real users. Nothing merges until B8 (GitHub billing) is fixed.
+
 ### 2026-08-27
 - **D-2026-08-27-04 — T-378 (QN-1 + QN-4) BUILT: `/quick`, the ten-card front door, and the
   explainer that has to add up.** A first-time user could not get a FIRE number out of FireKaro in

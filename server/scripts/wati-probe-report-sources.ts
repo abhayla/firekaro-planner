@@ -24,7 +24,8 @@ async function main() {
   }
   const base = c.endpoint.replace(/\/+$/, "");
   const auth = { Authorization: `Bearer ${c.token}` };
-  const TO = (process.env.WATI_TEST_RECIPIENTS ?? "").split(",")[0]?.trim() || "917972672473";
+  const TO = (process.env.WATI_TEST_RECIPIENTS ?? "").split(",")[0]?.trim();
+if (!TO) throw new Error("WATI_TEST_RECIPIENTS is required (owner test number lives in GLOBAL.env)");
 
   await probe("V3 broadcasts list", `${base}/api/ext/v3/broadcasts`, auth);
   await probe("V3 broadcasts overview", `${base}/api/ext/v3/broadcasts/overview`, auth);

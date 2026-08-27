@@ -14,11 +14,11 @@ const daysAgo = (d: number) => new Date(now.getTime() - d * 24 * 60 * 60 * 1000)
 
 describe("shouldPurgeSendLogPii (#10 DPDP retention)", () => {
   it("purges a row OLDER than the retention window that still carries a number", () => {
-    expect(shouldPurgeSendLogPii({ sentAt: daysAgo(91), toNumber: "917972672473" }, now)).toBe(true);
+    expect(shouldPurgeSendLogPii({ sentAt: daysAgo(91), toNumber: "919999900001" }, now)).toBe(true);
   });
 
   it("leaves a row WITHIN the retention window untouched", () => {
-    expect(shouldPurgeSendLogPii({ sentAt: daysAgo(89), toNumber: "917972672473" }, now)).toBe(false);
+    expect(shouldPurgeSendLogPii({ sentAt: daysAgo(89), toNumber: "919999900001" }, now)).toBe(false);
   });
 
   it("does NOT purge exactly at the boundary (90d is not yet older than 90d)", () => {
@@ -29,7 +29,7 @@ describe("shouldPurgeSendLogPii (#10 DPDP retention)", () => {
     // FAILED-send rows carry provider error text that can echo the recipient number.
     expect(
       shouldPurgeSendLogPii(
-        { sentAt: daysAgo(120), toNumber: "", failedDetail: "917972672473 is not a valid WhatsApp contact" },
+        { sentAt: daysAgo(120), toNumber: "", failedDetail: "919999900001 is not a valid WhatsApp contact" },
         now,
       ),
     ).toBe(true);

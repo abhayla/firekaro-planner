@@ -31,7 +31,7 @@ describe("firekaroUserToZohoLead", () => {
   });
 
   it("falls back to phone, then a literal, when no name or email", () => {
-    expect(firekaroUserToZohoLead({ phone: "917972672473" }).Last_Name).toBe("917972672473");
+    expect(firekaroUserToZohoLead({ phone: "919999900001" }).Last_Name).toBe("919999900001");
     expect(firekaroUserToZohoLead({}).Last_Name).toBe("FireKaro Lead");
   });
 
