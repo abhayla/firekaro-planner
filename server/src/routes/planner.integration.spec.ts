@@ -52,6 +52,31 @@ const RUN_LIVE =
   !!process.env.DATABASE_URL && !/placeholder|PASTE_/.test(process.env.DATABASE_URL);
 const dlive = RUN_LIVE ? describe : describe.skip;
 
+/**
+ * ADR-0006 migration guard for the assumptions WRITE path.
+ *
+ * `PUT /api/planner/assumptions` now persists `householdSavingsStepUpPercent`,
+ * `householdSplitPercent` and `assumptionsMigratedV` (migration
+ * `20260827120000_adr0006_assumptions_columns`). Against a dev DB that has not had
+ * `npm run prisma:migrate:deploy` run, the upsert fails on the absent columns — which is a
+ * DEPLOY gap, not a code regression. Tests that write assumptions therefore self-skip LOUDLY
+ * on such a DB, and assert for real everywhere the migration IS applied.
+ */
+async function adr0006ColumnsPresent(): Promise<boolean> {
+  const cols = await prisma.$queryRaw<{ column_name: string }[]>`
+    SELECT column_name FROM information_schema.columns
+    WHERE table_name = 'user_assumptions'
+      AND column_name IN ('assumptionsMigratedV', 'householdSavingsStepUpPercent', 'householdSplitPercent')`;
+  if (cols.length < 3) {
+    console.warn(
+      "[SKIPPED] assumptions write-path test: migration 20260827120000_adr0006_assumptions_columns " +
+        `is NOT applied to this DB (found ${cols.length}/3 columns). Run \`npm run prisma:migrate:deploy\`.`,
+    );
+    return false;
+  }
+  return true;
+}
+
 dlive("/api/planner integration (live DB — Supabase firekaro-planner)", () => {
   beforeAll(async () => {
     // Clean slate for the dev-bypass user.
@@ -99,6 +124,7 @@ dlive("/api/planner integration (live DB — Supabase firekaro-planner)", () => 
   });
 
   it("PUT+GET /assumptions round-trips", async () => {
+    if (!(await adr0006ColumnsPresent())) return;
     const assumptions = {
       inflation: 0.06, equityReturn: 0.12, debtReturn: 0.07, realEstateReturn: 0.06, goldReturn: 0.07,
       npsReturn: 0.1, ppfReturn: 0.071, epfReturn: 0.0825, internationalReturn: 0.1, reitReturn: 0.08,
@@ -401,35 +427,37 @@ dlive("/api/planner integration (live DB — Supabase firekaro-planner)", () => 
     expect(got.data.quick?.directPlans, "quick.directPlans survived alongside lifecycleSnapshot").toBe(true);
   });
 
-  // KNOWN GAP (found while writing this regression lock, NOT the ADR-0006 frameVersion class,
-  // and NOT fixed here — fixing it needs a UserAssumptions Prisma migration, out of scope for a
-  // server-schema-only change): `assumptionsMigratedV` and `householdSavingsStepUpPercent` /
-  // `householdSplitPercent` are declared on `assumptionsSchema` (so PUT accepts them, 200) but
-  // have NO Prisma column on `UserAssumptions` — the PUT handler's `data` object omits them, and
-  // `mapAssumptionsRow` (server/src/lib/planner-read.ts) always returns the RESEARCH DEFAULT for
-  // the step-up/split fields and never returns `assumptionsMigratedV` at all (undefined on GET).
-  // This is a DIFFERENT bug class from `frameVersion`: frameVersion was dropped by a strip-mode
-  // Zod schema that never declared the field at all (fixed in planner-schemas.ts); these three are
-  // ACCEPTED by Zod but dropped one layer deeper, at the Prisma write. This test locks the CURRENT
-  // (gap) contract so a future accidental "fix" that starts silently accepting-then-losing a NEW
-  // assumptions field doesn't slip past unnoticed — and documents that a real fix needs a
-  // UserAssumptions migration adding `assumptionsMigratedV` + persisting the other two.
-  it("PUT+GET /assumptions: assumptionsMigratedV + a non-default householdSavingsStepUpPercent do NOT persist (documented gap, no Prisma column)", async () => {
+  // ADR-0006: `assumptionsMigratedV`, `householdSavingsStepUpPercent` and `householdSplitPercent`
+  // are declared on `assumptionsSchema` (so PUT validated and 200-accepted them) but used to have
+  // NO Prisma column on `UserAssumptions` — the upsert silently discarded them and GET always
+  // returned the research default. A DIFFERENT bug class from the `frameVersion` gap above:
+  // frameVersion was dropped by a strip-mode Zod schema that never declared the field; these three
+  // were dropped one layer deeper, at the Prisma WRITE. Fixed by migration
+  // `20260827120000_adr0006_assumptions_columns` + `buildAssumptionsWriteData`/`mapAssumptionsRow`.
+  //
+  // Double-gated: on a live DB (the dlive gate) AND on the columns existing, so a checkout whose
+  // dev DB has not yet had `prisma migrate deploy` run stays green instead of failing on absent
+  // columns — while still PROVING the fix everywhere the migration is applied. The skip is LOUD.
+  it("PUT+GET /assumptions persists assumptionsMigratedV + householdSavingsStepUpPercent + householdSplitPercent", async () => {
+    if (!(await adr0006ColumnsPresent())) return;
+
     const assumptionsWithStamp = {
       ...sampleAssumptions,
-      householdSavingsStepUpPercent: 0, // a deliberate user choice
+      householdSavingsStepUpPercent: 0, // a DELIBERATE user choice — must not be lifted to the default
+      householdSplitPercent: 40,
       assumptionsMigratedV: 1,
     };
     const put = await app.request("/api/planner/assumptions", {
       method: "PUT", headers: H, body: JSON.stringify(assumptionsWithStamp),
     });
-    expect(put.status, "the PUT is accepted (200) — Zod validates the field, it just isn't persisted").toBe(200);
+    expect(put.status).toBe(200);
 
     const got: any = await (await app.request("/api/planner/assumptions", { headers: H })).json();
-    expect(got.data.assumptionsMigratedV, "no UserAssumptions column — always undefined on GET").toBeUndefined();
+    expect(got.data.assumptionsMigratedV, "the ADR-0006 migration stamp persists").toBe(1);
     expect(
       got.data.householdSavingsStepUpPercent,
-      "no UserAssumptions column — GET always returns the research default, not what was PUT",
-    ).toBe(2);
+      "a deliberate 0 step-up survives the round-trip (not overwritten by the research default 2)",
+    ).toBe(0);
+    expect(got.data.householdSplitPercent, "a non-default split % persists").toBe(40);
   });
 });

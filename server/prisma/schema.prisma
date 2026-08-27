@@ -454,6 +454,18 @@ model UserAssumptions {
   fatMultiplier  Float  @default(1.5)
   withdrawalRule String @default("Constant") // Constant | FloorCeiling
 
+  // ADR-0006 / #46 / #81 — the three `Assumptions` fields the API accepted but the write layer
+  // dropped (no column => PUT silently discarded them and GET always returned the research
+  // default). All NULLABLE on purpose: a NULL means "this row predates the column", and the
+  // read mapper falls back to DEFAULT_ASSUMPTIONS so existing rows keep today's behaviour.
+  //   - householdSavingsStepUpPercent: real savings step-up %/yr (#46 / ADR-0004, 0-15).
+  //   - householdSplitPercent: shared-cost share per adult for individual FIRE (#81, 0-100).
+  //   - assumptionsMigratedV: the ADR-0006 one-shot migration STAMP. Its ABSENCE is the signal
+  //     that the store-side migration has not run, so it stays nullable forever — never defaulted.
+  householdSavingsStepUpPercent Float?
+  householdSplitPercent         Float?
+  assumptionsMigratedV          Int?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

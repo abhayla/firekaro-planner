@@ -8,7 +8,7 @@ import { apiSuccess, apiError, ErrorCode } from "../lib/api-utils";
 import { logger } from "../lib/logger";
 import { prisma } from "../lib/prisma";
 import { readHousehold, applyHouseholdPlan } from "../lib/household-repo";
-import { mapAssumptionsRow } from "../lib/planner-read";
+import { mapAssumptionsRow, buildAssumptionsWriteData } from "../lib/planner-read";
 import { diffHousehold } from "../lib/household-diff";
 import {
   scenariosBodySchema,
@@ -122,28 +122,7 @@ app.put("/assumptions", async (c) => {
   if (!parsed.success) {
     return apiError(c, `Invalid assumptions: ${parsed.error.message}`, 422, ErrorCode.VALIDATION_ERROR);
   }
-  const a = parsed.data;
-  const data = {
-    inflation: a.inflation,
-    equityReturn: a.equityReturn,
-    debtReturn: a.debtReturn,
-    realEstateReturn: a.realEstateReturn,
-    goldReturn: a.goldReturn,
-    npsReturn: a.npsReturn,
-    ppfReturn: a.ppfReturn,
-    epfReturn: a.epfReturn,
-    internationalReturn: a.internationalReturn,
-    reitReturn: a.reitReturn,
-    cryptoReturn: a.cryptoReturn,
-    healthcareInflation: a.healthcareInflation,
-    educationInflation: a.educationInflation,
-    housingInflation: a.housingInflation,
-    inflationWeights: a.inflationWeights as unknown as Prisma.InputJsonValue,
-    swrOverride: a.swrOverride ?? null,
-    leanMultiplier: a.leanMultiplier,
-    fatMultiplier: a.fatMultiplier,
-    withdrawalRule: a.withdrawalRule,
-  };
+  const data = buildAssumptionsWriteData(parsed.data);
   try {
     const saved = await prisma.userAssumptions.upsert({
       where: { userId },

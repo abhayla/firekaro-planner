@@ -73,6 +73,14 @@ cd /var/www/firekaro/server && npm run prisma:migrate:deploy
 > (currently **B7** — gh-46 `Investment.contributionSchedule`) is applied by the command above,
 > but is schema-changing → **take a Supabase PITR backup first** (per §Rollback) and confirm the
 > column post-deploy (§8 smoke + an `Investment` read).
+>
+> **THIS RELEASE REQUIRES `prisma:migrate:deploy` BEFORE the app restart:** migration
+> `20260827120000_adr0006_assumptions_columns` adds three nullable columns to `user_assumptions`
+> (`householdSavingsStepUpPercent`, `householdSplitPercent`, `assumptionsMigratedV`). The new
+> server code writes them on every `PUT /api/planner/assumptions`, so restarting the app before
+> the migration is applied makes that endpoint 500 on every save. Additive + nullable → no
+> backfill, and pre-migration rows keep today's behaviour (the read mapper falls back to the
+> research defaults).
 
 ## 4. Build the SPA
 
