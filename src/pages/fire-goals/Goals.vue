@@ -85,7 +85,11 @@ const retirementCard = computed<GoalCard>(() => {
     category: "retirement",
     icon: "mdi-beach",
     color: "fire-orange",
-    note: `${fire.progressPercent.value}% there · current corpus ${formatINRCompact(fire.totalCorpus.value)}`,
+    // ADR-0006 Phase 1d: this card legitimately shows TODAY's target (`fireNumber`) alongside
+    // today's corpus, so its percentage is against today's target too — and says so. The hero's
+    // KPI shows the drifted need AT the target age; the two are different, correct figures, and
+    // the only unacceptable thing would be showing them unlabelled.
+    note: `${fire.progressPercent.value}% of today's target · current corpus ${formatINRCompact(fire.totalCorpus.value)}`,
   };
 });
 

@@ -166,6 +166,24 @@ describe("FireHero binding locks — T-377 QN-2 gap hero", () => {
     expect(src).toMatch(/resolveHeroTone\(\{/);
   });
 
+  it("ADR-0006 Phase 1d: the corpus-progress KPI names WHICH target it is measuring against", () => {
+    // The card printed "₹1.10 Cr / ₹10.60 Cr" (the anchor-year `fireNumber`) directly under the
+    // headline "you'll need ₹12.17 Cr" (the need AT the target age). Two different targets on one
+    // card, both unlabelled, the smaller one flattering the progress bar. The denominator is now
+    // the headline's own figure, and the caption says so.
+    expect(template).toContain('data-testid="hero-kpi-corpus-sub"');
+    expect(template, "the caption must name the target age, not just say 'of target'").toMatch(
+      /what you'll need at \$\{targetAge\}/,
+    );
+    // …and the member lens must keep its own generic wording (that figure is the member's own).
+    expect(template).toMatch(/hh\.isMember \? "their target"/);
+    // The denominator itself comes from the shared selector, never a component-local formula.
+    expect(template).toMatch(/formatINRCompact\(hh\.fireTargetForProgress\)/);
+    expect(src, "no parallel progress math in the component").not.toMatch(
+      /corpusForProgress\s*\/\s*/,
+    );
+  });
+
   it("ADR-0006: a baseline locked under the OLD model makes NO verdict — it offers a re-lock", () => {
     // Differencing across a frame change reports the model's move as the user's slippage: a
     // fabricated "N months behind" for every user who had ever locked a plan.

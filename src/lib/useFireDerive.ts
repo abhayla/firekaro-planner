@@ -221,6 +221,28 @@ export function useFireDerive() {
   //     (attributed corpus/expenses, per-member SWR, the reachability cap intact). An
   //     unreachable individual FIRE yields fireAge null — the hero renders the honest "—",
   //     never a sentinel/absurd age (rule 31 / fire-confidence-band discipline).
+  /**
+   * ADR-0006 Phase 1d — the household progress pair (target + percent), sourced from the SOLVER so
+   * the KPI denominator is the number the headline quotes.
+   *
+   * Falls back to the kernel's anchor-year `fireNumber` when the solver has no target to report
+   * (`hasTarget` false, or a non-finite/zero need) — a progress bar divided by 0 or NaN is the
+   * fabricated-claim class, and the honest fallback is the figure the kernel is sure of.
+   */
+  const householdProgressTarget = computed<{ target: number; percent: number }>(() => {
+    const k = d.value;
+    const solved = requiredContribution.value;
+    const target =
+      solved.hasTarget && Number.isFinite(solved.needReal) && solved.needReal > 0
+        ? solved.needReal
+        : k.fireNumber;
+    if (!(target > 0)) return { target: k.fireNumber, percent: 0 };
+    return {
+      target,
+      percent: Math.min(100, Math.max(0, Math.round((k.fireWithdrawableCorpus / target) * 100))),
+    };
+  });
+
   const heroHeadline = computed<HeroHeadline>(() => {
     const k = d.value;
     const r = k.individualFireByMember.find((m) => m.memberId === ui.viewingMemberId) ?? null;
@@ -233,8 +255,15 @@ export function useFireDerive() {
         yearsToFire: k.yearsToRegular,
         fireNumber: k.fireNumber,
         corpusForProgress: k.totalCorpus,
-        fireTargetForProgress: k.fireNumber,
-        progressPercent: k.progressPercent,
+        // ADR-0006 Phase 1d — the progress denominator is the SAME need the headline six inches
+        // above quotes: the solver's `needReal` at the hero's own target age. It used to be
+        // `k.fireNumber`, the ANCHOR-year target, so the card read "₹1.10 Cr / ₹10.60 Cr" directly
+        // under "you'll need ₹12.17 Cr" — two different unlabelled targets on one card, and the
+        // smaller one flattering the progress bar. `fireNumber` has not moved and is still exposed
+        // as `fireNumber` for anything that genuinely wants today's target; what changed is that
+        // the PROGRESS pair now shares one target with the sentence it sits under.
+        fireTargetForProgress: householdProgressTarget.value.target,
+        progressPercent: householdProgressTarget.value.percent,
         annualSavings: k.annualSavings,
         monthlyTakeHome: k.monthlyTakeHome,
         reachable: Number.isFinite(k.yearsToRegular),

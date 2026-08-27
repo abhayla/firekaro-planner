@@ -673,11 +673,15 @@ function yearsLabel(years: number): string {
             rounded
             color="fire-orange"
             bg-color="surface-variant"
-            :aria-label="`FIRE progress: ${hh.progressPercent}% of target corpus reached`"
+            :aria-label="`FIRE progress: ${hh.progressPercent}% of the target corpus you'll need at age ${targetAge}`"
           />
         </div>
-        <div class="kpi__sub">
-          {{ hh.progressPercent }}% of target ·
+        <!-- ADR-0006 Phase 1d: the denominator is the SAME need the headline above quotes (the
+             solver's `needReal` at the target age), so the label says WHICH target it is. Two
+             unlabelled targets on one card is what this replaced. Under a member lens the figure
+             is that member's own number, so the label stays generic there. -->
+        <div class="kpi__sub" data-testid="hero-kpi-corpus-sub">
+          {{ hh.progressPercent }}% of {{ hh.isMember ? "their target" : `what you'll need at ${targetAge}` }} ·
           <InfoTip term="savings-rate">saving</InfoTip>&nbsp;{{ savingsRateDisplay }}%<template v-if="!hh.isMember"> ·
           <InfoTip term="swr">SWR</InfoTip>&nbsp;{{ (fire.effectiveSWR.value * 100).toFixed(2) }}%</template>
         </div>

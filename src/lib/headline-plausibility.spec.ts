@@ -498,8 +498,25 @@ describe("member-lensed FIRE headline (heroHeadline) — D-2026-06-13-02 locks",
       expect(hh.yearsToFire).toBe(fire.yearsToRegular.value);
       expect(hh.fireNumber).toBe(fire.fireNumber.value);
       expect(hh.corpusForProgress).toBe(fire.totalCorpus.value);
-      expect(hh.fireTargetForProgress).toBe(fire.fireNumber.value);
-      expect(hh.progressPercent).toBe(fire.progressPercent.value);
+      // ADR-0006 Phase 1d — the progress pair is NO LONGER the kernel's anchor-year `fireNumber`.
+      // It is the SAME need the hero's headline sentence quotes, `requiredContribution.needReal`
+      // at the hero's target age. The card used to print "₹1.10 Cr / ₹10.60 Cr" directly under
+      // "you'll need ₹12.17 Cr": two different unlabelled targets, the smaller one flattering the
+      // bar. Re-pointed, not relaxed — the assertion is still an exact identity, just against the
+      // figure a user can actually reconcile with the sentence above it.
+      const req = fire.requiredContribution.value;
+      expect(req.hasTarget, "every seed persona must have a solved target").toBe(true);
+      expect(hh.fireTargetForProgress).toBe(req.needReal);
+      // …and that need is the DRIFTED target, so it can never be smaller than today's figure.
+      expect(hh.fireTargetForProgress).toBeGreaterThanOrEqual(fire.fireNumber.value);
+      expect(hh.progressPercent).toBe(
+        Math.min(100, Math.max(0, Math.round((fire.fireWithdrawableCorpus.value / req.needReal) * 100))),
+      );
+      // The kernel's own anchor-year progress stays available and unchanged for consumers that
+      // genuinely want "of today's target" — it is just no longer what the hero KPI shows.
+      expect(fire.progressPercent.value).toBe(
+        Math.min(100, Math.round((fire.fireWithdrawableCorpus.value / fire.fireNumber.value) * 100)),
+      );
       expect(hh.annualSavings).toBe(fire.annualSavings.value);
       expect(hh.monthlyTakeHome).toBe(fire.monthlyTakeHome.value);
       expect(hh.reachable).toBe(Number.isFinite(fire.yearsToRegular.value));
