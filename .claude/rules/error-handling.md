@@ -1,4 +1,6 @@
-# Scope: global
+---
+paths: ["src/**/*.ts", "src/**/*.vue", "server/**/*.ts"]
+---
 
 # Error Handling & Defensive Coding
 

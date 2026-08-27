@@ -1,4 +1,6 @@
-# Scope: global
+---
+paths: ["src/lib/**/*.ts", "src/types/assumptions.ts"]
+---
 
 # Output Plausibility Verification — catch "wrong-but-working", not just "broken"
 

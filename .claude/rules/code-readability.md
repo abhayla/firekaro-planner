@@ -1,4 +1,6 @@
-# Scope: global
+---
+paths: ["src/**/*.ts", "src/**/*.vue", "server/**/*.ts"]
+---
 
 # Code Readability & Maintainability
 

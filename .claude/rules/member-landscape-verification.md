@@ -1,4 +1,6 @@
-# Scope: global
+---
+paths: ["src/**/*.vue", "src/lib/derive.ts", "src/lib/useFireDerive.ts", "src/stores/ui.ts", "e2e/member-lens-sweep.spec.ts"]
+---
 
 # Member-Landscape Verification — the full E2E "Viewing as" sweep is mandatory, no exceptions
 
