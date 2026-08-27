@@ -37,8 +37,13 @@ const LENS = { isFamilyView: false, viewingMemberId: null, currentFY: "2025-26" 
 const PINNED_CURRENT_YEAR = 2026;
 const PINNED = { currentYear: PINNED_CURRENT_YEAR } as const;
 
-/** ₹50 L, one education goal, `dueInYears` from now, and NOTHING else in the family layer. */
-function oneEducationGoal(dueInYears: number) {
+/**
+ * ₹50 L, one education goal, `dueInYears` from now, and NOTHING else in the family layer.
+ * `bucket` is what the line's `inflationBucket` is set to — pass `null` (NOT `undefined`, which
+ * would silently take the default) to exercise the ADR-0006 Phase 1d fallback, where the price
+ * index has to come from `kind` instead.
+ */
+function oneEducationGoal(dueInYears: number, bucket: "education" | null = "education") {
   const h = useHouseholdStore();
   const a = useAssumptionsStore();
   loadSeedPersona(h, a);
@@ -49,7 +54,7 @@ function oneEducationGoal(dueInYears: number) {
       todayAmount: 5_000_000,
       targetYear: PINNED_CURRENT_YEAR + dueInYears,
       isMultiYear: false,
-      inflationBucket: "education",
+      ...(bucket ? { inflationBucket: bucket } : {}),
       kind: "education",
     },
   ];
@@ -138,5 +143,63 @@ describe("ADR-0006 Phase 1c (b) — a dated goal inflates to its due year and th
     expect(nominalAt(12), "no growth after the due year").toBeCloseTo(atDue, 4);
     expect(nominalAt(30), "still no growth 22 years later").toBeCloseTo(atDue, 4);
     expect(nominalAt(4), "…but it DOES grow before the due year").toBeLessThan(atDue);
+  });
+});
+
+/**
+ * ADR-0006 Phase 1d (F5) — a goal's price index falls back to its `kind` before it falls back to
+ * general CPI.
+ *
+ * `inflationBucket` is optional and most real lines never carry one; `kind` is the field the goal
+ * form and `derived-records.ts` actually classify by. Routing on the bucket alone sent every
+ * bucket-less education goal to 6% all-items CPI instead of 9% education inflation, which makes
+ * the FIRE target too SMALL — the optimistic direction.
+ */
+describe("ADR-0006 Phase 1d (F5) — an education goal with no bucket still inflates at education inflation", () => {
+  beforeEach(() => setActivePinia(createPinia()));
+
+  /** The goal leg at a 17-year target, in today's rupees, for the current fixture. */
+  function plannedGoalsRealAt17(h: ReturnType<typeof useHouseholdStore>, a: ReturnType<typeof useAssumptionsStore>) {
+    const k = derive(h.data, a.values, LENS, PINNED);
+    return requiredMonthlyContributionFor({
+      snapshot: h.data,
+      assumptions: a.values,
+      lens: LENS,
+      targetAge: k.anchorAge + 17,
+      currentYear: PINNED_CURRENT_YEAR,
+    }).needPlannedGoalsReal;
+  }
+
+  /** 9% to the due year, then flat, deflated at 6% over 17 years — the bucketed answer. */
+  const EDUCATION_ANSWER = 3_699_834;
+
+  it("the two rates are genuinely different, else nothing below proves anything", () => {
+    const a = useAssumptionsStore();
+    expect(a.values.educationInflation).not.toBeCloseTo(a.values.inflation, 6);
+  });
+
+  it("an EXPLICIT education bucket prices the goal at education inflation", () => {
+    const { h, a } = oneEducationGoal(8, "education");
+    expect(plannedGoalsRealAt17(h, a)).toBe(EDUCATION_ANSWER);
+  });
+
+  it("kind: 'education' with NO bucket prices IDENTICALLY — it does not fall through to CPI", () => {
+    const { h, a } = oneEducationGoal(8, null);
+    const goal = h.data.expenses.plannedFuture[0];
+    // The line reaches the kernel with no usable bucket — either genuinely absent, or stamped
+    // "general" by the store's hydrate backfill, which is the same under-pricing by another route.
+    expect(goal.inflationBucket ?? "general").toBe("general");
+    expect(goal.kind).toBe("education");
+
+    const got = plannedGoalsRealAt17(h, a);
+    expect(got, "a bucket-less education goal must cost the same as a bucketed one").toBe(
+      EDUCATION_ANSWER,
+    );
+
+    // …and strictly more than the all-items-CPI answer the pre-1d routing gave it.
+    const atGeneralCpi = Math.round(
+      (5_000_000 * Math.pow(1 + a.values.inflation, 8)) / Math.pow(1 + a.values.inflation, 17),
+    );
+    expect(got, "the pre-1d fallback under-priced this goal").toBeGreaterThan(atGeneralCpi);
   });
 });

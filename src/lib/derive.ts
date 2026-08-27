@@ -33,7 +33,7 @@ import {
   calculateFireTarget,
   type TargetSchedule,
 } from "@/lib/fire-math";
-import { derivedFamilyLayer } from "@/lib/derived-records";
+import { derivedFamilyLayer, plannedGoalInflationBucket } from "@/lib/derived-records";
 import { computeTax, recommendRegime, marginalSlabRate, getTaxConfigForFY } from "@/lib/tax";
 import { epfBucketAfterTaxReturn } from "@/lib/epf-vpf";
 import { ageFromDOB } from "@/lib/age";
@@ -754,7 +754,22 @@ export function derive(
   // then, so growing it for another twenty years is fiction. Holding it flat rather than removing
   // it is still conservative (the corpus must have carried the full amount to the due date and is
   // never credited back), and it never grows past the due year.
-  const bucketInflationRate = (bucket: PlannedFutureLine["inflationBucket"]): number => {
+  /**
+   * ADR-0006 Phase 1d — the price index for one dated goal.
+   *
+   * `inflationBucket` is OPTIONAL on a planned line and most real entries never carry one: the
+   * goal forms and `derived-records.ts` classify by `kind` ("education", "marriage", "medical",
+   * "general"), which is the field the user actually chooses. Routing on the bucket alone and
+   * falling straight through to general CPI therefore inflated a ₹50 L college fund at 6% instead
+   * of 9% for anyone who had not hand-set a bucket — the target came out too small, which is the
+   * optimistic direction and the one this ADR exists to remove.
+   *
+   * So the bucket wins when it is set (an explicit override stays an override), and otherwise the
+   * `kind` decides — via `plannedGoalInflationBucket`, the one shared map, so the kernel, the
+   * store's legacy backfill and the goal form cannot answer this differently.
+   */
+  const goalInflationRate = (goal: PlannedFutureLine): number => {
+    const bucket = goal.inflationBucket ?? plannedGoalInflationBucket(goal.kind);
     switch (bucket) {
       case "healthcare":
         return assumptions.healthcareInflation;
@@ -762,7 +777,7 @@ export function derive(
         return assumptions.educationInflation;
       case "housing":
         return assumptions.housingInflation;
-      // `general` and an absent bucket both mean the all-items CPI.
+      // `general`, and a line with neither a bucket nor a price-distinct kind, mean all-items CPI.
       default:
         return generalInflation;
     }
@@ -777,7 +792,7 @@ export function derive(
   /** One dated lump: its today's-₹ size, its own price index, and when it stops rising. */
   const plannedGoalComponents = familyLayer.allPlannedGoals.map((g) => ({
     todayAmount: Math.max(0, g.todayAmount ?? 0),
-    rate: bucketInflationRate(g.inflationBucket),
+    rate: goalInflationRate(g),
     // Same origin as `derived-records.ts` / `adequacy.ts` — a calendar targetYear, floored at now.
     dueYears: Math.max(0, g.targetYear - currentCalendarYear),
   }));
