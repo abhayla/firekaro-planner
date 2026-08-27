@@ -47,7 +47,7 @@ const overCommitted = computed(() => {
 });
 
 /**
- * "What you'll have vs what you'll need · today's money" — six sampled retirement ages, each a full
+ * "What you'll have vs what you'll need · today's rupees" — six sampled retirement ages, each a full
  * solver run through `derive()`. Six (not one per year) is deliberate: each point costs a kernel
  * bisection, and the shape of the two curves is the message, not the resolution.
  */
@@ -166,8 +166,15 @@ const answerRows = computed(() => {
 
       <v-card v-if="showChart" variant="outlined" class="pa-6 mt-4" data-testid="quick-chart-card">
         <h3 class="text-subtitle-1 font-weight-bold font-display mb-3">
-          What you'll have vs what you'll need · today's money
+          What you'll have vs what you'll need · today's rupees
         </h3>
+        <!-- ADR-0006: the need line SLOPES UP. Both series come from the same solver run per
+             sampled age (`r.needReal` / `r.haveAtTargetReal`), so the rise is the kernel's own
+             target drift — your spending basket outrunning general CPI — not a drawing choice. -->
+        <p class="text-caption text-medium-emphasis mb-2" data-testid="quick-chart-frame-note">
+          Both lines are in today's rupees. The need still rises: your spending basket grows a
+          little faster than general inflation, so retiring later costs more even in today's rupees.
+        </p>
         <svg
           class="quick-chart"
           :viewBox="`0 0 ${chart.W} ${chart.H}`"
@@ -190,7 +197,7 @@ const answerRows = computed(() => {
           <span>age {{ chart.first }}</span>
           <span>
             <span style="color: #2f5bff">■</span> have ·
-            <span style="color: #b45309">■</span> need · dashed = your target
+            <span style="color: #b45309">■</span> need (rises with your basket) · dashed = your target
           </span>
           <span>age {{ chart.last }}</span>
         </div>

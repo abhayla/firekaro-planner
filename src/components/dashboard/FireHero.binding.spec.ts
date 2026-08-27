@@ -26,12 +26,27 @@ describe("FireHero binding locks — T-377 QN-2 gap hero", () => {
     );
   });
 
-  it("shows BOTH today's money and the nominal figure — exactly once each (honesty guardrail)", () => {
-    expect(template).toMatch(/formatINRCompact\(req\.needReal\)[\s\S]{0,80}in today's money/);
+  it("shows BOTH today's rupees and the nominal figure — exactly once each (honesty guardrail)", () => {
+    expect(template).toMatch(/formatINRCompact\(req\.needReal\)[\s\S]{0,80}in today's rupees/);
     expect(template).toMatch(/formatINRCompact\(req\.needNominal\)[\s\S]{0,40}in \{\{ needYear \}\}/);
     // Exactly once each — a second render of the same figure is the "shown once" violation.
     expect((template.match(/req\.needReal/g) ?? []).length).toBe(1);
     expect((template.match(/req\.needNominal/g) ?? []).length).toBe(1);
+  });
+
+  it("ADR-0006: the today's-rupee figure is qualified — it is the target AT the target age", () => {
+    // "today's money" alone read as a target standing still. It does not: the FIRE number rises
+    // with the household spending basket even after deflating at general CPI, so needReal at 50 is
+    // NOT today's FIRE number. The note must say so, name the basket, and show it LIVE.
+    expect(template).toContain('data-testid="fire-hero-frame-note"');
+    expect(template).toMatch(/today's rupees, at age \{\{ targetAge \}\}/);
+    expect(template, "the basket rate must be read live from the kernel, never hard-coded").toMatch(
+      /fire\.householdInflation\.value \* 100/,
+    );
+    expect(template, "and the general-CPI deflator named as the different rate it is").toMatch(
+      /a\.values\.inflation \* 100/,
+    );
+    expect(template).toMatch(/\/preferences#pref-section-inflation/);
   });
 
   it("renders all four solver numbers: need · have-by-target · gap · do-this", () => {

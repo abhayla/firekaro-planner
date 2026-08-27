@@ -383,10 +383,20 @@ function yearsLabel(years: number): string {
         <RouterLink to="/expenses">add your monthly spending</RouterLink> and your FIRE number appears here.
       </div>
       <div v-else class="fire-hero__when" data-testid="fire-hero-need">
-        you'll need <b class="text-currency">{{ formatINRCompact(req.needReal) }}</b> in today's money
+        you'll need <b class="text-currency">{{ formatINRCompact(req.needReal) }}</b> in today's rupees
         <span class="fire-hero__sep">·</span> that's
         <b class="text-currency">{{ formatINRCompact(req.needNominal) }}</b> in {{ needYear }}
       </div>
+      <!-- ADR-0006: the today's-rupee figure is the target AT {{ targetAge }}, not today's target.
+           It is larger than today's number because your spending basket grows a little faster than
+           general inflation, so the target creeps up even after deflating. Saying "today's money"
+           without that read as a target standing still — the optimism gh #167 removed. -->
+      <p v-if="req.hasTarget" class="fire-hero__frame-note" data-testid="fire-hero-frame-note">
+        today's rupees, at age {{ targetAge }} — the target rises with your
+        <RouterLink to="/preferences#pref-section-inflation">spending basket</RouterLink>
+        ({{ (fire.householdInflation.value * 100).toFixed(1) }}%/yr), a little faster than the
+        {{ (a.values.inflation * 100).toFixed(0) }}% general inflation we deflate by.
+      </p>
 
       <!-- ADR-0006 item 4 — the honest headline-level state when no monthly amount closes the gap.
            It prints NO figure of its own (that is the whole point): it names the two things that
@@ -418,7 +428,7 @@ function yearsLabel(years: number): string {
             {{ formatINRCompact(req.haveAtTargetReal) }}
           </div>
           <div class="gap-tile__s">
-            at {{ formatINRCompact(req.currentMonthlyReal) }}/month, today's money
+            at {{ formatINRCompact(req.currentMonthlyReal) }}/month, today's rupees
           </div>
         </div>
         <div class="gap-tile">
@@ -714,6 +724,11 @@ function yearsLabel(years: number): string {
 }
 .fire-hero__when b {
   color: var(--text-primary);
+}
+.fire-hero__frame-note {
+  font-size: var(--type-xs, 12px);
+  color: var(--text-muted);
+  margin: 2px 0 0;
 }
 /* ADR-0006 — the unreachable state. Warning-toned, never red: it is an honest limit of the
    current assumptions, not a failure (contract 2.3 — red is never a hero state). */

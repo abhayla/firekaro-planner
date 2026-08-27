@@ -189,7 +189,14 @@ export interface ExplainerInput {
   currentCorpus: number;
   monthlyContributionReal: number;
   expectedReturn: number;
+  /** General CPI — the DISPLAY deflator only (ADR-0006). Never the rate the target grows at. */
   inflation: number;
+  /**
+   * ADR-0006 — the household spending BASKET (`derive().householdInflation`, ~6.2% on defaults):
+   * the rate the FIRE target itself grows at. It is a different number from `inflation` and the
+   * copy must never conflate them, which is exactly what the pre-ADR-0006 wording did.
+   */
+  householdInflation: number;
   yearsToTarget: number;
   haveAtTargetReal: number;
   needReal: number;
@@ -210,8 +217,9 @@ export function whySoBigBullets(input: ExplainerInput): string[] {
   return [
     `You'll live off it for about ${drawdown} years, not 15. Retire at ${input.targetAge}, plan to ${input.planToAge}.`,
     "Lifestyle creep. You came to the city by train; you won't go back by train. The Seltos doesn't become an Alto at 50.",
-    "Healthcare and help cost more with age — and rise faster than everything else, so we set aside an extra " +
-      "20% of the corpus purely for medical shocks.",
+    "Healthcare and help cost more with age — and rise faster than everything else. We inflate the " +
+      "medical slice of your spending at 9% a year (CPI-Health plus a private-tariff margin), and on " +
+      "top of that set aside an extra 20% of the corpus purely for medical shocks no premium pays.",
     "Taxes don't retire. Withdrawals get taxed, so we hold the safe withdrawal rate well below the American 4% " +
       "to leave room for it.",
     "Every withdrawal restarts the clock. Pulling money out for a wedding or a house every few years quietly kills the compounding you were counting on.",
@@ -244,20 +252,26 @@ export function howWeGotThis(input: ExplainerInput): string[] {
     )} reserved purely for medical shocks — 20% of the base, because health is the one cost that reliably outruns everything else.`,
     `Your ${formatINRCompact(input.currentCorpus)} plus ${formatINRCompact(
       input.monthlyContributionReal,
-    )} a month grow at ${pct(input.expectedReturn)} for ${input.yearsToTarget} years; then we remove ${pct(
-      input.inflation,
-      0,
-    )} inflation so you compare like with like — ${formatINRCompact(input.haveAtTargetReal)}.`,
+    )} a month grow at ${pct(input.expectedReturn)} for ${input.yearsToTarget} years — while the ` +
+      `number you're chasing keeps rising at ${pct(
+        input.householdInflation,
+        1,
+      )} a year, your own spending basket. We then show everything in today's rupees (deflated at ` +
+      `${pct(input.inflation, 0)} general inflation) — ${formatINRCompact(input.haveAtTargetReal)}.`,
     `The scary number others quote (${formatINRCompact(
       input.needNominal,
-    )}) is the same thing in ${input.targetYear} rupees. We show both and plan in today's.`,
+    )}) is that same target grown at your basket into ${input.targetYear} rupees. We show both; ` +
+      "the today's-rupee figures are the identical plan, just deflated at general inflation.",
   ];
 }
 
 /** The assumptions strip — names the horizon the SWR was chosen for (B2). */
 export function assumptionsLine(input: ExplainerInput): string {
   const drawdown = Math.max(0, Math.round(input.planToAge - input.targetAge));
-  return `${pct(input.inflation)} inflation · ${pct(input.expectedReturn)} return · ${pct(
+  return `${pct(input.inflation)} general inflation (your spending basket ${pct(
+    input.householdInflation,
+    1,
+  )}) · ${pct(input.expectedReturn)} return · ${pct(
     input.swrUsed,
     2,
   )} safe withdrawal (for a ${drawdown}-yr drawdown) · live to ${input.planToAge}. Honest defaults, not sales defaults — every one is editable in the full planner.`;

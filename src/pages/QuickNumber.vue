@@ -133,7 +133,7 @@ function refreshSoFar() {
   }
   const need = previewNeed(answers.value);
   soFar.value = need
-    ? `So far, to retire at ${answers.value.targetAge} you'd need ${formatINRCompact(need)} in today's money.`
+    ? `So far, to retire at ${answers.value.targetAge} you'd need ${formatINRCompact(need)} in today's rupees.`
     : SO_FAR_PLACEHOLDER;
 }
 

@@ -109,7 +109,9 @@ const ASSUMPTION_LABELS: Record<string, string> = {
   reitReturn: "REIT returns",
   cryptoReturn: "crypto returns",
   healthcareInflation: "healthcare inflation",
-  educationInflation: "education inflation",
+  // ADR-0006: education carries weight 0 in the PERPETUAL retirement basket (spending on it ends)
+  // but its 9% rate still drives the finite family-layer goals — the label must not imply otherwise.
+  educationInflation: "education inflation (your goals, not your retirement basket)",
   housingInflation: "housing inflation",
   leanMultiplier: "lean-FIRE target",
   fatMultiplier: "fat-FIRE target",
