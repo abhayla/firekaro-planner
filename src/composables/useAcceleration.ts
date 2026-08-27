@@ -1,5 +1,6 @@
 import { computed } from "vue";
 import { useFireDerive } from "@/lib/useFireDerive";
+import { STEP_UP_TAPER_AGE } from "@/lib/derive";
 import { useHouseholdStore } from "@/stores/household";
 import { useAssumptionsStore } from "@/stores/assumptions";
 import { useUiStore } from "@/stores/ui";
@@ -70,7 +71,16 @@ export function useAcceleration() {
     currentCorpus: fire.fireWithdrawableCorpus.value, // bridge-adjusted liquid base — the headline's base
     targetCorpus: fire.fireNumber.value,
     monthlySavings: fire.monthlyContribution.value,
-    expectedReturn: fire.realBlendedReturn.value, // REAL frame (#20)
+    // ADR-0006 NOMINAL triple — the exact frame `derive()`'s headline solver runs in, so the card's
+    // baseline reproduces the headline instead of approximating it: nominal return, target growing
+    // at the household expense basket, savings growing at general CPI on top of the real step-up
+    // (which tapers to 0 at 50). The old CPI-real scalar left the card ~1-3 years OPTIMISTIC
+    // against the headline printed beside it.
+    expectedReturn: fire.blendedReturn.value,
+    targetGrowthRate: fire.householdInflation.value,
+    savingsInflationRate: a.values.inflation,
+    savingsStepUpPercent: a.values.householdSavingsStepUpPercent ?? 0,
+    savingsStepUpTaperYears: Math.max(0, STEP_UP_TAPER_AGE - fire.anchorAge.value),
   }));
 
   // Canonical per-bucket corpus weights — the SAME basis derive() uses for blendedReturn/volatility
@@ -94,9 +104,12 @@ export function useAcceleration() {
 
   const ctx = computed<AccelerationContext>(() => {
     // Real equity−debt spread per +1pp equity (inflation cancels in the difference; kept ≥ 0).
-    const realEq = (1 + a.values.equityReturn) / (1 + a.values.inflation) - 1;
-    const realDebt = (1 + a.values.debtReturn) / (1 + a.values.inflation) - 1;
-    const realReturnPerEquityPoint = Math.max(0, (realEq - realDebt) / 100);
+    // ADR-0006: the baseline is NOMINAL now, so the per-point spread must be nominal too — a real
+    // spread applied to a nominal return understates the risk-notch by a factor of (1+CPI).
+    const realReturnPerEquityPoint = Math.max(
+      0,
+      (a.values.equityReturn - a.values.debtReturn) / 100,
+    );
     // 80CCD tax saving is on the deduction, so the marginal rate includes cess (the deduction shrinks
     // the base on which cess is levied). Single-slab approximation; OLD-regime-only (gated in the catalog).
     const marginalTaxRate = fire.householdMarginalRate.value * (1 + getTaxConfigForFY(ui.currentFY).cessRate);

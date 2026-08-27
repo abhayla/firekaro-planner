@@ -17,7 +17,7 @@
  */
 import { runMonteCarloFire, INDIA_EQUITY_ANNUAL_RETURNS, MAX_PROJECTION_YEARS } from "./monte-carlo";
 import { blendPortfolioVolatility, type PortfolioReturnWeights } from "./assumption-math";
-import type { FireBaseline } from "./lever-impact";
+import { resolveBaselineSchedules, type FireBaseline } from "./lever-impact";
 
 /**
  * Perturbed portfolio volatility after shifting `notchPoints` percentage-points of the portfolio into
@@ -103,7 +103,12 @@ export function computeLeverBand(input: LeverBandInput): LeverBand | null {
   const mc = runMonteCarloFire({
     currentCorpus: input.baseline.currentCorpus,
     targetCorpus: input.baseline.targetCorpus,
+    // ADR-0006: the band must bracket the SAME plan the deterministic point came from — a drifting
+    // target and a stepping-up, CPI-indexed contribution. Built from the one shared helper so the
+    // point and its band can never diverge into two models.
+    targetGrowthRate: input.baseline.targetGrowthRate,
     monthlySavings: input.baseline.monthlySavings,
+    monthlySavingsSchedule: resolveBaselineSchedules(input.baseline).savings,
     meanReturn: input.baseline.expectedReturn,
     volatility: input.volatility,
     // Borrow the real Indian-equity SHAPE + serial structure (mean-reversion) like the headline band,

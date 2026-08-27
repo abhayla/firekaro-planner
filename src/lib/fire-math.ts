@@ -254,11 +254,14 @@ export function calculateYearsToTarget(
     // de-risks the headline "years to FIRE" the same way it de-risks the
     // projection. A constant rate is byte-identical to the prior flat loop.
     const yearIndex = Math.floor(months / 12);
-    // ADR-0006: the target is resolved for THIS year — a nominal target inflating at the
-    // household basket. A scalar resolves to the same value every year ⇒ byte-identical to
-    // the prior `while (corpus < targetCorpus)` loop.
-    if (corpus >= resolveTarget(targetCorpus, yearIndex)) break;
-    const r = resolveReturn(expectedReturns, yearIndex) / 12;
+    // ADR-0006: the target is resolved CONTINUOUSLY (fractional years), not at the year index.
+    // The corpus is checked monthly, so quantising the target to the start of the year would let
+    // eleven months of corpus growth race a target frozen in January — the household would be
+    // declared FIRE-ready against last year's number (measured: it pulled the Mauryas headline
+    // ~2 years ahead of the projection's own crossover). A scalar target resolves identically at
+    // any index ⇒ byte-identical to the prior `while (corpus < targetCorpus)` loop.
+    if (corpus >= resolveTarget(targetCorpus, months / 12)) break;
+    const r = monthlyRate(resolveReturn(expectedReturns, yearIndex));
     // #46: resolve the contribution for the current year (constant ⇒ identical to the prior
     // `+ monthlySavings`; a step-up/stop schedule varies it year-by-year, same year-index origin
     // as projectCorpus so the headline and the chart curve agree).
@@ -323,6 +326,26 @@ export interface DecumulationOverlay {
  * household over-states its terminal corpus → an optimistically early FIRE date.
  */
 export type ReturnSchedule = number | ((yearIndex: number) => number);
+
+/**
+ * The monthly rate EQUIVALENT to an annual rate: `(1+r)^(1/12) − 1`, not `r/12`.
+ *
+ * ADR-0006 — this MUST be the true equivalent, because the kernel now runs in the nominal frame
+ * while the Monte Carlo band and the lever-impact engine stay in the CPI-real frame. With `r/12`
+ * the effective annual rate is `(1+r/12)^12 > 1+r`, and the size of that excess depends on `r` —
+ * so the SAME household reached FIRE ~1.2 years earlier in the nominal frame than in the real one
+ * purely from the compounding convention (measured on the Sharmas seed). A frame the answer
+ * depends on is not one frame. With the true equivalent, deflating the nominal path month by month
+ * reproduces the real path EXACTLY, and the two engines agree by construction.
+ *
+ * It is also the conservative correction: `r/12` silently over-compounded every projection.
+ */
+function monthlyRate(annual: number): number {
+  // (1+r)^(1/12) is undefined for r <= -1; the return floor elsewhere keeps us clear, but a
+  // schedule is caller-supplied, so guard rather than emit NaN into a corpus path.
+  if (!(annual > -1)) return -1;
+  return Math.pow(1 + annual, 1 / 12) - 1;
+}
 
 function resolveReturn(schedule: ReturnSchedule, yearIndex: number): number {
   const r = typeof schedule === "function" ? schedule(yearIndex) : schedule;
@@ -443,8 +466,9 @@ export function projectCorpus(args: {
       // prior `+ monthlyContribution`; a step-up/stop schedule varies it per year). Same
       // year-index origin as calculateYearsToTarget so headline and chart can't diverge.
       const contributionThisYear = resolveContribution(monthlyContribution, y);
+      const mr = monthlyRate(er);
       for (let m = 0; m < 12; m++) {
-        corpus = corpus * (1 + er / 12) + contributionThisYear;
+        corpus = corpus * (1 + mr) + contributionThisYear;
       }
     }
   }

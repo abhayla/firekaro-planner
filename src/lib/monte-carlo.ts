@@ -73,7 +73,12 @@
  *   4. Headline MUST use a conservative percentile + honest disclosure, never p50
  *      alone, and surface P(never reach FIRE).
  */
-import { calculateYearsToTarget, type ReturnSchedule, type TargetSchedule } from "./fire-math";
+import {
+  calculateYearsToTarget,
+  type ContributionSchedule,
+  type ReturnSchedule,
+  type TargetSchedule,
+} from "./fire-math";
 
 /** calculateYearsToTarget caps the horizon at 1200 months (100 yrs). Exported so
  *  UI can treat any percentile >= this as "off the chart" and never render the
@@ -182,6 +187,14 @@ export interface MonteCarloFireInput {
    */
   targetGrowthRate?: number;
   monthlySavings: number;
+  /**
+   * ADR-0006. Optional per-year contribution schedule in the SAME frame as `meanReturn` — used
+   * instead of the flat `monthlySavings` when present. Required once a household has a savings
+   * step-up (the default since ADR-0006): with a flat scalar the band's p50 ran ~2 years behind
+   * the deterministic headline it is supposed to bracket. `monthlySavings` is still the value the
+   * `<= 0 → never reaches FIRE` guard reads, so pass both.
+   */
+  monthlySavingsSchedule?: ContributionSchedule;
   /** Expected annual return. MUST share an inflation frame with targetCorpus (see header).
    *  Used as the per-year MEAN when `meanReturnSchedule` is absent (the v1 scalar path). */
   meanReturn: number;
@@ -400,7 +413,9 @@ export function runMonteCarloFire(input: MonteCarloFireInput): MonteCarloFireRes
     const raw = calculateYearsToTarget(
       input.currentCorpus,
       targetSchedule,
-      input.monthlySavings,
+      input.monthlySavings > 0 && input.monthlySavingsSchedule != null
+        ? input.monthlySavingsSchedule
+        : input.monthlySavings,
       schedule,
     );
     // Reached only if finite AND inside the cap; raw === 100 means the loop hit the

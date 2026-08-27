@@ -19,7 +19,11 @@
  *
  * Keep this module pure (no store/DOM access) per `.claude/rules/calculation-modules.md`.
  */
-import { calculateYearsToTarget } from "./fire-math";
+import {
+  calculateYearsToTarget,
+  type ContributionSchedule,
+  type TargetSchedule,
+} from "./fire-math";
 import { MAX_PROJECTION_YEARS } from "./monte-carlo";
 
 /**
@@ -43,8 +47,38 @@ export interface FireBaseline {
   targetCorpus: number;
   /** Monthly contribution today (real ₹). */
   monthlySavings: number;
-  /** Expected REAL return (matches the headline's real frame — the #20 invariant). */
+  /** Expected REAL return (matches the headline's CPI-real frame). */
   expectedReturn: number;
+  /**
+   * ADR-0006. The REAL annual drift of `targetCorpus` — the FIRE number rises in TODAY's rupees
+   * because the household's expense basket outruns general CPI (`derive().realTargetDriftRate`).
+   * Absent/0 ⇒ a fixed target, i.e. the pre-ADR-0006 model. This engine stays in the CPI-REAL
+   * frame (a real `expectedReturn` against a today's-₹ target); dividing the kernel's nominal
+   * crossing condition through by (1+CPI)^t gives exactly this. Omitting it made every lever's
+   * baseline 1–3 years more OPTIMISTIC than the headline it sits next to.
+   */
+  targetGrowthRate?: number;
+  /**
+   * ADR-0006. The REAL savings step-up (%/yr) applied to `monthlySavings`, and the number of years
+   * from now after which it stops compounding (the age-50 taper in `derive.ts`). Modelled as a rate
+   * rather than a pre-built schedule ON PURPOSE: a lever that raises `monthlySavings` must get the
+   * step-up applied to its RAISED amount, which a captured schedule could not do.
+   */
+  savingsStepUpPercent?: number;
+  savingsStepUpTaperYears?: number;
+  /**
+   * ADR-0006. Annual growth of `monthlySavings` in the frame of `expectedReturn` — general CPI when
+   * the caller works in the NOMINAL frame, 0 when it works in the CPI-real frame.
+   *
+   * FRAME CONTRACT: `expectedReturn`, `targetGrowthRate` and `savingsInflationRate` must all be
+   * quoted in ONE frame. The live caller (`useAcceleration`) passes the NOMINAL triple — nominal
+   * return, basket target growth, CPI savings growth — which reproduces `derive()`'s headline
+   * solver exactly. The CPI-real triple (real return, drift g, 0) is algebraically the same model
+   * only if contributions are re-indexed monthly; because the kernel re-indexes them ANNUALLY (a
+   * salary is revised once a year, and loses purchasing power in between) the real triple runs
+   * ~0.4 years optimistic. Quote the nominal triple.
+   */
+  savingsInflationRate?: number;
 }
 
 /** A single lever = a named, bounded perturbation of the baseline inputs. */
@@ -74,9 +108,43 @@ export interface LeverImpact {
   reachable: boolean;
 }
 
+/**
+ * The two time-varying schedules a baseline implies, in the baseline's own frame. Shared by
+ * `yearsToFire` and `lever-bands.computeLeverBand` so the deterministic point and the confidence
+ * band around it can never be built from two different models of the same plan.
+ */
+export function resolveBaselineSchedules(b: FireBaseline): {
+  target: TargetSchedule;
+  savings: ContributionSchedule;
+} {
+  const drift = Number.isFinite(b.targetGrowthRate) ? (b.targetGrowthRate as number) : 0;
+  const target: TargetSchedule =
+    drift === 0 ? b.targetCorpus : (y: number) => b.targetCorpus * Math.pow(1 + drift, y);
+
+  const stepUp = Number.isFinite(b.savingsStepUpPercent) ? (b.savingsStepUpPercent as number) : 0;
+  const taperYears = Number.isFinite(b.savingsStepUpTaperYears)
+    ? Math.max(0, b.savingsStepUpTaperYears as number)
+    : 0;
+  // A non-positive scalar is passed through so the kernel's `<= 0 → Infinity` sentinel still fires.
+  const savingsInflation = Number.isFinite(b.savingsInflationRate)
+    ? (b.savingsInflationRate as number)
+    : 0;
+  const stepUpApplies = stepUp > 0 && taperYears > 0;
+  const savings: ContributionSchedule =
+    b.monthlySavings <= 0 || (!stepUpApplies && savingsInflation === 0)
+      ? b.monthlySavings
+      : (y: number) =>
+          b.monthlySavings *
+          (stepUpApplies ? Math.pow(1 + stepUp / 100, Math.min(y, taperYears)) : 1) *
+          Math.pow(1 + savingsInflation, y);
+
+  return { target, savings };
+}
+
 /** Years-to-FIRE for a resolved baseline — thin wrapper over the ONE kernel. */
 export function yearsToFire(b: FireBaseline): number {
-  return calculateYearsToTarget(b.currentCorpus, b.targetCorpus, b.monthlySavings, b.expectedReturn);
+  const { target, savings } = resolveBaselineSchedules(b);
+  return calculateYearsToTarget(b.currentCorpus, target, savings, b.expectedReturn);
 }
 
 /** Compute one lever's impact: baseline vs perturbed years-to-FIRE. */

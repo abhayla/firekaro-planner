@@ -115,12 +115,22 @@ describe("computeLeverBand — honesty invariant vs the deterministic perturbed 
     expect(det).toBeLessThanOrEqual(band.p90Years);
   });
 
-  it("the median stays ANCHORED near the deterministic point (no material optimistic skew at p50)", () => {
+  it("the median is never MORE OPTIMISTIC than the deterministic point (one-sided anchor)", () => {
     const det = yearsToFire(PERTURBED);
     const band = computeLeverBand({ baseline: PERTURBED, volatility: 0.18, seed: 1 })!;
-    // anchored within ~0.5yr (history-fed mean-reversion keeps p50 ≈ the scalar point), so the band
-    // never flatters the lever at the median — the downside lives honestly in the p90 tail.
-    expect(Math.abs(band.expectedYears - det)).toBeLessThan(0.5);
+    // RE-BASELINED (ADR-0006). This was a SYMMETRIC |p50 − det| < 0.5 anchor, which held only
+    // because `calculateYearsToTarget` compounded `r/12`. That convention overstates a high draw
+    // more than a low one, so it cancelled the σ²/2 geometric drag and pinned p50 to the
+    // deterministic point. With the true monthly equivalent `(1+r)^(1/12) − 1` the drag is modelled
+    // correctly and p50 lands ~1.5yr LATER than the point at σ=0.18 — the CONSERVATIVE side.
+    //
+    // The honesty invariant was never "p50 equals the point"; it was "the band must not flatter the
+    // lever". So the assertion is now one-sided, which is what rule 31 actually requires, plus a
+    // sanity ceiling so a future regression that blows the median out is still caught.
+    expect(band.expectedYears, "p50 must not sit earlier than the deterministic point").toBeGreaterThanOrEqual(
+      det - 0.5,
+    );
+    expect(band.expectedYears - det, "p50 drag must stay in the σ²/2 range, not diverge").toBeLessThan(3);
   });
 });
 

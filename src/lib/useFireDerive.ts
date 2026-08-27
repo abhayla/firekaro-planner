@@ -375,6 +375,8 @@ export function useFireDerive() {
     healthcareReservationPercent: computed(() => d.value.healthcareReservationPercent),
     variants: computed(() => d.value.variants),
     blendedReturn: computed(() => d.value.blendedReturn),
+    // ADR-0006: the household 4-bucket expense basket the FIRE target grows at.
+    householdInflation: computed(() => d.value.householdInflation),
     realBlendedReturn: computed(() => d.value.realBlendedReturn),
     realReturnSchedule: computed(() => d.value.realReturnSchedule),
     // ADR-0006: the REAL drift of the FIRE target ((1+basket)/(1+CPI) − 1).
@@ -402,6 +404,10 @@ export function useFireDerive() {
         // basket's excess over CPI so it shares the deterministic headline's frame.
         targetGrowthRate: d.value.realTargetDriftRate,
         monthlySavings: d.value.monthlyContribution,
+        // ADR-0006: the REAL (today's-₹) inflow schedule, incl. the step-up and its age-50 taper —
+        // the same frame as `realBlendedReturn`. A flat scalar left the band's p50 behind the
+        // deterministic headline it brackets.
+        monthlySavingsSchedule: d.value.householdContributionSchedule,
         meanReturn: d.value.realBlendedReturn,
         meanReturnSchedule: d.value.realReturnSchedule,
         volatility: d.value.portfolioVolatility,
