@@ -1,6 +1,6 @@
 ---
 description: Vue 3 component structure and rendering conventions for all SFC files
-globs: ["src/components/**/*.vue", "src/pages/**/*.vue"]
+paths: ["src/components/**/*.vue", "src/pages/**/*.vue"]
 ---
 
 # Vue Component Conventions

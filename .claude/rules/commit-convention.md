@@ -1,6 +1,6 @@
 ---
 description: Git commit message format and pre-commit workflow
-globs: []
+paths: []
 ---
 
 # Scope: global

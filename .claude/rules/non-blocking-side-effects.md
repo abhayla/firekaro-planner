@@ -1,6 +1,6 @@
 ---
 description: Side effects in route handlers must never block the main response
-globs: ["server/routes/**/*.ts"]
+paths: ["server/routes/**/*.ts"]
 ---
 
 # Non-Blocking Side Effects

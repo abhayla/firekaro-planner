@@ -1,6 +1,6 @@
 ---
 description: Indian Financial Year (April-March) handling — auto-current FY + tax-screen-scoped picker
-globs: ["**/*.ts", "**/*.vue"]
+paths: ["**/*.ts", "**/*.vue"]
 ---
 
 # Financial Year Handling

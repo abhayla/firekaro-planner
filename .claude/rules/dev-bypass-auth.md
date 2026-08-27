@@ -1,6 +1,6 @@
 ---
 description: Dev-only auth bypass pattern. Gated by DEV_BYPASS_AUTH=true and production refusal. Security-sensitive — treat as private.
-globs: ["server/src/middleware/**/*.ts", "server/src/lib/auth.ts", "server/src/lib/validate-env.ts", "server/src/routes/**/*.ts"]
+paths: ["server/src/middleware/**/*.ts", "server/src/lib/auth.ts", "server/src/lib/validate-env.ts", "server/src/routes/**/*.ts"]
 version: "1.0.0"
 synthesized: true
 private: true

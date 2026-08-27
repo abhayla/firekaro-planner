@@ -1,6 +1,6 @@
 ---
 description: E2E Playwright Page Object Model conventions with BasePage helpers
-globs: ["e2e/pages/**/*.ts", "e2e/tests/**/*.spec.ts"]
+paths: ["e2e/pages/**/*.ts", "e2e/tests/**/*.spec.ts"]
 ---
 
 # E2E Page Object Model

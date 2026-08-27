@@ -1,6 +1,6 @@
 ---
 description: Form validation approaches using manual validation and VeeValidate+Zod
-globs: ["src/components/**/*.vue"]
+paths: ["src/components/**/*.vue"]
 ---
 
 # Form Validation Patterns

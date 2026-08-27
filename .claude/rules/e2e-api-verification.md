@@ -1,6 +1,6 @@
 ---
 description: API-based formula verification patterns for E2E calculation tests
-globs: ["e2e/tests/**/10-formula-verification.spec.ts", "e2e/utils/calculation-helpers.ts"]
+paths: ["e2e/tests/**/10-formula-verification.spec.ts", "e2e/utils/calculation-helpers.ts"]
 ---
 
 # E2E API Verification

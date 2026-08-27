@@ -1,6 +1,6 @@
 ---
 description: TypeScript type definition organization and export patterns
-globs: ["src/types/**/*.ts", "src/composables/**/*.ts"]
+paths: ["src/types/**/*.ts", "src/composables/**/*.ts"]
 ---
 
 # Type Organization

@@ -1,6 +1,6 @@
 ---
 description: Workflow for filing bugs as GitHub Issues. SSOT is GitHub Issues; never create docs/bugs/ markdown files. Every filed bug requires miss-analysis and sibling audit before declaring closed.
-globs: ["e2e/tests/**/*.spec.ts", "src/pages/**/*.vue", "src/components/**/*.vue", "src/composables/**/*.ts", "src/utils/**/*.ts", "server/routes/**/*.ts", "server/lib/**/*.ts"]
+paths: ["e2e/tests/**/*.spec.ts", "src/pages/**/*.vue", "src/components/**/*.vue", "src/composables/**/*.ts", "src/utils/**/*.ts", "server/routes/**/*.ts", "server/lib/**/*.ts"]
 ---
 
 # Bug Filing & Sibling Audit Protocol

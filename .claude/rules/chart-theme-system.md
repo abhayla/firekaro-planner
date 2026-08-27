@@ -1,6 +1,6 @@
 ---
 description: Centralized chart theming via @/utils/chartTheme for all Chart.js and custom SVG charts
-globs: ["src/components/**/*.vue", "src/utils/chartTheme.ts"]
+paths: ["src/components/**/*.vue", "src/utils/chartTheme.ts"]
 ---
 
 # Chart Theme System

@@ -1,6 +1,6 @@
 ---
 description: TanStack Vue Query conventions for composables including query keys, invalidation, and caching
-globs: ["src/composables/**/*.ts", "src/plugins/vue-query.ts"]
+paths: ["src/composables/**/*.ts", "src/plugins/vue-query.ts"]
 ---
 
 # Vue Query Patterns

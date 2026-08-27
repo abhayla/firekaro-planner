@@ -2,7 +2,7 @@
 description: >
   Architecture of the FireKaro comms subsystem (WhatsApp via Wati + Zoho CRM lifecycle messaging) —
   the mounted routes, the server/src/lib layer, template SSOT, and the spend/consent send-discipline.
-globs:
+paths:
   - "server/src/lib/wati-*.ts"
   - "server/src/lib/whatsapp-*.ts"
   - "server/src/lib/comms-*.ts"

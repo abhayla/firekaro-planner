@@ -1,6 +1,6 @@
 ---
 description: Multi-row insertion loops in E2E tests MUST verify per-iteration DB persistence + final UI render — never trust dialog-close as success
-globs: ["e2e/tests/**/*.spec.ts"]
+paths: ["e2e/tests/**/*.spec.ts"]
 ---
 
 # E2E Multi-Row Insertion — Per-Iteration Verification

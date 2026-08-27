@@ -1,6 +1,6 @@
 ---
 description: Hono routes MUST use apiSuccess/apiError/apiPaginated from server/lib/api-utils.ts. Raw c.json() is blocked by ESLint.
-globs: ["server/routes/**/*.ts", "server/middleware/**/*.ts", "server/index.ts", "server/lib/api-utils.ts"]
+paths: ["server/routes/**/*.ts", "server/middleware/**/*.ts", "server/index.ts", "server/lib/api-utils.ts"]
 version: "1.0.0"
 synthesized: true
 private: false

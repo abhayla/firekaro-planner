@@ -1,6 +1,6 @@
 ---
 description: Multi-format data export (CSV, JSON, PDF, Excel) pattern for reports
-globs: ["src/components/**/*OverviewTab.vue", "src/components/**/*ReportsTab.vue"]
+paths: ["src/components/**/*OverviewTab.vue", "src/components/**/*ReportsTab.vue"]
 ---
 
 # Export / Download Pattern

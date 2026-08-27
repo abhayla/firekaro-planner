@@ -1,6 +1,6 @@
 ---
 description: Composables MUST unwrap API envelopes via unwrapResponse/unwrapArrayResponse from src/utils/api-helpers.ts, never access data.data directly.
-globs: ["src/composables/**/*.ts", "src/utils/api-helpers.ts", "src/pages/**/*.vue"]
+paths: ["src/composables/**/*.ts", "src/utils/api-helpers.ts", "src/pages/**/*.vue"]
 version: "1.0.0"
 synthesized: true
 private: false

@@ -1,6 +1,6 @@
 ---
 description: Family view multi-user data filtering across backend and frontend
-globs: ["server/routes/**/*.ts", "src/composables/**/*.ts", "src/stores/**/*.ts"]
+paths: ["server/routes/**/*.ts", "src/composables/**/*.ts", "src/stores/**/*.ts"]
 ---
 
 # Family View Pattern

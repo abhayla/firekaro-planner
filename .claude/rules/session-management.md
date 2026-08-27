@@ -1,6 +1,6 @@
 ---
 description: Session continuity system for multi-session development workflow
-globs: [".claude/sessions/**/*.md", ".claude/commands/**/*.md"]
+paths: [".claude/sessions/**/*.md", ".claude/commands/**/*.md"]
 ---
 
 # Session Management

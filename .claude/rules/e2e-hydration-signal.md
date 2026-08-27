@@ -1,6 +1,6 @@
 ---
 description: Playwright tests wait on the data-hydrated="true" signal emitted by the app, not on fixed timeouts.
-globs: ["e2e/**/*.ts", "src/main.ts", "src/utils/hydration-signal.ts"]
+paths: ["e2e/**/*.ts", "src/main.ts", "src/utils/hydration-signal.ts"]
 version: "1.0.0"
 synthesized: true
 private: false

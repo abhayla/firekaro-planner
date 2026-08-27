@@ -1,6 +1,6 @@
 ---
 description: Standard documentation template for dashboard section plan docs in docs/
-globs: ["docs/*-Section-*.md", "docs/*-Implementation*.md"]
+paths: ["docs/*-Section-*.md", "docs/*-Implementation*.md"]
 ---
 
 # Section Plan Document Template

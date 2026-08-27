@@ -1,6 +1,6 @@
 ---
 description: Any documented E2E CLI flag / env-var / option that claims to change behavior MUST have a matching guard wired in the spec code.
-globs: ["e2e/**", ".claude/skills/**"]
+paths: ["e2e/**", ".claude/skills/**"]
 ---
 
 # E2E Documented Flags Must Be Wired
