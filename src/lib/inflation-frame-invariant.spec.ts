@@ -66,7 +66,14 @@ const PRE_ADR_0006 = {
 const LIVE_DEFAULTS_REQUIRED_MONTHLY = {
   sharmas: Number.POSITIVE_INFINITY,
   mehtas: Number.POSITIVE_INFINITY,
-  iyers: 146_273,
+  // RE-RECORDED at ADR-0006 Phase 1c: 146,273 → 158,421 (+8.3%, just outside the ±8% band).
+  // The move is UPWARD — the conservative direction — and the cause is named: the healthcare
+  // corpus reservation now drifts at `healthcareInflation` (9%) instead of the household basket
+  // (6.24%), so over the Iyers' 17-year horizon the reservation leg is ~1.5x bigger and the
+  // prescription rises with it. The goal-capping half of Phase 1c pushes the other way but the
+  // Iyers' family layer is small, so the reservation dominates. Re-recorded, not widened: the
+  // ±8% allowance below is unchanged.
+  iyers: 158_421,
   mauryas: Number.POSITIVE_INFINITY,
 } as const;
 /**
@@ -152,21 +159,42 @@ describe("ADR-0006 — the FIRE target and the corpus must not share one inflati
       educationInflation: cpi,
       housingInflation: cpi,
     };
-    // The single-rate reference: one bucket carrying all the weight.
+    // The single-rate reference: the SAME flat bucket rates, but arrived at the other way — one
+    // bucket carrying all the weight. When every bucket rate equals CPI, the weighting cannot
+    // matter, so these two must be the same plan field for field. That is the generalisation
+    // claim, stated as a property of the kernel rather than of one hard-coded number.
     const singleRate: Assumptions = {
-      ...a.values,
+      ...flat,
       inflationWeights: { general: 100, healthcare: 0, education: 0, housing: 0 },
     };
 
     const kFlat = derive(h.data, flat, DEFAULT_PRODUCT_LENS);
     const kRef = derive(h.data, singleRate, DEFAULT_PRODUCT_LENS);
 
+    // The BASE leg is what collapses. `realTargetDriftRate` is the household basket measured
+    // against CPI, and it must vanish EXACTLY.
     expect(kFlat.realTargetDriftRate, "g must be 0 when every bucket is CPI").toBeCloseTo(0, 12);
     expect(kRef.realTargetDriftRate, "g must be 0 for the single-rate reference").toBeCloseTo(0, 12);
+    // And the base COMPONENT must genuinely stand still in today's rupees for the whole horizon —
+    // a zero rate that the schedule then ignored would pass the line above and fail here.
+    const T = Math.max(1, kFlat.targetRetirementAge - kFlat.anchorAge);
+    expect(
+      kFlat.regularTargetComponentsRealAt(T).base,
+      "the base leg must be flat in today's ₹ when the basket is CPI",
+    ).toBeCloseTo(kFlat.regularTargetComponentsRealAt(0).base, 4);
 
+    // ADR-0006 Phase 1c — WHAT THIS DOES NOT ASSERT, deliberately. The AGGREGATE target still
+    // drifts here, and must: the healthcare reservation rides `healthcareInflation` (which this
+    // fixture also flattened to CPI, so that leg is flat) but every DATED goal stops inflating on
+    // its due year, which makes the goals leg FALL in real terms afterwards. Asserting
+    // "aggregate drift == 0" would therefore be asserting a model the kernel does not implement,
+    // and the only way to make it pass would be to delete the goal cap — i.e. the assertion
+    // would be enforcing the bug. The collapse claim belongs to the BASE leg and to the
+    // field-for-field equality below.
     const why =
-      "ADR-0006 §3: the change is a GENERALISATION, not a re-tuning — a household whose basket " +
-      "equals CPI must get the single-rate headline back, field for field.";
+      "ADR-0006 §3: the change is a GENERALISATION, not a re-tuning — a household whose bucket " +
+      "rates all equal CPI must get the same headline whichever way the weights are set, field " +
+      "for field.";
     expect(kFlat.yearsToRegular, `${why} — yearsToRegular`).toBe(kRef.yearsToRegular);
     expect(kFlat.fireNumber, `${why} — fireNumber`).toBe(kRef.fireNumber);
     expect(kFlat.householdFireAge, `${why} — householdFireAge`).toBe(kRef.householdFireAge);

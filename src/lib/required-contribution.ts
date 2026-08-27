@@ -207,10 +207,22 @@ export function requiredMonthlyContributionFor(
   // where g = (1+b)/(1+CPI) − 1 is the kernel's own `realTargetDriftRate`. Before ADR-0006 the
   // real figure was the UNDRIFTED needToday and the nominal one was `needToday x (1+CPI)^T`, so
   // both were short by ((1+b)/(1+CPI))^T — an optimistic prescription (gh #167).
-  const targetDrift = safe(atTarget.realTargetDriftRate, 0);
-  const realDriftFactor = Math.pow(1 + targetDrift, yearsToTarget);
+  //
+  // ADR-0006 PHASE 1C. `(1+g)^T` was only ever an approximation of that growth, because the
+  // target is not one rate: the reservation rides medical inflation and each dated goal STOPS
+  // rising on its due year. So the drift is read off the kernel's own COMPONENT schedule at the
+  // target horizon instead of recomputed from a scalar — for a goal-heavy household the scalar
+  // over-states the need (and the prescription with it), and the three narrated components would
+  // stop summing to the headline the moment one goal's due year fell inside the horizon.
+  const atTargetComponents = atTarget.regularTargetComponentsRealAt(yearsToTarget);
+  const componentDriftFactor =
+    atTarget.fireNumber > 0 && Number.isFinite(atTargetComponents.total)
+      ? atTargetComponents.total / atTarget.fireNumber
+      : Math.pow(1 + safe(atTarget.realTargetDriftRate, 0), yearsToTarget);
   const cpiInflator = Math.pow(1 + inflation, yearsToTarget);
-  const needReal = needRealToday * realDriftFactor;
+  // Household scope: `needRealToday` IS `atTarget.fireNumber`, so this is exactly the component
+  // total. Member lens: the individual number carries the same household drift it always has.
+  const needReal = needRealToday * componentDriftFactor;
 
   // "You'll have by <target>" — the CURRENT pace projected in the REAL frame with the SAME
   // inflow schedule + real return schedule the kernel just used (no re-built parallel math).
@@ -352,17 +364,19 @@ export function requiredMonthlyContributionFor(
     // ADR-0006: the three narrated components are at the SAME target age as `needReal`, so they
     // carry the SAME real drift — otherwise base + goals + reservation would stop summing to the
     // headline the moment the slider moved (the desync T-378 fixed, re-opened by the drift).
-    needBaseReal: Math.max(0, Math.round(safe(atTarget.baseFireNumber * realDriftFactor))),
-    needPlannedGoalsReal: Math.max(0, Math.round(safe(atTarget.familyLayerCorpus * realDriftFactor))),
+    // ADR-0006 Phase 1c: each component carries its OWN drift, read straight off the kernel's
+    // component schedule at the target horizon — the base and contingency at the household
+    // basket, the reservation at medical inflation, each dated goal capped at its due year.
+    // They sum to `needReal` by construction for the household scope.
+    needBaseReal: Math.max(0, Math.round(safe(atTargetComponents.base))),
+    needPlannedGoalsReal: Math.max(0, Math.round(safe(atTargetComponents.plannedGoals))),
     needHealthcareReservationReal: Math.max(
       0,
-      Math.round(safe(atTarget.healthcareReservation * realDriftFactor)),
+      Math.round(safe(atTargetComponents.healthcareReservation)),
     ),
     netAnnualExpensesReal: Math.max(
       0,
-      Math.round(
-        safe(atTarget.baseFireNumber * safe(atTarget.effectiveSWR, 0.035) * realDriftFactor),
-      ),
+      Math.round(safe(atTargetComponents.base * safe(atTarget.effectiveSWR, 0.035))),
     ),
   };
 }
