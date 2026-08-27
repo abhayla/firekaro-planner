@@ -356,4 +356,80 @@ dlive("/api/planner integration (live DB — Supabase firekaro-planner)", () => 
     });
     expect(res.status).toBe(422);
   });
+
+  // ===================== ADR-0006 frameVersion round-trip (T-379-fix) =====================
+  // Regression lock for the HIGH bug the server-schema-parity spec catches at the no-DB layer
+  // (src/lib/server-schema-parity.spec.ts): `frameVersion` was declared on the frontend
+  // PlanBaseline/LifecycleSnapshot types and persisted client-side, but the server's strip-mode
+  // Zod schemas never declared it — every ServerAdapter round-trip silently lost it. This proves
+  // the fix end-to-end through the real Hono route -> Prisma -> Supabase path.
+
+  it("PUT+GET /plan-baseline round-trips frameVersion (ADR-0006)", async () => {
+    const baselineWithFrame = { ...sampleBaseline, frameVersion: "adr-0006" };
+    const put = await app.request("/api/planner/plan-baseline", {
+      method: "PUT", headers: H, body: JSON.stringify(baselineWithFrame),
+    });
+    expect(put.status).toBe(200);
+
+    const body: any = await (await app.request("/api/planner/plan-baseline", { headers: H })).json();
+    expect(body.data.frameVersion, "frameVersion survived the plan-baseline round-trip").toBe("adr-0006");
+  });
+
+  it("PUT+GET /ui round-trips lifecycleSnapshot.frameVersion AND quick.directPlans together", async () => {
+    const lifecycleSnapshot = {
+      capturedAt: "2026-08-27T00:00:00.000Z",
+      fireAge: 52.4,
+      fireYear: 2044,
+      currentCorpus: 6200000,
+      fireNumber: 34285714,
+      savingsRatePct: 42,
+      milestoneBand: 25,
+      activeNudgeIds: ["milestone-25"],
+      monteCarloP50Age: 53,
+      frameVersion: "adr-0006",
+    };
+    const quick = { directPlans: true };
+    const put = await app.request("/api/planner/ui", {
+      method: "PUT",
+      headers: H,
+      body: JSON.stringify({ isFamilyView: false, currentFY: "2025-26", lifecycleSnapshot, quick }),
+    });
+    expect(put.status).toBe(200);
+
+    const got: any = await (await app.request("/api/planner/ui", { headers: H })).json();
+    expect(got.data.lifecycleSnapshot?.frameVersion, "lifecycleSnapshot.frameVersion survived").toBe("adr-0006");
+    expect(got.data.quick?.directPlans, "quick.directPlans survived alongside lifecycleSnapshot").toBe(true);
+  });
+
+  // KNOWN GAP (found while writing this regression lock, NOT the ADR-0006 frameVersion class,
+  // and NOT fixed here — fixing it needs a UserAssumptions Prisma migration, out of scope for a
+  // server-schema-only change): `assumptionsMigratedV` and `householdSavingsStepUpPercent` /
+  // `householdSplitPercent` are declared on `assumptionsSchema` (so PUT accepts them, 200) but
+  // have NO Prisma column on `UserAssumptions` — the PUT handler's `data` object omits them, and
+  // `mapAssumptionsRow` (server/src/lib/planner-read.ts) always returns the RESEARCH DEFAULT for
+  // the step-up/split fields and never returns `assumptionsMigratedV` at all (undefined on GET).
+  // This is a DIFFERENT bug class from `frameVersion`: frameVersion was dropped by a strip-mode
+  // Zod schema that never declared the field at all (fixed in planner-schemas.ts); these three are
+  // ACCEPTED by Zod but dropped one layer deeper, at the Prisma write. This test locks the CURRENT
+  // (gap) contract so a future accidental "fix" that starts silently accepting-then-losing a NEW
+  // assumptions field doesn't slip past unnoticed — and documents that a real fix needs a
+  // UserAssumptions migration adding `assumptionsMigratedV` + persisting the other two.
+  it("PUT+GET /assumptions: assumptionsMigratedV + a non-default householdSavingsStepUpPercent do NOT persist (documented gap, no Prisma column)", async () => {
+    const assumptionsWithStamp = {
+      ...sampleAssumptions,
+      householdSavingsStepUpPercent: 0, // a deliberate user choice
+      assumptionsMigratedV: 1,
+    };
+    const put = await app.request("/api/planner/assumptions", {
+      method: "PUT", headers: H, body: JSON.stringify(assumptionsWithStamp),
+    });
+    expect(put.status, "the PUT is accepted (200) — Zod validates the field, it just isn't persisted").toBe(200);
+
+    const got: any = await (await app.request("/api/planner/assumptions", { headers: H })).json();
+    expect(got.data.assumptionsMigratedV, "no UserAssumptions column — always undefined on GET").toBeUndefined();
+    expect(
+      got.data.householdSavingsStepUpPercent,
+      "no UserAssumptions column — GET always returns the research default, not what was PUT",
+    ).toBe(2);
+  });
 });
