@@ -127,6 +127,9 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 
 ## §3 — Decision log (append-only, newest first)
 
+### 2026-08-27 (16:00 IST)
+- **ADR-0006 build status (branch `feat/adr-0006-honest-inflation-frame`, not merged):** Phase 1 (kernel/inputs/tests, 5 commits) reproduced green (1,404 tests) and FinTech-validated SOUND-WITH-FIXES — arithmetic re-derived exactly; three HIGH leaks it did not touch (goal lumps + healthcare reservation inside fireNumber grow at the basket instead of their own 9% ≈ 3% understatement; `adequacy.ts` `retireByAgeRequiredSIP` on What-If un-migrated and now contradicts the hero; the step-up 0→2 migration is not one-shot so a deliberate 0 cannot persist) → Phase 1b fix-round running. Phase 2 (UI/copy/#180/migrations, 6 commits, 1,443 tests) done: Coast card on the kernel's one real return; first-class "unreachable at these assumptions" hero state; every "today's money / 6% inflation" line now describes the one frame with live rates; Preferences discloses the basket + a settable step-up; old-frame plan baselines show "re-lock to compare" instead of a false delta; the off-track WhatsApp nudge is suppressed for FY 2026-27 because its template would blame the user for a model change (cost: up to one FY of off-track nudges; A6 outbound gate still closed). Next: Phase 1b → code review + FinTech end-to-end → e2e + sweep + screenshots → ONE PR closing #167 + #180.
+
 ### 2026-08-27 (14:16 IST)
 - **D-2026-08-27-09 — ADR-0006 ACCEPTED (Option E) by Abhay: honest nominal frame + re-grounded basket (healthcare 9%, education out, weights 74/8/0/18 ≈ 6.24%) + 2% real step-up default tapering at 50 + an "unreachable" hero state; closes #167 and #180 together.** Built in-session via Opus subagents in two phases (kernel/inputs/tests → UI/copy/coherence), each independently reviewed (code + FinTech end-to-end) before the single PR. Frame + inputs + step-up land in ONE commit.
 
