@@ -20,7 +20,7 @@ async function shootEveryCard(page: Page, width: number, height: number, tag: st
   await page.goto("/", { waitUntil: "networkidle" });
   await page.evaluate(() => window.localStorage.clear());
   await page.reload({ waitUntil: "networkidle" });
-  await page.getByText("Start my own plan").click();
+  await page.getByRole("button", { name: /Find my number/i }).click();
   await expect(page).toHaveURL(/\/quick/, { timeout: 20000 });
 
   // Walk the ten cards, capturing each BEFORE advancing.
@@ -57,7 +57,7 @@ test("T-378: every card renders at 390 and 1280, and the result is honest and co
   await page.goto("/", { waitUntil: "networkidle" });
   await page.evaluate(() => window.localStorage.clear());
   await page.reload({ waitUntil: "networkidle" });
-  await page.getByText("Start my own plan").click();
+  await page.getByRole("button", { name: /Find my number/i }).click();
   await expect(page).toHaveURL(/\/quick/, { timeout: 20000 });
   await fillQuickPath(page);
 

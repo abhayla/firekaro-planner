@@ -4,6 +4,7 @@ import { makeAdapter } from "@/lib/storage-adapter";
 import { getAuthProvider } from "@/lib/auth-provider";
 import { getCurrentFinancialYear } from "@/lib/expense-history";
 import type { LifecycleSnapshot } from "@/lib/lifecycle-digest";
+import type { PlanLeverKey } from "@/lib/lever-catalog";
 
 // Storage now routes through @/lib/storage-adapter — namespaced by userId per ADR-0001.
 const ENTITY_KEY = "ui";
@@ -63,6 +64,11 @@ export const useUiStore = defineStore("ui", () => {
   // what-if, not a plan change. Persisting the target is the explicit "Set as my target" action,
   // which writes the household member's targetRetirementAge instead. null = follow the household.
   const whatIfTargetAge = ref<number | null>(null);
+  // T-379 (QN-5): the levers currently switched ON in "How to get there — pick your moves".
+  // SESSION-ONLY for the same reason as whatIfTargetAge: ticking a box is a what-if, not a plan
+  // change. Committing a move is the explicit "Make this my plan" action, which writes the
+  // step-up / target age through the existing store actions instead.
+  const whatIfLevers = ref<PlanLeverKey[]>([]);
   const adapter = makeAdapter(getAuthProvider());
 
   function hydrate() {
@@ -123,6 +129,13 @@ export const useUiStore = defineStore("ui", () => {
     const lo = Math.max(SHARED_TARGET_AGE_MIN, Math.round(floor));
     whatIfTargetAge.value = Math.min(SHARED_TARGET_AGE_MAX, Math.max(lo, Math.round(age)));
   }
+  /**
+   * T-379 (QN-5): replace the set of levers switched on in the "pick your moves" card.
+   * Session-only (see `whatIfLevers`) and de-duplicated so a double-toggle cannot double-count.
+   */
+  function setWhatIfLevers(keys: PlanLeverKey[]) {
+    whatIfLevers.value = Array.from(new Set(keys));
+  }
   /** T-377: merge a partial Quick-Number blob (QN-1 writes; QN-2 only reads). */
   function setQuickPrefs(next: QuickPrefs | null) {
     quick.value = next == null ? null : { ...(quick.value ?? {}), ...next };
@@ -139,8 +152,10 @@ export const useUiStore = defineStore("ui", () => {
     lifecycleSnapshot,
     quick,
     whatIfTargetAge,
+    whatIfLevers,
     hydrate,
     setWhatIfTargetAge,
+    setWhatIfLevers,
     setQuickPrefs,
     toggleFamilyView,
     setViewingMemberId,

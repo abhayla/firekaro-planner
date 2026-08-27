@@ -127,6 +127,42 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 
 ## §3 — Decision log (append-only, newest first)
 
+### 2026-08-27 (fleet, T-379 — newest)
+- **D-2026-08-27-06 — Quick Number wave CLOSED with QN-5 (T-379): the "How to get there" lever card ships,
+  and the stage's own rule-29 reviews caught a Tier-0 optimism error that the green suite did not.**
+  QN-5 adds four levers (step-up / delay-3 / direct-plans / no-prepay-roll-emi) beside the retained
+  `trim-expenses`, measured in "less to find" ₹/month by RE-SOLVING through `required-contribution.ts`
+  → `derive()` (no additive shortcut; stacking compounds). The card lives in
+  `src/components/quick/LeverPicker.vue` and is mounted twice — on the `/quick` result and as the BODY of
+  the dashboard `AccelerationCard`, whose years-saved "biggest win" KPI, bridge guard and baseline guard
+  are all RETAINED (only the fixed-amount save-more slider was replaced).
+  **The finding that matters:** the step-up lever wrote the NOMINAL 10 the user recognises into
+  `householdSavingsStepUpPercent`, which ADR-0004 §3 defines as **REAL** — asserting a 16.6% nominal
+  escalation every year. Measured on the reference persona the final-year contribution reached
+  **₹10.28 L/month in today's money, 206% of Amit's take-home**, while the card advertised the starting
+  amount as "1.41× current, clearly doable". Fixed at the boundary (`realStepUpPercentFor()` → ~3.8%/yr
+  real at 6% CPI). **Consequence, accepted deliberately:** Amit can no longer reach 50 by any combination
+  of moves, and the card now says "move the retirement age". **Why:** an optimistic error for the target
+  user makes them UNDER-save — Tier-0 under `goal-anchored-decisions.md` — so the honest "you can't get
+  there" beats a comfortable number built on an impossible path.
+  Three further blockers were fixed: a read-modify-write that compounded `equityReturn` on every
+  "Make this my plan" press (0.120 → 0.128 → …, with the lever never closing on the dashboard); a linear
+  EMI time-weight that over-credited late-ending loans by up to 79% while its comment claimed the
+  opposite (now annuity-equivalent); and a raw rate comparison that recommended keeping an 11% loan
+  against a 12% *expected* return (now a 2pp `LOAN_RISK_PREMIUM`, the same risk asymmetry the risk-notch
+  lever already discloses). A rule-31 screenshot review also caught the card rendering five identical
+  "−₹0/mo" rows on an unreachable baseline — reading as "nothing you do matters" — now a per-row
+  marginal-contribution view plus explicit `rescue` / `not-enough-alone` states.
+  **Deferred (with rule + reason):** `docs/goals/.run/quick-number-DEFERRED.md` — 7 items, incl. **gh #176**
+  (kernel: `derive()` ignores `RecurringExpenseLine.endYear`, so a terminating EMI inflates the FIRE
+  number forever — ~₹3.4 Cr on this persona; pre-existing, out of QN-5 scope) and the per-holding
+  direct/regular flag the TER lever would need to be exact on a mixed portfolio.
+  Contract `docs/goals/2026-08-27-quick-number-front-door.md` §6; matrix rows B4, B6, C6, C7, D2, E6, E7, F6.
+  **Corroboration:** D-2026-08-27-05 records the T-378 checker independently re-deriving the real-kernel
+  Amit — need ₹19.05 Cr in today's money and "Move the age" at 50. That is the same verdict this stage's
+  honest step-up produces, reached by a different route, which is why the lever card now steers to a later
+  age rather than quoting a comfortable number at 50.
+
 ### 2026-08-27 (10:15 IST)
 - **D-2026-08-27-05 — Quick Number wave: #166 (QN-3), #168 (QN-2), #175 (T-377 doc fixes) and #173 (QN-1+QN-4, the `/quick` front door) are ALL on `main`**, each behind an independent checker (evidence in `GetWorkDone/evidence/2026-08-27-T-37x/`). T-378's checker PASS-WITH-FINDINGS → fix-round T-378F running (card-3 EMI copy contradiction; loan balance must be the PV annuity via `amortization.ts`, not emi×12×years; sanity line on the result; the Option-C two-column desktop result layout; chart window from current age; QN-5 placeholder; server-mode rule-25 proof now possible with a local `server/.env`). Real-kernel Amit: need ₹19.05 Cr today's money, "Move the age" at 50 — re-derived exactly by the checker; the mock's ₹13.35 Cr was the simplified frame. T-379 (levers) is sequenced behind T-378F; T-380 (gh #167) after that. Costs so far: ≈$23 + $80 + $5 + $93 = **≈$200**; lessons logged (stage sizing, cap-death harvest, haiku context, trust-file race). Needs-Abhay B9 added (Supabase password rotation, low urgency).
 

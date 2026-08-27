@@ -7,12 +7,14 @@
  * shows (T-377). That is what makes "the quick result and the dashboard agree" true by construction
  * rather than by a test (rule 26) — there is exactly one hero in the product.
  *
- * The lever card ("how to get there — pick your moves") is stage QN-5 and lands in this slot next.
+ * The lever card ("how to get there — pick your moves", QN-5) is <LeverPicker />, mounted below
+ * the hero — the same component the dashboard's AccelerationCard uses as its body.
  */
 import { computed } from "vue";
 import { RouterLink } from "vue-router";
 import FireHero from "@/components/dashboard/FireHero.vue";
 import QuickExplainer from "@/components/quick/QuickExplainer.vue";
+import LeverPicker from "@/components/quick/LeverPicker.vue";
 import { useFireDerive } from "@/lib/useFireDerive";
 import { useHouseholdStore } from "@/stores/household";
 import { useAssumptionsStore } from "@/stores/assumptions";
@@ -20,7 +22,6 @@ import { useUiStore } from "@/stores/ui";
 import { requiredMonthlyContributionFor } from "@/lib/required-contribution";
 import {
   FULL_PLANNER_ADDS,
-  PLAN_HONESTY_LINE,
   QUICK_PORTFOLIO_CAVEAT,
 } from "@/lib/quick-number-copy";
 import { formatINRCompact } from "@/lib/formatters";
@@ -121,9 +122,12 @@ const answerRows = computed(() => {
   <div class="quick-result" data-testid="quick-result">
     <FireHero />
 
-    <p class="text-caption text-medium-emphasis mt-3 mb-4" data-testid="quick-honesty-line">
-      {{ PLAN_HONESTY_LINE }}
-    </p>
+    <!-- QN-5: "how to get there — pick your moves". Carries the honesty line under its plan
+         summary (its verbatim home per the design SSOT), so the standalone copy T-378 rendered
+         here is gone — one card, one line, no duplication. -->
+    <v-card variant="outlined" class="pa-6 mt-4 mb-4" data-testid="quick-lever-card">
+      <LeverPicker />
+    </v-card>
 
     <!-- The express path collapses every holding into one equity line to stay at ten cards. That
          makes the projection optimistic for anyone holding PF/PPF/FD money, so it is stated on the
