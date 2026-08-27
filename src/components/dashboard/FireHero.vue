@@ -246,6 +246,30 @@ const sliderMoved = computed(
 );
 
 const requiredFinite = computed(() => Number.isFinite(req.value.requiredMonthlyReal));
+
+/**
+ * ADR-0006 item 4 — the first-class "unreachable at these assumptions" state.
+ *
+ * The #20 mistake this exists to prevent was bending the kernel until it printed a reachable
+ * number. The kernel is now allowed to say "no monthly amount closes this", and the hero has to
+ * carry that honestly instead of leaving the user with a bare "Move the age" tile and a headline
+ * that still reads like a plan.
+ *
+ * Two independent honest signals, either of which means the target age is not achievable on the
+ * assumptions in force:
+ *   - `requiredMonthlyReal` is Infinity — the solver found no feasible monthly amount, either
+ *     because the target is beyond the ceiling or because there is no take-home headroom left
+ *     (`required-contribution.ts`, the `!reaches(hi)` and `hi <= 0` branches);
+ *   - `paceFireAge` is null — today's pace never reaches the number inside the plan horizon.
+ * `solved` gates both: on a `solve: false` run `requiredMonthlyReal` is Infinity by construction
+ * and is explicitly NOT a verdict, so treating it as one would fabricate the state.
+ */
+const unreachableAtAssumptions = computed(
+  () =>
+    req.value.hasTarget &&
+    req.value.solved &&
+    (!requiredFinite.value || req.value.paceFireAge == null),
+);
 /** The action question: does the user have to put MORE in every month than they do today? */
 const mustInvestMore = computed(
   () => !requiredFinite.value || req.value.requiredMonthlyReal > req.value.currentMonthlyReal,
@@ -362,6 +386,25 @@ function yearsLabel(years: number): string {
         you'll need <b class="text-currency">{{ formatINRCompact(req.needReal) }}</b> in today's money
         <span class="fire-hero__sep">·</span> that's
         <b class="text-currency">{{ formatINRCompact(req.needNominal) }}</b> in {{ needYear }}
+      </div>
+
+      <!-- ADR-0006 item 4 — the honest headline-level state when no monthly amount closes the gap.
+           It prints NO figure of its own (that is the whole point): it names the two things that
+           can move, the plan and the assumptions behind it. The "Move the age" tile below stays as
+           the tile-level version; this is the headline-level one. -->
+      <div v-if="unreachableAtAssumptions" class="fire-hero__unreachable" data-testid="fire-hero-unreachable">
+        <div class="fire-hero__unreachable-title">
+          At these assumptions you don't get there by {{ targetAge }}.
+        </div>
+        <p class="fire-hero__unreachable-body">
+          There is no honest monthly amount that closes this — so we're not going to invent one.
+          Two things can change it: the <b>plan</b> (drag the age above, or switch on a move below),
+          and the <b>assumptions</b> underneath it — your spending basket, your expected returns and
+          your savings step-up.
+          <RouterLink to="/preferences#pref-section-inflation" data-testid="fire-hero-unreachable-assumptions">
+            Review your assumptions
+          </RouterLink>.
+        </p>
       </div>
 
       <!-- Gut-feel comparison (only when the /quick path recorded a guess). -->
@@ -671,6 +714,27 @@ function yearsLabel(years: number): string {
 }
 .fire-hero__when b {
   color: var(--text-primary);
+}
+/* ADR-0006 — the unreachable state. Warning-toned, never red: it is an honest limit of the
+   current assumptions, not a failure (contract 2.3 — red is never a hero state). */
+.fire-hero__unreachable {
+  margin: 12px auto 0;
+  max-width: 640px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  text-align: left;
+  background: rgba(var(--v-theme-warning), 0.08);
+  border: 1px solid rgba(var(--v-theme-warning), 0.35);
+}
+.fire-hero__unreachable-title {
+  font-weight: var(--weight-semibold);
+  font-size: var(--type-sm);
+  color: var(--text-primary);
+}
+.fire-hero__unreachable-body {
+  font-size: var(--type-sm);
+  color: var(--text-secondary);
+  margin: 4px 0 0;
 }
 .fire-hero__sep {
   margin: 0 4px;

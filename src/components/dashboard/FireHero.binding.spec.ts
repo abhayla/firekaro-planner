@@ -52,6 +52,39 @@ describe("FireHero binding locks — T-377 QN-2 gap hero", () => {
     expect(src).toMatch(/Number\.isFinite\(req\.value\.requiredMonthlyReal\)/);
   });
 
+  it("ADR-0006: an unreachable plan gets a FIRST-CLASS headline state, not just a tile", () => {
+    expect(template, "the headline-level state must exist").toContain(
+      'data-testid="fire-hero-unreachable"',
+    );
+    expect(template).toMatch(/At these assumptions you don't get there by \{\{ targetAge \}\}/);
+    // The tile-level version stays — this is an addition, not a replacement (contract: zero data loss).
+    expect(template).toMatch(/v-if="!requiredFinite">Move the age/);
+  });
+
+  it("the unreachable state is gated on the solver's OWN honest signals, never inferred", () => {
+    // Infinity from a `solve: false` run is explicitly NOT a verdict — reading it as one would
+    // fabricate the state on the six-point QN-4 chart's sampled runs.
+    expect(src).toMatch(/const unreachableAtAssumptions = computed/);
+    expect(src).toMatch(/req\.value\.solved/);
+    expect(src).toMatch(/req\.value\.paceFireAge == null/);
+  });
+
+  it("the unreachable state prints NO number and points at BOTH the moves and the assumptions", () => {
+    const block = template.slice(
+      template.indexOf('data-testid="fire-hero-unreachable"'),
+      template.indexOf('data-testid="fire-hero-guess"'),
+    );
+    expect(block.length, "the unreachable block must precede the guess line").toBeGreaterThan(0);
+    // Rule 31 / the fire-confidence-band rule: a sentinel is never rendered as a figure.
+    expect(block, "no money figure may be rendered inside the unreachable state").not.toMatch(
+      /formatINRCompact/,
+    );
+    expect(block, "must name the levers below / the age slider above").toMatch(/drag the age|move below/i);
+    expect(block, "must deep-link to the assumptions that drive it").toMatch(
+      /\/preferences#pref-section-inflation/,
+    );
+  });
+
   it("the retirement-age slider is bounded by the SHARED range and commits to the SHARED ui field", () => {
     expect(template).toMatch(/data-testid="hero-age-slider"/);
     expect(template).toMatch(/:min="HERO_AGE_MIN"/);
