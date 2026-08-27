@@ -25,17 +25,20 @@ import { useFireDerive } from "@/lib/useFireDerive";
 import {
   buildPlanLevers,
   applyPlanLevers,
+  PLAN_LEVER_KEYS,
   leverEffectFor,
   marginalEffectFor,
   solvePlan,
   toFindMonthly,
-  STEP_UP_LEVER_PERCENT,
+  STEP_UP_LEVER_NOMINAL_PERCENT,
+  realStepUpPercentFor,
   DIRECT_PLAN_RETURN_UPLIFT,
   type PlanInputs,
   type PlanLever,
   type PlanLeverKey,
 } from "@/lib/lever-catalog";
 import { PLAN_HONESTY_LINE } from "@/lib/quick-number-copy";
+import { DEFAULT_ASSUMPTIONS } from "@/types/assumptions";
 import { formatINRCompact } from "@/lib/formatters";
 
 const props = withDefaults(defineProps<{ showCommit?: boolean }>(), { showCommit: true });
@@ -62,7 +65,11 @@ const levers = computed<PlanLever[]>(() =>
   buildPlanLevers({ plan: basePlan.value, directPlans: ui.quick?.directPlans ?? null }),
 );
 
-const selected = computed<PlanLeverKey[]>(() => ui.whatIfLevers as PlanLeverKey[]);
+// Filter against the catalog rather than casting: a stale key would otherwise survive into
+// `selectedNames` and render "With : you need…" with an empty join (code-review).
+const selected = computed<PlanLeverKey[]>(() =>
+  (ui.whatIfLevers as PlanLeverKey[]).filter((k) => PLAN_LEVER_KEYS.includes(k)),
+);
 
 function isOn(key: PlanLeverKey): boolean {
   return selected.value.includes(key);
@@ -129,8 +136,18 @@ const selectedNames = computed(() =>
     .map((l) => l.label.toLowerCase().split(" — ")[0].split(" - ")[0]),
 );
 
-const currentMonthly = computed(() => baseSolve.value.currentMonthlyReal);
+/**
+ * "Already flowing" MUST come from the SAME solve as the required figure beside it. `trim-expenses`
+ * raises the savings residual, so the baseline and the with-moves solves disagree by the trim —
+ * quoting `required` from one and `flowing` from the other left a user checking
+ * `required − flowing = to find` with an unaccounted rupee (code-review; the same class T-378
+ * already fixed once on the hero).
+ */
+const currentMonthly = computed(() => planSolve.value.currentMonthlyReal);
+/** The baseline's own figure — used only for the "was ₹X" comparison. */
+const baseCurrentMonthly = computed(() => baseSolve.value.currentMonthlyReal);
 const toFindNow = computed(() => toFindMonthly(baseSolve.value));
+void baseCurrentMonthly; // reserved for the "was" comparison; keeps the two solves distinct
 const toFindWithPlan = computed(() => toFindMonthly(planSolve.value));
 const planReachable = computed(() => Number.isFinite(planSolve.value.requiredMonthlyReal));
 /** True once the moves make today's contribution enough — the "you're already there" case. */
@@ -159,14 +176,23 @@ const committable = computed(() =>
 function makeThisMyPlan() {
   if (!committable.value.length) return;
   if (committable.value.includes("step-up-10")) {
+    // Idempotent by construction: max() against an absolute target, never an increment.
     a.set(
       "householdSavingsStepUpPercent",
-      Math.max(a.values.householdSavingsStepUpPercent ?? 0, STEP_UP_LEVER_PERCENT),
+      Math.max(
+        a.values.householdSavingsStepUpPercent ?? 0,
+        realStepUpPercentFor(a.values.inflation),
+      ),
     );
   }
   if (committable.value.includes("direct-plans")) {
-    // The existing equityReturn override, +0.8pp — the same value the lever previews.
-    a.set("equityReturn", a.values.equityReturn + DIRECT_PLAN_RETURN_UPLIFT);
+    // MUST NOT be a read-modify-write. `a.values.equityReturn + uplift` compounds on every press
+    // (0.120 → 0.128 → 0.136 …) and the lever stays available afterwards on the dashboard, where
+    // ui.quick is null — so a user could silently persist a 15% equity return (code-review
+    // BLOCKER). Write the ABSOLUTE target off the research default instead, and record the choice
+    // in ui.quick so the lever closes and the previewed number matches the committed one.
+    a.set("equityReturn", DEFAULT_ASSUMPTIONS.equityReturn + DIRECT_PLAN_RETURN_UPLIFT);
+    ui.setQuickPrefs({ directPlans: true });
   }
   if (committable.value.includes("delay-3")) {
     const age = planTargetAge.value;
@@ -298,7 +324,7 @@ function openPreferences() {
       </v-btn>
       <span class="lever-picker__commit-hint">
         Writes
-        <template v-if="committable.includes('step-up-10')">the {{ STEP_UP_LEVER_PERCENT }}%/yr step-up</template>
+        <template v-if="committable.includes('step-up-10')">the {{ STEP_UP_LEVER_NOMINAL_PERCENT }}%/yr step-up</template>
         <template v-if="committable.includes('step-up-10') && committable.length > 1"> and </template>
         <template v-if="committable.includes('delay-3')">your new retirement age</template>
         <template v-if="committable.includes('direct-plans')">

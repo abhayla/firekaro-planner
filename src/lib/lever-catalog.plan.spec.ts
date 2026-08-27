@@ -29,9 +29,12 @@ import {
   lessToFindFor,
   solvePlan,
   PLAN_LEVER_KEYS,
-  STEP_UP_LEVER_PERCENT,
+  STEP_UP_LEVER_NOMINAL_PERCENT,
+  realStepUpPercentFor,
   DELAY_LEVER_YEARS,
   DIRECT_PLAN_RETURN_UPLIFT,
+  LOAN_RISK_PREMIUM,
+  MAX_LOAN_TENURE_YEARS,
   type PlanInputs,
   type PlanLeverContext,
 } from "@/lib/lever-catalog";
@@ -109,11 +112,28 @@ describe("buildPlanLevers — the QN-5 catalog", () => {
 describe("lever semantics — each maps to the spec's exact mechanism", () => {
   beforeEach(() => setActivePinia(createPinia()));
 
-  it("step-up-10 sets householdSavingsStepUpPercent to 10 (ADR-0004, kernel already supports it)", () => {
+  it("step-up-10 writes the REAL-frame step-up, NOT the nominal headline (ADR-0004 section 3)", () => {
     const { plan, ctx } = sharmasPlan();
-    expect(plan.assumptions.householdSavingsStepUpPercent ?? 0).toBeLessThan(STEP_UP_LEVER_PERCENT);
     const out = applyPlanLevers(plan, buildPlanLevers(ctx), ["step-up-10"]);
-    expect(out.assumptions.householdSavingsStepUpPercent).toBe(STEP_UP_LEVER_PERCENT);
+    const written = out.assumptions.householdSavingsStepUpPercent;
+    // The kernel field is REAL. Writing the nominal 10 there asserts a 16.6%/yr nominal
+    // escalation and puts the reference persona's final-year contribution at ~206% of take-home.
+    expect(written).toBeCloseTo(realStepUpPercentFor(plan.assumptions.inflation), 6);
+    expect(written).toBeLessThan(STEP_UP_LEVER_NOMINAL_PERCENT);
+    // At the 6% default that is ~3.8%/yr real — consistent with ~9-9.5% nominal Indian increments.
+    expect(written).toBeGreaterThan(3);
+    expect(written).toBeLessThan(5);
+  });
+
+  it("realStepUpPercentFor deflates the nominal headline and never sells a real-terms cut", () => {
+    expect(realStepUpPercentFor(0.06, 10)).toBeCloseTo(((1.1 / 1.06) - 1) * 100, 6);
+    // A nominal step-up at or below inflation is not an accelerator — it floors at 0, never negative.
+    expect(realStepUpPercentFor(0.06, 6)).toBe(0);
+    expect(realStepUpPercentFor(0.06, 4)).toBe(0);
+    // Clamped to the ADR-0004 ceiling.
+    expect(realStepUpPercentFor(0.06, 100)).toBeLessThanOrEqual(15);
+    // A non-finite inflation falls back to the 6% default rather than producing NaN.
+    expect(Number.isFinite(realStepUpPercentFor(Number.NaN))).toBe(true);
   });
 
   it("step-up-10 never LOWERS an already-higher step-up (max, not overwrite)", () => {
@@ -197,6 +217,91 @@ describe("availability rules (honest gating)", () => {
     const lever = buildPlanLevers({ ...ctx, plan: dear }).find((l) => l.key === "no-prepay-roll-emi")!;
     expect(lever.available).toBe(false);
     expect(lever.unavailableNote).toMatch(/prepay it/i);
+  });
+
+  it("a loan inside the RISK PREMIUM band is unavailable - an 11% loan vs 12% expected is a coin-flip", () => {
+    const { plan, ctx } = sharmasPlan();
+    // Prepaying is a GUARANTEED return; equity's 12% is an EXPECTED one carrying real volatility.
+    // Without a premium the lever would tell a user to keep an 11% loan on a 1pp expected edge.
+    const marginal = withOnlyLoan(plan, { interestRate: 11 });
+    const lever = buildPlanLevers({ ...ctx, plan: marginal }).find((l) => l.key === "no-prepay-roll-emi")!;
+    expect(lever.available).toBe(false);
+    expect(lever.unavailableNote).toMatch(/prepay it/i);
+    // …while a genuine home-loan rate still clears the bar comfortably.
+    const home = withOnlyLoan(plan, { interestRate: 7.2 });
+    expect(
+      buildPlanLevers({ ...ctx, plan: home }).find((l) => l.key === "no-prepay-roll-emi")!.available,
+    ).toBe(true);
+  });
+
+  it("the premium is exactly the documented buffer, not an arbitrary fudge", () => {
+    const { plan, ctx } = sharmasPlan();
+    const equityPct = plan.assumptions.equityReturn * 100;
+    const justInside = withOnlyLoan(plan, { interestRate: equityPct - LOAN_RISK_PREMIUM * 100 - 0.1 });
+    const justOutside = withOnlyLoan(plan, { interestRate: equityPct - LOAN_RISK_PREMIUM * 100 + 0.1 });
+    const avail = (p: PlanInputs) =>
+      buildPlanLevers({ ...ctx, plan: p }).find((l) => l.key === "no-prepay-roll-emi")!.available;
+    expect(avail(justInside)).toBe(true);
+    expect(avail(justOutside)).toBe(false);
+  });
+
+  it("an absurd stored end year is capped, never left to silently disable the lever", () => {
+    const { plan, ctx } = sharmasPlan();
+    const corrupt = withOnlyLoan(plan, { derivedEndYear: 3500 });
+    const levers = buildPlanLevers({ ...ctx, plan: corrupt });
+    const out = applyPlanLevers(corrupt, levers, ["no-prepay-roll-emi"]);
+    expect(out.rolledEmiFromYear).toBeLessThanOrEqual(
+      new Date().getFullYear() + MAX_LOAN_TENURE_YEARS,
+    );
+    // …and the lever still produces a real effect rather than a dead tickbox.
+    expect(lessToFindFor(corrupt, levers, ["no-prepay-roll-emi"])).toBeGreaterThanOrEqual(0);
+  });
+
+  it("with two cheap loans the roll is DETERMINISTIC, not data-entry order", () => {
+    const { plan, ctx } = sharmasPlan();
+    const owner = plan.snapshot.members[0].id;
+    const thisYear = new Date().getFullYear();
+    const car = {
+      id: "car",
+      name: "Car loan",
+      type: "CarLoan" as const,
+      outstandingBalance: 400_000,
+      monthlyEMI: 20_000,
+      interestRate: 9,
+      ownerId: owner,
+      isSharedWithSpouse: false,
+      derivedEndYear: thisYear + 3,
+    };
+    const home = {
+      id: "home",
+      name: "Home loan",
+      type: "HomeLoan" as const,
+      outstandingBalance: 6_000_000,
+      monthlyEMI: 100_000,
+      interestRate: 7.2,
+      ownerId: owner,
+      isSharedWithSpouse: false,
+      derivedEndYear: thisYear + 12,
+    };
+    const forward = { ...plan, snapshot: { ...plan.snapshot, liabilities: [car, home] } };
+    const reversed = { ...plan, snapshot: { ...plan.snapshot, liabilities: [home, car] } };
+    const roll = (p: PlanInputs) =>
+      applyPlanLevers(p, buildPlanLevers({ ...ctx, plan: p }), ["no-prepay-roll-emi"]);
+    // Same answer regardless of the order the user entered them.
+    expect(roll(forward).rolledEmiMonthly).toBe(roll(reversed).rolledEmiMonthly);
+    // Earliest-ending wins - its EMI starts flowing soonest.
+    expect(roll(forward).rolledEmiMonthly).toBe(car.monthlyEMI);
+  });
+
+  it("an available lever carries NO unavailableNote (a note that contradicts itself is a trap)", () => {
+    const { ctx } = sharmasPlan();
+    for (const lever of buildPlanLevers(ctx)) {
+      if (lever.available) {
+        expect(lever.unavailableNote, `${lever.key} is available but carries a reason`).toBeUndefined();
+      } else {
+        expect(lever.unavailableNote, `${lever.key} is unavailable and must say why`).toBeTruthy();
+      }
+    }
   });
 
   it("the rate rule compares like with like — a 12% loan against a 12% return is NOT a win", () => {

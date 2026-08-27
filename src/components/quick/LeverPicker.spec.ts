@@ -11,8 +11,14 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { setActivePinia, createPinia } from "pinia";
 import { useUiStore } from "@/stores/ui";
+import { useAssumptionsStore } from "@/stores/assumptions";
+import { DEFAULT_ASSUMPTIONS } from "@/types/assumptions";
 import { PLAN_HONESTY_LINE } from "@/lib/quick-number-copy";
-import { PLAN_LEVER_KEYS } from "@/lib/lever-catalog";
+import {
+  DIRECT_PLAN_RETURN_UPLIFT,
+  PLAN_LEVER_KEYS,
+  realStepUpPercentFor,
+} from "@/lib/lever-catalog";
 
 const src = readFileSync(fileURLToPath(new URL("./LeverPicker.vue", import.meta.url)), "utf8");
 
@@ -130,5 +136,75 @@ describe("LeverPicker — toggling is SESSION-ONLY what-if state", () => {
     // The card reads the richer effect API (which distinguishes a ₹ saving from a RESCUE of an
     // otherwise-unreachable plan) rather than the bare ₹ metric — see leverEffectFor.
     expect(src).toMatch(/leverEffectFor\(/);
+  });
+});
+
+/**
+ * "Make this my plan" — the ONE write this card can make, tested against the REAL stores.
+ *
+ * `@vue/test-utils` is not a dependency of this repo and the goal contract forbids adding one, so
+ * rather than mounting we exercise the exact store sequence `makeThisMyPlan()` performs. That is
+ * where the blocker lived: a read-modify-write on `equityReturn` compounded on every press
+ * (0.120 → 0.128 → 0.136 …) and, on the dashboard where `ui.quick` is null, the lever stayed
+ * available forever — so a user could silently persist a 15%+ equity return.
+ */
+describe("LeverPicker — 'Make this my plan' is idempotent (persisted-plan safety)", () => {
+  beforeEach(() => setActivePinia(createPinia()));
+
+  it("committing direct-plans twice leaves equityReturn at the SAME value", () => {
+    const a = useAssumptionsStore();
+    const ui = useUiStore();
+    const start = a.values.equityReturn;
+
+    const commitDirect = () => {
+      // The absolute-target write the component performs — never `a.values.equityReturn + uplift`.
+      a.set("equityReturn", DEFAULT_ASSUMPTIONS.equityReturn + DIRECT_PLAN_RETURN_UPLIFT);
+      ui.setQuickPrefs({ directPlans: true });
+    };
+
+    commitDirect();
+    const afterFirst = a.values.equityReturn;
+    expect(afterFirst).toBeCloseTo(start + DIRECT_PLAN_RETURN_UPLIFT, 10);
+
+    for (let i = 0; i < 5; i++) commitDirect();
+    expect(
+      a.values.equityReturn,
+      "a read-modify-write would have compounded to ~0.16 after six presses",
+    ).toBeCloseTo(afterFirst, 10);
+    expect(a.values.equityReturn).toBeLessThan(0.5); // the Zod ceiling is never approached
+  });
+
+  it("committing direct-plans records the choice so the lever CLOSES afterwards", () => {
+    const ui = useUiStore();
+    expect(ui.quick?.directPlans).toBeUndefined();
+    ui.setQuickPrefs({ directPlans: true });
+    // buildPlanLevers gates on exactly this value — an affirmative "Direct" makes it unavailable.
+    expect(ui.quick?.directPlans).toBe(true);
+  });
+
+  it("the step-up commit is idempotent by construction (max against an absolute target)", () => {
+    const a = useAssumptionsStore();
+    const target = realStepUpPercentFor(a.values.inflation);
+    const commit = () =>
+      a.set(
+        "householdSavingsStepUpPercent",
+        Math.max(a.values.householdSavingsStepUpPercent ?? 0, realStepUpPercentFor(a.values.inflation)),
+      );
+    commit();
+    const first = a.values.householdSavingsStepUpPercent;
+    expect(first).toBeCloseTo(target, 10);
+    commit();
+    commit();
+    expect(a.values.householdSavingsStepUpPercent).toBeCloseTo(first, 10);
+  });
+
+  it("a household already stepping up MORE is never talked down by the commit", () => {
+    const a = useAssumptionsStore();
+    a.set("householdSavingsStepUpPercent", 9);
+    a.set(
+      "householdSavingsStepUpPercent",
+      Math.max(a.values.householdSavingsStepUpPercent ?? 0, realStepUpPercentFor(a.values.inflation)),
+    );
+    expect(a.values.householdSavingsStepUpPercent).toBe(9);
   });
 });
