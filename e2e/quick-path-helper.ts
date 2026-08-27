@@ -30,6 +30,20 @@ async function next(page: Page) {
   await page.waitForTimeout(150);
 }
 
+/**
+ * Enter the express path from the splash screen.
+ *
+ * The CTA is the BUTTON "Find my number"; "Start my own plan" is the section HEADING above it, so
+ * clicking the heading text silently does nothing and the walk then fails on card 1 with a
+ * confusing "quick-question not found" (T-379 found three specs doing exactly that). One helper
+ * so a future CTA rename is a one-line fix.
+ */
+export async function gotoQuickPath(page: Page) {
+  await page.goto("/", { waitUntil: "networkidle" });
+  await page.getByRole("button", { name: /Find my number/i }).click();
+  await expect(page).toHaveURL(/\/quick/, { timeout: 20000 });
+}
+
 /** Walk all ten cards with the reference household's answers, filling every optional field. */
 export async function fillQuickPath(page: Page) {
   // 1 · gut feel (chip row)

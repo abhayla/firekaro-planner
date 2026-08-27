@@ -150,7 +150,10 @@ const winBars = computed<WinBar[]>(() =>
     <!-- QN-5 picker — the concrete moves, priced in "₹ less to find every month" (re-solved
          through derive(), so stacking compounds). Replaces the old fixed-amount save-more slider. -->
     <v-divider class="my-4" />
-    <LeverPicker data-testid="accel-lever-picker" />
+    <!-- No data-testid here on purpose: Vue attribute fallthrough would OVERWRITE the picker's
+         own root data-testid="lever-picker", so the one selector every lever spec uses would
+         silently disappear on the dashboard while still working on /quick. -->
+    <LeverPicker />
   </v-card>
 </template>
 
