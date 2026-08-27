@@ -3,15 +3,16 @@
  * Acceleration card (objective 2, gh-issue #48) — "your biggest achievable wins": an opinionated,
  * RANKED list of the accelerators that move THIS household's FIRE date, biggest-years-saved first,
  * each stated as "do X → FIRE ~N years sooner" with its transparent bound. The variance-bearing
- * risk-notch shows a confidence RANGE (never a free-lunch point). A live "invest ₹X more/month"
- * stepper is an ephemeral what-if (not persisted). Decision-support framing — never product advice.
+ * risk-notch shows a confidence RANGE (never a free-lunch point). Its BODY is the QN-5
+ * <LeverPicker> (T-379): the same "pick your moves" card the /quick result shows, pricing each move
+ * in "₹ less to find every month". Decision-support framing — never product advice.
  *
  * All math comes from the pure libs via useAcceleration(); this component only renders.
  */
-import { ref, computed } from "vue";
+import { computed } from "vue";
 import { useAcceleration } from "@/composables/useAcceleration";
-import { formatINRCompact } from "@/lib/formatters";
 import WinsImpactBars, { type WinBar } from "@/components/dashboard/viz/WinsImpactBars.vue";
+import LeverPicker from "@/components/quick/LeverPicker.vue";
 
 const accel = useAcceleration();
 
@@ -64,15 +65,16 @@ const winBars = computed<WinBar[]>(() =>
   }),
 );
 
-// --- Save-more sensitivity (ephemeral component state — NOT persisted) ---
-const SAVE_MORE_STEP = 5000;
-// A sane ceiling for the stepper: a notch above the current monthly contribution, min ₹50k.
-const saveMoreMax = computed(() => {
-  const ceiling = Math.max(50_000, Math.ceil(accel.monthlyContribution.value / SAVE_MORE_STEP) * SAVE_MORE_STEP);
-  return ceiling;
-});
-const extraMonthly = ref(SAVE_MORE_STEP * 2); // default ₹10k/mo
-const saveMoreImpact = computed(() => accel.saveMoreImpact(extraMonthly.value));
+// --- T-379 (QN-5) ---
+// The fixed-amount "invest ₹X more/month" slider that used to sit here has been REPLACED by
+// <LeverPicker>: a picker of concrete moves whose effect is stated in the metric a person can act
+// on ("₹X less to find every month"), re-solved through derive() rather than estimated off the
+// scalar corpus model. Everything ABOVE this line is retained deliberately — the bridge-binding
+// caveat, the baseline-reachable guard and the years-saved "biggest win" ranking answer a
+// different question ("when can I stop?") and carry the #22/rule-31 honesty history.
+//
+// `useAcceleration`'s `saveMoreImpact` is likewise retained (still exported, still spec'd); only
+// this card's presentation of it changed.
 </script>
 
 <template>
@@ -142,39 +144,13 @@ const saveMoreImpact = computed(() => accel.saveMoreImpact(extraMonthly.value));
       data-testid="accel-empty"
     >
       No realistic accelerators apply right now — your allocation and spending are already working hard.
-      The biggest remaining lever is investing more each month (below).
+      The moves below are still yours to pick.
     </v-alert>
 
-    <!-- Save-more sensitivity — ephemeral what-if -->
+    <!-- QN-5 picker — the concrete moves, priced in "₹ less to find every month" (re-solved
+         through derive(), so stacking compounds). Replaces the old fixed-amount save-more slider. -->
     <v-divider class="my-4" />
-    <div class="section-label">Invest more each month</div>
-    <div class="d-flex align-center ga-4 mt-1">
-      <v-slider
-        v-model="extraMonthly"
-        :min="0"
-        :max="saveMoreMax"
-        :step="SAVE_MORE_STEP"
-        color="fire-orange"
-        hide-details
-        class="flex-grow-1"
-        data-testid="accel-savemore-slider"
-        :aria-label="`Invest an extra ${formatINRCompact(extraMonthly)} per month`"
-      />
-      <div class="accel-savemore__amount text-currency">+{{ formatINRCompact(extraMonthly) }}/mo</div>
-    </div>
-    <div class="accel-savemore__result mt-1" data-testid="accel-savemore-result">
-      <template v-if="bridgeBinding && extraMonthly > 0">
-        Investing {{ formatINRCompact(extraMonthly) }} more every month grows your corpus and your liquid
-        runway faster — easing the bridge gap that currently sets your date.
-      </template>
-      <template v-else-if="saveMoreImpact && saveMoreImpact.reachable && saveMoreImpact.deltaYears > 0">
-        Investing {{ formatINRCompact(extraMonthly) }} more every month →
-        <strong>{{ soonerLabel(saveMoreImpact.deltaYears) }}</strong>
-      </template>
-      <template v-else>
-        Drag to see how investing more each month brings your FIRE date closer.
-      </template>
-    </div>
+    <LeverPicker data-testid="accel-lever-picker" />
   </v-card>
 </template>
 
@@ -210,22 +186,5 @@ const saveMoreImpact = computed(() => accel.saveMoreImpact(extraMonthly.value));
   display: flex;
   align-items: center;
   justify-content: center;
-}
-.section-label {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: var(--tracking-wide);
-  font-weight: var(--weight-medium);
-  color: var(--text-muted);
-  margin-bottom: var(--space-2);
-}
-.accel-savemore__amount {
-  font-weight: var(--weight-bold);
-  min-width: 96px;
-  text-align: right;
-}
-.accel-savemore__result {
-  font-size: var(--type-sm);
-  color: var(--text-secondary);
 }
 </style>

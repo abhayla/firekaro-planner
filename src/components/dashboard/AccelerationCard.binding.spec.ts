@@ -45,3 +45,38 @@ describe("AccelerationCard template-binding honesty lock (gh-48, rule 31)", () =
     );
   });
 });
+
+/**
+ * T-379 (QN-5) — the card's BODY is now <LeverPicker>, but the retention contract above it is
+ * explicit in the goal contract: the years-saved KPI, the bridge guard and the baseline guard are
+ * kept, and ONLY the fixed-extra-amount "save more" presentation is replaced. These cases lock
+ * that split so a future edit cannot quietly delete the honesty surfaces while "modernising" the
+ * card, nor re-introduce the fixed-amount slider the picker replaced.
+ */
+describe("AccelerationCard × LeverPicker (T-379 QN-5 retention contract)", () => {
+  it("embeds the QN-5 lever picker as the card body", () => {
+    expect(src, "LeverPicker must be imported").toMatch(
+      /import LeverPicker from "@\/components\/quick\/LeverPicker\.vue";/,
+    );
+    expect(src, "LeverPicker must render inside the card").toMatch(/<LeverPicker\b/);
+  });
+
+  it("RETAINS the years-saved 'biggest win' KPI and both guards (not replaced by the picker)", () => {
+    // The ranked years-saved surface — the "when can I stop?" question the ₹ view cannot answer.
+    expect(src, "ranked levers must still drive the impact bars").toMatch(/reachableLevers/);
+    expect(src, "WinsImpactBars must still render").toMatch(/<WinsImpactBars\b/);
+    // bridgeBinding guard (#22 / rule 31) and the baseline-reachable guard (gh #39 empty state).
+    expect(src, "bridgeBinding guard retained").toMatch(/const bridgeBinding = computed/);
+    expect(src, "baselineReachable guard retained").toMatch(/const baselineReachable = computed/);
+    expect(src, "self-hide gate retained").toMatch(/const show = computed/);
+  });
+
+  it("the fixed-extra-amount save-more SLIDER is gone (only that presentation was replaced)", () => {
+    expect(src, "the ₹-stepper slider must not survive alongside the picker").not.toMatch(
+      /data-testid="accel-savemore-slider"/,
+    );
+    expect(src, "its result line must not survive either").not.toMatch(
+      /data-testid="accel-savemore-result"/,
+    );
+  });
+});
