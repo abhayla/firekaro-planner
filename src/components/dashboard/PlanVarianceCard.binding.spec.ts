@@ -12,6 +12,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 const src = readFileSync(fileURLToPath(new URL("./PlanVarianceCard.vue", import.meta.url)), "utf8");
+const template = src.slice(src.indexOf("<template>"));
 
 describe("PlanVarianceCard binding locks (#155 + H1 guard)", () => {
   it("#155: the re-lock button flips to a transient ✓ acknowledgement on click — regardless of variance state", () => {
@@ -45,5 +46,37 @@ describe("PlanVarianceCard binding locks (#155 + H1 guard)", () => {
     const template = src.slice(src.indexOf("<template>"));
     expect(template, "no plan-variance-lock control in this card").not.toContain('data-testid="plan-variance-lock"');
     expect(template, "empty state points at the hero").toMatch(/Lock this as my plan/);
+  });
+});
+
+/**
+ * ADR-0006 — the frame gate. A baseline locked under the old modelling frame would produce a
+ * verdict that is almost entirely the model's move, rendered as the user's slippage. The card
+ * declines to claim anything, says why in plain words, and offers the re-lock.
+ */
+describe("PlanVarianceCard — old-frame baseline (ADR-0006)", () => {
+  it("a stale-framed baseline is excluded from the usable path", () => {
+    expect(src).toMatch(/isBaselineFrameCurrent/);
+    expect(src).toMatch(/const baselineFrameStale = computed/);
+    expect(src).toMatch(/baselineUsable = computed\([\s\S]{0,220}!baselineFrameStale\.value/);
+  });
+
+  it("renders a dedicated state that makes NO numeric claim", () => {
+    expect(template).toContain('data-testid="plan-variance-stale-frame"');
+    const block = template.slice(template.indexOf('data-testid="plan-variance-stale-frame"'));
+    const stale = block.slice(0, block.indexOf("</v-card>"));
+    expect(stale, "no money or month figure may be rendered here").not.toMatch(/formatINRCompact|variance\./);
+    expect(stale).toMatch(/locked under the old model/);
+    // It must reassure as well as decline — nothing about the user's money changed.
+    expect(stale).toMatch(/Nothing about your money has changed/);
+  });
+
+  it("offers the re-lock rather than performing it", () => {
+    expect(template).toMatch(
+      /data-testid="plan-variance-relock-frame"[\s\S]{0,120}@click="lockBaseline"/,
+    );
+    expect(src, "no silent re-lock on mount or in a watcher").not.toMatch(
+      /onMounted\([\s\S]{0,200}lockBaseline\(\)/,
+    );
   });
 });

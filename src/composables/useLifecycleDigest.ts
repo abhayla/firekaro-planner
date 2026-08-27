@@ -16,6 +16,7 @@ import { analyzeLifestyleInflation, detectGoalPostShift } from "@/lib/expense-hi
 import {
   captureSnapshot,
   computeLifecycleDigest,
+  isSnapshotFrameCurrent,
   type SnapshotInputs,
   type LifecycleSnapshot,
 } from "@/lib/lifecycle-digest";
@@ -194,10 +195,20 @@ export function useLifecycleDigest() {
     ui.captureLifecycleSnapshot(buildLive(new Date()));
   }
 
-  /** First-ever load (no baseline): silently capture so the next change has a diff base. */
+  /**
+   * First-ever load (no baseline): silently capture so the next change has a diff base.
+   *
+   * ADR-0006 also re-captures when the stored snapshot predates the current modelling frame. The
+   * digest would otherwise open with "your FIRE date moved N years later" for every existing user on
+   * their first visit after deploy — a change the model made, dressed as something they did. Silent
+   * re-capture is right HERE (this baseline was always captured silently and is an internal marker);
+   * the plan baseline, which the user consciously locked, is never re-locked without being asked.
+   */
   function ensureBaseline() {
     if (!hasHousehold.value) return;
-    if (baseline.value == null) ui.captureLifecycleSnapshot(buildLive(new Date()));
+    if (baseline.value == null || !isSnapshotFrameCurrent(baseline.value)) {
+      ui.captureLifecycleSnapshot(buildLive(new Date()));
+    }
   }
 
   return {

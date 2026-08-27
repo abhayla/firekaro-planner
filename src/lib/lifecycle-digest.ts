@@ -37,6 +37,19 @@ export type MilestoneBand = (typeof MILESTONE_BANDS)[number];
 export const UNREACHABLE_FIRE_AGE = -1;
 
 /**
+ * ADR-0006 — the modelling frame a stored snapshot was captured under.
+ *
+ * Bump this ONLY when a kernel change moves every user's headline for reasons unrelated to their
+ * own behaviour. "Since you were away" is a claim about what the USER did; diffing across a frame
+ * change would attribute the model's move to them ("your FIRE date moved 2 years later") on every
+ * existing user's first visit after deploy. Unlike the plan baseline — which the user consciously
+ * locked and must therefore be asked before replacing — the digest baseline is an internal marker
+ * captured silently in the first place, so silently re-capturing it is the honest behaviour, not a
+ * loss: the next visit then reports only genuine, post-change movement.
+ */
+export const FRAME_VERSION = "adr-0006";
+
+/**
  * The exact `derive()` fields the snapshot is built from. Typed as a Pick so the
  * dashboard can pass an object assembled from `useFireDerive()` computeds (reading
  * derive() output via the wrapper — NOT re-calling the math), while the full
@@ -81,6 +94,16 @@ export interface LifecycleSnapshot {
   activeNudgeIds: string[];
   /** Monte-Carlo median FIRE age (anchorAge + p50 years), or null when off the chart. */
   monteCarloP50Age: number | null;
+  /**
+   * The modelling frame this snapshot was captured under. ABSENT on every snapshot written before
+   * ADR-0006 — which is how a pre-frame-change baseline is recognised.
+   */
+  frameVersion?: string;
+}
+
+/** True when a stored snapshot can honestly be differenced against a live one. */
+export function isSnapshotFrameCurrent(snapshot: LifecycleSnapshot | null | undefined): boolean {
+  return !!snapshot && snapshot.frameVersion === FRAME_VERSION;
 }
 
 export interface LifecycleDigest {
@@ -159,6 +182,7 @@ export function captureSnapshot(
 
   return {
     capturedAt: now.toISOString(),
+    frameVersion: FRAME_VERSION,
     fireAge,
     fireYear,
     currentCorpus,
@@ -204,7 +228,11 @@ export function computeLifecycleDigest(
   current: LifecycleSnapshot,
   baseline: LifecycleSnapshot | null,
 ): LifecycleDigest {
-  if (!baseline) {
+  // ADR-0006: a baseline from an older modelling frame is treated exactly like NO baseline — the
+  // delta across a frame change is the model's, not the user's, and reporting it as "since you were
+  // away" would be a fabricated claim about their behaviour. `useLifecycleDigest.ensureBaseline()`
+  // then re-captures silently, so the NEXT visit diffs genuine movement.
+  if (!baseline || baseline.frameVersion !== current.frameVersion) {
     return {
       hasMeaningfulChange: false,
       fireAgeDeltaYears: 0,

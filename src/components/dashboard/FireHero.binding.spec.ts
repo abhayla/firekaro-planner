@@ -164,6 +164,22 @@ describe("FireHero binding locks — T-377 QN-2 gap hero", () => {
     expect(src).toMatch(/resolveHeroTone\(\{/);
   });
 
+  it("ADR-0006: a baseline locked under the OLD model makes NO verdict — it offers a re-lock", () => {
+    // Differencing across a frame change reports the model's move as the user's slippage: a
+    // fabricated "N months behind" for every user who had ever locked a plan.
+    expect(src).toMatch(/isBaselineFrameCurrent/);
+    expect(src).toMatch(/const baselineFrameStale = computed/);
+    // The staleness must actually gate the verdict path, not merely exist.
+    expect(src).toMatch(/baselineUsable = computed\([\s\S]{0,220}!baselineFrameStale\.value/);
+    expect(src).toMatch(/your plan was locked under the old model — re-lock to compare/);
+    // The re-lock is OFFERED, never taken for the user — the baseline is their chosen starting point.
+    expect(template).toContain('data-testid="plan-variance-relock-frame"');
+    expect(template).toMatch(/v-if="planSlot\.relock"/);
+    expect(src, "no auto-relock may be wired to a watcher or mount hook").not.toMatch(
+      /baselineFrameStale[\s\S]{0,80}lockBaseline\(\)/,
+    );
+  });
+
   it("'Set as my target' writes only the LENSED member when a lens is on (never both spouses)", () => {
     expect(src).toMatch(/hh\.value\.isMember[\s\S]{0,160}m\.id === ui\.viewingMemberId/);
   });

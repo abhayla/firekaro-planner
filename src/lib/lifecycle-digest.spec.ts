@@ -16,6 +16,8 @@ import { setActivePinia, createPinia } from "pinia";
 import {
   captureSnapshot,
   computeLifecycleDigest,
+  isSnapshotFrameCurrent,
+  FRAME_VERSION,
   MILESTONE_BANDS,
   type LifecycleSnapshot,
 } from "@/lib/lifecycle-digest";
@@ -32,6 +34,8 @@ import { derivedFamilyLayer } from "@/lib/derived-records";
 // A minimal sane baseline used by the unit-level diff tests.
 const base: LifecycleSnapshot = {
   capturedAt: "2026-01-01T00:00:00.000Z",
+  // Same frame on both sides, so the diff tests below exercise the DIFF and not the frame gate.
+  frameVersion: FRAME_VERSION,
   fireAge: 56,
   fireYear: 2052,
   currentCorpus: 10_000_000,
@@ -298,4 +302,63 @@ describe("lifecycle-digest substance — reconciliation vs derive() (Stage D, ru
       expect(defSnap.milestoneBand).toBe(famSnap.milestoneBand);
     });
   }
+});
+
+/**
+ * ADR-0006 — the frame gate. Every stored snapshot predates the frame change on deploy day, and the
+ * headline moved for every user for reasons that have nothing to do with what they did. Reporting
+ * that as "your FIRE date moved 2 years later since you were away" is a fabricated claim about the
+ * user's behaviour — rule 31, and the exact class this ADR exists to remove from the product.
+ */
+describe("lifecycle-digest — frame-change migration (ADR-0006)", () => {
+  it("captureSnapshot stamps the current frame", () => {
+    const snap = captureSnapshot(
+      {
+        anchorAge: 35,
+        yearsToRegular: 20,
+        fireWithdrawableCorpus: 10_000_000,
+        fireNumber: 40_000_000,
+        savingsRate: 40,
+        realBlendedReturn: 0.04,
+        realReturnSchedule: 0.04,
+        realTargetDriftRate: 0.0023,
+        householdContributionSchedule: 100_000,
+        portfolioVolatility: 0.15,
+        monthlyContribution: 100_000,
+      },
+      [],
+      new Date("2026-08-27T00:00:00.000Z"),
+      { skipMonteCarlo: true },
+    );
+    expect(snap.frameVersion).toBe(FRAME_VERSION);
+    expect(isSnapshotFrameCurrent(snap)).toBe(true);
+  });
+
+  it("a snapshot with NO frame tag is recognised as pre-frame-change", () => {
+    const legacy: LifecycleSnapshot = { ...base };
+    delete legacy.frameVersion;
+    expect(isSnapshotFrameCurrent(legacy)).toBe(false);
+    expect(isSnapshotFrameCurrent(null)).toBe(false);
+  });
+
+  it("a stale-framed baseline is treated exactly like NO baseline — no delta is claimed", () => {
+    const legacy: LifecycleSnapshot = { ...base };
+    delete legacy.frameVersion;
+    // A move that WOULD be loudly reported within one frame: 4 years later + a corpus jump.
+    const current = withChange({ fireAge: 60, currentCorpus: 20_000_000 });
+
+    const acrossFrames = computeLifecycleDigest(current, legacy);
+    expect(acrossFrames.hasMeaningfulChange, "no claim may survive a frame change").toBe(false);
+    expect(acrossFrames.fireAgeDeltaYears).toBe(0);
+    expect(acrossFrames.fireDirection).toBe("same");
+    expect(acrossFrames.corpusDelta).toBe(0);
+    expect(acrossFrames.sinceCapturedAt).toBeNull();
+
+    // ...and the SAME diff inside one frame is still reported in full — the gate is scoped to the
+    // frame change, it does not quietly mute the digest.
+    const withinFrame = computeLifecycleDigest(current, base);
+    expect(withinFrame.hasMeaningfulChange).toBe(true);
+    expect(withinFrame.fireDirection).toBe("later");
+    expect(withinFrame.fireAgeDeltaYears).toBeCloseTo(-4, 6);
+  });
 });

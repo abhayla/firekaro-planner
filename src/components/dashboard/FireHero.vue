@@ -20,7 +20,7 @@ import { useHouseholdStore } from "@/stores/household";
 import { useAssumptionsStore } from "@/stores/assumptions";
 import { useUiStore, SHARED_TARGET_AGE_MIN, SHARED_TARGET_AGE_MAX } from "@/stores/ui";
 import { usePlanBaseline } from "@/composables/usePlanBaseline";
-import { computePlanVariance } from "@/lib/plan-variance";
+import { computePlanVariance, isBaselineFrameCurrent } from "@/lib/plan-variance";
 import { useAcceleration } from "@/composables/useAcceleration";
 import { useLifecycleDigest } from "@/composables/useLifecycleDigest";
 import { resolveHeroTone, resolveGapTone } from "@/lib/dashboard-verdict";
@@ -118,7 +118,15 @@ const { baseline, lockBaseline } = usePlanBaseline();
 // A baseline whose stored yearsToFire is not a finite number can't support ANY verdict: an
 // Infinity captured pre-guard JSON-round-trips to null, and (null − current)×12 coerces to a
 // finite-but-FABRICATED "behind" claim (code-review H1, 2026-06-10). Validate at the seam.
-const baselineUsable = computed(() => !!baseline.value && Number.isFinite(baseline.value.yearsToFire));
+// ADR-0006 — a baseline captured under the OLD modelling frame cannot support a verdict either.
+// Differencing it against today's plan would report the frame change as the user falling behind:
+// a fabricated "N months behind" for every existing user on their first visit after deploy. We say
+// so and offer the re-lock instead. Never a number, and never a silent re-lock (that would erase
+// the starting point the user consciously chose).
+const baselineFrameStale = computed(() => !!baseline.value && !isBaselineFrameCurrent(baseline.value));
+const baselineUsable = computed(
+  () => !!baseline.value && Number.isFinite(baseline.value.yearsToFire) && !baselineFrameStale.value,
+);
 const variance = computed(() => {
   if (!baseline.value || !baselineUsable.value) return null;
   return computePlanVariance({
@@ -152,20 +160,29 @@ const lockedOn = computed(() =>
 );
 const planSlot = computed(() => {
   if (!baseline.value) return null;
+  // Stale frame → no verdict at all, just the honest reason (the re-lock button renders beside it).
+  if (baselineFrameStale.value) {
+    return {
+      cls: "",
+      value: "—",
+      sub: `your plan was locked under the old model — re-lock to compare`,
+      relock: true,
+    };
+  }
   const d = variance.value?.fireDateDeltaMonths;
   // Guarded for display: heroTone already falls back to "no-baseline" (the "—" branch below)
   // whenever d is non-finite, so m is only ever rendered for a real, finite claim.
   const m = d != null && Number.isFinite(d) ? Math.abs(Math.round(d)) : 0;
   switch (heroTone.value) {
     case "ahead":
-      return { cls: "text-success", value: `▲ ${m} mo ahead`, sub: `vs the plan you locked ${lockedOn.value}` };
+      return { cls: "text-success", value: `▲ ${m} mo ahead`, sub: `vs the plan you locked ${lockedOn.value}`, relock: false };
     case "behind":
-      return { cls: "text-warning", value: `▼ ${m} mo behind`, sub: `vs the plan you locked ${lockedOn.value}` };
+      return { cls: "text-warning", value: `▼ ${m} mo behind`, sub: `vs the plan you locked ${lockedOn.value}`, relock: false };
     case "on-track":
-      return { cls: "text-success", value: "✓ On track", sub: `right on the plan you locked ${lockedOn.value}` };
+      return { cls: "text-success", value: "✓ On track", sub: `right on the plan you locked ${lockedOn.value}`, relock: false };
     default:
       // Baseline exists but the delta is indeterminate — make no claim (rule 20/31).
-      return { cls: "", value: "—", sub: `plan locked ${lockedOn.value}` };
+      return { cls: "", value: "—", sub: `plan locked ${lockedOn.value}`, relock: false };
   }
 });
 
@@ -588,6 +605,19 @@ function yearsLabel(years: number): string {
         <template v-if="planSlot">
           <div class="kpi__value" :class="planSlot.cls" data-testid="hero-kpi-plan">{{ planSlot.value }}</div>
           <div class="kpi__sub">{{ planSlot.sub }}</div>
+          <!-- ADR-0006: the re-lock is the user's call, offered here rather than taken silently. -->
+          <v-btn
+            v-if="planSlot.relock"
+            size="small"
+            color="primary"
+            variant="flat"
+            prepend-icon="mdi-lock-reset"
+            class="mt-1"
+            data-testid="plan-variance-relock-frame"
+            @click="lockBaseline"
+          >
+            Re-lock my plan
+          </v-btn>
         </template>
         <!-- Lock only when there is a projectable plan to lock — capturing an Infinity
              yearsToFire seeds the fabricated-claim class (code-review M4/H1). -->

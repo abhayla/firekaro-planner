@@ -67,6 +67,28 @@ export function formatINRCompact(n: number): string {
 // until they cross 75%.
 const MILESTONE_BANDS = [100, 75, 50, 25] as const;
 
+/**
+ * ADR-0006 — the date ADR-0006's frame change reached production.
+ *
+ * The frame change moves EVERY user's projected FIRE age later, by construction and by an amount
+ * that has nothing to do with what the user did. Two of the three nudges here are immune:
+ *   - `milestone` keys on `progressPercent` = corpus ÷ fireNumber, and `fireNumber` is a today's-
+ *     rupee figure that no inflation input can move — ADR-0006 left it byte-identical for every
+ *     seed persona. No band is newly crossed, so no wave.
+ *   - `annual_review` fires once per FY regardless of any signal.
+ * `offtrack` is the one that would fire en masse: users cross
+ * `projectedFireAge > targetRetirementAge + 0.5` together on the first daily run after deploy, and
+ * the template ATTRIBUTES the slip to "a low savings rate" or "rising expenses". Both attributions
+ * would be false — the cause was our model. Sending that to every consenting user is worse than
+ * silence, so off-track is suppressed for the FY the change landed in.
+ *
+ * Scoped to that FY on purpose: the dedupe key is already `offtrack:<FY>`, so nothing is lost — a
+ * user who is genuinely off-track still hears about it in the next FY, with an attribution that is
+ * true. A shorter fixed window would only have moved the same false wave a few weeks later.
+ */
+export const ADR_0006_FRAME_CHANGE_AT = new Date("2026-08-27T00:00:00.000Z");
+export const ADR_0006_FRAME_CHANGE_FY = financialYearOf(ADR_0006_FRAME_CHANGE_AT);
+
 export function evaluateLifecycle(input: LifecycleInput): LifecycleNudge[] {
   const s = input.signals;
   const out: LifecycleNudge[] = [];
@@ -86,14 +108,16 @@ export function evaluateLifecycle(input: LifecycleInput): LifecycleNudge[] {
   // keying on the drifting projection would re-fire every time the projection
   // slips by a year, which is noisier than intended. `yearsToRegular > 0` excludes
   // users who have already reached the target (where "off-track" copy is incoherent).
-  if (Number.isFinite(s.yearsToRegular) && s.yearsToRegular > 0) {
+  const offtrackFy = financialYearOf(input.now);
+  const frameChangeFy = offtrackFy === ADR_0006_FRAME_CHANGE_FY;
+  if (!frameChangeFy && Number.isFinite(s.yearsToRegular) && s.yearsToRegular > 0) {
     const projectedFireAge = s.anchorAge + s.yearsToRegular;
     if (projectedFireAge > s.targetRetirementAge + 0.5) {
       const projectedYear = input.now.getUTCFullYear() + Math.ceil(s.yearsToRegular);
       const driver = s.savingsRate < 20 ? "a low savings rate" : "rising expenses";
       out.push({
         key: "offtrack",
-        dedupeKey: `offtrack:${financialYearOf(input.now)}`,
+        dedupeKey: `offtrack:${offtrackFy}`,
         values: [String(projectedYear), driver],
       });
     }

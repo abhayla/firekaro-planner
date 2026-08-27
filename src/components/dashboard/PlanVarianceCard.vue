@@ -15,7 +15,7 @@ import { useHouseholdStore } from "@/stores/household";
 import { useAssumptionsStore } from "@/stores/assumptions";
 import { useUiStore } from "@/stores/ui";
 import { usePlanBaseline } from "@/composables/usePlanBaseline";
-import { computePlanVariance } from "@/lib/plan-variance";
+import { computePlanVariance, isBaselineFrameCurrent } from "@/lib/plan-variance";
 import { formatINRCompact } from "@/lib/formatters";
 import PlanVarianceWaterfall from "@/components/dashboard/viz/PlanVarianceWaterfall.vue";
 
@@ -27,7 +27,13 @@ const { baseline, lockBaseline } = usePlanBaseline();
 // A persisted Infinity yearsToFire JSON-round-trips to null and would fabricate a finite
 // claim ((null − current)×12 → "N mo behind"). An unusable baseline renders the empty state
 // (re-lock from the hero once the plan is projectable) — never a fabricated verdict.
-const baselineUsable = computed(() => !!baseline.value && Number.isFinite(baseline.value.yearsToFire));
+// ADR-0006 — a baseline captured under the OLD modelling frame is equally unusable: the delta
+// against today's plan would be almost entirely the model change, shown as if the user had slipped.
+// The card falls to its explainer state carrying the honest reason + the re-lock (below).
+const baselineFrameStale = computed(() => !!baseline.value && !isBaselineFrameCurrent(baseline.value));
+const baselineUsable = computed(
+  () => !!baseline.value && Number.isFinite(baseline.value.yearsToFire) && !baselineFrameStale.value,
+);
 
 const variance = computed(() => {
   if (!baseline.value || !baselineUsable.value) return null;
@@ -198,6 +204,33 @@ const changedAssumptionLabels = computed(() =>
         (inflation-adjusted) since you locked on {{ lockedOn }}.
       </template>
     </div>
+  </v-card>
+
+  <!-- ADR-0006: a baseline locked under the old model — say so, offer the re-lock, claim nothing. -->
+  <v-card
+    v-else-if="baselineFrameStale"
+    variant="outlined"
+    class="pa-4 text-center"
+    data-testid="plan-variance-stale-frame"
+  >
+    <v-icon icon="mdi-lock-reset" size="40" color="grey-lighten-1" />
+    <div class="text-subtitle-2 mt-2">Your plan was locked under the old model — re-lock to compare</div>
+    <p class="text-caption text-medium-emphasis mb-2">
+      We changed how the FIRE target grows (it now rises with your own spending basket, not general
+      inflation). Comparing today's plan with a baseline taken under the old model would report that
+      change as you falling behind, which would not be true — so we're showing no verdict until you
+      re-lock. Nothing about your money has changed.
+    </p>
+    <v-btn
+      size="small"
+      color="primary"
+      variant="flat"
+      prepend-icon="mdi-lock-reset"
+      data-testid="plan-variance-relock-frame"
+      @click="lockBaseline"
+    >
+      Re-lock my plan
+    </v-btn>
   </v-card>
 
   <!-- No (usable) baseline → explainer; the ONE canonical lock CTA lives in the hero above. -->
