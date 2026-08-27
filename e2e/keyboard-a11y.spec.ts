@@ -45,13 +45,14 @@ test.describe("keyboard a11y — operability + no traps (A7.9)", () => {
     await expect(begin, "the primary CTA must be focusable").toBeFocused();
     // Activating with the keyboard (Enter) — not a mouse click — must work.
     await page.keyboard.press("Enter");
-    await page.waitForURL(/\/wizard\/profile/, { timeout: 15000 });
+    // SPA pushState fires no `load` event, so waitForURL's default wait cannot resolve here.
+    await expect(page).toHaveURL(/\/quick/, { timeout: 15000 });
   });
 
   test("the wizard form is Tab-traversable across multiple controls (WCAG 2.1.2 — no keyboard trap)", async ({ page }) => {
     await freshSplash(page);
     await page.locator('[data-testid="splash-detailed-wizard"]').click();
-    await page.waitForURL(/\/wizard\/profile/, { timeout: 15000 });
+    await expect(page).toHaveURL(/\/wizard\/profile/, { timeout: 15000 });
     await waitHydrated(page);
     await dismissTour(page);
 

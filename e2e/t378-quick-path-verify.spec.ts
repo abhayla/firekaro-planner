@@ -83,8 +83,8 @@ test("T-378: every card renders at 390 and 1280, and the result is honest and co
 
   // ---- QN-4: the explainer's numbers come from the same kernel run as the hero ----
   const steps = await page.locator('[data-testid="quick-steps-list"] li').allInnerTexts();
-  expect(steps).toHaveLength(4);
-  expect(steps[3], "step 4 quotes the same nominal figure the hero shows").toMatch(/₹[\d.]+ (Cr|L)/);
+  expect(steps).toHaveLength(5);
+  expect(steps[4], "the last step quotes the same nominal figure the hero shows").toMatch(/₹[\d.]+ (Cr|L)/);
   const assumptions = await page.locator('[data-testid="quick-assumptions"]').innerText();
   expect(assumptions).toMatch(/safe withdrawal \(for a \d+-yr drawdown\)/);
 

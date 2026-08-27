@@ -46,7 +46,7 @@ test.describe("QN-1 — the /quick express path", () => {
 
     // QN-4 explainers, rendered from the same kernel outputs.
     await expect(page.locator('[data-testid="quick-why-list"] li')).toHaveCount(6);
-    await expect(page.locator('[data-testid="quick-steps-list"] li')).toHaveCount(4);
+    await expect(page.locator('[data-testid="quick-steps-list"] li')).toHaveCount(5);
     await expect(page.locator('[data-testid="quick-assumptions"]')).toContainText("drawdown");
     await expect(page.locator('[data-testid="quick-chart-card"]')).toBeVisible();
 
