@@ -31,7 +31,7 @@ function deps(over: Partial<SenderDeps> = {}): SenderDeps {
 
 const input = {
   userId: "u1",
-  toNumber: "917972672473",
+  toNumber: "919999900001",
   templateName: "firekaro_welcome",
   category: "utility" as const,
 };
@@ -70,7 +70,7 @@ describe("sendNudge", () => {
     const r = await sendNudge(input, d);
     expect(r).toMatchObject({ sent: true, reason: "sent", providerStatus: 200 });
     expect(d.send).toHaveBeenCalledWith(
-      expect.objectContaining({ whatsappNumber: "917972672473", templateName: "firekaro_welcome" }),
+      expect.objectContaining({ whatsappNumber: "919999900001", templateName: "firekaro_welcome" }),
     );
     expect(d.recordSend).toHaveBeenCalledWith(
       expect.objectContaining({ status: "SENT", providerMessageId: "m1" }),

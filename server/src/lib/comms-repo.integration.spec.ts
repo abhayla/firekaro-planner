@@ -30,18 +30,18 @@ dlive("purgeSendLogPii (live DB — #10 DPDP retention)", () => {
     const oldRow = await prisma.whatsAppSendLog.create({
       data: {
         userId: TEST_USER,
-        toNumber: "917972672473",
+        toNumber: "919999900001",
         templateName: "lifecycle_welcome",
         category: "utility",
         status: "FAILED",
-        failedDetail: "917972672473 is not a valid WhatsApp contact",
+        failedDetail: "919999900001 is not a valid WhatsApp contact",
         sentAt: new Date(now.getTime() - 120 * DAY),
       },
     });
     const freshRow = await prisma.whatsAppSendLog.create({
       data: {
         userId: TEST_USER,
-        toNumber: "917972672473",
+        toNumber: "919999900001",
         templateName: "lifecycle_welcome",
         category: "utility",
         status: "SENT",
@@ -61,7 +61,7 @@ dlive("purgeSendLogPii (live DB — #10 DPDP retention)", () => {
 
     // Fresh row (within the window): untouched.
     const freshAfter = await prisma.whatsAppSendLog.findUnique({ where: { id: freshRow.id } });
-    expect(freshAfter!.toNumber).toBe("917972672473");
+    expect(freshAfter!.toNumber).toBe("919999900001");
 
     // Idempotent: a second purge leaves the already-cleared old row unchanged.
     await purgeSendLogPii(now);

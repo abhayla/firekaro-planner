@@ -14,7 +14,7 @@ import type { WatiSendResult } from "./wati-client";
  * dep (typed) and assert the templateName/params it receives.
  */
 
-const target = { userId: "u1", toNumber: "917972672473", firstName: "Abhay" };
+const target = { userId: "u1", toNumber: "919999900001", firstName: "Abhay" };
 
 type SendInput = Parameters<SenderDeps["send"]>[0];
 
