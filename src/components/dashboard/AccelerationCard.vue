@@ -12,10 +12,12 @@
  */
 import { computed } from "vue";
 import { useAcceleration } from "@/composables/useAcceleration";
+import { useFireDerive } from "@/lib/useFireDerive";
 import WinsImpactBars, { type WinBar } from "@/components/dashboard/viz/WinsImpactBars.vue";
 import LeverPicker from "@/components/quick/LeverPicker.vue";
 
 const accel = useAcceleration();
+const fire = useFireDerive();
 
 // The card ALWAYS shows the honest, bridge-adjusted headline (never the rosier scalar corpus model) —
 // a user must never see a FIRE date more optimistic than the truth (rule 31 / bug-#22, fixed 2026-06-06).
@@ -31,9 +33,14 @@ const reachableLevers = computed(() => ranked.value.filter((l) => l.reachable &&
 // is "build the plan first", not a fake accelerator (gh #39 empty-state class).
 const baselineReachable = computed(() => Number.isFinite(headlineYears.value) && headlineYears.value > 0);
 
-// Self-hide only when there is genuinely nothing to offer: no reachable lever AND no plannable
-// baseline to save against. Otherwise always render (this is the obj-2 flagship surface).
-const show = computed(() => baselineReachable.value || reachableLevers.value.length > 0);
+// QN-5: the picker has moves to offer whenever ANY plan lever is available — which is exactly
+// the out-of-reach case ("Move the age") where the old rule hid this card and left the user with
+// nothing to pull. Self-hide only when there is genuinely nothing: no reachable ranked lever, no
+// plannable baseline AND no available plan move.
+const hasPickerMoves = computed(() => fire.planLevers.value.some((l) => l.available));
+const show = computed(
+  () => baselineReachable.value || reachableLevers.value.length > 0 || hasPickerMoves.value,
+);
 
 /** Format a duration in years as a compact "X.X yrs" / "N mo" string. */
 function yearsLabel(years: number): string {
@@ -61,9 +68,10 @@ const winBars = computed<WinBar[]>(() =>
   }),
 );
 
-// QN-5 (T-379): the fixed-extra-amount "save more" stepper is replaced by the lever picker below
-// (`useAcceleration.saveMoreImpact` stays available for the What-If page). The ranked years-saved
-// KPI + the bridge guards above are RETAINED — the picker adds the ₹/month "less to find" view.
+// QN-5 (T-379): the fixed-extra-amount "save more" stepper is replaced by the lever picker below.
+// `useAcceleration.saveMoreImpact` stays in the composable for the "biggest win" ranking path and its
+// own spec — no live UI calls it today. The ranked years-saved KPI + the bridge guards above are
+// RETAINED — the picker adds the ₹/month "less to find" view.
 </script>
 
 <template>
@@ -76,8 +84,17 @@ const winBars = computed<WinBar[]>(() =>
     <div class="d-flex align-center mb-3">
       <v-icon icon="mdi-rocket-launch-outline" color="fire-orange" size="24" class="mr-2" />
       <h3 class="accel-card__title flex-grow-1">Your biggest achievable wins</h3>
-      <v-chip size="small" variant="tonal" color="fire-orange" prepend-icon="mdi-flag-checkered">
+      <v-chip
+        v-if="baselineReachable"
+        size="small"
+        variant="tonal"
+        color="fire-orange"
+        prepend-icon="mdi-flag-checkered"
+      >
         FIRE in ~{{ yearsLabel(headlineYears) }}
+      </v-chip>
+      <v-chip v-else size="small" variant="tonal" color="warning" prepend-icon="mdi-flag-outline">
+        target out of reach today
       </v-chip>
     </div>
     <p class="text-body-2 text-medium-emphasis mb-4">
@@ -133,7 +150,8 @@ const winBars = computed<WinBar[]>(() =>
       data-testid="accel-empty"
     >
       No realistic accelerators apply right now — your allocation and spending are already working hard.
-      The biggest remaining lever is investing more each month (below).
+      Pick a move below — step up, retire later, trim, direct plans, roll the EMI — and see what it
+      changes.
     </v-alert>
 
     <!-- QN-5: "how to get there — pick your moves" (the same picker the /quick result shows). -->

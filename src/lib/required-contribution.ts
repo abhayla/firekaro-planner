@@ -37,6 +37,13 @@ export interface RequiredContributionInput {
   targetAge: number;
   /** QN-5: extra ADR-0004 segments summed onto the savings residual (the roll-the-EMI lever). */
   extraContributionSegments?: ContributionSegments;
+  /**
+   * `false` skips the bisection (the expensive part) and returns `requiredMonthlyReal = Infinity`
+   * with `solved: false` — for callers that only need need / have-by-target / gap (the QN-4 chart
+   * samples six ages per render; solving each one made every slider release cost ~300 ms for
+   * numbers the chart never draws). Default `true`.
+   */
+  solve?: boolean;
 }
 
 export interface RequiredContributionResult {
@@ -62,6 +69,8 @@ export interface RequiredContributionResult {
   yearsToTarget: number;
   /** False when there is no FIRE target yet (no expenses entered) — the card must make NO claim. */
   hasTarget: boolean;
+  /** False when the caller asked not to solve (`solve: false`) — `requiredMonthlyReal` is then not a verdict. */
+  solved: boolean;
   /**
    * T-378: the three components of `needReal`, taken from the SAME at-target kernel run.
    *
@@ -119,6 +128,7 @@ export function requiredMonthlyContributionFor(
       anchorAgeUsed: safe(k.anchorAge, 30),
       yearsToTarget: 0,
       hasTarget: false,
+      solved: true,
       needBaseReal: 0,
       needPlannedGoalsReal: 0,
       needHealthcareReservationReal: 0,
@@ -237,7 +247,10 @@ export function requiredMonthlyContributionFor(
   const hi = Math.max(0, monthlyTakeHome - livingFloor);
 
   let requiredMonthlyReal: number;
-  if (hi <= 0) {
+  const solve = input.solve !== false;
+  if (!solve) {
+    requiredMonthlyReal = Number.POSITIVE_INFINITY; // not solved — see `solved`
+  } else if (hi <= 0) {
     // No feasible headroom (no income, or every rupee of take-home is already committed) —
     // there is no honest monthly amount to quote (FinTech re-review §A finding 4, MEDIUM).
     requiredMonthlyReal = Number.POSITIVE_INFINITY;
@@ -282,6 +295,7 @@ export function requiredMonthlyContributionFor(
     anchorAgeUsed: anchorAge,
     yearsToTarget: wholeYears,
     hasTarget: needRealRounded > 0,
+    solved: solve,
     needBaseReal: Math.max(0, Math.round(safe(atTarget.baseFireNumber))),
     needPlannedGoalsReal: Math.max(0, Math.round(safe(atTarget.familyLayerCorpus))),
     needHealthcareReservationReal: Math.max(0, Math.round(safe(atTarget.healthcareReservation))),

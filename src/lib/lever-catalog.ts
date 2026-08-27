@@ -15,11 +15,13 @@
 import type { FireBaseline, Lever } from "./lever-impact";
 import { formatINRCompact } from "@/lib/formatters";
 import { LIMIT_80CCD_1B } from "./tax-deductions";
-import type { Household } from "@/types/household";
+import type { Expenses, Household } from "@/types/household";
 import type { Assumptions } from "@/types/assumptions";
+import { toMonthly } from "./cashflow";
 import type { ContributionSegments } from "./contribution-schedule";
 import type { DeriveLens } from "./derive";
-import { requiredMonthlyContributionFor } from "./required-contribution";
+import { requiredMonthlyContributionFor, REQUIRED_CONTRIBUTION_TOLERANCE } from "./required-contribution";
+import { returnBucketKey } from "./investment-traits";
 
 /** Household-resolved inputs needed to bound each lever to a realistic max effort. */
 export interface AccelerationContext {
@@ -204,6 +206,23 @@ export interface PlanLever {
 export const PLAN_STEP_UP_PERCENT = 10;
 export const PLAN_DELAY_YEARS = 3;
 export const PLAN_TRIM_FRACTION = 0.1;
+
+/**
+ * The ONE trimmable monthly spend base — shared by BOTH "Trim spending 10%" levers (the ranked
+ * accelerator via `AccelerationContext.monthlyExpenses` and the QN-5 plan lever), so the two rows
+ * can never quote different rupees for the same label. It is the discretionary spend only: the
+ * `avgMonthly` lump + the MANUAL recurring lines (converted to monthly). The auto-flowed EMI and
+ * insurance-premium lines are deliberately EXCLUDED — a solver has no business assuming a loan
+ * default or a lapsed policy (honesty, rule 31).
+ */
+export function trimmableMonthlyExpenses(expenses: Expenses): number {
+  return (
+    expenses.avgMonthly +
+    expenses.recurring
+      .filter((r) => r.source === "manual")
+      .reduce((sum, r) => sum + toMonthly({ amount: r.amount, period: r.frequency }), 0)
+  );
+}
 /** Direct vs regular mutual-fund TER gap, as a return uplift on the MF-bearing buckets. */
 export const PLAN_DIRECT_PLAN_UPLIFT = 0.008;
 
@@ -227,11 +246,13 @@ export function buildPlanLevers(
   const stepUp: PlanLever = {
     key: "step-up-10",
     label: `Raise investing ${PLAN_STEP_UP_PERCENT}% every year`,
-    note: "salary hikes → SIP hikes; above inflation, every year — usually the single biggest lever",
+    note: "salary hikes → SIP hikes; above inflation, every year — often the single biggest lever",
     available: stepUpAvailable,
-    unavailableReason: ctx.memberLens
-      ? memberLensReason
-      : `you already step up ${currentStepUp}%/yr — at or above this move`,
+    unavailableReason: stepUpAvailable
+      ? undefined
+      : ctx.memberLens
+        ? memberLensReason
+        : `you already step up ${currentStepUp}%/yr — at or above this move`,
     apply: stepUpAvailable
       ? (p) =>
           withAssumptions(p, {
@@ -257,16 +278,14 @@ export function buildPlanLevers(
   //    loan default). Lower spending lowers the FIRE number AND raises the savings residual that
   //    derive() invests — both genuine, no double count (the residual is income − tax − expenses,
   //    recomputed by the kernel).
-  const trimmable =
-    snapshot.expenses.avgMonthly +
-    snapshot.expenses.recurring.filter((r) => r.source === "manual").reduce((s, r) => s + r.amount, 0);
+  const trimmable = trimmableMonthlyExpenses(snapshot.expenses);
   const trimAvailable = trimmable > 0;
   const trim: PlanLever = {
     key: "trim-expenses",
     label: `Trim spending ${Math.round(PLAN_TRIM_FRACTION * 100)}%`,
     note: "lower spend lowers the target AND frees cash to invest — EMIs and premiums are left alone",
     available: trimAvailable,
-    unavailableReason: "no spending entered yet",
+    unavailableReason: trimAvailable ? undefined : "no spending entered yet",
     apply: trimAvailable
       ? (p) => ({
           ...p,
@@ -284,23 +303,41 @@ export function buildPlanLevers(
       : identity,
   };
 
-  // 4) Direct plans: ~0.8% lower fees ≈ +0.8% expected return on the MF-bearing buckets
-  //    (domestic + international equity). A What-If on the return assumption — no new persisted
-  //    field; "Make this my plan" maps it onto the existing equityReturn override (spec §6).
-  const directAvailable = ctx.directPlans !== true;
+  // 4) Direct plans: ~0.8% lower fees ≈ +0.8% expected return — on FUND-held money only. The
+  //    "equity" return bucket lumps direct stocks with equity mutual funds and the kernel applies
+  //    ONE equityReturn to both, so the uplift is SCALED by the fund-held share of that bucket
+  //    (a stocks-only household gets nothing — stocks pay no TER; FinTech review M1). International
+  //    holdings are fund-based (FoF / LRS) and take the full uplift. A What-If on the return
+  //    assumption — no new persisted field; "Make this my plan" maps it onto the existing
+  //    equityReturn override (spec §6).
+  const equityBucket = snapshot.investments.filter((i) => returnBucketKey(i) === "equity");
+  const equityValue = equityBucket.reduce((s, i) => s + (Number.isFinite(i.value) ? i.value : 0), 0);
+  const fundValue = equityBucket
+    .filter((i) => i.type === "MutualFunds")
+    .reduce((s, i) => s + (Number.isFinite(i.value) ? i.value : 0), 0);
+  const fundShare = equityValue > 0 ? Math.min(1, Math.max(0, fundValue / equityValue)) : 0;
+  const hasInternational = snapshot.investments.some((i) => returnBucketKey(i) === "international" && i.value > 0);
+  let directReason: string | undefined;
+  if (ctx.directPlans === true) directReason = "you are already on direct plans";
+  else if (fundShare <= 0 && !hasInternational) directReason = "no mutual funds to move — stocks pay no fund fee";
+  const directAvailable = directReason == null;
   const upliftPct = (PLAN_DIRECT_PLAN_UPLIFT * 100).toFixed(1);
+  const scopeNote =
+    fundShare > 0 && fundShare < 0.999
+      ? ` — on the ${Math.round(fundShare * 100)}% of your equity that's in funds`
+      : "";
   const direct: PlanLever = {
     key: "direct-plans",
     label: "Move to direct mutual funds",
-    note: `~${upliftPct}% lower fees ≈ +${upliftPct}% return, for free${
+    note: `~${upliftPct}% lower fees ≈ +${upliftPct}% return, for free${scopeNote}${
       ctx.directPlans == null ? " (if you're already on direct plans, ignore this)" : ""
     }`,
     available: directAvailable,
-    unavailableReason: "you are already on direct plans",
+    unavailableReason: directReason,
     apply: directAvailable
       ? (p) =>
           withAssumptions(p, {
-            equityReturn: p.assumptions.equityReturn + PLAN_DIRECT_PLAN_UPLIFT,
+            equityReturn: p.assumptions.equityReturn + PLAN_DIRECT_PLAN_UPLIFT * fundShare,
             internationalReturn: (p.assumptions.internationalReturn ?? 0) + PLAN_DIRECT_PLAN_UPLIFT,
           })
       : identity,
@@ -310,8 +347,13 @@ export function buildPlanLevers(
   //    loan exists whose rate is BELOW the expected equity return (else the honest line is the
   //    opposite: prepay it). Effect = an ADR-0004 segment adding the EMI from the loan's end age.
   //    The EMI is a fixed NOMINAL rupee amount while a segment amount is REAL, so it is deflated
-  //    at the geometric midpoint of the investing window (loan end → target): the real value of a
-  //    fixed rupee falls ~6%/yr, and deflating only to the end year would overstate the later years.
+  //    at the arithmetic time-midpoint of the investing window (loan end → target): the real
+  //    value of a fixed rupee falls ~6%/yr, and deflating only to the end year would overstate
+  //    the later years (the midpoint deflator slightly UNDER-states the true average — the safe
+  //    direction). Documented simplifications (FinTech review, both conservative): the rate
+  //    comparison is PRE-tax (Sec 24(b) relief would only make the loan cheaper and the move
+  //    available more often), and the kernel keeps today's EMI inside the FIRE target for the
+  //    whole horizon — so this move adds a genuine extra inflow but never shrinks the target.
   const loans = snapshot.liabilities.filter((l) => l.monthlyEMI > 0);
   const inflation = Number.isFinite(assumptions.inflation) ? assumptions.inflation : 0.06;
   const qualifying = loans.filter(
@@ -333,8 +375,8 @@ export function buildPlanLevers(
     label: "Don't prepay the home loan — roll the EMI into investing when it ends",
     note:
       qualifying.length > 0
-        ? `your loan rate is below what investing earns; keep it, and the day the ${formatINRCompact(emiTotal)}/month EMI stops, invest it`
-        : "your loan rate is below what investing earns; keep it, and the day the EMI stops, invest it",
+        ? `your loan rate is below what investing earns; keep it, and the day the ${formatINRCompact(emiTotal)}/month EMI stops, invest it — a genuine extra on top of today's plan (your target still assumes today's spending)`
+        : "your loan rate is below what investing earns; keep it, and the day the EMI stops, invest it — a genuine extra on top of today's plan (your target still assumes today's spending)",
     available: noPrepayAvailable,
     unavailableReason: noPrepayReason,
     apply: noPrepayAvailable
@@ -372,6 +414,8 @@ export interface PlanToFind {
   requiredMonthlyReal: number;
   currentMonthlyReal: number;
   hasTarget: boolean;
+  /** need − have-by-target (today's ₹). Always finite — the gradient that survives an unreachable target. */
+  gapReal: number;
 }
 
 /** The "extra to find" for a plan — ONE full solve through `derive()`. */
@@ -389,6 +433,7 @@ export function planToFind(base: PlanInputs, lens: DeriveLens): PlanToFind {
     requiredMonthlyReal: r.requiredMonthlyReal,
     currentMonthlyReal: r.currentMonthlyReal,
     hasTarget: r.hasTarget,
+    gapReal: Number.isFinite(r.gapReal) ? r.gapReal : 0,
   };
 }
 
@@ -400,6 +445,12 @@ export interface PlanLeverEffect {
   rescues: boolean;
   /** Even with this lever the target is beyond any realistic monthly amount. */
   stillUnreachable: boolean;
+  /**
+   * ₹ of the need−have GAP this lever closes on its own (today's ₹, ≥ 0). The honest gradient
+   * when the target is out of reach with AND without the lever — "less to find" is undefined
+   * there (∞ − ∞), but the corpus gap still moves, and the user deserves to see by how much.
+   */
+  gapClosed: number;
 }
 
 /**
@@ -413,13 +464,22 @@ export function evaluatePlanLevers(
 ): { baseline: PlanToFind; effects: PlanLeverEffect[] } {
   const baseline = planToFind(base, lens);
   const effects = levers.map((l): PlanLeverEffect => {
-    if (!l.available) return { key: l.key, lessToFind: 0, rescues: false, stillUnreachable: false };
+    if (!l.available) {
+      return { key: l.key, lessToFind: 0, rescues: false, stillUnreachable: false, gapClosed: 0 };
+    }
     const one = planToFind(l.apply(base), lens);
     const rescues = !Number.isFinite(baseline.toFind) && Number.isFinite(one.toFind);
     const stillUnreachable = !Number.isFinite(one.toFind);
     const delta =
       Number.isFinite(baseline.toFind) && Number.isFinite(one.toFind) ? baseline.toFind - one.toFind : 0;
-    return { key: l.key, lessToFind: Math.max(0, Math.round(delta)), rescues, stillUnreachable };
+    // A lever can only ever narrow the need−have gap; a widening is a stacking/apply bug, not a
+    // "did nothing" — surface it in dev rather than flooring it away silently (FinTech L6).
+    const rawGapClosed = Math.round(baseline.gapReal - one.gapReal);
+    if (rawGapClosed < -REQUIRED_CONTRIBUTION_TOLERANCE && import.meta.env?.DEV) {
+      console.warn(`[lever-catalog] ${l.key} WIDENED the gap by ${-rawGapClosed} — check its apply()`);
+    }
+    const gapClosed = Math.max(0, rawGapClosed);
+    return { key: l.key, lessToFind: Math.max(0, Math.round(delta)), rescues, stillUnreachable, gapClosed };
   });
   return { baseline, effects };
 }

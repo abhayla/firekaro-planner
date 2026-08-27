@@ -12,6 +12,7 @@ const KEYS = ["step-up-10", "delay-3", "trim-expenses", "direct-plans", "no-prep
 
 for (const width of [390, 1280]) {
   test(`levers at ${width}px — /quick result + dashboard`, async ({ page }) => {
+    test.setTimeout(240_000); // ten cards + six solver-backed toggles + full-page shots
     mkdirSync(DIR, { recursive: true });
     await page.setViewportSize({ width, height: width < 600 ? 900 : 1400 });
     await page.goto("/", { waitUntil: "networkidle" });

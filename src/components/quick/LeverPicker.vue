@@ -103,10 +103,18 @@ function makeThisMyPlan() {
   for (const k of keys) ui.toggleWhatIfLever(k); // now part of the plan, no longer a what-if
 }
 
-function effectLabel(e: { lessToFind: number; rescues: boolean; stillUnreachable: boolean } | undefined) {
+function effectLabel(
+  e: { lessToFind: number; rescues: boolean; stillUnreachable: boolean; gapClosed: number } | undefined,
+) {
   if (!e) return null;
   if (e.rescues) return { big: "makes it reachable", small: "on its own", tone: "ok" };
-  if (e.stillUnreachable) return { big: "still out of reach", small: "on its own", tone: "mut" };
+  if (e.stillUnreachable) {
+    // Out of reach with and without this move — "less to find" is undefined, but the corpus
+    // gap still moves; show that so the user can still tell a big move from a small one.
+    return e.gapClosed > 0
+      ? { big: `−${formatINRCompact(e.gapClosed)}`, small: "of the gap · still out of reach alone", tone: "mut" }
+      : { big: "still out of reach", small: "on its own", tone: "mut" };
+  }
   if (e.lessToFind <= 0) return { big: "no change", small: "on its own", tone: "mut" };
   return { big: `−${formatINRCompact(e.lessToFind)}/mo`, small: "less to find", tone: "ok" };
 }
@@ -161,6 +169,20 @@ function effectLabel(e: { lessToFind: number; rescues: boolean; stillUnreachable
 
     <div v-if="summary" class="plan-sum" data-testid="lever-plan-summary">
       {{ summary }}
+      <!-- One click back to the untouched plan — the what-if set is session-only, so switching all
+           off restores exactly the numbers the user arrived with. -->
+      <div v-if="anyOn" class="mt-2">
+        <v-btn
+          size="small"
+          variant="outlined"
+          density="comfortable"
+          prepend-icon="mdi-close"
+          data-testid="lever-clear-all"
+          @click="ui.clearWhatIfLevers()"
+        >
+          Switch all off
+        </v-btn>
+      </div>
       <div v-if="canMakePlan" class="mt-2">
         <v-btn
           size="small"
@@ -190,7 +212,7 @@ function effectLabel(e: { lessToFind: number; rescues: boolean; stillUnreachable
 }
 .lever {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   gap: 10px;
   align-items: center;
   padding: 10px 0;
@@ -214,6 +236,7 @@ function effectLabel(e: { lessToFind: number; rescues: boolean; stillUnreachable
   display: flex;
   flex-direction: column;
   min-width: 0;
+  overflow-wrap: anywhere;
 }
 .lever__label {
   color: var(--text-primary);
@@ -226,19 +249,25 @@ function effectLabel(e: { lessToFind: number; rescues: boolean; stillUnreachable
 }
 .lever__fx {
   text-align: right;
-  white-space: nowrap;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  max-width: 44%;
+  min-width: 0;
+  max-width: 160px;
 }
 .lever__fx b {
+  white-space: nowrap;
   font-size: 14px;
   font-variant-numeric: tabular-nums;
 }
-.lever--off .lever__fx .lever__note {
+.lever__fx .lever__note {
   white-space: normal;
   text-align: right;
+}
+@media (max-width: 599px) {
+  .lever__fx {
+    max-width: 42%;
+  }
 }
 .plan-sum {
   margin-top: 12px;

@@ -73,6 +73,7 @@ const chart = computed(() => {
       lens,
       targetAge: age,
       extraContributionSegments: plan.extraSegments,
+      solve: false, // the chart draws need + have only — no bisection per sampled age
     });
     return { age, need: Math.max(0, r.needReal), have: Math.max(0, r.haveAtTargetReal) };
   });

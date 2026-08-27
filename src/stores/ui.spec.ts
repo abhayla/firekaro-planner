@@ -163,3 +163,68 @@ describe("ui store — T-377 (QN-2) quick prefs + the shared session-only retire
     expect(ui.whatIfTargetAge).toBeNull();
   });
 });
+
+describe("ui store — T-379 (QN-5) what-if lever set", () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    mem = makeMemoryAdapter();
+    setAdapter(mem);
+  });
+  afterEach(() => setAdapter(null));
+
+  it("toggleWhatIfLever switches a move on, then off (and is idempotent per key)", () => {
+    const ui = useUiStore();
+    expect(ui.whatIfLevers).toEqual([]);
+
+    ui.toggleWhatIfLever("step-up-10");
+    expect(ui.whatIfLevers).toEqual(["step-up-10"]);
+    // Toggling the SAME key again removes it — never duplicates it.
+    ui.toggleWhatIfLever("step-up-10");
+    expect(ui.whatIfLevers).toEqual([]);
+
+    ui.toggleWhatIfLever("delay-3");
+    ui.toggleWhatIfLever("delay-3");
+    ui.toggleWhatIfLever("delay-3");
+    expect(ui.whatIfLevers).toEqual(["delay-3"]);
+  });
+
+  it("toggleWhatIfLever keeps the other switched-on moves untouched", () => {
+    const ui = useUiStore();
+    ui.toggleWhatIfLever("step-up-10");
+    ui.toggleWhatIfLever("delay-3");
+    ui.toggleWhatIfLever("trim-expenses");
+    expect(ui.whatIfLevers).toEqual(["step-up-10", "delay-3", "trim-expenses"]);
+
+    ui.toggleWhatIfLever("delay-3");
+    expect(ui.whatIfLevers).toEqual(["step-up-10", "trim-expenses"]);
+  });
+
+  it("clearWhatIfLevers switches every move off (the picker's 'Switch all off')", () => {
+    const ui = useUiStore();
+    ui.toggleWhatIfLever("step-up-10");
+    ui.toggleWhatIfLever("direct-plans");
+    expect(ui.whatIfLevers).toHaveLength(2);
+
+    ui.clearWhatIfLevers();
+    expect(ui.whatIfLevers).toEqual([]);
+    // Idempotent — clearing an already-empty set is a no-op, never a crash.
+    ui.clearWhatIfLevers();
+    expect(ui.whatIfLevers).toEqual([]);
+  });
+
+  it("the what-if lever set is SESSION-ONLY — never written to the persisted blob (#64 class)", async () => {
+    const ui = useUiStore();
+    ui.toggleWhatIfLever("step-up-10");
+    ui.setQuickPrefs({ guess: 1 }); // force a persist so the blob is definitely written
+    await nextTick();
+
+    const blob = mem.get<Record<string, unknown>>("ui");
+    expect(blob).toBeTruthy();
+    expect(Object.keys(blob!)).not.toContain("whatIfLevers");
+
+    setActivePinia(createPinia());
+    const fresh = useUiStore();
+    fresh.hydrate();
+    expect(fresh.whatIfLevers).toEqual([]);
+  });
+});
