@@ -401,11 +401,21 @@ describe("requiredMonthlyContributionFor — solves through the REAL derive() pa
       targetRetirementAge: 55,
     });
     const adultAtTarget = atTarget.individualFireByMember.find((m) => m.memberId === adult.memberId)!;
-    expect(member.needReal).toBe(Math.round(adultAtTarget.individualFireNumber));
+    // ADR-0006: `needReal` is the today's-₹ number AT THE TARGET AGE, so it carries the real
+    // basket drift `(1+g)^T` over the today's-₹ figure the kernel reports for age 0. Asserting
+    // against the undrifted figure would re-assert the very optimism gh #167 removed.
+    const driftFactor = (k: { realTargetDriftRate: number }, anchor: number) =>
+      Math.pow(1 + k.realTargetDriftRate, Math.max(0, 55 - anchor));
+    expect(member.needReal).toBe(
+      Math.round(adultAtTarget.individualFireNumber * driftFactor(atTarget, adultAtTarget.anchorAge)),
+    );
     // (rounded — every monetary output of the solver is an integer rupee, per the
     // calculation-module convention.)
+    const householdAtTarget = derive(h.data, a.values, LENS, { targetRetirementAge: 55 });
     expect(household.needReal).toBe(
-      Math.round(derive(h.data, a.values, LENS, { targetRetirementAge: 55 }).fireNumber),
+      Math.round(
+        householdAtTarget.fireNumber * driftFactor(householdAtTarget, householdAtTarget.anchorAge),
+      ),
     );
     // Household stays the PRIMARY, bigger claim — the individual view funds only that adult.
     expect(member.needReal).not.toBe(household.needReal);

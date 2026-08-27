@@ -18,6 +18,21 @@
  * (drawn money doesn't compound), expenses are flat in today's rupees, and every
  * income stream is post-tax — so the check errs toward declaring a gap, never
  * hiding one. Pure — no store/DOM access.
+ *
+ * ADR-0006 item (6) — DELIBERATELY UNCHANGED, and this is the record of that decision.
+ * ADR-0006 makes the household's expenses grow at the basket, so "expenses flat in today's
+ * rupees over the bridge window" is now an OPTIMISTIC simplification: at g ≈ 0.23%/yr it
+ * understates bridge-year spending by roughly 1–4% over a 5–15 year window. It is retained
+ * because it is PAIRED with an equal-and-opposite PESSIMISTIC one — the drawn pool earns zero
+ * return for the whole window, which understates the money available by considerably more than
+ * a fraction of a percent a year. The NET direction of the pair is ambiguous, and closing only
+ * the optimistic half would leave the bridge strictly more pessimistic than it is today for no
+ * measured reason. So the two are treated as ONE decision: revisit them together, with numbers,
+ * or not at all. Do not "consistency-fix" the expense line on its own.
+ *
+ * (The one thing ADR-0006 DID change for the bridge is upstream, in `derive.ts`: `corpusScale`
+ * now scales holdings by the DRIFTED real target at the adequacy age, so the bridge starts from
+ * the same corpus the adequacy leg actually reaches.)
  */
 import type { Investment } from "@/types/household";
 import { accessibleAtAge, type AssumptionNote } from "@/lib/accessibility";

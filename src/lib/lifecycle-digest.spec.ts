@@ -162,7 +162,13 @@ describe("captureSnapshot — pure builder (Stage A)", () => {
     const mc = runMonteCarloFire({
       currentCorpus: k.fireWithdrawableCorpus,
       targetCorpus: k.fireNumber,
+      // ADR-0006: the production call now also carries the drifting today's-₹ target and the
+      // REAL contribution schedule (the step-up + its age-50 taper). Omitting either here made
+      // this "mirror the production call EXACTLY" test stop mirroring it — the exact
+      // cross-consumer divergence the assertion exists to catch, so they are added, not relaxed.
+      targetGrowthRate: k.realTargetDriftRate,
       monthlySavings: k.monthlyContribution,
+      monthlySavingsSchedule: k.householdContributionSchedule,
       meanReturn: k.realBlendedReturn,
       meanReturnSchedule: k.realReturnSchedule,
       volatility: k.portfolioVolatility,

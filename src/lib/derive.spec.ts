@@ -911,13 +911,23 @@ describe("seed-anchor regression locks (gh-issue #17 — catch silent adequacy-l
     // Pinned to the known-good values (re-anchored 2026-08-27, T-376/gh-#165). The byte-identical
     // wrapper/kernel test only proves the two agree with EACH OTHER; this anchors the ACTUAL headline
     // so a future adequacy-leg refactor (#23) that silently drifts it is a CI failure. FIRE age ≈ 59
-    // (anchor 33 + ~25.67y), comfortably under the #22 sanity ceiling.
+    // (anchor 30 + ~24.42y), comfortably under the #22 sanity ceiling.
     // Re-anchor note: this moved from 25.58y/₹105,482,068 → 25.67y/₹105,982,068 (a +₹5,00,000 shift)
     // when T-376 fixed the Tier-0 honesty bug (gh-#165): the Sharmas seed's kind-less "Foreign
     // vacation" plannedFuture line (`seed-persona.ts`, no `kind` set → defaults to 'general') now
-    // correctly enters the FIRE-number family-layer lump, matching every other planned goal. This is
-    // the EXPECTED, intended effect of the fix, not drift.
-    expect(k.yearsToRegular).toBeCloseTo(25.67, 2);
+    // correctly enters the FIRE-number family-layer lump, matching every other planned goal.
+    //
+    // RE-ANCHORED 2026-08-27 (ADR-0006): 25.67y → 24.42y. `fireNumber` is UNCHANGED (₹10.60 Cr —
+    // it is a today's-rupee figure and no inflation input can move it), which is itself the proof
+    // that the target, not the target's SIZE, is what changed. Four effects net out:
+    //   + later  — the target now drifts up at g ≈ 0.23%/yr instead of standing still
+    //   + later  — (1+r)^(1/12) replaces r/12, removing the over-compounding
+    //   + later  — the target is resolved continuously, not frozen at the year's start
+    //   − earlier— the 2%-real step-up (tapering at 50) now defaults ON, and the re-grounded
+    //              basket cut the drift from 1.79%/yr to 0.23%/yr
+    // The frame leg ALONE (old inputs, new kernel) moves this persona to 36.67y / age 67 — locked
+    // separately in `inflation-frame-invariant.spec.ts` assertion 4.
+    expect(k.yearsToRegular).toBeCloseTo(24.42, 2);
     expect(Math.round(k.fireNumber)).toBe(105_982_068);
   });
 });

@@ -22,15 +22,22 @@ describe("derive — time-varying household savings schedule (#46 Stage C)", () 
     return { h, a };
   }
 
-  it("0% household step-up reproduces the exact current headline (byte-identical default path)", () => {
+  it("0% household step-up leaves the inflow a plain scalar (the schedule resolver stays inert)", () => {
+    // RE-BASELINED (ADR-0006): the default moved 0 → 2, so "0% reproduces the default headline" is
+    // no longer a statement about a no-op — it would be a statement that the new default does
+    // nothing. What #46 actually locked, and what still matters, is that 0% bypasses the resolver
+    // entirely (which is what preserves the `monthlyContribution <= 0 → Infinity` empty-state
+    // sentinel in calculateYearsToTarget) and never touches the FIRE number.
     const { h, a } = sharmas();
     const base = derive(h.data, a.values, DEFAULT_LENS);
     const zeroStepUp = derive(h.data, { ...a.values, householdSavingsStepUpPercent: 0 }, DEFAULT_LENS);
-    expect(zeroStepUp.yearsToRegular).toBe(base.yearsToRegular);
-    expect(zeroStepUp.corpusOnlyYearsToRegular).toBe(base.corpusOnlyYearsToRegular);
+    expect(typeof zeroStepUp.householdContributionSchedule).toBe("number");
+    expect(zeroStepUp.householdContributionSchedule).toBe(zeroStepUp.monthlyContribution);
     expect(zeroStepUp.fireNumber).toBe(base.fireNumber);
     // The exposed scalar monthlyContribution is unchanged (MC / What-If baseline / retire-by-age read it).
     expect(zeroStepUp.monthlyContribution).toBe(base.monthlyContribution);
+    // …and the default step-up can only be earlier-or-equal.
+    expect(base.corpusOnlyYearsToRegular).toBeLessThanOrEqual(zeroStepUp.corpusOnlyYearsToRegular);
   });
 
   it("a positive REAL household step-up pulls the FIRE date earlier-or-equal (never later)", () => {

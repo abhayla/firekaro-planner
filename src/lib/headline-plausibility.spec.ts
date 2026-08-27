@@ -102,7 +102,13 @@ describe("headline plausibility — DEFAULT product lens (#22 foolproof gate)", 
       const mc = runMonteCarloFire({
         currentCorpus: k.fireWithdrawableCorpus,
         targetCorpus: k.fireNumber,
+        // ADR-0006: the production band also carries the drifting today's-₹ target and the REAL
+        // inflow SCHEDULE (step-up + age-50 taper). Omitting them here stopped this from mirroring
+        // the production call — the p50 ran 2.5y behind a headline it is meant to bracket. Added,
+        // not relaxed; the tight 2.0y bound below is what proves the band still tracks.
+        targetGrowthRate: k.realTargetDriftRate,
         monthlySavings: k.monthlyContribution,
+        monthlySavingsSchedule: k.householdContributionSchedule,
         meanReturn: k.realBlendedReturn,
         meanReturnSchedule: k.realReturnSchedule,
         volatility: k.portfolioVolatility,
@@ -120,7 +126,9 @@ describe("headline plausibility — DEFAULT product lens (#22 foolproof gate)", 
       const mcScalar = runMonteCarloFire({
         currentCorpus: k.fireWithdrawableCorpus,
         targetCorpus: k.fireNumber,
+        targetGrowthRate: k.realTargetDriftRate,
         monthlySavings: k.monthlyContribution,
+        monthlySavingsSchedule: k.householdContributionSchedule,
         meanReturn: k.realBlendedReturn,
         volatility: k.portfolioVolatility,
       });
@@ -301,17 +309,34 @@ describe("headline plausibility — temporal contributions (#46 locks, DEFAULT l
   beforeEach(() => setActivePinia(createPinia()));
 
   for (const persona of PERSONAS) {
-    it(`${persona.name}: 0% household step-up is a NO-OP (default-path byte-identity)`, () => {
+    it(`${persona.name}: 0% household step-up is the SCALAR path (no schedule resolver in play)`, () => {
       const h = useHouseholdStore();
       const a = useAssumptionsStore();
       persona.load(h, a);
-      const base = derive(h.data, a.values, DEFAULT_PRODUCT_LENS);
+      // RE-BASELINED (ADR-0006): `householdSavingsStepUpPercent`'s default moved 0 → 2, so a run
+      // with an explicit 0 can no longer equal the DEFAULT run — the old assertion compared the
+      // default against an override that is now a different plan, and asserting they match would
+      // assert the new default does nothing. The #46 content that survives is the one that was
+      // ever load-bearing: at 0% the schedule mechanism is INERT — the kernel falls back to a plain
+      // scalar inflow (which is also what preserves the `<= 0 → Infinity` empty-state sentinel) —
+      // and a positive step-up may only pull FIRE earlier.
       const zero = derive(h.data, { ...a.values, householdSavingsStepUpPercent: 0 }, DEFAULT_PRODUCT_LENS);
-      expect(zero.yearsToRegular, `${persona.name}: 0% step-up must not move yearsToRegular`).toBe(
-        base.yearsToRegular,
+      expect(
+        typeof zero.householdContributionSchedule,
+        `${persona.name}: 0% step-up must leave the inflow a scalar, not a resolver`,
+      ).toBe("number");
+      expect(zero.householdContributionSchedule).toBe(zero.monthlyContribution);
+
+      const base = derive(h.data, a.values, DEFAULT_PRODUCT_LENS);
+      expect(zero.fireNumber, `${persona.name}: a step-up may never move the FIRE NUMBER`).toBe(
+        base.fireNumber,
       );
-      expect(zero.corpusOnlyYearsToRegular).toBe(base.corpusOnlyYearsToRegular);
-      expect(zero.fireNumber).toBe(base.fireNumber);
+      if (Number.isFinite(zero.corpusOnlyYearsToRegular)) {
+        expect(
+          base.corpusOnlyYearsToRegular,
+          `${persona.name}: the default 2% step-up must be earlier-or-equal to 0%`,
+        ).toBeLessThanOrEqual(zero.corpusOnlyYearsToRegular);
+      }
     });
 
     it(`${persona.name}: per-investment contributionSchedule does NOT leak into corpus (#11 coherence)`, () => {

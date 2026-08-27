@@ -125,21 +125,32 @@ describe("#139 useFireDerive.deflateProjection — Sharmas seed (end-to-end hone
     expect(crossYear!).toBeLessThanOrEqual(headlineYear);
   });
 
-  it("flattens the Regular target to a CONSTANT today's-₹ line (origin-alignment guard)", () => {
-    // FinTech-recommended invariant (2026-06-10): the kernel inflates the target at
-    // base·(1+inf)^yearIndex, so deflating by (1+inf)^(year−year0) collapses it to a CONSTANT =
-    // the year-0 base FIRE number — IFF the deflation origin matches the kernel's inflation origin.
-    // If anyone ever shifts the projection start year, this assertion goes RED instantly (the
-    // deflation exponent would desync from the inflation exponent and the line would slope).
+  it("in today's ₹ the Regular target rises at EXACTLY the basket drift g (origin-alignment guard)", () => {
+    // RE-BASELINED (ADR-0006). This asserted the deflated target was a CONSTANT line, which was
+    // true only while the kernel inflated the target at general CPI — the same rate this view
+    // deflates by. It no longer is, and that is the whole point of gh #167: the target grows at
+    // the household BASKET, so in today's rupees it RISES at g = (1+basket)/(1+CPI) − 1. A flat
+    // line here would now mean the optimistic collapse had come back.
+    //
+    // The ORIGIN-ALIGNMENT guard the test exists for is preserved and is actually sharper: the
+    // deflated ratio must equal (1+g)^i for EVERY point. If anyone shifts the projection start
+    // year, the deflation exponent desyncs from the inflation exponent and the measured ratio
+    // stops matching (1+g)^i immediately.
     loadSeedPersona(useHouseholdStore(), useAssumptionsStore());
     const d = useFireDerive();
     const real = d.deflateProjection(true);
     expect(real.length).toBeGreaterThan(3);
     const base = real[0].targetForRegular;
     expect(base).toBeGreaterThan(0);
+    const g = d.realTargetDriftRate.value;
+    expect(g, "the basket must genuinely outrun CPI on the default assumptions").toBeGreaterThan(0);
     real.forEach((p, i) => {
-      // ±1 ₹ for the per-point Math.round; the line is flat across the whole horizon.
-      expect(Math.abs(p.targetForRegular - base), `point ${i} (year ${p.year}) target flat`).toBeLessThanOrEqual(1);
+      const expected = base * Math.pow(1 + g, i);
+      // Relative tolerance absorbs the kernel's per-point Math.round on a ₹10^8-scale figure.
+      expect(
+        Math.abs(p.targetForRegular - expected) / expected,
+        `point ${i} (year ${p.year}) must sit on the (1+g)^i curve, got ${p.targetForRegular} vs ${Math.round(expected)}`,
+      ).toBeLessThan(1e-6);
     });
   });
 

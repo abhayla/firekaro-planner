@@ -58,14 +58,24 @@ describe("getHorizonSWR (audit Entry #1 A1.1 — horizon-driven)", () => {
 });
 
 describe("blendedInflation (audit Entry #3 A3.1 — 4-bucket)", () => {
-  it("research defaults (6/14/9/6 at 60/20/10/10) blend to ~7.9%", () => {
+  it("research defaults (6/9/9/6 at 74/8/0/18) blend to ~6.24% and stay within 100bp of CPI", () => {
+    // RE-BASELINED (ADR-0006): was 6/14/9/6 at 60/20/10/10 ⇒ 7.90%. Both legs changed: 14%
+    // healthcare is an insurer CLAIMS-COST trend, not a price index (CPI-Health ~4–7% + a 3–4pp
+    // private-tariff excess ⇒ 9%), and the old weights were NOT DISJOINT — `general` is the
+    // all-items CPI, which already contains health/education/housing, so the split double-counted
+    // all three by construction.
     const blend = blendedInflation({
       general: 0.06,
-      healthcare: 0.14,
+      healthcare: 0.09,
       education: 0.09,
       housing: 0.06,
     });
-    expect(blend).toBeCloseTo(0.079, 4);
+    expect(blend).toBeCloseTo(0.0624, 6);
+    // SUBSTANCE, not just the value: a household basket built from disjoint shares of the very
+    // buckets CPI aggregates cannot credibly sit far from CPI. This bound is what makes the number
+    // defensible — it would have failed at 7.90% by 90bp.
+    expect(blend - 0.06, "basket must sit within 0–100bp of general CPI").toBeGreaterThanOrEqual(0);
+    expect(blend - 0.06).toBeLessThanOrEqual(0.01);
   });
   it("blend exceeds the v4 single 6% general rate", () => {
     const blend = blendedInflation({

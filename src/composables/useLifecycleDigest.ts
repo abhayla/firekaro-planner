@@ -43,6 +43,7 @@ export function useLifecycleDigest() {
     realBlendedReturn: fire.realBlendedReturn.value,
     realReturnSchedule: fire.realReturnSchedule.value,
     realTargetDriftRate: fire.realTargetDriftRate.value,
+    householdContributionSchedule: fire.householdContributionSchedule.value,
     portfolioVolatility: fire.portfolioVolatility.value,
     monthlyContribution: fire.monthlyContribution.value,
   }));
