@@ -141,3 +141,315 @@ export function buildAccelerationLevers(ctx: AccelerationContext): Lever[] {
 
   return levers;
 }
+
+// ---------------------------------------------------------------------------------------------
+// T-379 (QN-5) — PLAN levers: "How to get there — pick your moves"
+// ---------------------------------------------------------------------------------------------
+/**
+ * A SECOND lever shape, additive to the scalar-baseline `Lever` above. The distinction is real and
+ * load-bearing, not cosmetic:
+ *
+ *   - `Lever`     perturbs a resolved scalar `FireBaseline` and is measured in YEARS SAVED via
+ *                 `calculateYearsToTarget`. That is the "biggest achievable win" ranking (#48).
+ *   - `PlanLever` perturbs the PLAN INPUTS (`snapshot` / `assumptions` / `targetAge`) and is
+ *                 measured in "LESS TO FIND" rupees/month by RE-SOLVING through
+ *                 `required-contribution.ts` -> `derive()`. That is the Option-C card.
+ *
+ * Both are kept because they answer different questions ("when can I stop?" vs "what must I find
+ * every month?") and because the years-saved ranking carries the bridge/volatility honesty work
+ * (#22, lever-bands) that the rupee view has no equivalent of.
+ *
+ * Every plan lever is measured by a full kernel re-solve, so stacking COMPOUNDS - there is no
+ * additive shortcut anywhere in this file, by design (a sum would over-state every combination).
+ */
+import type { Household, Liability } from "@/types/household";
+import type { Assumptions } from "@/types/assumptions";
+import type { DeriveLens } from "@/lib/derive";
+import {
+  requiredMonthlyContributionFor,
+  type RequiredContributionResult,
+} from "@/lib/required-contribution";
+
+/** The plan a lever perturbs - exactly the solver's inputs, nothing else. */
+export interface PlanInputs {
+  snapshot: Household;
+  assumptions: Assumptions;
+  lens: DeriveLens;
+  targetAge: number;
+  /**
+   * Set by `no-prepay-roll-emi` only: the EMI (rupees/mo, today's money) that starts flowing into
+   * the corpus from `rolledEmiFromYear`. Carried on the plan (not folded into the snapshot) because
+   * the kernel owns the household contribution schedule - see `solvePlan` for how it is applied.
+   */
+  rolledEmiMonthly?: number;
+  /** Calendar year the rolled EMI starts (the loan's end year). */
+  rolledEmiFromYear?: number;
+}
+
+/** What the catalog needs to decide availability. */
+export interface PlanLeverContext {
+  plan: PlanInputs;
+  /**
+   * `ui.quick.directPlans` - true ONLY when the user affirmatively said "Direct".
+   * `false` (Regular) and `null`/`undefined` (Not sure / never asked) both leave the lever
+   * available, with the note telling an already-direct user to ignore it.
+   */
+  directPlans?: boolean | null;
+}
+
+export type PlanLeverKey =
+  | "step-up-10"
+  | "delay-3"
+  | "trim-expenses"
+  | "direct-plans"
+  | "no-prepay-roll-emi";
+
+export interface PlanLever {
+  key: PlanLeverKey;
+  label: string;
+  /** The one-line "why this works" the card shows under the label. */
+  note: string;
+  /** False => rendered greyed out and NOT applicable; `apply` is never called. */
+  available: boolean;
+  /** Shown in place of the rupee figure when `available` is false. Honest, specific reason. */
+  unavailableNote?: string;
+  /** Pure: returns a NEW plan, never mutates. Only called when `available`. */
+  apply: (p: PlanInputs) => PlanInputs;
+}
+
+/** Card order = the mockup's order (`option-c-merged.html`). */
+export const PLAN_LEVER_KEYS: PlanLeverKey[] = [
+  "step-up-10",
+  "delay-3",
+  "trim-expenses",
+  "direct-plans",
+  "no-prepay-roll-emi",
+];
+
+/** The step-up this lever commits to (%/yr, REAL - ADR-0004, `derive.ts` reads it directly). */
+export const STEP_UP_LEVER_PERCENT = 10;
+/** "Retire 3 years later". */
+export const DELAY_LEVER_YEARS = 3;
+/**
+ * Direct-vs-regular mutual-fund TER saving, as a return uplift. +0.8pp is the gap the reference
+ * video cites and SEBI's direct-plan disclosures bear out (regular plans carry the distributor
+ * trail inside the TER). Applied to the EQUITY class only - it is a fund fee, not a gilt yield -
+ * and only as a What-If lever value; no persisted assumption field is created.
+ */
+export const DIRECT_PLAN_RETURN_UPLIFT = 0.008;
+/** The realistic spending trim this lever commits to (matches the scalar catalog's default). */
+export const TRIM_LEVER_PCT = 0.1;
+
+/**
+ * The cheapest honest estimate of when a loan ends. Prefers the stored `derivedEndYear`; otherwise
+ * computes the interest-inclusive months-to-clear, capped at a 30-year tenure (a home loan's outer
+ * edge) and rounded UP - starting the rolled EMI LATER is the conservative direction for a lever
+ * whose whole claim is "money arrives eventually".
+ */
+export function loanEndYear(loan: Liability, now = new Date()): number {
+  const thisYear = now.getFullYear();
+  if (Number.isFinite(loan.derivedEndYear) && (loan.derivedEndYear ?? 0) > thisYear) {
+    return loan.derivedEndYear as number;
+  }
+  if (!(loan.monthlyEMI > 0) || !(loan.outstandingBalance > 0)) return thisYear + 1;
+  const r = Math.max(0, loan.interestRate / 100) / 12;
+  const ratio = 1 - (loan.outstandingBalance * r) / loan.monthlyEMI;
+  const months =
+    r > 0 && ratio > 0
+      ? Math.log(1 / ratio) / Math.log(1 + r)
+      : loan.outstandingBalance / loan.monthlyEMI;
+  return thisYear + Math.min(30, Math.max(1, Math.ceil(months / 12)));
+}
+
+/**
+ * The loans this household is better off KEEPING: rate strictly below the expected equity return.
+ * Strict `<` is deliberate - a loan at exactly the expected return is a coin-flip dressed up as a
+ * strategy, and the honest answer for an equal-rate loan is "prepay it" (a guaranteed return beats
+ * an expected one). `interestRate` is stored in PERCENT, the assumption as a FRACTION.
+ */
+export function cheapLoans(snapshot: Household, assumptions: Assumptions): Liability[] {
+  const equity = assumptions.equityReturn;
+  return snapshot.liabilities.filter(
+    (l) => l.monthlyEMI > 0 && Number.isFinite(l.interestRate) && l.interestRate / 100 < equity,
+  );
+}
+
+/** Build the plan-lever catalog for this household, each already resolved for availability. */
+export function buildPlanLevers(ctx: PlanLeverContext): PlanLever[] {
+  const { plan } = ctx;
+  const loans = plan.snapshot.liabilities.filter((l) => l.monthlyEMI > 0);
+  const rollable = cheapLoans(plan.snapshot, plan.assumptions)[0];
+  const monthlyExpenses = plan.snapshot.expenses.avgMonthly ?? 0;
+  const currentStepUp = plan.assumptions.householdSavingsStepUpPercent ?? 0;
+
+  const byKey: Record<PlanLeverKey, PlanLever> = {
+    "step-up-10": {
+      key: "step-up-10",
+      label: `Raise investing ${STEP_UP_LEVER_PERCENT}% every year`,
+      note: "salary hikes to SIP hikes; the single biggest lever",
+      available: currentStepUp < STEP_UP_LEVER_PERCENT,
+      unavailableNote: `you already plan to raise investing ${currentStepUp}%/yr`,
+      apply: (p) => ({
+        ...p,
+        assumptions: {
+          ...p.assumptions,
+          // max, never overwrite - a household already stepping up 12% must not be talked DOWN.
+          householdSavingsStepUpPercent: Math.max(
+            p.assumptions.householdSavingsStepUpPercent ?? 0,
+            STEP_UP_LEVER_PERCENT,
+          ),
+        },
+      }),
+    },
+    "delay-3": {
+      key: "delay-3",
+      label: `Retire ${DELAY_LEVER_YEARS} years later`,
+      note: `${DELAY_LEVER_YEARS} more years of investing, ${DELAY_LEVER_YEARS} fewer to fund`,
+      available: true,
+      apply: (p) => ({ ...p, targetAge: p.targetAge + DELAY_LEVER_YEARS }),
+    },
+    "trim-expenses": {
+      key: "trim-expenses",
+      label: `Trim spending ${Math.round(TRIM_LEVER_PCT * 100)}%`,
+      note: "lower spend lowers the target AND frees cash to invest",
+      available: monthlyExpenses > 0,
+      unavailableNote: "no spending entered yet",
+      apply: (p) => ({
+        ...p,
+        snapshot: {
+          ...p.snapshot,
+          expenses: {
+            ...p.snapshot.expenses,
+            // Lowering avgMonthly does BOTH jobs through the kernel: it shrinks the FIRE number
+            // (via SWR) and raises the savings residual (income - tax - expenses). No double-count.
+            avgMonthly: Math.round((p.snapshot.expenses.avgMonthly ?? 0) * (1 - TRIM_LEVER_PCT)),
+          },
+        },
+      }),
+    },
+    "direct-plans": {
+      key: "direct-plans",
+      label: "Move to direct mutual funds",
+      note: "~0.8% lower fees means +0.8% return, for free (if you are already on direct plans, ignore this)",
+      // Only an affirmative "Direct" closes this lever. Regular / Not sure / never asked => available.
+      available: ctx.directPlans !== true,
+      unavailableNote: "you are already on direct plans",
+      apply: (p) => ({
+        ...p,
+        assumptions: {
+          ...p.assumptions,
+          // Equity class ONLY - the TER saving is a mutual-fund fee, not a debt or gold yield.
+          // A What-If lever VALUE: this object is never persisted (no new assumption field).
+          equityReturn: p.assumptions.equityReturn + DIRECT_PLAN_RETURN_UPLIFT,
+        },
+      }),
+    },
+    "no-prepay-roll-emi": {
+      key: "no-prepay-roll-emi",
+      label: "Don't prepay the home loan - roll the EMI into investing when it ends",
+      note: "your loan rate is below what investing earns; keep it, and the day the EMI stops, invest it",
+      available: rollable != null,
+      unavailableNote:
+        loans.length === 0
+          ? "no home loan"
+          : "your loan costs more than investing earns - prepay it",
+      apply: (p) => {
+        const loan = cheapLoans(p.snapshot, p.assumptions)[0];
+        if (!loan) return p;
+        return {
+          ...p,
+          rolledEmiMonthly: loan.monthlyEMI,
+          rolledEmiFromYear: loanEndYear(loan),
+        };
+      },
+    },
+  };
+
+  return PLAN_LEVER_KEYS.map((k) => byKey[k]);
+}
+
+/**
+ * Apply a selection of levers to a plan, in catalog order so the result is deterministic regardless
+ * of the order the user ticked the boxes. Unavailable levers are SKIPPED - selecting one can never
+ * change the answer (locked by spec), which is what makes a greyed-out row honest.
+ */
+export function applyPlanLevers(
+  plan: PlanInputs,
+  levers: PlanLever[],
+  selected: readonly PlanLeverKey[],
+): PlanInputs {
+  const on = new Set(selected);
+  return levers
+    .filter((l) => l.available && on.has(l.key))
+    .reduce<PlanInputs>((acc, l) => l.apply(acc), plan);
+}
+
+/**
+ * Solve a (possibly perturbed) plan through the ONE solver -> `derive()`.
+ *
+ * The rolled EMI is applied HERE rather than inside `apply` because the kernel owns the household
+ * contribution schedule (`derive.ts` builds it from `householdSavingsStepUpPercent`; per-investment
+ * `contributionSchedule` is deliberately NOT read - the gh #11 double-count lock). Expressing the
+ * roll as a segment therefore means crediting the EMI only for the share of the accumulation
+ * horizon AFTER the loan ends: a loan ending late adds almost nothing, one ending next year adds
+ * nearly all of it - never the full EMI from day one, which would be the optimistic lie.
+ */
+export function solvePlan(plan: PlanInputs): RequiredContributionResult {
+  const solved = requiredMonthlyContributionFor({
+    snapshot: plan.snapshot,
+    assumptions: plan.assumptions,
+    lens: plan.lens,
+    targetAge: plan.targetAge,
+  });
+  const emi = plan.rolledEmiMonthly ?? 0;
+  if (!(emi > 0) || !Number.isFinite(solved.requiredMonthlyReal)) return solved;
+
+  const yearsToTarget = solved.yearsToTarget;
+  if (yearsToTarget <= 0) return solved;
+  const yearsUntilLoanEnds = Math.max(
+    0,
+    (plan.rolledEmiFromYear ?? new Date().getFullYear()) - new Date().getFullYear(),
+  );
+  const yearsRolling = Math.max(0, yearsToTarget - yearsUntilLoanEnds);
+  if (yearsRolling <= 0) return solved;
+
+  // Time-weighted average of the extra inflow over the accumulation horizon (ADR-0004 in spirit:
+  // a segment starting at the loan's end year). Under-states the true compounding benefit of a
+  // late, large inflow - the honest direction (rule 31): promise less rather than more.
+  const effectiveExtra = Math.round((emi * yearsRolling) / yearsToTarget);
+  if (!(effectiveExtra > 0)) return solved;
+
+  // The rolled EMI is money the household will invest ANYWAY once the loan clears, so it reduces
+  // what must be found from today's cashflow one-for-one, floored at zero.
+  return {
+    ...solved,
+    requiredMonthlyReal: Math.max(0, solved.requiredMonthlyReal - effectiveExtra),
+  };
+}
+
+/**
+ * "Less to find" for a lever selection = how much SMALLER the monthly shortfall becomes.
+ *
+ *   toFind(plan) = max(0, required - current)   // never negative: a surplus is not a debt
+ *   lessToFind   = toFind(baseline) - toFind(with the levers on)
+ *
+ * Clamped at 0 so a lever is never advertised as a setback, and finite-guarded so an unreachable
+ * baseline yields 0 rather than an `Infinity - Infinity` NaN reaching a user (rule 31).
+ */
+export function toFindMonthly(r: RequiredContributionResult): number {
+  if (!Number.isFinite(r.requiredMonthlyReal)) return Number.POSITIVE_INFINITY;
+  return Math.max(0, r.requiredMonthlyReal - r.currentMonthlyReal);
+}
+
+export function lessToFindFor(
+  plan: PlanInputs,
+  levers: PlanLever[],
+  selected: readonly PlanLeverKey[],
+): number {
+  if (selected.length === 0) return 0;
+  const baseFind = toFindMonthly(solvePlan(plan));
+  const withFind = toFindMonthly(solvePlan(applyPlanLevers(plan, levers, selected)));
+  // Either side unreachable => no honest saving to claim.
+  if (!Number.isFinite(baseFind) || !Number.isFinite(withFind)) return 0;
+  return Math.max(0, Math.round(baseFind - withFind));
+}
