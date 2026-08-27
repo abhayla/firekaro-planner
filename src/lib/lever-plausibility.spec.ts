@@ -19,6 +19,8 @@ import { emptyQuickAnswers, type QuickAnswers } from "@/types/quick-number";
 import { DEFAULT_ASSUMPTIONS } from "@/types/assumptions";
 import type { Household } from "@/types/household";
 import {
+  DELAY_LEVER_YEARS,
+  PLAN_LEVER_KEYS,
   buildPlanLevers,
   applyPlanLevers,
   solvePlan,
@@ -86,10 +88,15 @@ describe("rule 31 — Amit lands in the 'clearly doable' band with three realist
   it("step-up + delay + direct brings required monthly to <= 1.5x his current contribution", () => {
     const plan = amitPlan();
     const levers = buildPlanLevers({ plan, directPlans: AMIT.directPlans });
-    const withMoves = solvePlan(applyPlanLevers(plan, levers, MOVES));
+    const applied = applyPlanLevers(plan, levers, MOVES);
+    const withMoves = solvePlan(applied);
 
     const current = withMoves.currentMonthlyReal;
     const required = withMoves.requiredMonthlyReal;
+
+    // `delay-3` is one of the three moves, so the plan is solved AT 53, not 50 - that is the whole
+    // point of the lever and it is the age the card puts on screen.
+    expect(applied.targetAge).toBe(AMIT.targetAge + DELAY_LEVER_YEARS);
 
     expect(current, "Amit must be investing something for the ratio to mean anything").toBeGreaterThan(0);
     expect(Number.isFinite(required), "the target must be reachable with the three moves").toBe(true);
@@ -101,6 +108,35 @@ describe("rule 31 — Amit lands in the 'clearly doable' band with three realist
       `required ${Math.round(required)} / current ${Math.round(current)} = ${ratio.toFixed(2)}x — ` +
         "beyond 1.5x the card is telling a salaried accumulator that nothing he can do matters",
     ).toBeLessThanOrEqual(1.5);
+  });
+
+  it("retiring at 50 stays HONESTLY out of reach - the card says 'move the age', not a number", () => {
+    // Before the ADR-0004 frame fix this reported a comfortable 1.41x. That number was an artifact:
+    // the step-up lever wrote the NOMINAL 10 into the REAL field, so the quoted starting amount sat
+    // on a path reaching ~206% of Amit's take-home by year 12. With the honest real step-up, NO
+    // combination of moves reaches 50 - and saying so plainly is the product's job.
+    const plan = amitPlan();
+    const levers = buildPlanLevers({ plan, directPlans: AMIT.directPlans });
+    const everything = PLAN_LEVER_KEYS.filter((k) => levers.find((l) => l.key === k)?.available);
+    const all = solvePlan(applyPlanLevers(plan, levers, everything));
+    expect(Number.isFinite(all.requiredMonthlyReal)).toBe(false);
+  });
+
+  it("the committed step-up never escalates past what the household can actually pay", () => {
+    // The substance assertion the old 1.5x bar was blind to: it measured the STARTING contribution
+    // while the path escalated. Project the committed step-up across the horizon and check the
+    // final year against the same feasibility ceiling the solver applies at t=0.
+    const plan = amitPlan();
+    const levers = buildPlanLevers({ plan, directPlans: AMIT.directPlans });
+    const applied = applyPlanLevers(plan, levers, MOVES);
+    const solved = solvePlan(applied);
+    const stepUp = (applied.assumptions.householdSavingsStepUpPercent ?? 0) / 100;
+    const finalYearReal = solved.requiredMonthlyReal * Math.pow(1 + stepUp, solved.yearsToTarget);
+    expect(
+      finalYearReal,
+      `final-year contribution ${Math.round(finalYearReal)}/mo (today's rupees) exceeds take-home ` +
+        `${AMIT.income} - the plan is affordable only on its first day`,
+    ).toBeLessThanOrEqual(AMIT.income);
   });
 
   it("the three moves RESCUE an otherwise impossible plan (and the card says so, not '₹0 saved')", () => {
@@ -188,19 +224,22 @@ describe("per-row effect on an unreachable baseline (marginal contribution)", ()
     expect(solo.lessToFind).toBe(0);
   });
 
-  it("adding the move that TIPS the plan into reach reports a rescue", () => {
+  it("a move on an unreachable plan is never sold as a rupee saving", () => {
     const plan = amitPlan();
     const levers = buildPlanLevers({ plan, directPlans: AMIT.directPlans });
-    // step-up alone is not enough; delay-3 on top of it is what makes the target reachable.
-    const marginal = marginalEffectFor(plan, levers, "delay-3", ["step-up-10"]);
-    expect(marginal.kind).toBe("rescue");
-    expect(Number.isFinite(marginal.requiredWith)).toBe(true);
+    // Amit at 50 is out of reach for EVERY subset, so no single addition can tip it. Whatever the
+    // reported state, it must never be a fabricated saving.
+    const others = PLAN_LEVER_KEYS.filter((k) => k !== "delay-3");
+    const marginal = marginalEffectFor(plan, levers, "delay-3", others);
+    expect(["rescue", "not-enough-alone"]).toContain(marginal.kind);
+    expect(marginal.lessToFind).toBe(0);
   });
 
-  it("once reachable, a further move reports a real ₹ saving on top of the picks", () => {
-    const plan = amitPlan();
+  it("on a REACHABLE plan a further move reports a real ₹ saving on top of the picks", () => {
+    // Solve at an age Amit's plan can actually make, so both sides are finite.
+    const plan = { ...amitPlan(), targetAge: 58 };
     const levers = buildPlanLevers({ plan, directPlans: AMIT.directPlans });
-    const marginal = marginalEffectFor(plan, levers, "direct-plans", ["step-up-10", "delay-3"]);
+    const marginal = marginalEffectFor(plan, levers, "direct-plans", ["step-up-10"]);
     expect(["saving", "none"]).toContain(marginal.kind);
     expect(marginal.lessToFind).toBeGreaterThanOrEqual(0);
     expect(Number.isFinite(marginal.requiredWith)).toBe(true);

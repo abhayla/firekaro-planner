@@ -29,13 +29,15 @@ import {
   marginalEffectFor,
   solvePlan,
   toFindMonthly,
-  STEP_UP_LEVER_PERCENT,
+  STEP_UP_LEVER_NOMINAL_PERCENT,
+  realStepUpPercentFor,
   DIRECT_PLAN_RETURN_UPLIFT,
   type PlanInputs,
   type PlanLever,
   type PlanLeverKey,
 } from "@/lib/lever-catalog";
 import { PLAN_HONESTY_LINE } from "@/lib/quick-number-copy";
+import { DEFAULT_ASSUMPTIONS } from "@/types/assumptions";
 import { formatINRCompact } from "@/lib/formatters";
 
 const props = withDefaults(defineProps<{ showCommit?: boolean }>(), { showCommit: true });
@@ -159,14 +161,23 @@ const committable = computed(() =>
 function makeThisMyPlan() {
   if (!committable.value.length) return;
   if (committable.value.includes("step-up-10")) {
+    // Idempotent by construction: max() against an absolute target, never an increment.
     a.set(
       "householdSavingsStepUpPercent",
-      Math.max(a.values.householdSavingsStepUpPercent ?? 0, STEP_UP_LEVER_PERCENT),
+      Math.max(
+        a.values.householdSavingsStepUpPercent ?? 0,
+        realStepUpPercentFor(a.values.inflation),
+      ),
     );
   }
   if (committable.value.includes("direct-plans")) {
-    // The existing equityReturn override, +0.8pp — the same value the lever previews.
-    a.set("equityReturn", a.values.equityReturn + DIRECT_PLAN_RETURN_UPLIFT);
+    // MUST NOT be a read-modify-write. `a.values.equityReturn + uplift` compounds on every press
+    // (0.120 → 0.128 → 0.136 …) and the lever stays available afterwards on the dashboard, where
+    // ui.quick is null — so a user could silently persist a 15% equity return (code-review
+    // BLOCKER). Write the ABSOLUTE target off the research default instead, and record the choice
+    // in ui.quick so the lever closes and the previewed number matches the committed one.
+    a.set("equityReturn", DEFAULT_ASSUMPTIONS.equityReturn + DIRECT_PLAN_RETURN_UPLIFT);
+    ui.setQuickPrefs({ directPlans: true });
   }
   if (committable.value.includes("delay-3")) {
     const age = planTargetAge.value;
@@ -298,7 +309,7 @@ function openPreferences() {
       </v-btn>
       <span class="lever-picker__commit-hint">
         Writes
-        <template v-if="committable.includes('step-up-10')">the {{ STEP_UP_LEVER_PERCENT }}%/yr step-up</template>
+        <template v-if="committable.includes('step-up-10')">the {{ STEP_UP_LEVER_NOMINAL_PERCENT }}%/yr step-up</template>
         <template v-if="committable.includes('step-up-10') && committable.length > 1"> and </template>
         <template v-if="committable.includes('delay-3')">your new retirement age</template>
         <template v-if="committable.includes('direct-plans')">

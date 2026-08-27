@@ -169,6 +169,7 @@ import {
   requiredMonthlyContributionFor,
   type RequiredContributionResult,
 } from "@/lib/required-contribution";
+import { STEP_UP_MAX_PERCENT } from "@/lib/contribution-schedule";
 
 /** The plan a lever perturbs - exactly the solver's inputs, nothing else. */
 export interface PlanInputs {
@@ -226,8 +227,35 @@ export const PLAN_LEVER_KEYS: PlanLeverKey[] = [
   "no-prepay-roll-emi",
 ];
 
-/** The step-up this lever commits to (%/yr, REAL - ADR-0004, `derive.ts` reads it directly). */
-export const STEP_UP_LEVER_PERCENT = 10;
+/**
+ * The step-up this lever commits to, as the user understands it: "raise my SIP 10% a year".
+ *
+ * This is a NOMINAL figure - it is what every Indian SIP calculator, AMC top-up-SIP facility and
+ * the reference video mean, and it is what the design mock uses (`fk-mock.js` runs entirely in the
+ * nominal frame). It MUST NOT be written into `householdSavingsStepUpPercent` directly: that field
+ * is REAL (ADR-0004 section 3, `derive.ts` "The step-up is REAL - no inflation added"), so a raw 10
+ * there asserts a 1.10 x 1.06 - 1 = 16.6% NOMINAL escalation every year.
+ *
+ * Measured on the reference persona that error is not academic: a 10% REAL step-up puts Amit's
+ * final-year contribution at Rs10.28 L/month in TODAY's money - 206% of his entire take-home - while
+ * the card advertised the starting amount as "1.41x current, clearly doable". Exactly the
+ * optimistically-early FIRE date ADR-0004 section 3 exists to prevent. Convert at the boundary with
+ * `realStepUpPercentFor()`.
+ */
+export const STEP_UP_LEVER_NOMINAL_PERCENT = 10;
+
+/**
+ * The nominal step-up above, expressed in the REAL frame the kernel consumes:
+ * `(1 + nominal) / (1 + inflation) - 1`. At the 6% default this is ~3.77%/yr real, which is also
+ * the honest reading of Indian salary data (nominal increments ~9-9.5%/yr against ~6% CPI leave
+ * ~3% real). Clamped to the ADR-0004 ceiling and floored at 0 - a nominal step-up BELOW inflation
+ * is not an accelerator, it is a real-terms cut, and must never be sold as a move.
+ */
+export function realStepUpPercentFor(inflation: number, nominalPercent = STEP_UP_LEVER_NOMINAL_PERCENT): number {
+  const infl = Number.isFinite(inflation) ? inflation : 0.06;
+  const real = ((1 + nominalPercent / 100) / (1 + infl) - 1) * 100;
+  return Math.min(STEP_UP_MAX_PERCENT, Math.max(0, real));
+}
 /** "Retire 3 years later". */
 export const DELAY_LEVER_YEARS = 3;
 /**
@@ -262,15 +290,34 @@ export function loanEndYear(loan: Liability, now = new Date()): number {
 }
 
 /**
- * The loans this household is better off KEEPING: rate strictly below the expected equity return.
- * Strict `<` is deliberate - a loan at exactly the expected return is a coin-flip dressed up as a
- * strategy, and the honest answer for an equal-rate loan is "prepay it" (a guaranteed return beats
- * an expected one). `interestRate` is stored in PERCENT, the assumption as a FRACTION.
+ * The margin by which expected equity must beat a loan rate before "don't prepay" is honest advice.
+ *
+ * Prepaying is a GUARANTEED, zero-volatility, tax-free return. Equity's 12% is an EXPECTED return
+ * carrying ~15-18% annualised volatility and real sequence risk. Comparing the two on raw rates is
+ * the classic risk-blind arbitrage argument, and it is the same asymmetry the scalar risk-notch
+ * lever is already forbidden from asserting (see its "adds market risk - not a guaranteed gain"
+ * caveat above). 2pp is the buffer: at the 12% default the lever gates at loan rates below 10%, so
+ * a 7.2% home loan still qualifies comfortably (keeping it IS sound), while an 11% loan-against-
+ * property or a 10.5% education loan no longer reads as free money.
+ */
+export const LOAN_RISK_PREMIUM = 0.02;
+
+/**
+ * The loans this household is better off KEEPING: rate below the expected equity return BY THE RISK
+ * PREMIUM. A bare `rate < return` would recommend keeping an 11% loan against a 12% expectation - a
+ * coin-flip sold as a strategy. `interestRate` is stored in PERCENT, the assumption as a FRACTION.
+ *
+ * NOTE on Section 24: a self-occupied home loan's interest deduction (up to Rs2L) cuts the EFFECTIVE
+ * rate and would make this test EASIER to pass - but it is an OLD-regime-only benefit
+ * (`derive.ts` uses it solely inside `estimatedDeductionsForOld`), and the post-Budget-2025 salaried
+ * default is the NEW regime, where it is worth nothing. Modelling it would need a regime gate like
+ * the scalar `nps-80ccd1b` lever's; we deliberately do NOT credit it, which under-states the case
+ * for keeping the loan - the honest direction.
  */
 export function cheapLoans(snapshot: Household, assumptions: Assumptions): Liability[] {
-  const equity = assumptions.equityReturn;
+  const threshold = assumptions.equityReturn - LOAN_RISK_PREMIUM;
   return snapshot.liabilities.filter(
-    (l) => l.monthlyEMI > 0 && Number.isFinite(l.interestRate) && l.interestRate / 100 < equity,
+    (l) => l.monthlyEMI > 0 && Number.isFinite(l.interestRate) && l.interestRate / 100 < threshold,
   );
 }
 
@@ -281,22 +328,26 @@ export function buildPlanLevers(ctx: PlanLeverContext): PlanLever[] {
   const rollable = cheapLoans(plan.snapshot, plan.assumptions)[0];
   const monthlyExpenses = plan.snapshot.expenses.avgMonthly ?? 0;
   const currentStepUp = plan.assumptions.householdSavingsStepUpPercent ?? 0;
+  // The REAL step-up this lever would set, converted from the nominal figure the user sees.
+  const leverRealStepUp = realStepUpPercentFor(plan.assumptions.inflation);
 
   const byKey: Record<PlanLeverKey, PlanLever> = {
     "step-up-10": {
       key: "step-up-10",
-      label: `Raise investing ${STEP_UP_LEVER_PERCENT}% every year`,
-      note: "salary hikes to SIP hikes; the single biggest lever",
-      available: currentStepUp < STEP_UP_LEVER_PERCENT,
-      unavailableNote: `you already plan to raise investing ${currentStepUp}%/yr`,
+      label: `Raise investing ${STEP_UP_LEVER_NOMINAL_PERCENT}% every year`,
+      // The parenthetical is the honesty half: the headline is the nominal number the user acts on,
+      // the bracket is what it is worth once inflation is taken out - which is what the plan uses.
+      note: `salary hikes to SIP hikes (about ${leverRealStepUp.toFixed(1)}% a year after inflation) - the single biggest lever`,
+      available: currentStepUp < leverRealStepUp,
+      unavailableNote: `you already plan to raise investing ${currentStepUp}%/yr after inflation`,
       apply: (p) => ({
         ...p,
         assumptions: {
           ...p.assumptions,
-          // max, never overwrite - a household already stepping up 12% must not be talked DOWN.
+          // max, never overwrite - a household already stepping up more must not be talked DOWN.
           householdSavingsStepUpPercent: Math.max(
             p.assumptions.householdSavingsStepUpPercent ?? 0,
-            STEP_UP_LEVER_PERCENT,
+            realStepUpPercentFor(p.assumptions.inflation),
           ),
         },
       }),
@@ -413,12 +464,30 @@ export function solvePlan(plan: PlanInputs): RequiredContributionResult {
   const yearsRolling = Math.max(0, yearsToTarget - yearsUntilLoanEnds);
   if (yearsRolling <= 0) return solved;
 
-  // Time-weighted average of the extra inflow over the accumulation horizon (ADR-0004 in spirit:
-  // a segment starting at the loan's end year). Under-states the true compounding benefit of a
-  // late, large inflow - the honest direction (rule 31): promise less rather than more.
-  const effectiveExtra = Math.round((emi * yearsRolling) / yearsToTarget);
-  if (!(effectiveExtra > 0)) return solved;
-
+  // ANNUITY-EQUIVALENT of the rolled EMI, not a linear time-weight.
+  //
+  // The obvious `emi * yearsRolling / yearsToTarget` is WRONG in the optimistic direction: it
+  // spreads a LATE inflow evenly from day one, handing it compounding time it never gets. Measured
+  // at a 6% real return over a 20-year horizon that over-credits by 3.5% for a loan ending next
+  // year and by 79% for one ending in year 18 - and the error grows precisely as the loan gets
+  // later, i.e. worst for the long home loans this lever exists to serve (code-review BLOCKER).
+  // An over-stated saving makes the user UNDER-save, the failure mode the honesty mandate names.
+  //
+  // So: take the future value of the EMI annuity over the years it ACTUALLY flows, then express
+  // that same future value as the level monthly amount payable across the WHOLE horizon. Equal
+  // future value, honest present framing. `realMonthlyRate` comes from the plan's own assumptions
+  // (the kernel's real frame), so this is not a parallel return model.
+  const realAnnual = (1 + plan.assumptions.equityReturn) / (1 + plan.assumptions.inflation) - 1;
+  const r = Math.pow(1 + Math.max(0, realAnnual), 1 / 12) - 1;
+  const nRolling = Math.round(yearsRolling * 12);
+  const nTotal = Math.round(yearsToTarget * 12);
+  const effectiveExtra =
+    r > 0
+      ? Math.round(
+          ((emi * (Math.pow(1 + r, nRolling) - 1)) / r) * (r / (Math.pow(1 + r, nTotal) - 1)),
+        )
+      : // Zero real return degenerates to the linear case, which is then exact.
+        Math.round((emi * nRolling) / nTotal);
   // The rolled EMI is money the household will invest ANYWAY once the loan clears, so it reduces
   // what must be found from today's cashflow one-for-one, floored at zero.
   return {

@@ -29,7 +29,8 @@ import {
   lessToFindFor,
   solvePlan,
   PLAN_LEVER_KEYS,
-  STEP_UP_LEVER_PERCENT,
+  STEP_UP_LEVER_NOMINAL_PERCENT,
+  realStepUpPercentFor,
   DELAY_LEVER_YEARS,
   DIRECT_PLAN_RETURN_UPLIFT,
   type PlanInputs,
@@ -109,11 +110,28 @@ describe("buildPlanLevers — the QN-5 catalog", () => {
 describe("lever semantics — each maps to the spec's exact mechanism", () => {
   beforeEach(() => setActivePinia(createPinia()));
 
-  it("step-up-10 sets householdSavingsStepUpPercent to 10 (ADR-0004, kernel already supports it)", () => {
+  it("step-up-10 writes the REAL-frame step-up, NOT the nominal headline (ADR-0004 section 3)", () => {
     const { plan, ctx } = sharmasPlan();
-    expect(plan.assumptions.householdSavingsStepUpPercent ?? 0).toBeLessThan(STEP_UP_LEVER_PERCENT);
     const out = applyPlanLevers(plan, buildPlanLevers(ctx), ["step-up-10"]);
-    expect(out.assumptions.householdSavingsStepUpPercent).toBe(STEP_UP_LEVER_PERCENT);
+    const written = out.assumptions.householdSavingsStepUpPercent;
+    // The kernel field is REAL. Writing the nominal 10 there asserts a 16.6%/yr nominal
+    // escalation and puts the reference persona's final-year contribution at ~206% of take-home.
+    expect(written).toBeCloseTo(realStepUpPercentFor(plan.assumptions.inflation), 6);
+    expect(written).toBeLessThan(STEP_UP_LEVER_NOMINAL_PERCENT);
+    // At the 6% default that is ~3.8%/yr real — consistent with ~9-9.5% nominal Indian increments.
+    expect(written).toBeGreaterThan(3);
+    expect(written).toBeLessThan(5);
+  });
+
+  it("realStepUpPercentFor deflates the nominal headline and never sells a real-terms cut", () => {
+    expect(realStepUpPercentFor(0.06, 10)).toBeCloseTo(((1.1 / 1.06) - 1) * 100, 6);
+    // A nominal step-up at or below inflation is not an accelerator — it floors at 0, never negative.
+    expect(realStepUpPercentFor(0.06, 6)).toBe(0);
+    expect(realStepUpPercentFor(0.06, 4)).toBe(0);
+    // Clamped to the ADR-0004 ceiling.
+    expect(realStepUpPercentFor(0.06, 100)).toBeLessThanOrEqual(15);
+    // A non-finite inflation falls back to the 6% default rather than producing NaN.
+    expect(Number.isFinite(realStepUpPercentFor(Number.NaN))).toBe(true);
   });
 
   it("step-up-10 never LOWERS an already-higher step-up (max, not overwrite)", () => {
