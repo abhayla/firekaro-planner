@@ -108,7 +108,10 @@ describe("headline plausibility — DEFAULT product lens (#22 foolproof gate)", 
         // not relaxed; the tight 2.0y bound below is what proves the band still tracks.
         targetGrowthRate: k.realTargetDriftRate,
         monthlySavings: k.monthlyContribution,
-        monthlySavingsSchedule: k.householdContributionSchedule,
+        // ADR-0006 Phase 1b: the CPI-RE-INDEXED inflow, exactly as the production band uses
+        // (`useFireDerive`). The un-discounted real schedule credited the household with
+        // purchasing power the nominal kernel never gives, so this mirror had stopped mirroring.
+        monthlySavingsSchedule: k.bandContributionSchedule,
         meanReturn: k.realBlendedReturn,
         meanReturnSchedule: k.realReturnSchedule,
         volatility: k.portfolioVolatility,
@@ -128,7 +131,10 @@ describe("headline plausibility — DEFAULT product lens (#22 foolproof gate)", 
         targetCorpus: k.fireNumber,
         targetGrowthRate: k.realTargetDriftRate,
         monthlySavings: k.monthlyContribution,
-        monthlySavingsSchedule: k.householdContributionSchedule,
+        // ADR-0006 Phase 1b: the CPI-RE-INDEXED inflow, exactly as the production band uses
+        // (`useFireDerive`). The un-discounted real schedule credited the household with
+        // purchasing power the nominal kernel never gives, so this mirror had stopped mirroring.
+        monthlySavingsSchedule: k.bandContributionSchedule,
         meanReturn: k.realBlendedReturn,
         volatility: k.portfolioVolatility,
       });

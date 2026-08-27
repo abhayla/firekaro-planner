@@ -172,7 +172,9 @@ describe("captureSnapshot — pure builder (Stage A)", () => {
       // cross-consumer divergence the assertion exists to catch, so they are added, not relaxed.
       targetGrowthRate: k.realTargetDriftRate,
       monthlySavings: k.monthlyContribution,
-      monthlySavingsSchedule: k.householdContributionSchedule,
+      // Phase 1b: …and CPI-RE-INDEXED, again exactly as production does. The raw real schedule
+      // over-credits the household within each year (the nominal inflow steps annually).
+      monthlySavingsSchedule: k.bandContributionSchedule,
       meanReturn: k.realBlendedReturn,
       meanReturnSchedule: k.realReturnSchedule,
       volatility: k.portfolioVolatility,
@@ -323,6 +325,8 @@ describe("lifecycle-digest — frame-change migration (ADR-0006)", () => {
         realReturnSchedule: 0.04,
         realTargetDriftRate: 0.0023,
         householdContributionSchedule: 100_000,
+        // ADR-0006 Phase 1b: the CPI-re-indexed band inflow (≈ 96.8% of the real amount at 6% CPI).
+        bandContributionSchedule: 96_766,
         portfolioVolatility: 0.15,
         monthlyContribution: 100_000,
       },

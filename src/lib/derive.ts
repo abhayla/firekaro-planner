@@ -686,6 +686,29 @@ export function derive(
       (typeof real === "function" ? real(yearIndex) : real) * cpiFactor(yearIndex);
   };
   const nominalContributionSchedule = toNominalContribution(householdContributionSchedule);
+
+  // ADR-0006 Phase 1b (MEDIUM-4) — the CPI-RE-INDEXED real inflow, for engines that work in the
+  // CPI-real frame (the Monte Carlo band, `lever-bands`) rather than the nominal one the headline
+  // solves in. Deflating the nominal path reproduces the real path exactly for RETURNS but NOT for
+  // contributions: the nominal inflow steps once a year, so the amount paid in month `j` of year
+  // `y` is worth `C_real(y)·(1+CPI)^−(j+1)/12` in today's rupees — strictly less than `C_real(y)`
+  // in every month. Handing a real-frame engine the un-discounted `C_real(y)` credits the
+  // household with purchasing power the nominal kernel never gives them, which put the band's p50
+  // ~0.4 years AHEAD of the headline it exists to bracket. The factor is the mean of those twelve
+  // monthly discounts — exact for the year's contribution TOTAL, and independent of `y`, so it is
+  // one scalar.
+  const CPI_WITHIN_YEAR_REINDEX = (() => {
+    let sum = 0;
+    for (let k = 1; k <= 12; k++) sum += Math.pow(1 + generalInflation, -k / 12);
+    return sum / 12;
+  })();
+  const bandContributionSchedule: ContributionSchedule =
+    typeof householdContributionSchedule === "number" && householdContributionSchedule <= 0
+      ? householdContributionSchedule
+      : (yearIndex: number) =>
+          (typeof householdContributionSchedule === "function"
+            ? householdContributionSchedule(yearIndex)
+            : householdContributionSchedule) * CPI_WITHIN_YEAR_REINDEX;
   /** Today's-₹ target → the nominal target in year `yearIndex`, growing at the basket. */
   const toNominalTarget = (todayTarget: number) => (yearIndex: number) =>
     todayTarget * basketFactor(yearIndex);
@@ -928,6 +951,9 @@ export function derive(
     // ADR-0006: the NOMINAL corpus inflow the headline was actually solved with (the real
     // schedule above grown at general CPI). Exposed so no consumer rebuilds it.
     nominalContributionSchedule,
+    // ADR-0006 Phase 1b: the same inflow for CPI-REAL-frame engines (the Monte Carlo band), with
+    // the within-year CPI step the nominal frame imposes already applied. Never rebuild it.
+    bandContributionSchedule,
     portfolioVolatility,
     // The canonical per-bucket corpus weights (₹, from fireCorpusInvestments — whole-household,
     // primary-residence excluded) that back blendedReturn + portfolioVolatility. Exposed so the

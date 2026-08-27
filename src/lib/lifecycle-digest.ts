@@ -66,6 +66,7 @@ export type SnapshotInputs = Pick<
   | "realReturnSchedule"
   | "realTargetDriftRate"
   | "householdContributionSchedule"
+  | "bandContributionSchedule"
   | "portfolioVolatility"
   | "monthlyContribution"
 >;
@@ -203,7 +204,10 @@ function computeMonteCarloP50Age(derived: SnapshotInputs, skip: boolean): number
     // ADR-0006: same CPI-real band, drifting today's-₹ target (see monte-carlo.ts header).
     targetGrowthRate: derived.realTargetDriftRate,
     monthlySavings: derived.monthlyContribution,
-    monthlySavingsSchedule: derived.householdContributionSchedule,
+    // ADR-0006 Phase 1b: the CPI-RE-INDEXED inflow — the band is CPI-real, and the nominal
+    // kernel only steps the contribution once a year, so the un-discounted real amount would
+    // credit purchasing power the headline never gives (see derive.bandContributionSchedule).
+    monthlySavingsSchedule: derived.bandContributionSchedule,
     meanReturn: derived.realBlendedReturn,
     // #24 Part 1: taper the MC per-year MEAN along the glide schedule so the digest's MC
     // p50 age converges to the headline for glide-ON households (same as useFireDerive).

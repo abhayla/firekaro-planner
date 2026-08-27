@@ -66,6 +66,16 @@
  *      so nominalising here would have meant re-grounding σ and the return history too — a
  *      much larger, un-validated change for an algebraically identical result. Divide the
  *      nominal crossing condition through by (1+CPI)^t and you get exactly this model.
+ *
+ *      ADR-0006 Phase 1b — "algebraically identical" holds for RETURNS and for the TARGET, but
+ *      NOT for CONTRIBUTIONS, and the caller must correct for it. The nominal kernel steps the
+ *      inflow once a year, so in today's rupees the amount paid in month j of year y is worth
+ *      `C_real(y)·(1+CPI)^−(j+1)/12`, i.e. ~3.2% less on average at 6% CPI. Passing the
+ *      un-discounted real schedule here ran p50 ~0.4 years AHEAD of the deterministic headline
+ *      this band exists to bracket. `monthlySavingsSchedule` MUST therefore be
+ *      `derive().bandContributionSchedule` (already re-indexed) — never
+ *      `householdContributionSchedule`. This module does not apply the factor itself: it has no
+ *      CPI input, and a second place that knows the factor is a second place to get it wrong.
  *   3. GLIDE PATH: the per-year MEAN now tapers via the optional `meanReturnSchedule`
  *      (#24 Part 1 — p50 converges to the glide-tapered headline). The VOLATILITY is
  *      still a single scalar (a per-year vol taper needs a per-year ALLOCATION schedule
@@ -188,7 +198,9 @@ export interface MonteCarloFireInput {
   targetGrowthRate?: number;
   monthlySavings: number;
   /**
-   * ADR-0006. Optional per-year contribution schedule in the SAME frame as `meanReturn` — used
+   * ADR-0006. Optional per-year contribution schedule in the SAME frame as `meanReturn`. For the
+   * CPI-real FIRE band this MUST be `derive().bandContributionSchedule` (CPI-re-indexed), not the
+   * raw real schedule — see note 2 in the header. Used
    * instead of the flat `monthlySavings` when present. Required once a household has a savings
    * step-up (the default since ADR-0006): with a flat scalar the band's p50 ran ~2 years behind
    * the deterministic headline it is supposed to bracket. `monthlySavings` is still the value the

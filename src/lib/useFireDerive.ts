@@ -383,6 +383,7 @@ export function useFireDerive() {
     realTargetDriftRate: computed(() => d.value.realTargetDriftRate),
     // ADR-0006: the REAL (today's-₹) corpus-inflow schedule the headline was solved with.
     householdContributionSchedule: computed(() => d.value.householdContributionSchedule),
+    bandContributionSchedule: computed(() => d.value.bandContributionSchedule),
     portfolioVolatility: computed(() => d.value.portfolioVolatility),
     // Canonical per-bucket corpus weights (₹) backing blendedReturn/portfolioVolatility — the basis
     // the obj-2 acceleration composable must use for risk-notch equity headroom + perturbed σ (gh-48).
@@ -409,7 +410,12 @@ export function useFireDerive() {
         // ADR-0006: the REAL (today's-₹) inflow schedule, incl. the step-up and its age-50 taper —
         // the same frame as `realBlendedReturn`. A flat scalar left the band's p50 behind the
         // deterministic headline it brackets.
-        monthlySavingsSchedule: d.value.householdContributionSchedule,
+        //
+        // Phase 1b: and CPI-RE-INDEXED. The nominal kernel steps the contribution once a year, so
+        // every month of that year is worth less than the real amount in today's rupees; handing
+        // the band the un-discounted figure ran it ~0.4 years optimistic against the headline it
+        // brackets (`derive.bandContributionSchedule` owns the factor — never rebuild it here).
+        monthlySavingsSchedule: d.value.bandContributionSchedule,
         meanReturn: d.value.realBlendedReturn,
         meanReturnSchedule: d.value.realReturnSchedule,
         volatility: d.value.portfolioVolatility,

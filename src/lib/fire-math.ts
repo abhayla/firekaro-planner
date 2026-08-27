@@ -335,8 +335,17 @@ export type ReturnSchedule = number | ((yearIndex: number) => number);
  * the effective annual rate is `(1+r/12)^12 > 1+r`, and the size of that excess depends on `r` —
  * so the SAME household reached FIRE ~1.2 years earlier in the nominal frame than in the real one
  * purely from the compounding convention (measured on the Sharmas seed). A frame the answer
- * depends on is not one frame. With the true equivalent, deflating the nominal path month by month
- * reproduces the real path EXACTLY, and the two engines agree by construction.
+ * depends on is not one frame.
+ *
+ * With the true equivalent, deflating the nominal path month by month reproduces the real path
+ * exactly FOR RETURNS. It does NOT for CONTRIBUTIONS, and Phase 1b corrects the claim that it did:
+ * the nominal inflow steps ONCE A YEAR (a salary is revised annually), so the contribution paid in
+ * month `j` of year `y` is `C_real(y)·(1+CPI)^y` while the deflator at that instant is
+ * `(1+CPI)^(y + (j+1)/12)`. Its real value is therefore `C_real(y)·(1+CPI)^−(j+1)/12` — below
+ * `C_real(y)` for every month of the year, by `1 − (1/12)Σ_{k=1..12}(1+CPI)^−k/12` ≈ 3.2% at 6%
+ * CPI. Any engine that works in the CPI-real frame (the Monte Carlo band, `lever-impact`) must
+ * re-index its contributions by that factor or it runs optimistic against the nominal headline;
+ * `derive().bandContributionSchedule` is the one place that factor is applied.
  *
  * It is also the conservative correction: `r/12` silently over-compounded every projection.
  */
