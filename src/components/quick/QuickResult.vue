@@ -7,24 +7,20 @@
  * shows (T-377). That is what makes "the quick result and the dashboard agree" true by construction
  * rather than by a test (rule 26) — there is exactly one hero in the product.
  *
- * The real lever card ("how to get there — pick your moves") is stage QN-5 and lands in this slot
- * next; a visible placeholder card holds the spot until then (T-378C finding F7).
+ * The lever card ("how to get there — pick your moves", QN-5 / T-379) is `<LeverPicker />` — the
+ * same component the dashboard's AccelerationCard embeds, driven by the same session-only
+ * `ui.whatIfLevers`, so a move switched on here is still on in the full planner.
  */
 import { computed } from "vue";
 import { RouterLink } from "vue-router";
 import FireHero from "@/components/dashboard/FireHero.vue";
 import QuickExplainer from "@/components/quick/QuickExplainer.vue";
+import LeverPicker from "@/components/quick/LeverPicker.vue";
 import { useFireDerive } from "@/lib/useFireDerive";
 import { useHouseholdStore } from "@/stores/household";
-import { useAssumptionsStore } from "@/stores/assumptions";
 import { useUiStore } from "@/stores/ui";
 import { requiredMonthlyContributionFor } from "@/lib/required-contribution";
-import {
-  FULL_PLANNER_ADDS,
-  PLAN_HONESTY_LINE,
-  QUICK_PORTFOLIO_CAVEAT,
-  overCommitmentWarning,
-} from "@/lib/quick-number-copy";
+import { FULL_PLANNER_ADDS, QUICK_PORTFOLIO_CAVEAT, overCommitmentWarning } from "@/lib/quick-number-copy";
 import { formatINRCompact } from "@/lib/formatters";
 import type { QuickAnswers } from "@/types/quick-number";
 
@@ -33,7 +29,6 @@ defineEmits<{ (e: "edit"): void }>();
 
 const fire = useFireDerive();
 const h = useHouseholdStore();
-const a = useAssumptionsStore();
 const ui = useUiStore();
 
 const req = computed(() => fire.requiredContribution.value);
@@ -65,19 +60,20 @@ const chart = computed(() => {
   // explainer had just talked about. Start at the user's actual current age instead.
   const from = anchor;
   const to = Math.max(from + 5, target + 6);
-  const lens = {
-    isFamilyView: ui.isFamilyView,
-    viewingMemberId: ui.viewingMemberId,
-    currentFY: ui.currentFY,
-  };
+  // QN-5: the curves are drawn on the SAME lever-applied inputs the hero solves on, so a
+  // switched-on move bends the "have" line the user is looking at (rule 26 — one plan on screen).
+  const plan = fire.activePlan.value;
+  const lens = fire.solverLens.value;
   const step = (to - from) / (CHART_POINTS - 1);
   const points = Array.from({ length: CHART_POINTS }, (_, i) => {
     const age = Math.round(from + i * step);
     const r = requiredMonthlyContributionFor({
-      snapshot: h.data,
-      assumptions: a.values,
+      snapshot: plan.snapshot,
+      assumptions: plan.assumptions,
       lens,
       targetAge: age,
+      extraContributionSegments: plan.extraSegments,
+      solve: false, // the chart draws need + have only — no bisection per sampled age
     });
     return { age, need: Math.max(0, r.needReal), have: Math.max(0, r.haveAtTargetReal) };
   });
@@ -153,10 +149,6 @@ const answerRows = computed(() => {
         <FireHero />
       </div>
 
-      <p class="text-caption text-medium-emphasis mt-3 mb-4" data-testid="quick-honesty-line">
-        {{ PLAN_HONESTY_LINE }}
-      </p>
-
       <!-- The express path collapses every holding into one equity line to stay at ten cards. That
            makes the projection optimistic for anyone holding PF/PPF/FD money, so it is stated on
            the screen rather than buried (FinTech review HIGH 3/4). -->
@@ -204,20 +196,8 @@ const answerRows = computed(() => {
         </div>
       </v-card>
 
-      <!-- T-378C finding F7: the lever card (QN-5, "how to get there — pick your moves") is not
-           built yet. The only trace used to be a source comment — invisible to the user. This is
-           the honest, visible placeholder until QN-5 lands. -->
-      <v-card
-        variant="outlined"
-        class="pa-6 mt-4"
-        data-testid="quick-levers-placeholder"
-      >
-        <h3 class="text-subtitle-1 font-weight-bold font-display mb-2">How to get there</h3>
-        <p class="text-body-2 text-medium-emphasis mb-0">
-          Coming soon: pick your moves — step up savings, trim spend, retire later — and see the
-          date move. For now, make those changes in the full planner.
-        </p>
-      </v-card>
+      <!-- QN-5 (T-379): the "how to get there" moves — re-solves the hero above live. -->
+      <LeverPicker />
 
       <v-card variant="outlined" class="pa-6 mt-4">
         <h3 class="text-subtitle-1 font-weight-bold font-display mb-3">What the full planner adds</h3>

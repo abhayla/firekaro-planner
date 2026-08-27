@@ -6,7 +6,9 @@ import { useUiStore } from "@/stores/ui";
 import {
   buildAccelerationLevers,
   makeSaveMoreLever,
+  trimmableMonthlyExpenses,
   EQUITY_NOTCH_POINTS,
+  PLAN_TRIM_FRACTION,
   type AccelerationContext,
 } from "@/lib/lever-catalog";
 import {
@@ -45,8 +47,6 @@ import { getTaxConfigForFY } from "@/lib/tax";
  * user is not yet investing — `saveMoreImpact(0)` is a no-op (null), never a phantom acceleration.
  */
 
-/** Realistic achievable expense trim — matches the catalog's trim-lever convention (no new magic number). */
-const REALISTIC_EXPENSE_TRIM_PCT = 0.1;
 /**
  * Assumption: a realistic equity ceiling for the urban-salaried accumulator. derive() exposes no
  * household equity cap, so the risk-notch lever is bounded by this research-grounded default — aggressive
@@ -102,8 +102,14 @@ export function useAcceleration() {
     const marginalTaxRate = fire.householdMarginalRate.value * (1 + getTaxConfigForFY(ui.currentFY).cessRate);
     return {
       baseline: baseline.value,
-      monthlyExpenses: fire.annualExpensesToday.value / 12,
-      realisticExpenseTrimPct: REALISTIC_EXPENSE_TRIM_PCT,
+      // ONE constant + ONE base for BOTH "Trim spending 10%" rows on the card (the ranked
+      // accelerator here and the QN-5 plan lever in the picker below it): `PLAN_TRIM_FRACTION` and
+      // `trimmableMonthlyExpenses` — the discretionary spend only, with the auto-flowed EMI /
+      // insurance-premium lines excluded. Feeding the full `annualExpensesToday/12` here would make
+      // the two identically-labelled rows quote different rupees, and would silently assume the user
+      // can trim a contractual EMI.
+      monthlyExpenses: trimmableMonthlyExpenses(h.data.expenses),
+      realisticExpenseTrimPct: PLAN_TRIM_FRACTION,
       swr: fire.effectiveSWR.value,
       currentEquityPct: currentEquityPct.value,
       maxEquityPct: DEFAULT_MAX_EQUITY_PCT,

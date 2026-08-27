@@ -583,7 +583,7 @@ export function derive(
   // real step-up is net-of-inflation growth on top of the constant-real baseline). The flattening
   // lives in lib/contribution-schedule.ts (single-kernel rule), not inline here.
   const householdSavingsStepUpPct = assumptions.householdSavingsStepUpPercent ?? 0;
-  const householdContributionSchedule: ContributionSchedule =
+  const baseContributionSchedule: ContributionSchedule =
     householdSavingsStepUpPct > 0 && monthlyContribution > 0
       ? buildContributionResolver(
           [
@@ -597,6 +597,27 @@ export function derive(
         )
       : monthlyContribution; // scalar ⇒ byte-identical (default path; also preserves the
   // `monthlyContribution <= 0 → Infinity` empty-state guard in calculateYearsToTarget).
+  // QN-5 (T-379): optional EXTRA segments from the override seam (the "roll the EMI into
+  // investing when the loan ends" lever) are SUMMED onto the base inflow — each segment gets
+  // its own resolver because `buildContributionResolver` picks the latest-starting segment on
+  // overlap (replace semantics), and a lever must add to the residual, never replace it. With no
+  // segments the base schedule passes through untouched (scalar stays scalar).
+  const extraSegments = (overrides?.extraContributionSegments ?? []).filter(
+    (s) => Number.isFinite(s.amount) && s.amount > 0 && Number.isFinite(s.startAtAge),
+  );
+  const householdContributionSchedule: ContributionSchedule =
+    extraSegments.length === 0
+      ? baseContributionSchedule
+      : (() => {
+          const extras = extraSegments.map((s) => buildContributionResolver([s], anchorAge));
+          return (yearIndex: number) => {
+            const base =
+              typeof baseContributionSchedule === "function"
+                ? baseContributionSchedule(yearIndex)
+                : baseContributionSchedule;
+            return extras.reduce((sum, r) => sum + r(yearIndex), base);
+          };
+        })();
 
   // Headline FIRE dates (FireHero) — the ADEQUACY leg (corpus grows to the FIRE
   // number) in the REAL frame. The bridge layer below can push the HEADLINE later

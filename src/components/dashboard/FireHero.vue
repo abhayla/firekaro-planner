@@ -212,9 +212,11 @@ const targetAge = computed<number>(() => fire.heroTargetAge.value);
  * every integer the thumb crossed and janked the drag (code-review M6). The thumb still moves
  * at 60fps; the numbers land the moment the user lets go.
  */
-const sliderAge = ref<number>(fire.heroTargetAge.value);
+// The thumb follows the SLIDER age (what the user dragged); the headline may sit +3 above it
+// while the "retire 3 years later" move is switched on (QN-5) — the two are deliberately distinct.
+const sliderAge = ref<number>(fire.sliderTargetAge.value);
 watch(
-  () => fire.heroTargetAge.value,
+  () => fire.sliderTargetAge.value,
   (v) => {
     sliderAge.value = v;
   },
@@ -323,6 +325,8 @@ function setAsMyTarget() {
     : h.earners;
   for (const m of targets) h.updateMember(m.id, { targetRetirementAge: age });
   ui.setWhatIfTargetAge(null); // follow the plan again now that the plan IS this age
+  // The delay move is now baked into the saved age — switching it off keeps the headline honest.
+  if (ui.whatIfLevers.includes("delay-3")) ui.toggleWhatIfLever("delay-3");
 }
 function resetTargetAge() {
   ui.setWhatIfTargetAge(null);

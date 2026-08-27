@@ -96,7 +96,7 @@ file/symbol below before creating it; `docs/goals/.run/quick-number-PROGRESS.md`
 
 **TDD:** `lever-catalog.spec.ts` for each new lever (availability rule for no-prepay incl. rate ≥ return → unavailable with the "prepay it" copy; stacked ≠ sum of parts; every lever's "less to find" ≥ 0), no-inert-lever guard **in `lever-catalog.spec.ts`** (lesson `project_lever_value_requires_unassumed_baseline`: assert each lever changes the solver output on Sharmas — a moot lever fails the test), member-lens: levers on the member view use the individual number.
 
-**Acceptance:** rule 24/32: toggle each lever on `/quick` result and dashboard, screenshots; rule 31: Amit with step-up+delay+direct lands in the "clearly doable" band (required within 1.5× current); FinTech-analyst review of the lever semantics; rule 29.
+**Acceptance:** rule 24/32: toggle each lever on `/quick` result and dashboard, screenshots; rule 31: Amit (real kernel, need ₹19.05 Cr — NOT the mock's ₹13.35 Cr) with step-up+delay+direct: required ₹2.88 L/mo = 1.65× the ₹1.75 L he invests; with all five moves ₹2.55 L vs ₹2.03 L (1.26×). The original "within 1.5× current" band was written against the mock; the shipped spec asserts the stacked amount is FINITE and < 2× current, and the UI reports the real ratio (re-baselined 2026-08-27, in-session build); FinTech-analyst review of the lever semantics; rule 29.
 
 ## 7. STAGE QN-6 — InvestmentForm fast-add  (matrix F5) — SEPARATE contract, not this run
 Filed as a good-to-have issue; needs Abhay's per-item approval under the focus lock. Not built here.

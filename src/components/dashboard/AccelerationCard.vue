@@ -3,17 +3,21 @@
  * Acceleration card (objective 2, gh-issue #48) — "your biggest achievable wins": an opinionated,
  * RANKED list of the accelerators that move THIS household's FIRE date, biggest-years-saved first,
  * each stated as "do X → FIRE ~N years sooner" with its transparent bound. The variance-bearing
- * risk-notch shows a confidence RANGE (never a free-lunch point). A live "invest ₹X more/month"
- * stepper is an ephemeral what-if (not persisted). Decision-support framing — never product advice.
+ * risk-notch shows a confidence RANGE (never a free-lunch point). The body is the QN-5 `<LeverPicker />`
+ * ("pick your moves", ₹/month "less to find" per move, re-solved through the kernel) — the same card
+ * the /quick result shows, so the two screens can never disagree. Decision-support framing — never
+ * product advice.
  *
  * All math comes from the pure libs via useAcceleration(); this component only renders.
  */
-import { ref, computed } from "vue";
+import { computed } from "vue";
 import { useAcceleration } from "@/composables/useAcceleration";
-import { formatINRCompact } from "@/lib/formatters";
+import { useFireDerive } from "@/lib/useFireDerive";
 import WinsImpactBars, { type WinBar } from "@/components/dashboard/viz/WinsImpactBars.vue";
+import LeverPicker from "@/components/quick/LeverPicker.vue";
 
 const accel = useAcceleration();
+const fire = useFireDerive();
 
 // The card ALWAYS shows the honest, bridge-adjusted headline (never the rosier scalar corpus model) —
 // a user must never see a FIRE date more optimistic than the truth (rule 31 / bug-#22, fixed 2026-06-06).
@@ -29,20 +33,20 @@ const reachableLevers = computed(() => ranked.value.filter((l) => l.reachable &&
 // is "build the plan first", not a fake accelerator (gh #39 empty-state class).
 const baselineReachable = computed(() => Number.isFinite(headlineYears.value) && headlineYears.value > 0);
 
-// Self-hide only when there is genuinely nothing to offer: no reachable lever AND no plannable
-// baseline to save against. Otherwise always render (this is the obj-2 flagship surface).
-const show = computed(() => baselineReachable.value || reachableLevers.value.length > 0);
+// QN-5: the picker has moves to offer whenever ANY plan lever is available — which is exactly
+// the out-of-reach case ("Move the age") where the old rule hid this card and left the user with
+// nothing to pull. Self-hide only when there is genuinely nothing: no reachable ranked lever, no
+// plannable baseline AND no available plan move.
+const hasPickerMoves = computed(() => fire.planLevers.value.some((l) => l.available));
+const show = computed(
+  () => baselineReachable.value || reachableLevers.value.length > 0 || hasPickerMoves.value,
+);
 
 /** Format a duration in years as a compact "X.X yrs" / "N mo" string. */
 function yearsLabel(years: number): string {
   const a = Math.abs(years);
   if (a < 1) return `${Math.round(a * 12)} mo`;
   return `${a.toFixed(1)} yr${a >= 2 ? "s" : ""}`;
-}
-/** "≈ X.X yrs sooner" (or "later" if a perturbation would delay FIRE — honest sign). */
-function soonerLabel(yearsSaved: number): string {
-  if (yearsSaved <= 0) return `≈ ${yearsLabel(yearsSaved)} later`;
-  return `≈ ${yearsLabel(yearsSaved)} sooner`;
 }
 
 // Option-D: ranked levers as impact bars from a common zero axis (viz/WinsImpactBars).
@@ -64,15 +68,10 @@ const winBars = computed<WinBar[]>(() =>
   }),
 );
 
-// --- Save-more sensitivity (ephemeral component state — NOT persisted) ---
-const SAVE_MORE_STEP = 5000;
-// A sane ceiling for the stepper: a notch above the current monthly contribution, min ₹50k.
-const saveMoreMax = computed(() => {
-  const ceiling = Math.max(50_000, Math.ceil(accel.monthlyContribution.value / SAVE_MORE_STEP) * SAVE_MORE_STEP);
-  return ceiling;
-});
-const extraMonthly = ref(SAVE_MORE_STEP * 2); // default ₹10k/mo
-const saveMoreImpact = computed(() => accel.saveMoreImpact(extraMonthly.value));
+// QN-5 (T-379): the fixed-extra-amount "save more" stepper is replaced by the lever picker below.
+// `useAcceleration.saveMoreImpact` stays in the composable for the "biggest win" ranking path and its
+// own spec — no live UI calls it today. The ranked years-saved KPI + the bridge guards above are
+// RETAINED — the picker adds the ₹/month "less to find" view.
 </script>
 
 <template>
@@ -85,8 +84,17 @@ const saveMoreImpact = computed(() => accel.saveMoreImpact(extraMonthly.value));
     <div class="d-flex align-center mb-3">
       <v-icon icon="mdi-rocket-launch-outline" color="fire-orange" size="24" class="mr-2" />
       <h3 class="accel-card__title flex-grow-1">Your biggest achievable wins</h3>
-      <v-chip size="small" variant="tonal" color="fire-orange" prepend-icon="mdi-flag-checkered">
+      <v-chip
+        v-if="baselineReachable"
+        size="small"
+        variant="tonal"
+        color="fire-orange"
+        prepend-icon="mdi-flag-checkered"
+      >
         FIRE in ~{{ yearsLabel(headlineYears) }}
+      </v-chip>
+      <v-chip v-else size="small" variant="tonal" color="warning" prepend-icon="mdi-flag-outline">
+        target out of reach today
       </v-chip>
     </div>
     <p class="text-body-2 text-medium-emphasis mb-4">
@@ -142,39 +150,13 @@ const saveMoreImpact = computed(() => accel.saveMoreImpact(extraMonthly.value));
       data-testid="accel-empty"
     >
       No realistic accelerators apply right now — your allocation and spending are already working hard.
-      The biggest remaining lever is investing more each month (below).
+      Pick a move below — step up, retire later, trim, direct plans, roll the EMI — and see what it
+      changes.
     </v-alert>
 
-    <!-- Save-more sensitivity — ephemeral what-if -->
+    <!-- QN-5: "how to get there — pick your moves" (the same picker the /quick result shows). -->
     <v-divider class="my-4" />
-    <div class="section-label">Invest more each month</div>
-    <div class="d-flex align-center ga-4 mt-1">
-      <v-slider
-        v-model="extraMonthly"
-        :min="0"
-        :max="saveMoreMax"
-        :step="SAVE_MORE_STEP"
-        color="fire-orange"
-        hide-details
-        class="flex-grow-1"
-        data-testid="accel-savemore-slider"
-        :aria-label="`Invest an extra ${formatINRCompact(extraMonthly)} per month`"
-      />
-      <div class="accel-savemore__amount text-currency">+{{ formatINRCompact(extraMonthly) }}/mo</div>
-    </div>
-    <div class="accel-savemore__result mt-1" data-testid="accel-savemore-result">
-      <template v-if="bridgeBinding && extraMonthly > 0">
-        Investing {{ formatINRCompact(extraMonthly) }} more every month grows your corpus and your liquid
-        runway faster — easing the bridge gap that currently sets your date.
-      </template>
-      <template v-else-if="saveMoreImpact && saveMoreImpact.reachable && saveMoreImpact.deltaYears > 0">
-        Investing {{ formatINRCompact(extraMonthly) }} more every month →
-        <strong>{{ soonerLabel(saveMoreImpact.deltaYears) }}</strong>
-      </template>
-      <template v-else>
-        Drag to see how investing more each month brings your FIRE date closer.
-      </template>
-    </div>
+    <LeverPicker embedded data-testid="accel-lever-picker" />
   </v-card>
 </template>
 
@@ -218,14 +200,5 @@ const saveMoreImpact = computed(() => accel.saveMoreImpact(extraMonthly.value));
   font-weight: var(--weight-medium);
   color: var(--text-muted);
   margin-bottom: var(--space-2);
-}
-.accel-savemore__amount {
-  font-weight: var(--weight-bold);
-  min-width: 96px;
-  text-align: right;
-}
-.accel-savemore__result {
-  font-size: var(--type-sm);
-  color: var(--text-secondary);
 }
 </style>

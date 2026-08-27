@@ -4,6 +4,12 @@ import { useAssumptionsStore } from "@/stores/assumptions";
 import { useUiStore } from "@/stores/ui";
 import { derive } from "@/lib/derive";
 import {
+  buildPlanLevers,
+  applyPlanLevers,
+  evaluatePlanLevers,
+  type PlanInputs,
+} from "@/lib/lever-catalog";
+import {
   requiredMonthlyContributionFor,
   type RequiredContributionResult,
 } from "@/lib/required-contribution";
@@ -244,7 +250,7 @@ export function useFireDerive() {
   // session-only `ui.whatIfTargetAge` when the user has dragged it, else the household's own
   // `targetRetirementAge` (the persisted plan). Dragging the slider is a what-if — it never
   // writes the plan; "Set as my target" does that through the household store.
-  const heroTargetAge = computed<number>(() => {
+  const sliderTargetAge = computed<number>(() => {
     const slider = ui.whatIfTargetAge;
     if (slider != null && Number.isFinite(slider)) return Math.round(slider);
     // Untouched slider ⇒ follow the SAVED plan of whatever scope is on screen. Under a member
@@ -258,41 +264,77 @@ export function useFireDerive() {
     return Number.isFinite(fromPlan) && (fromPlan ?? 0) > 0 ? Math.round(fromPlan as number) : 50;
   });
 
-  // One solver run per (household, assumptions, lens, targetAge). Vue caches it, so the
+  const solverLens = computed(() => ({
+    isFamilyView: ui.isFamilyView,
+    viewingMemberId: ui.viewingMemberId,
+    currentFY: ui.currentFY,
+  }));
+
+  // ---- QN-5 (T-379): the "how to get there" plan levers ----
+  // The catalog is built from the live household + assumptions; the switched-on set lives in
+  // `ui.whatIfLevers` (session-only, like the slider). `planBase` is today's plan at the slider
+  // age with NO lever applied — the reference every "less to find" is measured against;
+  // `activePlan` is the same inputs with the switched-on levers stacked (re-solved, never summed).
+  const planLevers = computed(() =>
+    buildPlanLevers(h.data, a.values, {
+      anchorAge: d.value.anchorAge,
+      directPlans: ui.quick?.directPlans ?? null,
+      memberLens: d.value.applyMemberLens,
+      currentYear: new Date().getFullYear(),
+    }),
+  );
+  const planBase = computed<PlanInputs>(() => ({
+    snapshot: h.data,
+    assumptions: a.values,
+    targetAge: sliderTargetAge.value,
+    extraSegments: [],
+  }));
+  const activePlan = computed<PlanInputs>(() =>
+    applyPlanLevers(planBase.value, planLevers.value, new Set(ui.whatIfLevers)),
+  );
+  /** Each lever ALONE vs today's plan — one full solve per available lever (memoised by Vue). */
+  const planLeverEffects = computed(() =>
+    evaluatePlanLevers(planBase.value, solverLens.value, planLevers.value),
+  );
+  /** The age every money figure on the hero is solved at: the slider age, +3 when "retire later" is on. */
+  const heroTargetAge = computed<number>(() => activePlan.value.targetAge);
+
+  // One solver run per (household, assumptions, lens, targetAge, levers). Vue caches it, so the
   // slider recomputes only on change. Every number on the hero comes from here — never from a
   // component-local formula (contract §10: no parallel math).
   const requiredContribution = computed<RequiredContributionResult>(() =>
     requiredMonthlyContributionFor({
-      snapshot: h.data,
-      assumptions: a.values,
-      lens: {
-        isFamilyView: ui.isFamilyView,
-        viewingMemberId: ui.viewingMemberId,
-        currentFY: ui.currentFY,
-      },
-      targetAge: heroTargetAge.value,
+      snapshot: activePlan.value.snapshot,
+      assumptions: activePlan.value.assumptions,
+      lens: solverLens.value,
+      targetAge: activePlan.value.targetAge,
+      extraContributionSegments: activePlan.value.extraSegments,
     }),
   );
 
   /** The "+3 years → ₹X" slider hint (mockup: "Three more years … Drag to feel it."). */
   const requiredContributionAtTargetPlus3 = computed<RequiredContributionResult>(() =>
     requiredMonthlyContributionFor({
-      snapshot: h.data,
-      assumptions: a.values,
-      lens: {
-        isFamilyView: ui.isFamilyView,
-        viewingMemberId: ui.viewingMemberId,
-        currentFY: ui.currentFY,
-      },
-      targetAge: heroTargetAge.value + 3,
+      snapshot: activePlan.value.snapshot,
+      assumptions: activePlan.value.assumptions,
+      lens: solverLens.value,
+      targetAge: activePlan.value.targetAge + 3,
+      extraContributionSegments: activePlan.value.extraSegments,
     }),
   );
 
   return {
     // T-377 (QN-2) — the gap hero's solver + the shared slider age.
     heroTargetAge,
+    sliderTargetAge,
     requiredContribution,
     requiredContributionAtTargetPlus3,
+    // QN-5 (T-379) — the plan levers + the lever-applied solver inputs.
+    planLevers,
+    planBase,
+    activePlan,
+    planLeverEffects,
+    solverLens,
     // #81 Phase 3 — the centralized same-scope Financial-Health resolver (member or household).
     memberFinancials,
     // D-2026-06-13-02 — the member-lensed FireHero headline selector (see above).
