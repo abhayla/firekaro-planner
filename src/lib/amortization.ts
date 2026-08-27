@@ -54,6 +54,23 @@ export function amortize(
   return steps;
 }
 
+/**
+ * PV-annuity principal implied by an EMI, rate, and months remaining — the actual amount still
+ * owed, not the undiscounted sum of future payments (which double-counts every rupee of interest
+ * not yet due). Standard formula: P = EMI * (1 - (1+r)^-n) / r.
+ */
+export function outstandingPrincipalFromEMI(
+  monthlyEMI: number,
+  annualRatePercent: number,
+  monthsRemaining: number,
+): number {
+  if (monthlyEMI <= 0 || monthsRemaining <= 0) return 0;
+  const r = annualRatePercent / 12 / 100;
+  if (r === 0) return Math.round(monthlyEMI * monthsRemaining);
+  const pv = (monthlyEMI * (1 - Math.pow(1 + r, -monthsRemaining))) / r;
+  return Math.round(pv);
+}
+
 /** Returns annual home-loan interest paid in this calendar year (used for Section 24 in tax math). */
 export function annualInterestForYear(
   outstandingBalance: number,

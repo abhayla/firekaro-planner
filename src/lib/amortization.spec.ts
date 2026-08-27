@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { monthsRemaining, derivedEndYear, amortize, annualInterestForYear } from "./amortization";
+import {
+  monthsRemaining,
+  derivedEndYear,
+  amortize,
+  annualInterestForYear,
+  outstandingPrincipalFromEMI,
+} from "./amortization";
 
 describe("monthsRemaining", () => {
   it("returns 0 for zero balance", () => {
@@ -25,6 +31,25 @@ describe("monthsRemaining", () => {
     const n = monthsRemaining(3800000, 42000, 8.5);
     expect(n).toBeGreaterThan(120);
     expect(n).toBeLessThan(180);
+  });
+});
+
+describe("outstandingPrincipalFromEMI", () => {
+  it("returns 0 for non-positive EMI or months", () => {
+    expect(outstandingPrincipalFromEMI(0, 7.2, 84)).toBe(0);
+    expect(outstandingPrincipalFromEMI(100000, 7.2, 0)).toBe(0);
+  });
+
+  it("handles zero interest as simple multiplication", () => {
+    expect(outstandingPrincipalFromEMI(10000, 0, 10)).toBe(100000);
+  });
+
+  it("computes the PV-annuity principal — NOT the undiscounted sum of payments", () => {
+    // ₹1L EMI, 7.2%, 7 years (84 months) — true principal ≈ ₹65.8L, not ₹84L.
+    const principal = outstandingPrincipalFromEMI(100000, 7.2, 84);
+    expect(principal).toBeGreaterThan(6_500_000);
+    expect(principal).toBeLessThan(6_650_000);
+    expect(principal).not.toBeCloseTo(8_400_000, -4);
   });
 });
 

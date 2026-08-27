@@ -52,7 +52,7 @@ export const QUICK_CARDS: readonly QuickCardCopy[] = [
       "Everything except your home-loan EMI — groceries, school fees, help, travel, fun, and a monthly share of " +
       "the lumpy ones people forget: insurance premiums, annual fees, festivals. " +
       "If you have a loan we add its EMI from the last card, so leaving it out here keeps it from being counted twice. " +
-      "Around ₹2.5–3 L a month? Say 2.8.",
+      "If your all-in spend (rent/EMI included) feels like ₹2.8 L a month and your EMI is ₹1 L, say 1.8 here.",
   },
   {
     key: "corpus",

@@ -85,6 +85,27 @@ describe("quick-number copy — the ten cards", () => {
     const spend = QUICK_CARDS.find((c) => c.key === "spend")!;
     expect(`${spend.question} ${spend.hint}`.toLowerCase()).toContain("emi");
   });
+
+  // T-378C finding F1: the worked example used to say "Say 2.8" for an all-in figure that already
+  // includes the EMI — directly contradicting the EMI-exclusion clause one sentence earlier and
+  // inflating a real user's number by the EMI's SWR-multiplied share (~₹3.69 Cr for a ₹1L EMI).
+  // The example MUST quote the EMI-EXCLUDED figure, never the all-in one, as its "say N" answer.
+  it("the spend card's worked example names the EMI-excluded figure, not the all-in one", () => {
+    const spend = QUICK_CARDS.find((c) => c.key === "spend")!;
+    const hint = spend.hint;
+    const sayMatch = hint.match(/say ([\d.]+)/i);
+    expect(sayMatch, "hint must contain a worked 'say N' example").toBeTruthy();
+    const said = Number(sayMatch![1]);
+    const allInMatch = hint.match(/₹([\d.]+)\s*L a month/i);
+    expect(allInMatch, "hint must name the all-in figure it is excluding the EMI from").toBeTruthy();
+    const allIn = Number(allInMatch![1]);
+    const emiMatch = hint.match(/EMI is ₹([\d.]+)\s*L/i);
+    expect(emiMatch, "hint must name the EMI it is excluding").toBeTruthy();
+    const emi = Number(emiMatch![1]);
+    // The "say" figure must equal all-in minus EMI, never the all-in figure itself.
+    expect(said).toBeCloseTo(allIn - emi, 5);
+    expect(said).not.toBeCloseTo(allIn, 5);
+  });
 });
 
 describe("quick-number copy — QN-4 explainers", () => {
