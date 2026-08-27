@@ -100,6 +100,12 @@ The claimed triple-count is (1) the healthcare bucket RATE inflating ongoing med
 **Levers — no-inert-lever guard.** `lever-catalog.spec.ts` passes: every available lever still changes
 the solver output on Sharmas after the frame change.
 
+> **Phase 1b correction (LOW-9).** Anywhere this report or ADR §3 implied the headline is
+> "byte-identical when all buckets = CPI", read instead: the model is **internally consistent at
+> g = 0** (the positive control — a real target that does not drift). The pre-ADR-0006 headline
+> still moves, for every household and at any `g`, by the two conservative corrections in §3
+> (true monthly compounding + continuous target resolution). Both move every persona later.
+
 ## 6. Red-then-green self-test of the new lock
 
 Temporarily reverting the target growth in `derive.ts` from the basket back to general CPI (i.e.
