@@ -17,7 +17,7 @@ import { useScenariosStore, type LeverValues } from "@/stores/scenarios";
 import { useUiStore, SHARED_TARGET_AGE_MIN, SHARED_TARGET_AGE_MAX } from "@/stores/ui";
 import { calculateFIRENumber, calculateYearsToTarget, projectCorpus, type ContributionSchedule } from "@/lib/fire-math";
 import { buildContributionResolver } from "@/lib/contribution-schedule";
-import { retireByAgeRequiredSIP } from "@/lib/adequacy";
+import { requiredMonthlyContributionFor } from "@/lib/required-contribution";
 import { formatINRCompact, formatYearsMonths } from "@/lib/formatters";
 import InfoTip from "@/components/shared/InfoTip.vue";
 import DeltaChip from "@/components/shared/DeltaChip.vue";
@@ -242,7 +242,16 @@ function loadScenario(id: string) {
 
 // ---- Retire-by-age reverse solver (gh-issue #30) ----
 // "Pick a target retirement age → see the required monthly SIP to get there."
-// Reuses the shared engine (retireByAgeRequiredSIP); no math duplicated here.
+//
+// ADR-0006 Phase 1b (HIGH-2). This used to call a SECOND, closed-form reverse-SIP helper in
+// `adequacy.ts` that never made the ADR-0006 migration: it discounted a CONSTANT today's-₹
+// target, compounded at
+// `rate/12`, and knew nothing about the savings step-up. It therefore quoted a DIFFERENT — always
+// smaller — ₹/month than the dashboard hero for the same household at the same age, which is the
+// cross-screen incoherence class this repo has been bitten by before. That function is deleted;
+// this card now reads the ONE solver `requiredMonthlyContributionFor`, exactly as the hero does,
+// so the two screens cannot disagree. Baseline plan only (the levers above do not feed it —
+// per-lever what-if solving is the deferred #162 work), same as before.
 // T-377: one shared range with the dashboard hero (the store clamps to it too) so the two
 // sliders can never render different numbers for the same stored value (code-review M4).
 const ageFloor = computed(() =>
@@ -269,16 +278,33 @@ const targetAge = computed<number>({
   set: (next: number) => ui.setWhatIfTargetAge(next, ageFloor.value),
 });
 
-const retireByAge = computed(() =>
-  retireByAgeRequiredSIP({
-    targetRetirementAge: targetAge.value,
-    currentAge: fire.anchorAge.value ?? 30,
-    fireNumber: fire.fireNumber.value ?? 0,
-    currentCorpus: fire.fireWithdrawableCorpus.value ?? 0,
-    expectedReturn: fire.realBlendedReturn.value ?? 0.05,
-    currentMonthlySIP: fire.monthlyContribution.value ?? 0,
+const solved = computed(() =>
+  requiredMonthlyContributionFor({
+    snapshot: household.data,
+    assumptions: assumptions.values,
+    lens: fire.solverLens.value,
+    targetAge: targetAge.value,
   }),
 );
+
+/**
+ * The card's view of that one solve. `reachable` is the honest gate: when the solver finds no
+ * feasible monthly amount it returns Infinity, and rule 31 forbids rendering a fabricated finite
+ * figure in its place — so the numbers are withheld and the card says so.
+ */
+const retireByAge = computed(() => {
+  const r = solved.value;
+  const reachable = r.solved && Number.isFinite(r.requiredMonthlyReal);
+  const required = reachable ? r.requiredMonthlyReal : 0;
+  return {
+    reachable,
+    yearsToTarget: r.yearsToTarget,
+    requiredMonthlySIP: required,
+    currentMonthlySIP: r.currentMonthlyReal,
+    additionalMonthlySIP: Math.max(0, required - r.currentMonthlyReal),
+    onTrack: reachable && required <= r.currentMonthlyReal,
+  };
+});
 
 // True only once we actually have a FIRE target to solve against (empty-household guard).
 const hasFireTarget = computed(() => (fire.fireNumber.value ?? 0) > 0);
@@ -601,7 +627,7 @@ function resetTargetAge() {
             data-testid="retire-age-slider"
           />
 
-          <div v-if="hasFireTarget" class="retire-grid mt-3">
+          <div v-if="hasFireTarget && retireByAge.reachable" class="retire-grid mt-3">
             <div class="retire-cell">
               <div class="layer-label">Required monthly SIP</div>
               <div class="layer-value text-currency" data-testid="retire-required-sip">
@@ -625,7 +651,10 @@ function resetTargetAge() {
             </div>
           </div>
 
-          <div v-if="hasFireTarget" class="d-flex align-center justify-space-between mt-3">
+          <div
+            v-if="hasFireTarget && retireByAge.reachable"
+            class="d-flex align-center justify-space-between mt-3"
+          >
             <v-chip
               size="small"
               variant="tonal"
@@ -643,6 +672,15 @@ function resetTargetAge() {
                 Step up to {{ formatINRCompact(retireByAge.requiredMonthlySIP ?? 0) }}/mo to retire by {{ targetAge }}.
               </template>
             </span>
+          </div>
+          <div
+            v-else-if="hasFireTarget"
+            class="text-caption text-medium-emphasis mt-3"
+            data-testid="retire-unreachable"
+          >
+            At these assumptions you don't get there by {{ targetAge }} — there is no honest
+            monthly amount that closes it, so we're not going to invent one. Drag the age above, or
+            review your assumptions on /preferences.
           </div>
           <div v-else class="text-caption text-medium-emphasis mt-3">
             Add income, expenses and investments first — then this solves the SIP you'd need.

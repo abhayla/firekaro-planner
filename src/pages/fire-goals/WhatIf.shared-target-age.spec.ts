@@ -41,6 +41,35 @@ describe("shared retirement-age field — hero slider ⇄ What-If slider", () =>
     expect(uiStore).toMatch(/Math\.min\(SHARED_TARGET_AGE_MAX, Math\.max\(lo, Math\.round\(age\)\)\)/);
   });
 
+  it("BOTH screens read the ONE solver — no second reverse-FIRE engine (ADR-0006 HIGH-2)", () => {
+    // The drift this case exists to prevent: What-If used `retireByAgeRequiredSIP`, a separate
+    // closed-form with a CONSTANT target, `rate/12` compounding and no savings step-up, so the
+    // two screens quoted different ₹/month for the same household at the same age.
+    for (const [name, srcText] of [["what-if", whatIf], ["hero", hero]] as const) {
+      expect(srcText, `${name} must read the one solver`).toMatch(
+        /requiredMonthlyContributionFor|requiredContribution/,
+      );
+      expect(srcText, `${name} must not use the deleted second solver`).not.toMatch(
+        /retireByAgeRequiredSIP/,
+      );
+    }
+    // …and the deleted function must not come back.
+    const adequacy = readFileSync(
+      fileURLToPath(new URL("../../lib/adequacy.ts", import.meta.url)),
+      "utf8",
+    );
+    expect(adequacy, "adequacy.ts must not re-export a parallel reverse-FIRE solver").not.toMatch(
+      /export function retireByAgeRequiredSIP/,
+    );
+  });
+
+  it("What-If withholds the SIP when the solver says unreachable (rule 31 — no invented figure)", () => {
+    expect(whatIf).toMatch(/const reachable = r\.solved && Number\.isFinite\(r\.requiredMonthlyReal\)/);
+    expect(whatIf, "the numbers must be gated on reachability").toMatch(
+      /v-if="hasFireTarget && retireByAge\.reachable"/,
+    );
+  });
+
   it("reset clears the shared field so BOTH sliders follow the saved plan again", () => {
     expect(whatIf).toMatch(/function resetTargetAge\(\)[\s\S]{0,200}ui\.setWhatIfTargetAge\(null\)/);
     expect(hero).toMatch(/function resetTargetAge\(\)[\s\S]{0,200}ui\.setWhatIfTargetAge\(null\)/);

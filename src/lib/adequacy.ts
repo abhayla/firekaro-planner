@@ -152,68 +152,27 @@ export function educationAdequacy(args: {
   };
 }
 
-export interface RetireByAgeInput {
-  /** The age the user wants to retire by. */
-  targetRetirementAge: number;
-  /** Today's age — the projection anchor (derive's anchorAge). */
-  currentAge: number;
-  /** FIRE target corpus, REAL frame / today's rupees (derive's fireNumber). */
-  fireNumber: number;
-  /** Today's FIRE-relevant corpus (derive's fireWithdrawableCorpus). */
-  currentCorpus: number;
-  /** Expected REAL annual return — same frame as fireNumber (derive's realBlendedReturn). */
-  expectedReturn: number;
-  /** The household's current monthly contribution (derive's monthlyContribution). */
-  currentMonthlySIP: number;
-}
-
-export interface RetireByAgeResult {
-  yearsToTarget: number;
-  /** Future value of today's corpus ALONE at the target age (no further SIP). */
-  projectedCorpusFromCurrent: number;
-  /** The corpus gap the SIP must close (≥ 0; 0 ⇒ today's corpus alone already reaches the target). */
-  gap: number;
-  /** Monthly SIP required to close the gap by the target age. */
-  requiredMonthlySIP: number;
-  currentMonthlySIP: number;
-  /** Extra monthly SIP needed BEYOND what they save today (≥ 0) — the actionable shortfall. */
-  additionalMonthlySIP: number;
-  /** True if today's SIP already reaches the FIRE target by the target age. */
-  onTrack: boolean;
-}
-
-/**
- * Reverse FIRE solver (gh-issue #30, objective 2 "get there faster"): "to retire BY age X, what
- * monthly SIP do I need?". The forward engine (derive → yearsToRegular) takes savings and yields
- * the FIRE age; this INVERTS it for the headline retirement target, mirroring educationAdequacy's
- * per-goal back-solve. The existing corpus keeps compounding, so the SIP only has to close the GAP
- * between the target and the future value of today's corpus. All real-frame (today's rupees) — same
- * inflation frame as fireNumber, so no double-count.
+/*
+ * `RetireByAgeInput` / `RetireByAgeResult` / `retireByAgeRequiredSIP` (gh-issue #30) were DELETED
+ * by ADR-0006 Phase 1b (HIGH-2). They were a second reverse-FIRE solver that never made the
+ * ADR-0006 migration — a constant today's-₹ target, `rate/12` compounding and no savings step-up —
+ * so `/fire-goals/what-if` quoted a different, always smaller ₹/month than the dashboard hero for
+ * the same household at the same age. Its only consumer now calls the ONE solver,
+ * `required-contribution.requiredMonthlyContributionFor`, which drives the real `derive()` kernel.
+ * Do not re-introduce a parallel closed-form here.
  */
-export function retireByAgeRequiredSIP(input: RetireByAgeInput): RetireByAgeResult {
-  const years = Math.max(0, input.targetRetirementAge - input.currentAge);
-  const projectedCorpusFromCurrent = Math.round(
-    input.currentCorpus * Math.pow(1 + input.expectedReturn, years),
-  );
-  const gap = Math.max(0, input.fireNumber - projectedCorpusFromCurrent);
-  const requiredMonthlySIP = requiredSIP(gap, years, input.expectedReturn);
-  const currentMonthlySIP = Math.round(input.currentMonthlySIP);
-  return {
-    yearsToTarget: years,
-    projectedCorpusFromCurrent,
-    gap,
-    requiredMonthlySIP,
-    currentMonthlySIP,
-    additionalMonthlySIP: Math.max(0, requiredMonthlySIP - currentMonthlySIP),
-    onTrack: requiredMonthlySIP <= currentMonthlySIP,
-  };
-}
 
 /** Future-value-annuity monthly payment to reach `fv` over `years` at annual `rate`. */
 function requiredSIP(fv: number, years: number, rate: number): number {
   const months = Math.round(years * 12);
   if (months <= 0) return Math.round(fv); // due now — needs the lump immediately
-  const r = rate / 12;
+  // ADR-0006 Phase 1b: the TRUE monthly equivalent of the annual rate, `(1+r)^(1/12) − 1`, not
+  // `r/12`. `r/12` compounds to `(1+r/12)^12 > 1+r`, by an amount that depends on `r`, so it
+  // over-states the growth the SIP earns and therefore UNDER-states the SIP required — the
+  // optimistic direction, on a prescription. Same correction, same reason, as `fire-math.ts`'s
+  // `monthlyRate` (which the headline solver already uses); the two must not disagree about what
+  // "8% a year" means.
+  const r = rate > -1 ? Math.pow(1 + rate, 1 / 12) - 1 : -1;
   if (r <= 0) return Math.round(fv / months);
   const factor = (Math.pow(1 + r, months) - 1) / r;
   return Math.round(fv / factor);
