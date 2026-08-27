@@ -9,6 +9,7 @@ import {
   PLAN_HONESTY_LINE,
   QUICK_PORTFOLIO_CAVEAT,
   sanityLine,
+  overCommitmentWarning,
   type ExplainerInput,
 } from "./quick-number-copy";
 import { formatINRCompact } from "@/lib/formatters";
@@ -84,6 +85,27 @@ describe("quick-number copy — the ten cards", () => {
   it("the spend card states the EMI carve-out so the EMI is never double-counted", () => {
     const spend = QUICK_CARDS.find((c) => c.key === "spend")!;
     expect(`${spend.question} ${spend.hint}`.toLowerCase()).toContain("emi");
+  });
+
+  // T-378C finding F1: the worked example used to say "Say 2.8" for an all-in figure that already
+  // includes the EMI — directly contradicting the EMI-exclusion clause one sentence earlier and
+  // inflating a real user's number by the EMI's SWR-multiplied share (~₹3.69 Cr for a ₹1L EMI).
+  // The example MUST quote the EMI-EXCLUDED figure, never the all-in one, as its "say N" answer.
+  it("the spend card's worked example names the EMI-excluded figure, not the all-in one", () => {
+    const spend = QUICK_CARDS.find((c) => c.key === "spend")!;
+    const hint = spend.hint;
+    const sayMatch = hint.match(/say ([\d.]+)/i);
+    expect(sayMatch, "hint must contain a worked 'say N' example").toBeTruthy();
+    const said = Number(sayMatch![1]);
+    const allInMatch = hint.match(/₹([\d.]+)\s*L a month/i);
+    expect(allInMatch, "hint must name the all-in figure it is excluding the EMI from").toBeTruthy();
+    const allIn = Number(allInMatch![1]);
+    const emiMatch = hint.match(/EMI is ₹([\d.]+)\s*L/i);
+    expect(emiMatch, "hint must name the EMI it is excluding").toBeTruthy();
+    const emi = Number(emiMatch![1]);
+    // The "say" figure must equal all-in minus EMI, never the all-in figure itself.
+    expect(said).toBeCloseTo(allIn - emi, 5);
+    expect(said).not.toBeCloseTo(allIn, 5);
   });
 });
 
@@ -171,6 +193,23 @@ describe("quick-number copy — QN-4 explainers", () => {
     expect(ok).toContain("₹45.0K");
     expect(ok).toContain("count it as spending");
     expect(sanityLine(1_80_000, 1_75_000, 0, 1_00_000)).toBe("");
+  });
+
+  // T-378C finding F3: the over-commitment guard was architecturally dead — it only rendered on
+  // card 3, before the SIP (card 5) and EMI (card 10) were known. This is the guard that fires
+  // once all three are known (last card / result screen).
+  it("overCommitmentWarning fires only when spend+sip+emi exceeds take-home", () => {
+    // AMIT-shaped answers: 1.8L spend + 1.75L sip + 1L emi = 4.55L against 5L take-home — fine.
+    expect(overCommitmentWarning(1_80_000, 1_75_000, 5_00_000, 1_00_000)).toBe("");
+    // Bump spend past the take-home: 2.8L spend + 1.75L sip + 1L emi = 5.55L against 5L — impossible.
+    const warning = overCommitmentWarning(2_80_000, 1_75_000, 5_00_000, 1_00_000);
+    expect(warning).not.toBe("");
+    expect(warning).toContain("can't all be true");
+    expect(warning).toContain(formatINRCompact(5_55_000));
+  });
+
+  it("overCommitmentWarning is silent with no income given (nothing to check against)", () => {
+    expect(overCommitmentWarning(2_80_000, 1_75_000, 0, 1_00_000)).toBe("");
   });
 
   it("keeps the honesty framing and the full-planner list", () => {

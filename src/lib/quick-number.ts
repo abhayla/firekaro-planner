@@ -35,6 +35,7 @@ import type {
 import type { QuickAnswers, QuickAnswersDraft } from "@/types/quick-number";
 import { emptyQuickAnswers } from "@/types/quick-number";
 import { derive } from "@/lib/derive";
+import { outstandingPrincipalFromEMI } from "@/lib/amortization";
 
 /** Every row the quick path owns carries this id prefix — that is what makes a re-run idempotent. */
 export const QUICK_ID_PREFIX = "quick-";
@@ -325,10 +326,15 @@ export function applyQuickAnswers(
       id: `${QUICK_ID_PREFIX}home-loan`,
       name: "Home loan",
       type: "HomeLoan",
-      // Balance is not asked (it is not needed for the FIRE number — the EMI is). A simple
-      // undiscounted remaining-payments figure is honest about what we know and is refined in
-      // the full planner rather than invented with a false precision.
-      outstandingBalance: Math.round(emi * 12 * yearsLeft),
+      // Balance is not asked (it is not needed for the FIRE number — the EMI is). Derive the
+      // actual PV-annuity principal from EMI/rate/years-left rather than summing undiscounted
+      // future payments, which overstated the debt by ~28% (T-378C finding F2) — e.g. ₹84L
+      // instead of the true ₹65.8L for a ₹1L/7.2%/7yr loan.
+      outstandingBalance: outstandingPrincipalFromEMI(
+        emi,
+        Math.round(n(answers.loanRate) * 1000) / 10,
+        yearsLeft * 12,
+      ),
       monthlyEMI: emi,
       // `answers.loanRate` is a FRACTION (0.072); the Liability schema stores a PERCENT (7.2).
       interestRate: Math.round(n(answers.loanRate) * 1000) / 10,

@@ -114,6 +114,18 @@ describe("applyQuickAnswers — money", () => {
     expect(loan.derivedEndYear).toBe(NOW.getFullYear() + 7);
   });
 
+  // T-378C finding F2: the balance used to be the undiscounted sum of remaining payments
+  // (emi * 12 * yearsLeft = ₹84L), a 28% over-statement of the real ₹65.8L PV-annuity principal
+  // for a ₹1L EMI / 7.2% / 7yr loan — and it reached the user via the plan-baseline net worth.
+  it("books the loan balance as the PV-annuity principal, not the undiscounted sum of payments", () => {
+    const { household } = apply();
+    const loan = household.liabilities[0];
+    // Undiscounted sum would be 1L * 12 * 7 = 84L — must NOT equal that.
+    expect(loan.outstandingBalance).not.toBeCloseTo(84 * L, -3);
+    // The true PV-annuity principal at 7.2%/84 months is ~₹65.8L.
+    expect(loan.outstandingBalance).toBeCloseTo(65.8 * L, -4);
+  });
+
   it("creates no loan and no EMI line when the loan card is unticked", () => {
     const { household } = apply({ ...AMIT, hasLoan: false });
     expect(household.liabilities.length).toBe(0);
