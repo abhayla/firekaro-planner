@@ -11,6 +11,14 @@ import {
   sanityLine,
   type ExplainerInput,
 } from "./quick-number-copy";
+import { formatINRCompact } from "@/lib/formatters";
+
+// The fixture is INTERNALLY CONSISTENT on purpose: base + goals layer + reservation == needReal,
+// and base == annualExpensesToday / swrUsed. An earlier fixture was off by 19% and the reconcile
+// test still passed, because that test compared a sum to itself (blind verification finding 1).
+const BASE_CORPUS = 5_83_78_378; // 21.6 L / 3.7%
+const GOALS_CORPUS = 3_78_00_000;
+const HEALTHCARE = 1_16_00_000;
 
 const explainer: ExplainerInput = {
   annualExpensesToday: 21_60_000,
@@ -18,15 +26,16 @@ const explainer: ExplainerInput = {
   targetAge: 50,
   planToAge: 90,
   plannedGoalsLumpToday: 3_25_00_000,
-  plannedGoalsCorpus: 3_78_00_000,
-  healthcareReservation: 1_16_00_000,
+  plannedGoalsCorpus: GOALS_CORPUS,
+  healthcareReservation: HEALTHCARE,
+  baseCorpus: BASE_CORPUS,
   currentCorpus: 1_50_00_000,
   monthlyContributionReal: 1_75_000,
   expectedReturn: 0.12,
   inflation: 0.06,
   yearsToTarget: 12,
   haveAtTargetReal: 6_10_00_000,
-  needReal: 9_09_00_000,
+  needReal: BASE_CORPUS + GOALS_CORPUS + HEALTHCARE,
   needNominal: 18_29_00_000,
   targetYear: 2038,
   guess: 10_00_00_000,
@@ -129,11 +138,25 @@ describe("quick-number copy — QN-4 explainers", () => {
   });
 
   it("the five steps reconcile to the headline they explain", () => {
-    const base = explainer.annualExpensesToday / explainer.swrUsed;
-    const sum = base + explainer.plannedGoalsCorpus + explainer.healthcareReservation;
-    // The three corpus components the steps name ARE the FIRE number the hero shows.
-    expect(sum).toBeCloseTo(base + 3_78_00_000 + 1_16_00_000, 0);
-    expect(howWeGotThis(explainer)[0]).toContain("₹5.84 Cr");
+    // The real assertion: the three components the steps name must ADD UP to `needReal` — the very
+    // figure the hero prints beside them. Anything else is shape, not substance.
+    const sum =
+      explainer.baseCorpus + explainer.plannedGoalsCorpus + explainer.healthcareReservation;
+    expect(sum).toBeCloseTo(explainer.needReal, 0);
+
+    // And the rendered strings must quote those same components, not re-derive them.
+    const steps = howWeGotThis(explainer);
+    expect(steps[0]).toContain(formatINRCompact(explainer.baseCorpus));
+    expect(steps[1]).toContain(formatINRCompact(explainer.plannedGoalsCorpus));
+    expect(steps[2]).toContain(formatINRCompact(explainer.healthcareReservation));
+  });
+
+  it("quotes the kernel's base corpus rather than re-dividing the expenses", () => {
+    // An NPS-holding household capitalises expenses NET of the annuity income, so the base is
+    // SMALLER than annualExpenses / SWR. Re-deriving it here would over-sum the steps.
+    const withNps: ExplainerInput = { ...explainer, baseCorpus: BASE_CORPUS - 50_00_000 };
+    expect(howWeGotThis(withNps)[0]).toContain(formatINRCompact(BASE_CORPUS - 50_00_000));
+    expect(howWeGotThis(withNps)[0]).not.toContain(formatINRCompact(BASE_CORPUS));
   });
 
   it("names the single-equity-line simplification rather than hiding it", () => {

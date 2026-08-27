@@ -152,6 +152,12 @@ export interface ExplainerInput {
   plannedGoalsLumpToday: number;
   /** What the goals layer actually ADDS to the number (goals + the extended-family contingency). */
   plannedGoalsCorpus: number;
+  /**
+   * The base corpus, taken from the kernel rather than re-divided here. `annualExpensesToday /
+   * swrUsed` looked equivalent but is not: the kernel capitalises expenses NET of post-tax NPS
+   * annuity income, so re-dividing over-sums the steps for anyone holding NPS.
+   */
+  baseCorpus: number;
   /** The 20% medical-shock reservation the kernel adds on top of the base corpus. */
   healthcareReservation: number;
   currentCorpus: number;
@@ -197,12 +203,11 @@ export function whySoBigBullets(input: ExplainerInput): string[] {
  */
 export function howWeGotThis(input: ExplainerInput): string[] {
   const drawdown = Math.max(0, Math.round(input.planToAge - input.targetAge));
-  const baseCorpus = input.swrUsed > 0 ? input.annualExpensesToday / input.swrUsed : 0;
   return [
     `You spend ${formatINRCompact(input.annualExpensesToday)} a year today. To draw that safely for ${drawdown} years — age ${input.targetAge} to ${input.planToAge} — we keep withdrawals at ${pct(
       input.swrUsed,
       2,
-    )} of the corpus, which needs ${formatINRCompact(baseCorpus)}.`,
+    )} of the corpus, which needs ${formatINRCompact(input.baseCorpus)}.`,
     `Plus your one-off goals in today's money — education, post-grad, weddings, any big purchase — ${formatINRCompact(
       input.plannedGoalsLumpToday,
     )}. With the buffer we keep for extended family, that layer adds ${formatINRCompact(

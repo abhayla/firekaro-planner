@@ -350,3 +350,41 @@ describe("applyQuickAnswers — re-entry safety", () => {
     expect(quickAnswersFromHousehold(emptyHouseholdFixture(), 0, NOW)).toBeNull();
   });
 });
+
+describe("applyQuickAnswers — the minimal honest answer set", () => {
+  // The express path promises "rough is fine": a single person with no spouse, no kids, no goals
+  // and no loan who answers only age, target, spend and investing must still get a real number.
+  const MINIMAL: QuickAnswers = {
+    ...emptyQuickAnswers(30),
+    age: 30,
+    targetAge: 55,
+    spend: 60_000,
+    sip: 40_000,
+    corpus: 20_00_000,
+  };
+
+  it("produces a plausible plan from four answers", () => {
+    const { household } = apply(MINIMAL);
+    expect(household.members.length).toBe(1);
+    expect(household.expenses.plannedFuture.length).toBe(0);
+    expect(household.liabilities.length).toBe(0);
+    const k = derive(household, DEFAULT_ASSUMPTIONS, {
+      isFamilyView: false,
+      viewingMemberId: null,
+      currentFY: "2026-27",
+    });
+    // 7.2 L/yr of spending at roughly a 3% horizon SWR is a low-two-digit-crore target — nowhere
+    // near NaN, zero, or the tens of crores an absurd anchor age would produce (rule 31).
+    expect(k.fireNumber).toBeGreaterThan(2 * CR);
+    expect(k.fireNumber).toBeLessThan(15 * CR);
+    expect(k.monthlyContribution).toBeGreaterThan(0);
+    expect(Number.isFinite(k.householdFireAge ?? Number.POSITIVE_INFINITY)).toBe(true);
+  });
+
+  it("invents no unaccounted spending when no take-home was given", () => {
+    expect(apply(MINIMAL).unaccountedMonthly).toBeLessThanOrEqual(0);
+    expect(
+      apply(MINIMAL).household.expenses.recurring.some((r) => /Unaccounted/.test(r.label)),
+    ).toBe(false);
+  });
+});

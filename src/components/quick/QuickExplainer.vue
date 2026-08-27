@@ -35,15 +35,20 @@ const plannedGoalsLumpToday = computed(() =>
 );
 
 const input = computed<ExplainerInput>(() => ({
-  annualExpensesToday: fire.annualExpensesToday.value,
+  // NET of post-tax NPS annuity income — the base the kernel actually capitalises.
+  annualExpensesToday: req.value.netAnnualExpensesReal,
+  baseCorpus: req.value.needBaseReal,
   swrUsed: req.value.swrUsed,
   targetAge: fire.heroTargetAge.value,
   planToAge: fire.planToAge.value,
   plannedGoalsLumpToday: plannedGoalsLumpToday.value,
   // The two components an earlier draft left out — without them the four steps explained only
   // ~83% of the headline they sit beside (code-review H5 / FinTech HIGH 7).
-  plannedGoalsCorpus: fire.familyLayerCorpus.value,
-  healthcareReservation: fire.healthcareReservation.value,
+  // From the AT-TARGET solver run, never the stored-target one — otherwise dragging the hero
+  // slider recomputes step 1's SWR while steps 2 and 3 stay pinned to the old age, and the five
+  // steps stop summing to the headline six inches above them (blind verification finding 2).
+  plannedGoalsCorpus: req.value.needPlannedGoalsReal,
+  healthcareReservation: req.value.needHealthcareReservationReal,
   currentCorpus: fire.totalCorpus.value,
   monthlyContributionReal: req.value.currentMonthlyReal,
   expectedReturn: fire.blendedReturn.value,
