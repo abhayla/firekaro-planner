@@ -27,3 +27,22 @@ export function resolveHeroTone(input: HeroToneInput): HeroTone {
   if (d <= -1) return "behind";
   return "on-track";
 }
+
+/**
+ * T-377 (QN-2) — the SECOND, independent hero signal: is the plan SHORT of the number, or past it?
+ *
+ * Deliberately NOT folded into `HeroTone` above. They answer different questions and are both
+ * shown: `HeroTone` = "am I ahead of the plan I locked?" (plan-variance, #138); `GapTone` = "does
+ * the money get there at all?" (need vs have at the target age). Two signals, two types.
+ *
+ * Honesty rule (20/31): a NaN or non-finite gap makes NO claim — `unknown` renders a neutral
+ * "—", never a fabricated "you're on track". Unlike `resolveHeroTone`, ±Infinity is NOT a claim
+ * here: an infinite gap means the projection broke down, not that the user is short by infinity.
+ */
+export type GapTone = "short" | "surplus" | "unknown";
+
+/** @param gapReal needReal − haveAtTargetReal (₹, today's money). Positive = short. */
+export function resolveGapTone(gapReal: number | null | undefined): GapTone {
+  if (gapReal == null || !Number.isFinite(gapReal)) return "unknown";
+  return gapReal > 0 ? "short" : "surplus";
+}

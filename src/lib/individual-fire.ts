@@ -25,6 +25,7 @@
  * figure; this is a clearly-caveated secondary view. This helper NEVER feeds the household number
  * (derive only ADDS it alongside).
  */
+import { usableOverride, type DeriveOverrides } from "@/lib/derive-overrides";
 import { isAdultRole, type Household } from "@/types/household";
 import type { Assumptions } from "@/types/assumptions";
 import { isEarningMember } from "@/lib/member-earning";
@@ -51,6 +52,9 @@ export interface IndividualFireResult {
   attributableAnnualSavings: number;
   /** SWR-based personal FIRE number from attributable expenses. ₹ today. */
   individualFireNumber: number;
+  /** The member's OWN real (inflation-adjusted) blended return — the rate their FIRE age was
+   *  solved at. Exposed so no consumer grows a member's corpus at the HOUSEHOLD rate (T-377). */
+  realReturn: number;
   yearsToIndividualFire: number;
   /** anchorAge + yearsToIndividualFire (Infinity → anchorAge unchanged sentinel handled by caller). */
   individualFireAge: number;
@@ -68,13 +72,16 @@ export function computeIndividualFire(
   assumptions: Assumptions,
   memberId: string,
   currentFY: string,
+  /** T-377 (QN-2): the same additive solver seam the household path honours — see derive-overrides.ts. */
+  overrides?: DeriveOverrides,
 ): IndividualFireResult | null {
   const member = household.members.find((m) => m.id === memberId);
   if (!member || !isAdultRole(member.role)) return null;
 
   const split = Math.min(100, Math.max(0, assumptions.householdSplitPercent ?? 50)) / 100;
   const anchorAge = ageFromDOB(member.dateOfBirth);
-  const targetRetirementAge = member.targetRetirementAge ?? 50;
+  const targetRetirementAge =
+    usableOverride(overrides?.targetRetirementAge, 1) ?? member.targetRetirementAge ?? 50;
   const planToAge = member.planToAge ?? 90;
 
   // ---- attributable expenses: own ring-1 (100%) + shared ring-2 (× split); ring-3 excluded ----
@@ -174,7 +181,8 @@ export function computeIndividualFire(
     0,
     attributableAnnualIncome - attributableAnnualTax - attributableAnnualExpenses,
   );
-  const monthlyContribution = Math.round(attributableAnnualSavings / 12);
+  const monthlyContribution =
+    usableOverride(overrides?.monthlyContributionReal, 0) ?? Math.round(attributableAnnualSavings / 12);
 
   const cfg = getTaxConfigForFY(currentFY);
   const slabs = recommended.recommended === "NEW" ? cfg.newRegime.slabs : cfg.oldRegime.slabs;
@@ -218,6 +226,7 @@ export function computeIndividualFire(
     attributableAnnualTax,
     attributableAnnualSavings,
     individualFireNumber,
+    realReturn,
     yearsToIndividualFire,
     individualFireAge,
   };

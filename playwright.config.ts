@@ -6,6 +6,10 @@ import { defineConfig, devices } from "@playwright/test";
 
 export default defineConfig({
   testDir: "./e2e",
+  // Scratch verification specs (per-task PR evidence) are NOT regression tests: they mint a new
+  // timestamped verification-screenshots/ dir on every run and assert against one task's state.
+  // Opt in with RUN_SCRATCH_VERIFY=1 (a bare path argument cannot override testIgnore).
+  testIgnore: process.env.RUN_SCRATCH_VERIFY === "1" ? [] : ["**/t3??-*-verify.spec.ts"],
   fullyParallel: false,
   workers: 1,
   retries: process.env.CI ? 1 : 0,

@@ -14,6 +14,7 @@ import { useFireDerive } from "@/lib/useFireDerive";
 import { useAssumptionsStore } from "@/stores/assumptions";
 import { useHouseholdStore } from "@/stores/household";
 import { useScenariosStore, type LeverValues } from "@/stores/scenarios";
+import { useUiStore, SHARED_TARGET_AGE_MIN, SHARED_TARGET_AGE_MAX } from "@/stores/ui";
 import { calculateFIRENumber, calculateYearsToTarget, projectCorpus, type ContributionSchedule } from "@/lib/fire-math";
 import { buildContributionResolver } from "@/lib/contribution-schedule";
 import { retireByAgeRequiredSIP } from "@/lib/adequacy";
@@ -32,6 +33,8 @@ const fire = useFireDerive();
 const assumptions = useAssumptionsStore();
 const household = useHouseholdStore();
 const scenarios = useScenariosStore();
+// T-377: the shared session-only retirement-age field (also driven by the dashboard hero slider).
+const ui = useUiStore();
 
 onMounted(() => scenarios.hydrate());
 
@@ -240,8 +243,12 @@ function loadScenario(id: string) {
 // ---- Retire-by-age reverse solver (gh-issue #30) ----
 // "Pick a target retirement age → see the required monthly SIP to get there."
 // Reuses the shared engine (retireByAgeRequiredSIP); no math duplicated here.
-const ageFloor = computed(() => Math.round((fire.anchorAge.value ?? 30) + 1));
-const ageCeiling = 75;
+// T-377: one shared range with the dashboard hero (the store clamps to it too) so the two
+// sliders can never render different numbers for the same stored value (code-review M4).
+const ageFloor = computed(() =>
+  Math.max(SHARED_TARGET_AGE_MIN, Math.round((fire.anchorAge.value ?? 30) + 1)),
+);
+const ageCeiling = SHARED_TARGET_AGE_MAX;
 const defaultTargetAge = computed(() => {
   const fromHousehold = fire.targetRetirementAge.value;
   const fallback = (fire.anchorAge.value ?? 30) + 15;
@@ -249,11 +256,17 @@ const defaultTargetAge = computed(() => {
   return Math.min(ageCeiling, Math.max(ageFloor.value, Math.round(raw)));
 });
 
-const targetAge = ref(defaultTargetAge.value);
-
-// Re-seed when the baseline anchor/target shifts (e.g. family-view toggle elsewhere).
-watch(defaultTargetAge, (next) => {
-  targetAge.value = next;
+// T-377 (QN-2): the retirement age is now ONE shared session-only field (`ui.whatIfTargetAge`)
+// read/written by BOTH this slider and the dashboard gap-hero slider — two controls for the same
+// idea must never drift (#64 class). null = follow the household's saved target. Clamped to this
+// page's own floor/ceiling so a hero value outside them can never render an impossible age here.
+const targetAge = computed<number>({
+  get: () => {
+    const shared = ui.whatIfTargetAge;
+    if (shared == null || !Number.isFinite(shared)) return defaultTargetAge.value;
+    return Math.min(ageCeiling, Math.max(ageFloor.value, Math.round(shared)));
+  },
+  set: (next: number) => ui.setWhatIfTargetAge(next, ageFloor.value),
 });
 
 const retireByAge = computed(() =>
@@ -271,7 +284,8 @@ const retireByAge = computed(() =>
 const hasFireTarget = computed(() => (fire.fireNumber.value ?? 0) > 0);
 
 function resetTargetAge() {
-  targetAge.value = defaultTargetAge.value;
+  // Clearing the shared field is the reset — it makes both sliders follow the saved plan again.
+  ui.setWhatIfTargetAge(null);
 }
 </script>
 

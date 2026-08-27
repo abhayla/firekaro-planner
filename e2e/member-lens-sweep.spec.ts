@@ -180,6 +180,11 @@ test.describe("Viewing-as lens — real-dropdown sweep across every member-attri
     await dismissTour(page);
 
     const heroAge = page.getByTestId("fire-hero-age");
+    // T-377 (QN-2): the big number is now the TARGET age the user wants (the slider), which is
+    // legitimately the same for two adults who share a target. The figure that must carry the
+    // lens is the hero's NEED — the member's own individual FIRE number (#81). Asserting on the
+    // need keeps this sweep testing REAL lensing instead of a coincidence of equal target ages.
+    const heroNeed = page.getByTestId("fire-hero-need");
     const labels = await memberOptionLabels(page);
     expect(labels[0], 'the first "Viewing as" option must be Whole household').toMatch(/whole household/i);
     const members = labels.slice(1);
@@ -187,27 +192,30 @@ test.describe("Viewing-as lens — real-dropdown sweep across every member-attri
 
     await selectViewing(page, labels[0]);
     const householdAge = (await heroAge.innerText()).trim();
+    const householdNeed = (await heroNeed.innerText()).trim();
     expect(householdAge, "household headline renders a real age").not.toBe("");
+    expect(householdNeed, "household headline renders a real need figure").toMatch(/₹/);
 
     let differed = false;
     for (const m of members) {
       await selectViewing(page, m);
-      // Auto-waiting caveat assertion FIRST proves the lensed re-render landed before the age read.
+      // Auto-waiting caveat assertion FIRST proves the lensed re-render landed before the read.
       await expect(
         page.getByTestId("fire-hero-member-caveat"),
         `the member caveat must render under "Viewing as ${m}"`,
       ).toBeVisible();
-      const memberAge = (await heroAge.innerText()).trim();
-      if (memberAge !== householdAge) differed = true;
+      const memberNeed = (await heroNeed.innerText()).trim();
+      if (memberNeed !== householdNeed) differed = true;
     }
     expect(
       differed,
-      "the big FIRE age must DIFFER for ≥1 member vs Whole household (the lensed headline)",
+      "the hero NEED figure must DIFFER for ≥1 member vs Whole household (the lensed headline)",
     ).toBe(true);
 
     // Switching back restores the household headline exactly — and the caveat disappears.
     await selectViewing(page, labels[0]);
     await expect(heroAge).toHaveText(householdAge);
+    await expect(heroNeed).toHaveText(householdNeed);
     await expect(page.getByTestId("fire-hero-member-caveat")).toBeHidden();
   });
 

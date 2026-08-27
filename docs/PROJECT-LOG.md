@@ -149,6 +149,54 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
   shipping an understated "do this" to real users. Nothing merges until B8 (GitHub billing) is fixed.
 
 ### 2026-08-27
+- **D-2026-08-27-03 — T-377 (QN-2) BUILT: the dashboard answers "what must I DO", not just "when
+  will it happen".** Until now the FIRE hero made one claim — "you'll FIRE at age 56" — which is a
+  *prediction*, not a *plan*. It never told the accumulator the one number they can act on: the
+  monthly amount that gets them to the age they actually want. QN-2 flips the headline to **the age
+  the user WANTS** ("To retire at 47 you'll need ₹10.60 Cr in today's money · ₹28.54 Cr in 2043") and
+  adds the four numbers that make it actionable — need · you'll-have-by-then · gap · **do this
+  ₹/month** — plus a live 40–70 retirement-age slider so the trade-off is felt, not explained
+  (Sharmas: retire at 47 → ₹3.11 L/month; drag to 52 → ₹1.94 L/month).
+  - **How the number is computed (the load-bearing decision):** `src/lib/required-contribution.ts`
+    **binary-searches the household real monthly contribution through the REAL `derive()` kernel** —
+    NOT a closed-form annuity formula. Every candidate is a full kernel run, so step-up (ADR-0004),
+    the accessible-money bridge (#15), horizon-driven SWR, the healthcare reservation, the
+    planned-goals family layer (#165/T-376) and the member lens (#81) are all honoured by
+    construction. A parallel formula would have been faster and would have quietly disagreed with
+    the rest of the app — the exact class of drift the repo has been bitten by (#65, #85).
+  - **Bisection needs monotonicity, so monotonicity is PROVEN, not assumed:** a fast-check property
+    in `kernel-invariants.property.spec.ts` asserts, over all 4 seed personas × every slider target
+    age 40–70, that `derive()`'s headline years-to-FIRE is non-increasing in the monthly
+    contribution. It HELD (bridge, horizon-SWR, healthcare and the NPS post-tax offset included), so
+    the contract's monotone-scan fallback was not needed. If that property ever fails, the solver
+    must fall back to a scan rather than ship a silently-wrong "do this".
+  - **Kernel seam:** a new additive, default-OFF `DeriveOverrides { monthlyContributionReal,
+    targetRetirementAge }` (`src/lib/derive-overrides.ts`), honoured by `derive()` and forwarded to
+    `computeIndividualFire`. Non-finite/out-of-range values are ignored; omitting the object leaves
+    every kernel output byte-identical (proven by the untouched golden master + the full suite).
+  - **Two signals, two types:** the NEW `GapTone`/`resolveGapTone` (short/surplus/**unknown**) sits
+    ALONGSIDE the plan-variance `HeroTone`/`resolveHeroTone`, which is untouched. "Am I ahead of the
+    plan I locked?" and "does the money get there at all?" are different questions and both are
+    shown. A non-finite gap makes NO claim; an unreachable target renders "Move the age", never a
+    fabricated amount.
+  - **One retirement age, two sliders (#64 class):** the hero slider and `/fire-goals/what-if` both
+    read/write the session-only `ui.whatIfTargetAge` — explicitly excluded from the persisted `ui`
+    blob and its watch list. Dragging is a what-if; "Set as my target" is the only write, and it
+    writes the household member's `targetRetirementAge`.
+  - **`ui.quick` declared here, written by QN-1:** `{ guess, completedAt, createdIds, directPlans }`
+    rides the existing `userUiPrefs.prefs` JSON — no new entity key, no Prisma migration. The ONE
+    permitted `server/` edit adds it to `uiBodySchema` (a strip-mode `z.object` would otherwise drop
+    it silently on PUT, losing the user's gut-feel guess with a 200 OK).
+  - **The member-lens sweep earned its keep:** it FAILED on this change and was right to. The big
+    number is now the *target* age, which is legitimately identical for two adults sharing a target,
+    so "the age must differ per member" had stopped testing lensing. Re-pointed at the hero **need**
+    figure (the member's own individual FIRE number) — the figure that actually carries the lens
+    now. 22/22 PASS after the fix. Evidence: `e2e/t377-gap-hero-verify.spec.ts` (slider recomputes
+    47→52 = ₹3.11 L→₹1.94 L; rule-26 hero need ₹10.6 Cr matched the Goals screen exactly; 1280 +
+    390 screenshots; zero new console errors).
+  - **Design SSOT:** `docs/design/2026-08-27-quick-number-gap-hero/option-c-merged.html`;
+    `SCREEN-STANDARD.md` v1.3 records the pattern. Contract: `docs/goals/2026-08-27-quick-number-front-door.md` §3.
+    Coverage-matrix rows C1–C5, E3, E4, F3.
 - **D-2026-08-27-02 — T-376 (QN-3) LANDED: `general`/kind-less planned goals now enter the FIRE number
   (closes #165).** Root cause: `derive.ts:449-451` summed only `familyLayer.educationGoals` +
   `familyLayer.marriageEvents` into the corpus lump — a `plannedFuture` line of any other kind

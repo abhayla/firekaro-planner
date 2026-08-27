@@ -3,6 +3,10 @@ import { useHouseholdStore } from "@/stores/household";
 import { useAssumptionsStore } from "@/stores/assumptions";
 import { useUiStore } from "@/stores/ui";
 import { derive } from "@/lib/derive";
+import {
+  requiredMonthlyContributionFor,
+  type RequiredContributionResult,
+} from "@/lib/required-contribution";
 import { runMonteCarloFire, INDIA_EQUITY_ANNUAL_RETURNS } from "@/lib/monte-carlo";
 import { isEmergencyFundEligible } from "@/lib/investment-traits";
 import type { ProjectionPoint } from "@/lib/fire-math";
@@ -235,7 +239,60 @@ export function useFireDerive() {
     };
   });
 
+  // ---- T-377 (QN-2): the gap-hero solver, Pinia-aware ----
+  // `heroTargetAge` is the ONE age the hero slider and /fire-goals/what-if share: the
+  // session-only `ui.whatIfTargetAge` when the user has dragged it, else the household's own
+  // `targetRetirementAge` (the persisted plan). Dragging the slider is a what-if — it never
+  // writes the plan; "Set as my target" does that through the household store.
+  const heroTargetAge = computed<number>(() => {
+    const slider = ui.whatIfTargetAge;
+    if (slider != null && Number.isFinite(slider)) return Math.round(slider);
+    // Untouched slider ⇒ follow the SAVED plan of whatever scope is on screen. Under a member
+    // lens that is THAT adult's own targetRetirementAge — `derive().targetRetirementAge` is
+    // deliberately the household/primary-earner value, so using it would show one spouse the
+    // other's target age (code-review M3).
+    const lensedMember = d.value.applyMemberLens
+      ? h.data.members.find((m) => m.id === ui.viewingMemberId) ?? null
+      : null;
+    const fromPlan = lensedMember?.targetRetirementAge ?? d.value.targetRetirementAge;
+    return Number.isFinite(fromPlan) && (fromPlan ?? 0) > 0 ? Math.round(fromPlan as number) : 50;
+  });
+
+  // One solver run per (household, assumptions, lens, targetAge). Vue caches it, so the
+  // slider recomputes only on change. Every number on the hero comes from here — never from a
+  // component-local formula (contract §10: no parallel math).
+  const requiredContribution = computed<RequiredContributionResult>(() =>
+    requiredMonthlyContributionFor({
+      snapshot: h.data,
+      assumptions: a.values,
+      lens: {
+        isFamilyView: ui.isFamilyView,
+        viewingMemberId: ui.viewingMemberId,
+        currentFY: ui.currentFY,
+      },
+      targetAge: heroTargetAge.value,
+    }),
+  );
+
+  /** The "+3 years → ₹X" slider hint (mockup: "Three more years … Drag to feel it."). */
+  const requiredContributionAtTargetPlus3 = computed<RequiredContributionResult>(() =>
+    requiredMonthlyContributionFor({
+      snapshot: h.data,
+      assumptions: a.values,
+      lens: {
+        isFamilyView: ui.isFamilyView,
+        viewingMemberId: ui.viewingMemberId,
+        currentFY: ui.currentFY,
+      },
+      targetAge: heroTargetAge.value + 3,
+    }),
+  );
+
   return {
+    // T-377 (QN-2) — the gap hero's solver + the shared slider age.
+    heroTargetAge,
+    requiredContribution,
+    requiredContributionAtTargetPlus3,
     // #81 Phase 3 — the centralized same-scope Financial-Health resolver (member or household).
     memberFinancials,
     // D-2026-06-13-02 — the member-lensed FireHero headline selector (see above).
