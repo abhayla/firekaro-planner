@@ -33,17 +33,17 @@ Consent model: opt-in checkbox at onboarding + a per-channel preference centre w
 cap and an STOP/opt-out path. Store `{ userId, channel: "whatsapp", purpose, consentedAt, revokedAt, source }`.
 
 ## Safety rail — recipient allowlist (enforced in code, not just policy)
-Per Abhay's standing instruction, **all testing sends go ONLY to his number `917972672473`; no other
+Per Abhay's standing instruction, **all testing sends go ONLY to his number `<owner-test-number — see D:AbhayGLOBAL.md>`; no other
 number is messaged without explicit broadcast approval.** This is enforced in `wati-client.ts`, not
 left to discipline — the adapter is **fail-closed**:
-- `WATI_TEST_RECIPIENTS` (comma-separated, in `server/.env`) — the allowlist. Dev value: `917972672473`.
+- `WATI_TEST_RECIPIENTS` (comma-separated, in `server/.env`) — the allowlist. Dev value: `<owner-test-number — see D:AbhayGLOBAL.md>`.
 - `WATI_ALLOW_ALL_RECIPIENTS` — the explicit broadcast switch; only the exact string `'true'` enables
   sending to non-allowlisted numbers. Flipping it on = messaging real users = **escalation** (spend +
   outbound), Abhay's call only.
 - If a recipient is not allowlisted and broadcast is off, `sendTemplateMessage` returns a blocked
   result and **never calls Wati** (no message leaves). Empty allowlist + broadcast off ⇒ nothing sends.
 
-Regression-locked by `wati-client.spec.ts` (blocks a stranger's number, allows `917972672473`,
+Regression-locked by `wati-client.spec.ts` (blocks a stranger's number, allows `<owner-test-number — see D:AbhayGLOBAL.md>`,
 broadcast bypass requires the explicit flag).
 
 ## Inputs needed from Abhay (the only blockers to live sends)
@@ -73,7 +73,7 @@ Wati `sendTemplateMessage` returns **HTTP 200 on ACCEPT, not on delivery**. Real
 verify via `GET /api/v1/getMessages/{number}` → `statusString` + `failedDetail` (see
 `scripts/wati-diagnose.ts`).
 
-First live test to `917972672473` returned 200 but the message **FAILED**:
+First live test to `<owner-test-number — see D:AbhayGLOBAL.md>` returned 200 but the message **FAILED**:
 `"Message undeliverable as Meta has restricted it for higher quality messaging - retry again in a
 few days"` — and so did the PIFS broker MARKETING broadcasts to that number going back to April. Cause:
 **Meta's per-recipient MARKETING-template frequency cap** (quality throttle). Implications:

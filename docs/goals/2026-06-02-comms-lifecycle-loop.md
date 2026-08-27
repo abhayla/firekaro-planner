@@ -13,7 +13,7 @@ The WhatsApp comms system is built and **all 8 templates are Meta-APPROVED** (`d
 the consent-gated **sender** (`server/src/lib/whatsapp-sender.ts`), the **triggers**
 (`whatsapp-triggers.ts` — `triggerWelcome/Milestone/OffTrack/GoalReminder/AnnualReview/MonthlyDigest/Winback/SalaryUpdate`),
 and the **signup hook** (`comms-signup.ts` → wired into Better Auth `user.create.after`) all exist and
-are unit-tested. The fail-closed allowlist (`WATI_TEST_RECIPIENTS`, only `917972672473`) + the
+are unit-tested. The fail-closed allowlist (`WATI_TEST_RECIPIENTS`, only `<owner-test-number — see D:AbhayGLOBAL.md>`) + the
 `WATI_ALLOW_ALL_RECIPIENTS` broadcast flip (**A6 — Abhay's spend gate, untouched by this goal**) are live.
 
 **The gap (why nothing auto-sends today):**
@@ -31,7 +31,7 @@ are unit-tested. The fail-closed allowlist (`WATI_TEST_RECIPIENTS`, only `917972
 architecture.
 
 **Safety property (must hold throughout):** every send flows through the existing consent gate
-(`decideSend`) + fail-closed allowlist. Until Abhay flips A6, sends reach ONLY `917972672473`. The whole
+(`decideSend`) + fail-closed allowlist. Until Abhay flips A6, sends reach ONLY `<owner-test-number — see D:AbhayGLOBAL.md>`. The whole
 loop is therefore **buildable and end-to-end testable now, with zero real-user spend.** This goal MUST
 NOT flip A6.
 
@@ -75,7 +75,7 @@ NOT flip A6.
   stores it (normalized); Preferences Notifications UI captures/edits it (shown when WhatsApp enabled).
 - Sender resolves `toNumber` from the stored consent row; no number ⇒ fail-closed (no send, logged).
 - **Verified (rules 24/25):** set a number via the Preferences UI → confirm persisted via
-  `GET /api/comms/consent` → a test send to that number (= `917972672473`) reaches `DELIVERED` via the
+  `GET /api/comms/consent` → a test send to that number (= `<owner-test-number — see D:AbhayGLOBAL.md>`) reaches `DELIVERED` via the
   existing Wati path.
 
 **Phase 1 — Welcome + scheduled evaluator (UTILITY nudges).** DoD:
@@ -86,7 +86,7 @@ NOT flip A6.
 - All sends consent-gated + allowlist-gated (no real-user send; A6 untouched).
 - **Tests:** unit specs for the evaluator (condition→nudge mapping), dedup, and number-resolution;
   the welcome-on-consent path. Full `npm run test:unit` (both trees) green; type-check clean.
-- **Verified end-to-end** to `917972672473`: trigger the endpoint against a seeded household → the right
+- **Verified end-to-end** to `<owner-test-number — see D:AbhayGLOBAL.md>`: trigger the endpoint against a seeded household → the right
   UTILITY nudge(s) reach `DELIVERED`; a re-run sends nothing (dedup).
 - VPS: document the daily cron line in `docs/DEPLOY.md` (Abhay wires the cron — it's a VPS change).
 
@@ -99,7 +99,7 @@ NOT flip A6.
 ## Verification & gates (every phase)
 - Rule 29 independent review (code-reviewer-agent; no financial math here so FinTech analyst N/A).
 - Rules 24/25 for the Preferences UI change (screenshot + ARIA + console; UI→DB persistence).
-- The fail-closed allowlist is the test harness — verify real `DELIVERED` to `917972672473` only.
+- The fail-closed allowlist is the test harness — verify real `DELIVERED` to `<owner-test-number — see D:AbhayGLOBAL.md>` only.
 - Conventional commits per phase; `/post-fix-pipeline` to finalize.
 
 ## Out of scope (do NOT do)

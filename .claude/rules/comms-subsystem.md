@@ -31,7 +31,7 @@ globs:
 
 ## The `server/src/lib/` layer
 
-- `wati-client.ts` — WhatsApp send. **Fail-closed allowlist → only Abhay's `917972672473`** in test
+- `wati-client.ts` — WhatsApp send. **Fail-closed allowlist → only Abhay's `<owner-test-number — see D:AbhayGLOBAL.md>`** in test
   (see the `feedback_whatsapp_test_recipient` memory — never message any other number without
   explicit approval).
 - `whatsapp-sender.ts` + `whatsapp-triggers.ts` — consent-gated send + per-event triggers; the

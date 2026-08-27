@@ -81,7 +81,7 @@ Source: [Meta — Per-user marketing template message limits](https://developers
 
 Key mechanics:
 - **It's a RECIPIENT-side, adaptive cap** — it tracks *the user*, across *all* businesses, not just us.
-  Our test number `917972672473` had received broker-marketing broadcasts; its marketing read-rate /
+  Our test number `<owner-test-number — see D:AbhayGLOBAL.md>` had received broker-marketing broadcasts; its marketing read-rate /
   inbox state pushed it over the line, so *new* marketing templates (ours included) are dropped.
 - **Counting:** every delivered marketing template counts toward the user's limit. **If the user
   replies to a marketing message, it opens a 24h window; marketing sent inside that window does NOT
@@ -135,7 +135,7 @@ in which you can send **free-form, non-template "service" messages** AND **free 
 - **NOT subject to the per-user marketing cap.**
 - **Free** (utility-in-window and service messages cost nothing).
 - This is the most reliable way to reach an engaged user — and how we'll verify delivery to
-  `917972672473` (have the user message the business number, then send a session message).
+  `<owner-test-number — see D:AbhayGLOBAL.md>` (have the user message the business number, then send a session message).
 
 ---
 
