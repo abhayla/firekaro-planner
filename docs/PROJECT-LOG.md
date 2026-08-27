@@ -127,6 +127,15 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 
 ## §3 — Decision log (append-only, newest first)
 
+### 2026-08-27 (08:30 IST)
+- **D-2026-08-27-04 — Repo made PUBLIC (Abhay: "make this repo public hence github billing won't be needed").**
+  Unblocks CI for the whole Quick Number wave (B8 resolved). Pre-flip: 555-commit secret scan clean, no `.env`
+  ever committed, owner phone number redacted from HEAD (`server/scripts/*` now require `WATI_TEST_RECIPIENTS`,
+  spec fixtures use a fake number) — the number still exists in older commits; a history rewrite was NOT done
+  (destructive, owner's call). `main` now has branch protection requiring both CI jobs; auto-merge enabled.
+  Fleet note: the registry's "PRIVATE ⇒ never arm auto-merge" trap no longer applies; the worker-never-merges
+  guard is unchanged.
+
 ### 2026-08-27 (fleet, 07:30 IST)
 - **D-2026-08-27-03 — Quick Number wave: T-376 (QN-3, PR #166) CHECKED PASS; T-377 (QN-2, PR #168) delivered;
   gh #167 (Tier-0, real target grown at 6% CPI vs the 7.9% basket) sequenced as the wave's last stage.**
