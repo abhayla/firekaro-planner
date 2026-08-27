@@ -292,6 +292,11 @@ export const investmentSchema = z.object({
   // automated (SIP / EPF deduction / auto-debit). Drives the "auto-debit
   // gap" nudge in Phase 6 Stage Q.
   isAutomated: z.boolean().optional(),
+  // T-378 (QN-1) — created by the `/quick` express path as the ONE "all my investments" line.
+  // Rides the server's existing `subtypeData` JSONB (household-repo sweeps every non-typed key
+  // there and spreads it back on read) — so NO Prisma change. Deliberately NOT `source`, which
+  // already means something else (Direct/Regular, owner-entity id).
+  quickSource: z.boolean().optional(),
 });
 export type Investment = z.infer<typeof investmentSchema>;
 

@@ -26,6 +26,10 @@ const routes: RouteRecordRaw[] = [
   // ---- Public routes (no sidebar layout) ----
   { path: "/", name: "splash", component: () => import("@/pages/Splash.vue") },
   { path: "/login", name: "login", component: () => import("@/pages/Login.vue") },
+  // T-378 (QN-1) — the express front door: ten cards to one honest number. NO `meta.layout`, exactly
+  // like Splash/Login (App.vue only special-cases 'sidebar'), and deliberately outside the
+  // onboarding guard's sidebar branch so a brand-new user with zero members can reach it.
+  { path: "/quick", name: "quick", component: () => import("@/pages/QuickNumber.vue") },
   { path: "/wizard", redirect: "/wizard/profile" },
   {
     path: "/wizard/:step",

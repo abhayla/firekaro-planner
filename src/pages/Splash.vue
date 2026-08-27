@@ -29,7 +29,14 @@ function exploreWithSample() {
   router.push({ name: "fire-dashboard" });
 }
 
+// T-378 (QN-1): "start my own plan" now means the ten-card express path. The seven-step wizard
+// stays as "refine your plan" — reachable from the link below and from the quick result.
 function startMyOwnPlan() {
+  household.resetAll();
+  router.push({ name: "quick" });
+}
+
+function startDetailedWizard() {
   household.resetAll();
   router.push({ name: "wizard", params: { step: "profile" } });
 }
@@ -87,13 +94,21 @@ function continuePlan() {
               <v-icon icon="mdi-pencil-plus" size="48" color="fire-orange" class="mb-3" />
               <h2 class="text-h6 font-weight-bold font-display mb-2">Start my own plan</h2>
               <p class="text-body-2 text-medium-emphasis flex-grow-1">
-                Six-step wizard tailored to your household. Profile takes 30 seconds —
-                the rest are skippable, every input auto-saves, and you can resume any time.
+                Ten quick questions, about three minutes, and you get one honest FIRE number —
+                what you'll need, what you'll have, and what to do every month to close the gap.
               </p>
               <v-btn color="fire-orange" variant="flat" class="mt-3" @click.stop="startMyOwnPlan">
-                Begin wizard
+                Find my number
                 <v-icon icon="mdi-arrow-right" class="ml-1" />
               </v-btn>
+              <a
+                class="text-caption mt-3 d-inline-block"
+                href="#"
+                data-testid="splash-detailed-wizard"
+                @click.stop.prevent="startDetailedWizard"
+              >
+                Prefer the detailed seven-step wizard?
+              </a>
             </v-card>
           </v-col>
         </v-row>

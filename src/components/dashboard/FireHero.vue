@@ -28,6 +28,7 @@ import { describeFireConfidenceBand } from "@/lib/fire-confidence-band";
 import { MAX_PROJECTION_YEARS } from "@/lib/monte-carlo";
 import { formatINRCompact } from "@/lib/formatters";
 import InfoTip from "@/components/shared/InfoTip.vue";
+import QuickExplainer from "@/components/quick/QuickExplainer.vue";
 
 const fire = useFireDerive();
 const h = useHouseholdStore();
@@ -612,6 +613,18 @@ function yearsLabel(years: number): string {
         <span class="stat-block__value text-currency">{{ (fire.blendedReturn.value * 100).toFixed(1) }}%</span>
       </div>
     </div>
+
+    <!-- T-378 (QN-4) — the same "why so big / how we got this" explainer the /quick result shows,
+         collapsed here so the dashboard stays a verdict and the reasoning is one click away.
+         Hidden under a member lens: the explainer narrates the HOUSEHOLD plan's numbers. -->
+    <v-expansion-panels v-if="!hh.isMember && req.hasTarget" variant="accordion" flat class="mt-4">
+      <v-expansion-panel data-testid="hero-explainer-panel">
+        <v-expansion-panel-title>Why is the number so big, and how did we get it?</v-expansion-panel-title>
+        <v-expansion-panel-text>
+          <QuickExplainer dense />
+        </v-expansion-panel-text>
+      </v-expansion-panel>
+    </v-expansion-panels>
   </v-card>
 </template>
 
