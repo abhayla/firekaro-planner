@@ -1,4 +1,6 @@
-# Scope: global
+---
+paths: ["src/**/*.vue", "scripts/verify-persona.mjs", "scripts/enter-persona-via-ui.mjs"]
+---
 
 # UI Verification (headed persona sweep)
 

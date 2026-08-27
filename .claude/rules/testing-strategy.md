@@ -1,4 +1,6 @@
-# Scope: global
+---
+paths: ["**/*.spec.ts", "docs/DEPLOY.md", "server/src/routes/smoke-internal.ts"]
+---
 
 # Testing Strategy — which test type runs in which environment
 

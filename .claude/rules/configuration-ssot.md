@@ -1,4 +1,6 @@
-# Scope: global
+---
+paths: [".claude/**/*.md", "CLAUDE.md"]
+---
 
 # Configuration Single Source of Truth (SSOT)
 
