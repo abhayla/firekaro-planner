@@ -54,6 +54,17 @@ describe("LeverPicker — the Option-C card surface", () => {
     expect(src).toContain("Make this my plan");
   });
 
+  it("reports a RESCUE as a rescue, never as '−₹0/mo less to find' (the Amit case)", () => {
+    // On the reference persona the baseline is unreachable, so the rupee delta cannot exist.
+    // Flattening that to "0 less to find" would hide the best news the card has.
+    expect(src, "per-row rescue branch").toMatch(/row\.effect\.kind === 'rescue'/);
+    expect(src).toContain("makes it reachable");
+    expect(src, "summary rescue branch").toMatch(/v-else-if="isRescue"/);
+    expect(src).toMatch(/this target becomes <b>reachable<\/b>/);
+    // …and the "instead of ₹X" comparison must be suppressed when X is Infinity.
+    expect(src).toMatch(/v-if="!baselineUnreachable"/);
+  });
+
   it("makes NO claim when the moves still cannot reach the target (rule 31)", () => {
     // The unreachable branch must exist and must point at the age, not quote a fake number.
     expect(src).toMatch(/beyond any realistic monthly\s*\n?\s*amount/);
@@ -116,6 +127,8 @@ describe("LeverPicker — toggling is SESSION-ONLY what-if state", () => {
   it("the component reads the catalog's key list (rows can never drift from the math)", () => {
     expect(PLAN_LEVER_KEYS.length).toBe(5);
     expect(src).toMatch(/buildPlanLevers\(/);
-    expect(src).toMatch(/lessToFindFor\(/);
+    // The card reads the richer effect API (which distinguishes a ₹ saving from a RESCUE of an
+    // otherwise-unreachable plan) rather than the bare ₹ metric — see leverEffectFor.
+    expect(src).toMatch(/leverEffectFor\(/);
   });
 });

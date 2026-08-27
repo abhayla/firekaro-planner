@@ -25,7 +25,7 @@ import { useFireDerive } from "@/lib/useFireDerive";
 import {
   buildPlanLevers,
   applyPlanLevers,
-  lessToFindFor,
+  leverEffectFor,
   solvePlan,
   toFindMonthly,
   STEP_UP_LEVER_PERCENT,
@@ -83,7 +83,9 @@ function toggle(key: PlanLeverKey) {
 const perLever = computed(() =>
   levers.value.map((lever) => ({
     lever,
-    lessToFind: lever.available ? lessToFindFor(basePlan.value, levers.value, [lever.key]) : 0,
+    effect: lever.available
+      ? leverEffectFor(basePlan.value, levers.value, [lever.key])
+      : ({ kind: "none", lessToFind: 0, requiredWith: Number.NaN } as const),
   })),
 );
 
@@ -97,9 +99,18 @@ const planTargetAge = computed(
 );
 
 const anyOn = computed(() => selected.value.length > 0);
-const stackedLessToFind = computed(() =>
-  lessToFindFor(basePlan.value, levers.value, selected.value),
+const stackedEffect = computed(() =>
+  leverEffectFor(basePlan.value, levers.value, selected.value),
 );
+const stackedLessToFind = computed(() => stackedEffect.value.lessToFind);
+/**
+ * True when the moves turn an IMPOSSIBLE target into a reachable one. This is the most valuable
+ * thing the card can say, and it has no rupee figure (the baseline required amount is Infinity),
+ * so it gets its own line rather than being flattened to a misleading "-Rs0/mo".
+ */
+const isRescue = computed(() => stackedEffect.value.kind === "rescue");
+/** True when even the ticked moves leave the target out of reach — the card makes NO claim. */
+const baselineUnreachable = computed(() => !Number.isFinite(baseSolve.value.requiredMonthlyReal));
 /** Lower-cased short labels, as the mockup joins them ("with X + Y + Z"). */
 const selectedNames = computed(() =>
   levers.value
@@ -196,12 +207,21 @@ function openPreferences() {
         </div>
         <div class="lever__fx">
           <template v-if="row.lever.available">
-            <b
-              class="lever__amount"
-              :class="row.lessToFind > 0 ? 'lever__amount--win' : 'lever__amount--flat'"
-              :data-testid="`lever-effect-${row.lever.key}`"
-            >−{{ money(row.lessToFind) }}/mo</b>
-            <span class="lever__fxnote">less to find</span>
+            <template v-if="row.effect.kind === 'rescue'">
+              <b
+                class="lever__amount lever__amount--win"
+                :data-testid="`lever-effect-${row.lever.key}`"
+              >makes it reachable</b>
+              <span class="lever__fxnote">on its own</span>
+            </template>
+            <template v-else>
+              <b
+                class="lever__amount"
+                :class="row.effect.lessToFind > 0 ? 'lever__amount--win' : 'lever__amount--flat'"
+                :data-testid="`lever-effect-${row.lever.key}`"
+              >−{{ money(row.effect.lessToFind) }}/mo</b>
+              <span class="lever__fxnote">less to find</span>
+            </template>
           </template>
           <span
             v-else
@@ -221,6 +241,11 @@ function openPreferences() {
         Even with {{ selectedNames.join(" + ") }} this target is beyond any realistic monthly
         amount — move the retirement age above.
       </template>
+      <template v-else-if="isRescue">
+        With {{ selectedNames.join(" + ") }} this target becomes <b>reachable</b> — at today's pace
+        alone it is not. You'd need <b>{{ money(planSolve.requiredMonthlyReal) }}/month</b> to
+        retire at {{ planTargetAge }}, of which {{ money(currentMonthly) }} is already flowing.
+      </template>
       <template v-else-if="alreadyEnough">
         With {{ selectedNames.join(" + ") }}: your current
         <b>{{ money(currentMonthly) }}/month</b> is enough to retire at
@@ -229,7 +254,8 @@ function openPreferences() {
       <template v-else>
         With {{ selectedNames.join(" + ") }}: you need
         <b>{{ money(planSolve.requiredMonthlyReal) }}/month</b> to retire at
-        {{ planTargetAge }} — instead of {{ money(baseSolve.requiredMonthlyReal) }}. Of that,
+        {{ planTargetAge }}<span v-if="!baselineUnreachable"> — instead of
+        {{ money(baseSolve.requiredMonthlyReal) }}</span>. Of that,
         {{ money(currentMonthly) }} is already flowing; the extra to find is
         <b>{{ money(toFindWithPlan) }}/month</b><span
           v-if="stackedLessToFind > 0"

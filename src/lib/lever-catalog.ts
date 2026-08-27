@@ -446,10 +446,53 @@ export function lessToFindFor(
   levers: PlanLever[],
   selected: readonly PlanLeverKey[],
 ): number {
-  if (selected.length === 0) return 0;
-  const baseFind = toFindMonthly(solvePlan(plan));
-  const withFind = toFindMonthly(solvePlan(applyPlanLevers(plan, levers, selected)));
-  // Either side unreachable => no honest saving to claim.
-  if (!Number.isFinite(baseFind) || !Number.isFinite(withFind)) return 0;
-  return Math.max(0, Math.round(baseFind - withFind));
+  return leverEffectFor(plan, levers, selected).lessToFind;
+}
+
+/**
+ * What a lever selection actually does, in the three states that are honestly distinguishable.
+ *
+ * The rupee metric alone is not enough, and the gap is not academic: on the reference persona
+ * (Amit, retire at 50) the BASELINE is unreachable - the solver returns Infinity because no
+ * feasible monthly amount gets him there. Switching on step-up + delay + direct makes the target
+ * reachable at a real number. Reporting that as "0 less to find" (Infinity minus a finite amount
+ * is not a claimable saving) would UNDER-sell the single most valuable thing the card can tell a
+ * user: your plan just went from impossible to possible. So a rescue is its own state, with its
+ * own copy, rather than a rupee figure that cannot exist.
+ */
+export type LeverEffectKind =
+  /** Baseline was unreachable and the moves make the target reachable. */
+  | "rescue"
+  /** Both reachable: the moves cut the monthly shortfall by `lessToFind`. */
+  | "saving"
+  /** Nothing selected, still unreachable, or no measurable change. */
+  | "none";
+
+export interface LeverEffect {
+  kind: LeverEffectKind;
+  /** Rupees/month less to find. Always finite and >= 0; 0 for "rescue" and "none". */
+  lessToFind: number;
+  /** The monthly amount the perturbed plan needs — finite only when the target is reachable. */
+  requiredWith: number;
+}
+
+export function leverEffectFor(
+  plan: PlanInputs,
+  levers: PlanLever[],
+  selected: readonly PlanLeverKey[],
+): LeverEffect {
+  if (selected.length === 0) return { kind: "none", lessToFind: 0, requiredWith: Number.NaN };
+  const baseSolved = solvePlan(plan);
+  const withSolved = solvePlan(applyPlanLevers(plan, levers, selected));
+  const baseFind = toFindMonthly(baseSolved);
+  const withFind = toFindMonthly(withSolved);
+  const requiredWith = withSolved.requiredMonthlyReal;
+
+  // Still out of reach even with the moves - no claim of any kind.
+  if (!Number.isFinite(withFind)) return { kind: "none", lessToFind: 0, requiredWith };
+  // Was out of reach, now is not: the honest headline is the rescue, not a rupee delta.
+  if (!Number.isFinite(baseFind)) return { kind: "rescue", lessToFind: 0, requiredWith };
+
+  const lessToFind = Math.max(0, Math.round(baseFind - withFind));
+  return { kind: lessToFind > 0 ? "saving" : "none", lessToFind, requiredWith };
 }
