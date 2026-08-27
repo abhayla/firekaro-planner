@@ -226,7 +226,7 @@ export function computeLifecycleDigest(
   // delta across a frame change is the model's, not the user's, and reporting it as "since you were
   // away" would be a fabricated claim about their behaviour. `useLifecycleDigest.ensureBaseline()`
   // then re-captures silently, so the NEXT visit diffs genuine movement.
-  if (!baseline || baseline.frameVersion !== current.frameVersion) {
+  if (!baseline || !isSnapshotFrameCurrent(baseline)) {
     return {
       hasMeaningfulChange: false,
       fireAgeDeltaYears: 0,

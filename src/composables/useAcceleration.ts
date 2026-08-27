@@ -109,10 +109,10 @@ export function useAcceleration() {
   });
 
   const ctx = computed<AccelerationContext>(() => {
-    // Real equity−debt spread per +1pp equity (inflation cancels in the difference; kept ≥ 0).
+    // Nominal equity−debt spread per +1pp equity (ADR-0006: kept ≥ 0).
     // ADR-0006: the baseline is NOMINAL now, so the per-point spread must be nominal too — a real
     // spread applied to a nominal return understates the risk-notch by a factor of (1+CPI).
-    const realReturnPerEquityPoint = Math.max(
+    const nominalReturnPerEquityPoint = Math.max(
       0,
       (a.values.equityReturn - a.values.debtReturn) / 100,
     );
@@ -132,7 +132,7 @@ export function useAcceleration() {
       swr: fire.effectiveSWR.value,
       currentEquityPct: currentEquityPct.value,
       maxEquityPct: DEFAULT_MAX_EQUITY_PCT,
-      realReturnPerEquityPoint,
+      nominalReturnPerEquityPoint,
       currentNps80ccd1bUsed: deriveDeductions(h.data).section80CCD1B,
       marginalTaxRate,
       regime: fire.householdTaxRecommendation.value?.recommended ?? "NEW",

@@ -40,7 +40,7 @@ const CTX: AccelerationContext = {
   swr: 0.035,
   currentEquityPct: 55,
   maxEquityPct: 75,
-  realReturnPerEquityPoint: 0.0005, // +0.05% real return per +1pp equity
+  nominalReturnPerEquityPoint: 0.0005, // +0.05% nominal return per +1pp equity
   currentNps80ccd1bUsed: 20_000, // ₹20k of the ₹50k 80CCD(1B) sub-limit already claimed
   marginalTaxRate: 0.3, // 30% slab (incl. cess in the real wiring) — a typical accumulator
   regime: "OLD", // 80CCD(1B) only saves tax in the OLD regime
@@ -73,11 +73,11 @@ describe("buildAccelerationLevers — realistic max-effort catalog", () => {
     expect(perturbed.targetCorpus).toBeLessThan(BASE.targetCorpus);
   });
 
-  it("risk-notch raises expected real return by one bounded equity notch", () => {
+  it("risk-notch raises expected return by one bounded equity notch", () => {
     const lever = buildAccelerationLevers(CTX).find((l) => l.key === "risk-notch")!;
     const perturbed = lever.apply(BASE);
     const notch = Math.min(10, CTX.maxEquityPct - CTX.currentEquityPct); // 10
-    expect(perturbed.expectedReturn).toBeCloseTo(BASE.expectedReturn + notch * CTX.realReturnPerEquityPoint, 6);
+    expect(perturbed.expectedReturn).toBeCloseTo(BASE.expectedReturn + notch * CTX.nominalReturnPerEquityPoint, 6);
   });
 
   // HONESTY LOCK (FinTech review, 2026-06-06): the risk-notch lever raises return on a deterministic
