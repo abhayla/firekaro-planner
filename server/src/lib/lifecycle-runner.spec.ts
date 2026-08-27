@@ -23,7 +23,7 @@ const onTrack: LifecycleSignals = {
 function deps(over: Partial<RunnerDeps> = {}): RunnerDeps {
   const sent = new Set<string>(); // dedupe keys "sent" this run, to model alreadySent across calls
   return {
-    listUsers: vi.fn(async () => [{ userId: "u1", whatsappNumber: "917972672473" }]),
+    listUsers: vi.fn(async () => [{ userId: "u1", whatsappNumber: "919999900001" }]),
     loadSignals: vi.fn(async () => onTrack),
     getFirstName: vi.fn(async () => "Abhay"),
     alreadySent: vi.fn(async (_u: string, key: string) => sent.has(key)),
@@ -45,7 +45,7 @@ describe("runLifecycle", () => {
     expect(r.sent).toBe(2);
     expect(d.fire).toHaveBeenCalledWith(
       "milestone",
-      expect.objectContaining({ userId: "u1", toNumber: "917972672473", firstName: "Abhay" }),
+      expect.objectContaining({ userId: "u1", toNumber: "919999900001", firstName: "Abhay" }),
       ["Abhay", "₹1.25Cr", "62%"],
       "milestone:50",
     );
@@ -78,7 +78,7 @@ describe("runLifecycle", () => {
       deps({
         listUsers: vi.fn(async () => [
           { userId: "boom", whatsappNumber: "910000000000" },
-          { userId: "u1", whatsappNumber: "917972672473" },
+          { userId: "u1", whatsappNumber: "919999900001" },
         ]),
         loadSignals: vi.fn(async (uid: string) => {
           if (uid === "boom") throw new Error("derive blew up");

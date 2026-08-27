@@ -35,7 +35,7 @@ submitted all 7 (#2–8) from the manifest `docs/wati-templates.json` via the gl
   `server/src/lib/comms-templates.ts` (`DEFAULTS`), so the sender resolves the right name with NO
   `COMMS_TEMPLATE_*` override — locally AND on the VPS (which already runs that code from A4). The
   override env vars remain available if a future template ever approves under a different name.
-- **End-to-end proven:** sent `firekaro_milestone` (UTILITY, 3 vars) to the test number `917972672473`
+- **End-to-end proven:** sent `firekaro_milestone` (UTILITY, 3 vars) to the test number `<owner-test-number — see GLOBAL.md>`
   → Wati terminal status `DELIVERED` confirmed. The approved-template → send → deliver path works.
 - Remaining for full lifecycle: the MARKETING three (`monthly_digest`/`winback`/`salary_update`) only
   *send* once `marketingOptIn` consent + broadcast (A6) are on; UTILITY four are usable now (gated by
@@ -106,8 +106,7 @@ carries ONLY the `whatsappMessageId`; fixed to correlate by that id (commit `996
   feature is inert without the column **only on the ServerAdapter path** — the localStorage demo path
   works regardless (verified).
 
-- **B8. GitHub Actions billing block — CI on `main` cannot run at all — 🚦 needs your GitHub billing
-  fix (found 2026-08-26, fleet task T-350).** **UPDATE 2026-08-27 01:45 IST: still blocked (every run on 2026-08-26 19:xx UTC failed the same way) and now BLOCKS THE QUICK NUMBER WAVE — T-376→T-379 (`docs/goals/2026-08-27-quick-number-front-door.md`) will open PRs whose checks never start; checkers verify locally but nothing can merge until GitHub → Settings → Billing & plans is fixed (payment method / spending limit).** `main`'s CI workflow (`.github/workflows/ci.yml`) has
+- ~~**B8. GitHub Actions billing block**~~ — **RESOLVED 2026-08-27 08:30 IST: Abhay made the repo PUBLIC ("make this repo public hence github billing won't be needed"); Actions minutes are free on public repos. Pre-flip scrub: full-history secret scan clean (555 commits, no .env ever committed); owner phone number redacted from HEAD (docs/rules/scripts/specs — it remains in old commits; history rewrite not done). Branch protection on `main` now requires both CI checks; auto-merge + delete-on-merge enabled.** Original entry kept for the record: needs your GitHub billing fix (found 2026-08-26, fleet task T-350). **UPDATE 2026-08-27 01:45 IST: still blocked (every run on 2026-08-26 19:xx UTC failed the same way) and now BLOCKS THE QUICK NUMBER WAVE — T-376→T-379 (`docs/goals/2026-08-27-quick-number-front-door.md`) will open PRs whose checks never start; checkers verify locally but nothing can merge until GitHub → Settings → Billing & plans is fixed (payment method / spending limit).** `main`'s CI workflow (`.github/workflows/ci.yml`) has
   been RED on the last 2 pushes (2026-06-25 `ac7dc76`, 2026-08-26 `b7614de`), but **the code is not
   broken** — a full local reproduction of every CI step (frontend `npm ci` + `type-check` + 1239/1239
   unit tests + `build`, exact CI env vars) passed cleanly on current `main`. The real cause, confirmed
@@ -142,7 +141,7 @@ carries ONLY the `whatsappMessageId`; fixed to correlate by that id (commit `996
   done. Number capture (`CommsConsent.whatsappNumber`, Preferences UI), welcome-on-consent (D3), the
   server-side `lifecycle-evaluator` + token-guarded `POST /api/internal/lifecycle/run`, and per-period
   send-log dedupe (`whatsapp_send_log.dedupeKey`) all ship. **Live-verified end-to-end:** `welcome` +
-  `annual_review` both reached **DELIVERED** to the test number `917972672473`; a second endpoint run
+  `annual_review` both reached **DELIVERED** to the test number `<owner-test-number — see GLOBAL.md>`; a second endpoint run
   sent nothing (dedup). Two additive Supabase migrations applied (`whatsappNumber`, `dedupeKey`). Phase 2
   (marketing digest / winback / salary-update + `lastSeenAt`) stays deferred behind `marketingOptIn` + A6.
   Full unit coverage; both trees green. **Needs Abhay (to take it live on prod):**

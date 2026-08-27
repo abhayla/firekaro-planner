@@ -6,7 +6,8 @@
 import "dotenv/config";
 import { getWatiConfig } from "../src/lib/wati-client";
 
-const TO = (process.env.WATI_TEST_RECIPIENTS ?? "").split(",")[0]?.trim() || "917972672473";
+const TO = (process.env.WATI_TEST_RECIPIENTS ?? "").split(",")[0]?.trim();
+if (!TO) throw new Error("WATI_TEST_RECIPIENTS is required (owner test number lives in GLOBAL.env)");
 const NAME = process.argv[2] ?? "firekaro_welcome_2026_06_02";
 
 async function main() {
