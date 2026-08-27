@@ -18,7 +18,7 @@
  * `ui` storage blob unchanged.
  */
 import type { DerivedFinancials } from "@/lib/derive";
-import { runMonteCarloFire, MAX_PROJECTION_YEARS, INDIA_EQUITY_ANNUAL_RETURNS } from "@/lib/monte-carlo";
+import { runMonteCarloFire, headlineBandInputs, MAX_PROJECTION_YEARS } from "@/lib/monte-carlo";
 
 /**
  * Milestone bands, ascending. Mirrors `lifecycle-evaluator.ts` MILESTONE_BANDS
@@ -65,6 +65,10 @@ export type SnapshotInputs = Pick<
   | "realBlendedReturn"
   | "realReturnSchedule"
   | "realTargetDriftRate"
+  // ADR-0006 Phase 1d: the band's drift is the EFFECTIVE (whole-target) rate, never the base
+  // leg's `realTargetDriftRate` — see `headlineBandInputs`. `realTargetDriftRate` stays in the
+  // Pick because other snapshot consumers still read it.
+  | "effectiveTargetDriftRate"
   | "householdContributionSchedule"
   | "bandContributionSchedule"
   | "portfolioVolatility"
@@ -198,26 +202,12 @@ export function captureSnapshot(
 /** MC median FIRE age (anchorAge + p50 years), or null when off the chart / skipped. */
 function computeMonteCarloP50Age(derived: SnapshotInputs, skip: boolean): number | null {
   if (skip) return null;
-  const mc = runMonteCarloFire({
-    currentCorpus: derived.fireWithdrawableCorpus,
-    targetCorpus: derived.fireNumber,
-    // ADR-0006: same CPI-real band, drifting today's-₹ target (see monte-carlo.ts header).
-    targetGrowthRate: derived.realTargetDriftRate,
-    monthlySavings: derived.monthlyContribution,
-    // ADR-0006 Phase 1b: the CPI-RE-INDEXED inflow — the band is CPI-real, and the nominal
-    // kernel only steps the contribution once a year, so the un-discounted real amount would
-    // credit purchasing power the headline never gives (see derive.bandContributionSchedule).
-    monthlySavingsSchedule: derived.bandContributionSchedule,
-    meanReturn: derived.realBlendedReturn,
-    // #24 Part 1: taper the MC per-year MEAN along the glide schedule so the digest's MC
-    // p50 age converges to the headline for glide-ON households (same as useFireDerive).
-    meanReturnSchedule: derived.realReturnSchedule,
-    volatility: derived.portfolioVolatility,
-    // #24 Part 2: MUST pass the SAME history-fed series the dashboard band uses
-    // (useFireDerive) — else the digest's MC FIRE age (IID) would diverge from the
-    // FireHero band's p50 (bootstrap) for the same household. One model, both surfaces.
-    historicalReturns: INDIA_EQUITY_ANNUAL_RETURNS,
-  });
+  // ADR-0006 Phase 1d: the digest's MC age and the FireHero band are now the SAME call, built by
+  // the SAME function (`headlineBandInputs`) — they cannot diverge again. They had: this site was
+  // still passing `realTargetDriftRate` (the base leg alone, so the 9% medical reservation and the
+  // goal due-year caps were invisible to it), which under-stated the target the band chases and
+  // put the digest's FIRE age ahead of the dashboard's for the same household.
+  const mc = runMonteCarloFire(headlineBandInputs(derived));
   return Number.isFinite(mc.p50Years) && mc.p50Years < MAX_PROJECTION_YEARS
     ? Math.round(derived.anchorAge + mc.p50Years)
     : null;

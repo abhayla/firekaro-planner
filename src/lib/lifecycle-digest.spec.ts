@@ -27,7 +27,7 @@ import { loadSeedPersona } from "@/lib/seed-persona";
 import { loadMehtasSeed } from "@/seeds/mehtas";
 import { loadIyersSeed } from "@/seeds/iyers";
 import { derive } from "@/lib/derive";
-import { runMonteCarloFire, MAX_PROJECTION_YEARS, INDIA_EQUITY_ANNUAL_RETURNS } from "@/lib/monte-carlo";
+import { runMonteCarloFire, headlineBandInputs, MAX_PROJECTION_YEARS } from "@/lib/monte-carlo";
 import { evaluateNudges } from "@/lib/nudge-engine";
 import { derivedFamilyLayer } from "@/lib/derived-records";
 
@@ -163,23 +163,11 @@ describe("captureSnapshot — pure builder (Stage A)", () => {
     // inputs useFireDerive feeds the headline band — incl. the #24-Part-1 glide schedule
     // AND the #24-Part-2 history-fed series — never an independent recompute. Mirroring
     // the production call EXACTLY guards the cross-consumer divergence (digest vs band).
-    const mc = runMonteCarloFire({
-      currentCorpus: k.fireWithdrawableCorpus,
-      targetCorpus: k.fireNumber,
-      // ADR-0006: the production call now also carries the drifting today's-₹ target and the
-      // REAL contribution schedule (the step-up + its age-50 taper). Omitting either here made
-      // this "mirror the production call EXACTLY" test stop mirroring it — the exact
-      // cross-consumer divergence the assertion exists to catch, so they are added, not relaxed.
-      targetGrowthRate: k.realTargetDriftRate,
-      monthlySavings: k.monthlyContribution,
-      // Phase 1b: …and CPI-RE-INDEXED, again exactly as production does. The raw real schedule
-      // over-credits the household within each year (the nominal inflow steps annually).
-      monthlySavingsSchedule: k.bandContributionSchedule,
-      meanReturn: k.realBlendedReturn,
-      meanReturnSchedule: k.realReturnSchedule,
-      volatility: k.portfolioVolatility,
-      historicalReturns: INDIA_EQUITY_ANNUAL_RETURNS,
-    });
+    // ADR-0006 Phase 1d: "mirror the production call EXACTLY" is now structural — both sides build
+    // their arguments with `headlineBandInputs`, so a hand-copied field can no longer rot out of
+    // sync (it had: this mirror was passing the base-leg `realTargetDriftRate` while production
+    // passed the effective whole-target rate).
+    const mc = runMonteCarloFire(headlineBandInputs(k));
     const expectedP50Age =
       mc.p50Years < MAX_PROJECTION_YEARS ? Math.round(k.anchorAge + mc.p50Years) : null;
     expect(snap.monteCarloP50Age).toBe(expectedP50Age);
@@ -324,6 +312,10 @@ describe("lifecycle-digest — frame-change migration (ADR-0006)", () => {
         realBlendedReturn: 0.04,
         realReturnSchedule: 0.04,
         realTargetDriftRate: 0.0023,
+        // ADR-0006 Phase 1d: the WHOLE-target drift the band actually runs on. Same value here
+        // because this synthetic fixture has no dated goals and no medical reservation — on a real
+        // household the two differ, which is exactly why the band must not read the base leg.
+        effectiveTargetDriftRate: 0.0023,
         householdContributionSchedule: 100_000,
         // ADR-0006 Phase 1b: the CPI-re-indexed band inflow (≈ 96.8% of the real amount at 6% CPI).
         bandContributionSchedule: 96_766,

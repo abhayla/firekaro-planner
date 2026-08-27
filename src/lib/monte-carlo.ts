@@ -242,6 +242,54 @@ export interface MonteCarloFireInput {
   seed?: number;
 }
 
+/**
+ * ADR-0006 Phase 1d — the exact `derive()` fields the HEADLINE confidence band is built from.
+ *
+ * Structural (not a `Pick<DerivedFinancials>`) so this module keeps its zero-dependency purity;
+ * the full kernel return, and `lifecycle-digest`'s `SnapshotInputs`, are both assignable to it.
+ */
+export interface HeadlineBandKernelInputs {
+  fireWithdrawableCorpus: number;
+  fireNumber: number;
+  effectiveTargetDriftRate: number;
+  monthlyContribution: number;
+  bandContributionSchedule: ContributionSchedule;
+  realBlendedReturn: number;
+  realReturnSchedule: ReturnSchedule;
+  portfolioVolatility: number;
+}
+
+/**
+ * ADR-0006 Phase 1d — the ONE place the headline band's inputs are assembled.
+ *
+ * WHY THIS EXISTS. The same band is run from three places — `useFireDerive.monteCarlo` (the
+ * FireHero band), `lifecycle-digest.computeMonteCarloP50Age` (the "since you were away" MC age),
+ * and `headline-plausibility.spec` (the lock that asserts the band tracks the deterministic
+ * headline). Each assembled its own argument object, and they DRIFTED: the digest was still
+ * handing the band `realTargetDriftRate` — the BASE leg's drift, which ignores the medical
+ * reservation compounding at 9% and every dated goal's due-year cap — while the spec that claims
+ * to "mirror production" was ALSO on the base leg AND omitted the history-fed series production
+ * passes. A lock that does not run production's inputs locks nothing.
+ *
+ * So the inputs are built here, once. `effectiveTargetDriftRate` is the constant real rate that
+ * reproduces the kernel's own component target curve over the horizon the headline was solved at
+ * (`derive.ts`) — the band takes one scalar, and this is the only honest one. Under-stating the
+ * target's drift makes the band optimistic, which is the Tier-0 direction.
+ */
+export function headlineBandInputs(k: HeadlineBandKernelInputs): MonteCarloFireInput {
+  return {
+    currentCorpus: k.fireWithdrawableCorpus,
+    targetCorpus: k.fireNumber,
+    targetGrowthRate: k.effectiveTargetDriftRate,
+    monthlySavings: k.monthlyContribution,
+    monthlySavingsSchedule: k.bandContributionSchedule,
+    meanReturn: k.realBlendedReturn,
+    meanReturnSchedule: k.realReturnSchedule,
+    volatility: k.portfolioVolatility,
+    historicalReturns: INDIA_EQUITY_ANNUAL_RETURNS,
+  };
+}
+
 export interface MonteCarloFireResult {
   /** 10th-percentile years-to-FIRE — the optimistic/fast outcome. */
   p10Years: number;

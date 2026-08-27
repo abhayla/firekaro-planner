@@ -13,7 +13,7 @@ import {
   requiredMonthlyContributionFor,
   type RequiredContributionResult,
 } from "@/lib/required-contribution";
-import { runMonteCarloFire, INDIA_EQUITY_ANNUAL_RETURNS } from "@/lib/monte-carlo";
+import { runMonteCarloFire, headlineBandInputs } from "@/lib/monte-carlo";
 import { isEmergencyFundEligible } from "@/lib/investment-traits";
 import type { ProjectionPoint } from "@/lib/fire-math";
 import { DEFAULT_ASSUMPTIONS } from "@/types/assumptions";
@@ -419,36 +419,13 @@ export function useFireDerive() {
     // REAL return shape + serial structure (mean-reversion) of Indian equity since 1991 —
     // measured tighter-or-equal to IID, not heavier (the lognormal's fat tail was an
     // artifact); surfaced as the "history-informed" disclosure.
-    monteCarlo: computed(() =>
-      runMonteCarloFire({
-        currentCorpus: d.value.fireWithdrawableCorpus,
-        targetCorpus: d.value.fireNumber,
-        // ADR-0006: the band stays CPI-real; the today's-₹ target DRIFTS so it shares the
-        // deterministic headline's frame.
-        //
-        // Phase 1c: at the EFFECTIVE drift, not the basket's excess over CPI. The target is now a
-        // sum of legs with different rates (medical reservation at 9%, each dated goal capped at
-        // its due year), and the band takes one scalar. `effectiveTargetDriftRate` is the constant
-        // real rate that reproduces the component curve over the horizon the headline was actually
-        // solved at — handing the band `realTargetDriftRate` instead left p50 years away from the
-        // deterministic figure it is supposed to bracket (measured: mauryas 3.25 y).
-        targetGrowthRate: d.value.effectiveTargetDriftRate,
-        monthlySavings: d.value.monthlyContribution,
-        // ADR-0006: the REAL (today's-₹) inflow schedule, incl. the step-up and its age-50 taper —
-        // the same frame as `realBlendedReturn`. A flat scalar left the band's p50 behind the
-        // deterministic headline it brackets.
-        //
-        // Phase 1b: and CPI-RE-INDEXED. The nominal kernel steps the contribution once a year, so
-        // every month of that year is worth less than the real amount in today's rupees; handing
-        // the band the un-discounted figure ran it ~0.4 years optimistic against the headline it
-        // brackets (`derive.bandContributionSchedule` owns the factor — never rebuild it here).
-        monthlySavingsSchedule: d.value.bandContributionSchedule,
-        meanReturn: d.value.realBlendedReturn,
-        meanReturnSchedule: d.value.realReturnSchedule,
-        volatility: d.value.portfolioVolatility,
-        historicalReturns: INDIA_EQUITY_ANNUAL_RETURNS,
-      }),
-    ),
+    //
+    // ADR-0006 Phase 1d: the argument object is built by `headlineBandInputs` — the ONE builder
+    // the digest's MC age and the plausibility lock also use. Three hand-assembled copies of the
+    // same call had already drifted apart (the digest was a whole leg behind, the "mirrors
+    // production" spec was mirroring nothing); a shared builder makes that impossible rather than
+    // re-detectable. The rationale for each field lives on the builder.
+    monteCarlo: computed(() => runMonteCarloFire(headlineBandInputs(d.value))),
     annualEpfVpfContribution: computed(() => d.value.annualEpfVpfContribution),
     householdMarginalRate: computed(() => d.value.householdMarginalRate),
     epfAfterTaxReturn: computed(() => d.value.epfAfterTaxReturn),

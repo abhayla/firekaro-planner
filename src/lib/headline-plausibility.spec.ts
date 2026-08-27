@@ -35,7 +35,7 @@ import { calculateYearsToTarget } from "@/lib/fire-math";
 import { computeRunway } from "@/lib/runway";
 import { toMonthly } from "@/lib/cashflow";
 import { buildContributionResolver } from "@/lib/contribution-schedule";
-import { runMonteCarloFire } from "@/lib/monte-carlo";
+import { runMonteCarloFire, headlineBandInputs } from "@/lib/monte-carlo";
 import { captureSnapshot, milestoneBandFor } from "@/lib/lifecycle-digest";
 
 type Loader = (h: ReturnType<typeof useHouseholdStore>, a: ReturnType<typeof useAssumptionsStore>) => void;
@@ -99,23 +99,13 @@ describe("headline plausibility — DEFAULT product lens (#22 foolproof gate)", 
       // The residual gap is just IID-vs-headline discretization noise (the glide-OFF
       // personas show the same ~0.8–1.4y), NOT the glide asymmetry — so the bound is now
       // TIGHT (≤ 2.5y across all personas). It trips RED if the convergence ever regresses.
-      const mc = runMonteCarloFire({
-        currentCorpus: k.fireWithdrawableCorpus,
-        targetCorpus: k.fireNumber,
-        // ADR-0006: the production band also carries the drifting today's-₹ target and the REAL
-        // inflow SCHEDULE (step-up + age-50 taper). Omitting them here stopped this from mirroring
-        // the production call — the p50 ran 2.5y behind a headline it is meant to bracket. Added,
-        // not relaxed; the tight 2.0y bound below is what proves the band still tracks.
-        targetGrowthRate: k.realTargetDriftRate,
-        monthlySavings: k.monthlyContribution,
-        // ADR-0006 Phase 1b: the CPI-RE-INDEXED inflow, exactly as the production band uses
-        // (`useFireDerive`). The un-discounted real schedule credited the household with
-        // purchasing power the nominal kernel never gives, so this mirror had stopped mirroring.
-        monthlySavingsSchedule: k.bandContributionSchedule,
-        meanReturn: k.realBlendedReturn,
-        meanReturnSchedule: k.realReturnSchedule,
-        volatility: k.portfolioVolatility,
-      });
+      // ADR-0006 Phase 1d: this block no longer hand-copies the production call — it BUILDS the
+      // production call, via the same `headlineBandInputs` the FireHero band and the digest use.
+      // Hand-copying is why the mirror had rotted twice: it was passing the base-leg
+      // `realTargetDriftRate` (blind to the 9% medical reservation and the goal due-year caps) and
+      // omitting the history-fed series production passes. A lock that runs different inputs from
+      // production locks nothing, so the fix is structural, not another copied field.
+      const mc = runMonteCarloFire(headlineBandInputs(k));
       expect(mc.p10Years, `${ctx} — MC ordered p10≤p50≤p90`).toBeLessThanOrEqual(mc.p50Years);
       expect(mc.p50Years).toBeLessThanOrEqual(mc.p90Years);
       expect(
@@ -126,18 +116,11 @@ describe("headline plausibility — DEFAULT product lens (#22 foolproof gate)", 
       // #24 directional lock: the taper de-risks, so the tapered p50 is LATER (≥) than the scalar
       // pre-glide p50. Glide-OFF personas are equal (scalar schedule); glide-ON (Iyers) is strictly
       // later — pins the #24 intent without depending on the synthetic monte-carlo.spec inputs.
-      const mcScalar = runMonteCarloFire({
-        currentCorpus: k.fireWithdrawableCorpus,
-        targetCorpus: k.fireNumber,
-        targetGrowthRate: k.realTargetDriftRate,
-        monthlySavings: k.monthlyContribution,
-        // ADR-0006 Phase 1b: the CPI-RE-INDEXED inflow, exactly as the production band uses
-        // (`useFireDerive`). The un-discounted real schedule credited the household with
-        // purchasing power the nominal kernel never gives, so this mirror had stopped mirroring.
-        monthlySavingsSchedule: k.bandContributionSchedule,
-        meanReturn: k.realBlendedReturn,
-        volatility: k.portfolioVolatility,
-      });
+      // The scalar control differs from the production band in EXACTLY ONE field — the glide
+      // taper — because that is the one thing this lock is about. Building it off the same
+      // `headlineBandInputs` is what guarantees that (the old hand-built copy also silently
+      // dropped the history-fed series, so it was comparing two different samplers).
+      const mcScalar = runMonteCarloFire({ ...headlineBandInputs(k), meanReturnSchedule: undefined });
       expect(
         mc.p50Years,
         `${ctx} — tapered p50 ${mc.p50Years.toFixed(1)} ≥ scalar p50 ${mcScalar.p50Years.toFixed(1)} (de-risking)`,

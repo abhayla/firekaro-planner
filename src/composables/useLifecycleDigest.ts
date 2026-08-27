@@ -42,6 +42,10 @@ export function useLifecycleDigest() {
     realBlendedReturn: fire.realBlendedReturn.value,
     realReturnSchedule: fire.realReturnSchedule.value,
     realTargetDriftRate: fire.realTargetDriftRate.value,
+    // ADR-0006 Phase 1d: the WHOLE-target drift, which is what the digest's Monte Carlo band runs
+    // on. Without it the snapshot could only offer the base leg, so the digest's MC FIRE age sat
+    // ahead of the dashboard band's for the same household.
+    effectiveTargetDriftRate: fire.effectiveTargetDriftRate.value,
     householdContributionSchedule: fire.householdContributionSchedule.value,
     bandContributionSchedule: fire.bandContributionSchedule.value,
     portfolioVolatility: fire.portfolioVolatility.value,
