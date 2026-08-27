@@ -42,6 +42,7 @@ export function useLifecycleDigest() {
     savingsRate: fire.savingsRate.value,
     realBlendedReturn: fire.realBlendedReturn.value,
     realReturnSchedule: fire.realReturnSchedule.value,
+    realTargetDriftRate: fire.realTargetDriftRate.value,
     portfolioVolatility: fire.portfolioVolatility.value,
     monthlyContribution: fire.monthlyContribution.value,
   }));

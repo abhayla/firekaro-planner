@@ -377,6 +377,8 @@ export function useFireDerive() {
     blendedReturn: computed(() => d.value.blendedReturn),
     realBlendedReturn: computed(() => d.value.realBlendedReturn),
     realReturnSchedule: computed(() => d.value.realReturnSchedule),
+    // ADR-0006: the REAL drift of the FIRE target ((1+basket)/(1+CPI) − 1).
+    realTargetDriftRate: computed(() => d.value.realTargetDriftRate),
     portfolioVolatility: computed(() => d.value.portfolioVolatility),
     // Canonical per-bucket corpus weights (₹) backing blendedReturn/portfolioVolatility — the basis
     // the obj-2 acceleration composable must use for risk-notch equity headroom + perturbed σ (gh-48).
@@ -396,6 +398,9 @@ export function useFireDerive() {
       runMonteCarloFire({
         currentCorpus: d.value.fireWithdrawableCorpus,
         targetCorpus: d.value.fireNumber,
+        // ADR-0006: the band stays CPI-real; the today's-₹ target DRIFTS at the household
+        // basket's excess over CPI so it shares the deterministic headline's frame.
+        targetGrowthRate: d.value.realTargetDriftRate,
         monthlySavings: d.value.monthlyContribution,
         meanReturn: d.value.realBlendedReturn,
         meanReturnSchedule: d.value.realReturnSchedule,

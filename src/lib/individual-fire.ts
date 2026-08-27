@@ -36,7 +36,11 @@ import { computeTax, recommendRegime, marginalSlabRate, getTaxConfigForFY } from
 import { deriveDeductions } from "@/lib/tax-deductions";
 import { epfBucketAfterTaxReturn } from "@/lib/epf-vpf";
 import { returnBucketKey } from "@/lib/investment-traits";
-import { resolveEffectiveSWRByHorizon, blendPortfolioReturn } from "@/lib/assumption-math";
+import {
+  resolveEffectiveSWRByHorizon,
+  blendPortfolioReturn,
+  resolveHouseholdInflation,
+} from "@/lib/assumption-math";
 import { EXPENSE_OWNER_HOUSEHOLD } from "@/lib/expense-attribution";
 
 export interface IndividualFireResult {
@@ -55,6 +59,8 @@ export interface IndividualFireResult {
   /** The member's OWN real (inflation-adjusted) blended return — the rate their FIRE age was
    *  solved at. Exposed so no consumer grows a member's corpus at the HOUSEHOLD rate (T-377). */
   realReturn: number;
+  /** ADR-0006: the NOMINAL blended return this member's FIRE age was solved at. */
+  nominalReturn: number;
   yearsToIndividualFire: number;
   /** anchorAge + yearsToIndividualFire (Infinity → anchorAge unchanged sentinel handled by caller). */
   individualFireAge: number;
@@ -194,7 +200,13 @@ export function computeIndividualFire(
   });
   const blendedReturn = blendPortfolioReturn(assumptions, returnWeights, epfAfterTaxReturn);
   const generalInflation = assumptions.inflation;
+  // ADR-0006: `realReturn` is still the CPI-deflated return every DISPLAY surface (and the
+  // solver's have-by-target projection) reads, but the individual FIRE age itself is now solved
+  // in the SAME nominal frame as the household path below. If this site kept the old fixed-target
+  // real frame, the same person's household and individual FIRE ages would drift apart — the
+  // cross-screen incoherence class `feedback_cross_screen_figure_coherence` names.
   const realReturn = (1 + blendedReturn) / (1 + generalInflation) - 1;
+  const householdBasket = resolveHouseholdInflation(assumptions);
 
   const effectiveSWR = resolveEffectiveSWRByHorizon(assumptions, targetRetirementAge, planToAge);
   const individualFireNumber = Math.round(
@@ -207,8 +219,20 @@ export function computeIndividualFire(
   // horizon (planToAge) is not really FIRE — surface it as "not within horizon", else the card
   // renders a domain-absurd "age 125+" (a rule-31 headline leak the code-review caught).
   const hasTarget = individualFireNumber > 0;
+  // Nominal frame: target grows at the household expense basket, corpus at the NOMINAL blended
+  // return, the real contribution at general CPI. A non-positive scalar contribution is passed
+  // through unchanged so the `<= 0 → Infinity` sentinel still fires.
+  const nominalContribution =
+    monthlyContribution <= 0
+      ? monthlyContribution
+      : (yearIndex: number) => monthlyContribution * Math.pow(1 + generalInflation, yearIndex);
   const rawYearsToFire = hasTarget
-    ? calculateYearsToTarget(attributableCorpus, individualFireNumber, monthlyContribution, realReturn)
+    ? calculateYearsToTarget(
+        attributableCorpus,
+        (yearIndex: number) => individualFireNumber * Math.pow(1 + householdBasket, yearIndex),
+        nominalContribution,
+        blendedReturn,
+      )
     : Number.POSITIVE_INFINITY;
   const reachable = Number.isFinite(rawYearsToFire) && anchorAge + rawYearsToFire <= planToAge;
   const yearsToIndividualFire = reachable ? rawYearsToFire : Number.POSITIVE_INFINITY;
@@ -227,6 +251,8 @@ export function computeIndividualFire(
     attributableAnnualSavings,
     individualFireNumber,
     realReturn,
+    /** ADR-0006: the NOMINAL blended return this member's FIRE age was solved at. */
+    nominalReturn: blendedReturn,
     yearsToIndividualFire,
     individualFireAge,
   };

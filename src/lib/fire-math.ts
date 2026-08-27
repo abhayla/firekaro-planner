@@ -9,10 +9,12 @@ import { floorCeilingWithdrawal, type FloorCeilingWithdrawalConfig } from "@/lib
 // SWR. Keep this in mind before treating the FIRE number as a strictly pre-tax target.
 export const INDIA_SWR = 0.035;
 export const INDIA_INFLATION = 0.06;
-// NB: the LIVE healthcare-inflation default is 14% (`DEFAULT_ASSUMPTIONS.healthcareInflation`
-// in types/assumptions.ts) — research-grounded for Indian medical inflation. The old 8%
-// `INDIA_HEALTHCARE_INFLATION` constant was stale + dead (no importers) and is removed to
-// avoid a future editor "fixing" the wrong value (FinTech sweep 2026-06-02).
+// NB: the LIVE healthcare-inflation default is 9% (`DEFAULT_ASSUMPTIONS.healthcareInflation`
+// in types/assumptions.ts) — CPI-Health runs ~4-7% and the private-tariff / retiree-mix excess
+// adds ~3-4 pp (ADR-0006). It was 14% until 2026-08-27; that figure is an INSURER CLAIMS-COST
+// TREND (Aon/Marsh), which belongs to the insurance-PREMIUM line (already auto-flowed into
+// expenses), not to a price index. The old 8% `INDIA_HEALTHCARE_INFLATION` constant was stale +
+// dead (no importers) and is removed to avoid a future editor "fixing" the wrong value.
 export const DEFAULT_RETURNS = 0.12;
 
 export const SWR_AGE_TABLE: Array<{ maxAge: number; swr: number }> = [
@@ -84,10 +86,16 @@ export function getHorizonSWR(args: { retirementAge?: number; planToAge?: number
  * 4-bucket household inflation blend (audit Entry #3 A3.1).
  *
  * Indian expenses do not inflate at a single rate. The household blend weights
- * four buckets (research Ch 02 §2.2):
- *   general 60% · healthcare 20% · education 10% · housing 10%
- * With research-default rates (6/14/9/6%) the blend ≈ 7.9% — materially higher
- * than the v4 single 6%, which under-projected required corpus.
+ * four buckets. The weights MUST be DISJOINT shares of an urban household's budget
+ * (ADR-0006 / FinTech CRITICAL-1): `general` is the ALL-ITEMS CPI, which already contains
+ * health, education and housing, so the pre-ADR-0006 60/20/10/10 split double-counted those
+ * three by construction and inflated the blend to 7.90%.
+ *
+ * Live grounding (ADR-0006, 2026-08-27): general 74% · healthcare 8% · education 0% · housing 18%
+ * with rates 6 / 9 / 9 / 6% ⇒ blend ≈ 6.24%. Education carries weight 0 in the PERPETUAL
+ * retirement basket because education spending ENDS — it is already funded as finite lump-sum
+ * goals through the family layer (`calculateFamilyLayerCorpus` + `adequacy.ts`, which still
+ * inflates them at `educationInflation`). Keeping it here too was a double-count.
  */
 export interface InflationBuckets {
   general: number;
@@ -102,10 +110,10 @@ export interface InflationWeights {
   housing: number;
 }
 export const DEFAULT_INFLATION_WEIGHTS: InflationWeights = {
-  general: 0.6,
-  healthcare: 0.2,
-  education: 0.1,
-  housing: 0.1,
+  general: 0.74,
+  healthcare: 0.08,
+  education: 0,
+  housing: 0.18,
 };
 
 export function blendedInflation(
@@ -208,13 +216,32 @@ export function calculateFIREVariants(
   };
 }
 
+/**
+ * A per-year TARGET schedule (ADR-0006). Mirrors {@link ReturnSchedule}/{@link ContributionSchedule}:
+ * either one constant target for the whole horizon (the pre-ADR-0006 today's-rupee scalar — kept
+ * working for every legacy caller), or a function of the year index returning that year's target.
+ *
+ * ADR-0006 runs the headline in ONE nominal frame: the target grows at the household expense
+ * basket `b` while the corpus compounds at the NOMINAL return, so this schedule carries the
+ * inflating target. A constant scalar is byte-identical to the prior fixed-target loop.
+ */
+export type TargetSchedule = number | ((yearIndex: number) => number);
+
+function resolveTarget(schedule: TargetSchedule, yearIndex: number): number {
+  const t = typeof schedule === "function" ? schedule(yearIndex) : schedule;
+  // Defensive (defensive-coding.md): a non-finite target would either return 0 years
+  // ("already at FIRE") or loop to the cap — both are user-visible lies. Fall back to
+  // +Infinity for that year, which the caller's 1200-month cap turns into "unreachable".
+  return Number.isFinite(t) ? t : Number.POSITIVE_INFINITY;
+}
+
 export function calculateYearsToTarget(
   currentCorpus: number,
-  targetCorpus: number,
+  targetCorpus: TargetSchedule,
   monthlySavings: ContributionSchedule,
   expectedReturns: ReturnSchedule = DEFAULT_RETURNS,
 ): number {
-  if (currentCorpus >= targetCorpus) return 0;
+  if (currentCorpus >= resolveTarget(targetCorpus, 0)) return 0;
   // Preserve the prior scalar guard EXACTLY: a constant non-positive contribution can never
   // reach the target (keeps the constant path byte-identical, incl. the Infinity sentinel the
   // empty-state headline relies on). A function schedule is not eagerly rejected — it may start
@@ -222,11 +249,15 @@ export function calculateYearsToTarget(
   if (typeof monthlySavings === "number" && monthlySavings <= 0) return Infinity;
   let months = 0;
   let corpus = currentCorpus;
-  while (corpus < targetCorpus && months < 1200) {
+  while (months < 1200) {
     // M1 (#9): resolve the return for the current year so a glide-path schedule
     // de-risks the headline "years to FIRE" the same way it de-risks the
     // projection. A constant rate is byte-identical to the prior flat loop.
     const yearIndex = Math.floor(months / 12);
+    // ADR-0006: the target is resolved for THIS year — a nominal target inflating at the
+    // household basket. A scalar resolves to the same value every year ⇒ byte-identical to
+    // the prior `while (corpus < targetCorpus)` loop.
+    if (corpus >= resolveTarget(targetCorpus, yearIndex)) break;
     const r = resolveReturn(expectedReturns, yearIndex) / 12;
     // #46: resolve the contribution for the current year (constant ⇒ identical to the prior
     // `+ monthlySavings`; a step-up/stop schedule varies it year-by-year, same year-index origin
@@ -246,6 +277,12 @@ export function calculateSavingsRate(monthlyIncome: number, monthlySavings: numb
 /**
  * Multi-year corpus projection. Returns one data point per year (start of year).
  * Inflation grows annual expenses; returns grow corpus; contributions add monthly.
+ *
+ * ADR-0006 FRAME: this projection is NOMINAL and is the shape the whole kernel now runs in.
+ * `inflation` is the household EXPENSE BASKET (`resolveHouseholdInflation`), not general CPI —
+ * it grows the expense/target line only. `expectedReturns` are NOMINAL and `monthlyContribution`
+ * is a NOMINAL schedule (real amount x (1+CPI)^y). Display deflation at general CPI happens
+ * downstream in `useFireDerive.deflateProjectionPoints`, never here.
  */
 export interface ProjectionPoint {
   year: number;
@@ -323,6 +360,18 @@ export function projectCorpus(args: {
   swr: number;
   horizonYears: number;
   decumulation?: DecumulationOverlay;
+  /**
+   * ADR-0006 two-frame coherence. The REGULAR target the headline solves against is
+   * `derive()`'s `fireNumber` = base + family layer (#165) + healthcare reservation — NOT
+   * `annualExpensesToday / swr`. Before ADR-0006 this projection built its regular target from
+   * expenses alone, so the chart crossover sat 4–8 years EARLIER than the headline on every seed
+   * persona (measured: Sharmas 52 vs 56, Mehtas 45 vs 51, Iyers 52 vs 57, Mauryas 60 vs 68) —
+   * an optimistic divergence in the one place `#20` claimed the two frames agreed. Passing the
+   * headline target here makes them agree by construction (locked by
+   * `inflation-frame-invariant.spec.ts` assertion 3). Omitted ⇒ the legacy expenses-only basis.
+   * Lean/Fat keep the variant-multiplier basis they already share with the headline.
+   */
+  regularTargetToday?: number;
 }): ProjectionPoint[] {
   const {
     currentCorpus,
@@ -334,6 +383,7 @@ export function projectCorpus(args: {
     swr,
     horizonYears,
     decumulation,
+    regularTargetToday,
   } = args;
 
   const points: ProjectionPoint[] = [];
@@ -346,15 +396,22 @@ export function projectCorpus(args: {
     // M1 (#9): this year's expected return — a per-year value when a glide-path
     // schedule is supplied, else the constant blended return (byte-identical).
     const er = resolveReturn(expectedReturns, y);
-    const inflated = annualExpensesToday * Math.pow(1 + inflation, y);
+    const inflationFactor = Math.pow(1 + inflation, y);
+    const inflated = annualExpensesToday * inflationFactor;
     const target = inflated / Math.max(swr, 0.001);
+    // ADR-0006: the regular target is the headline FIRE number when supplied, inflated at the
+    // SAME rate as the expense line (both are the household's spending basket).
+    const regularTarget =
+      regularTargetToday != null && Number.isFinite(regularTargetToday)
+        ? regularTargetToday * inflationFactor
+        : target;
     const inDecumulation = !!decumulation && age >= decumulation.retirementAge;
     points.push({
       year: new Date().getFullYear() + y,
       ageYears: age,
       corpus: Math.max(0, Math.round(corpus)),
       inflatedAnnualExpenses: Math.round(inflated),
-      targetForRegular: Math.round(target),
+      targetForRegular: Math.round(regularTarget),
       targetForLean: Math.round(target * 0.6),
       targetForFat: Math.round(target * 1.5),
       ...(inDecumulation ? { withdrawal: Math.round(prevWithdrawal) } : {}),

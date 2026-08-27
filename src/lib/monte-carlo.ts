@@ -57,6 +57,15 @@
  *      frame. For FIRE, pass a REAL return (≈ nominal − inflation) with today's
  *      (un-inflated) target, OR inflate the target each year. Passing a NOMINAL
  *      return against a non-inflating target reaches too fast = optimistic (H3).
+ *      ADR-0006 CHOICE: the band stays in the CPI-REAL frame (real return + today's-₹
+ *      target) and satisfies the precondition via `targetGrowthRate` — the REAL drift
+ *      `g = (1+basket)/(1+CPI) − 1` at which the today's-₹ target rises, because the
+ *      household's spending basket outruns general CPI. The alternative (moving the band to
+ *      the nominal frame like the deterministic headline) was rejected: the volatility, the
+ *      historical bootstrap series and every consumer of `realBlendedReturn` are REAL-frame,
+ *      so nominalising here would have meant re-grounding σ and the return history too — a
+ *      much larger, un-validated change for an algebraically identical result. Divide the
+ *      nominal crossing condition through by (1+CPI)^t and you get exactly this model.
  *   3. GLIDE PATH: the per-year MEAN now tapers via the optional `meanReturnSchedule`
  *      (#24 Part 1 — p50 converges to the glide-tapered headline). The VOLATILITY is
  *      still a single scalar (a per-year vol taper needs a per-year ALLOCATION schedule
@@ -64,7 +73,7 @@
  *   4. Headline MUST use a conservative percentile + honest disclosure, never p50
  *      alone, and surface P(never reach FIRE).
  */
-import { calculateYearsToTarget, type ReturnSchedule } from "./fire-math";
+import { calculateYearsToTarget, type ReturnSchedule, type TargetSchedule } from "./fire-math";
 
 /** calculateYearsToTarget caps the horizon at 1200 months (100 yrs). Exported so
  *  UI can treat any percentile >= this as "off the chart" and never render the
@@ -165,6 +174,13 @@ const RETURN_FLOOR = -0.95;
 export interface MonteCarloFireInput {
   currentCorpus: number;
   targetCorpus: number;
+  /**
+   * ADR-0006. Annual REAL growth of `targetCorpus`, i.e. how fast the FIRE number rises in
+   * TODAY's rupees because the household's expense basket outruns general CPI
+   * (`derive().realTargetDriftRate`). Omitted or 0 ⇒ a fixed target, byte-identical to the
+   * pre-ADR-0006 path. MUST be a REAL rate — it shares the frame of `meanReturn`.
+   */
+  targetGrowthRate?: number;
   monthlySavings: number;
   /** Expected annual return. MUST share an inflation frame with targetCorpus (see header).
    *  Used as the per-year MEAN when `meanReturnSchedule` is absent (the v1 scalar path). */
@@ -350,6 +366,14 @@ export function runMonteCarloFire(input: MonteCarloFireInput): MonteCarloFireRes
   // standardized series is precomputed ONCE; each path draws fresh circular blocks. The
   // IID lognormal path is the fallback (and the byte-identical backward-compat path when
   // no series is passed — its rng draw sequence is untouched).
+  // ADR-0006: the today's-₹ target rises at the REAL basket drift. A 0/absent rate resolves to
+  // the constant scalar ⇒ byte-identical to the pre-ADR-0006 fixed-target path.
+  const targetDrift = Number.isFinite(input.targetGrowthRate) ? (input.targetGrowthRate as number) : 0;
+  const targetSchedule: TargetSchedule =
+    targetDrift === 0
+      ? input.targetCorpus
+      : (yearIndex: number) => input.targetCorpus * Math.pow(1 + targetDrift, yearIndex);
+
   const useBootstrap = !!input.historicalReturns && input.historicalReturns.length > 0 && input.volatility > 0;
   const stdSeries = useBootstrap ? standardizeSeries(input.historicalReturns!) : null;
   const blockLen = Math.max(1, Math.floor(input.blockYears ?? BOOTSTRAP_BLOCK_YEARS));
@@ -373,7 +397,12 @@ export function runMonteCarloFire(input: MonteCarloFireInput): MonteCarloFireRes
     }
     const schedule = (yearIndex: number): number => yearly[Math.min(yearIndex, MAX_PROJECTION_YEARS - 1)];
 
-    const raw = calculateYearsToTarget(input.currentCorpus, input.targetCorpus, input.monthlySavings, schedule);
+    const raw = calculateYearsToTarget(
+      input.currentCorpus,
+      targetSchedule,
+      input.monthlySavings,
+      schedule,
+    );
     // Reached only if finite AND inside the cap; raw === 100 means the loop hit the
     // month-cap without reaching ⇒ never-reached, must sort to the worst end (M2).
     const reached = Number.isFinite(raw) && raw < MAX_PROJECTION_YEARS;
