@@ -76,8 +76,14 @@ export function useAcceleration() {
     // at the household expense basket, savings growing at general CPI on top of the real step-up
     // (which tapers to 0 at 50). The old CPI-real scalar left the card ~1-3 years OPTIMISTIC
     // against the headline printed beside it.
+    //
+    // Phase 1c: the target no longer grows at ONE rate — the medical reservation rides healthcare
+    // inflation and each dated goal stops on its due year — but `FireBaseline` takes a scalar, so
+    // it gets `effectiveTargetGrowthNominal`: the constant nominal rate that reproduces the
+    // kernel's component curve over the horizon the headline was actually SOLVED at. Handing it
+    // the raw household basket put the card's baseline a full year off the headline beside it.
     expectedReturn: fire.blendedReturn.value,
-    targetGrowthRate: fire.householdInflation.value,
+    targetGrowthRate: fire.effectiveTargetGrowthNominal.value,
     savingsInflationRate: a.values.inflation,
     savingsStepUpPercent: a.values.householdSavingsStepUpPercent ?? 0,
     savingsStepUpTaperYears: Math.max(0, STEP_UP_TAPER_AGE - fire.anchorAge.value),

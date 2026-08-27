@@ -127,33 +127,44 @@ describe("#139 useFireDerive.deflateProjection — Sharmas seed (end-to-end hone
     expect(crossYear!).toBeLessThanOrEqual(headlineYear);
   });
 
-  it("in today's ₹ the Regular target rises at EXACTLY the basket drift g (origin-alignment guard)", () => {
-    // RE-BASELINED (ADR-0006). This asserted the deflated target was a CONSTANT line, which was
-    // true only while the kernel inflated the target at general CPI — the same rate this view
-    // deflates by. It no longer is, and that is the whole point of gh #167: the target grows at
-    // the household BASKET, so in today's rupees it RISES at g = (1+basket)/(1+CPI) − 1. A flat
-    // line here would now mean the optimistic collapse had come back.
+  it("in today's ₹ the Regular target rises at EXACTLY the kernel's own target curve (origin-alignment guard)", () => {
+    // RE-BASELINED TWICE, and the reason matters both times.
     //
-    // The ORIGIN-ALIGNMENT guard the test exists for is preserved and is actually sharper: the
-    // deflated ratio must equal (1+g)^i for EVERY point. If anyone shifts the projection start
-    // year, the deflation exponent desyncs from the inflation exponent and the measured ratio
-    // stops matching (1+g)^i immediately.
+    // Originally this asserted the deflated target was a CONSTANT line, which was true only while
+    // the kernel inflated the target at general CPI — the same rate this view deflates by. ADR-0006
+    // ended that: the target grows at the household BASKET, so in today's rupees it RISES.
+    //
+    // ADR-0006 Phase 1c ends the SECOND simplification. The target is not one rate at all: the
+    // medical reservation drifts at healthcare inflation and every dated goal stops inflating on
+    // its due year, so `(1+g)^i` is now the wrong curve (g is only the BASE leg's drift) and the
+    // Sharmas' line sits ~0.8% above it by year 1. Asserting `(1+g)^i` here could only be made to
+    // pass by collapsing the target back onto one rate — the assertion would be enforcing the bug.
+    //
+    // The ORIGIN-ALIGNMENT guard the test exists for is preserved and is SHARPER than either
+    // version: the deflated point must equal the kernel's own today's-₹ target at that year,
+    // point for point. Shift the projection start year and the deflation exponent desyncs from
+    // the inflation exponent, and the measured value stops matching immediately.
     loadSeedPersona(useHouseholdStore(), useAssumptionsStore());
     const d = useFireDerive();
     const real = d.deflateProjection(true);
     expect(real.length).toBeGreaterThan(3);
+    const targetRealAt = d.regularTargetComponentsRealAt.value;
     const base = real[0].targetForRegular;
     expect(base).toBeGreaterThan(0);
-    const g = d.realTargetDriftRate.value;
-    expect(g, "the basket must genuinely outrun CPI on the default assumptions").toBeGreaterThan(0);
+    expect(base, "point 0 must be the headline number itself").toBeCloseTo(targetRealAt(0).total, -1);
     real.forEach((p, i) => {
-      const expected = base * Math.pow(1 + g, i);
+      const expected = targetRealAt(i).total;
       // Relative tolerance absorbs the kernel's per-point Math.round on a ₹10^8-scale figure.
       expect(
         Math.abs(p.targetForRegular - expected) / expected,
-        `point ${i} (year ${p.year}) must sit on the (1+g)^i curve, got ${p.targetForRegular} vs ${Math.round(expected)}`,
+        `point ${i} (year ${p.year}) must sit on the kernel's target curve, got ${p.targetForRegular} vs ${Math.round(expected)}`,
       ).toBeLessThan(1e-6);
     });
+    // …and it must genuinely RISE — a flat line would mean the optimistic collapse came back.
+    expect(
+      real[real.length - 1].targetForRegular,
+      "the today's-₹ target must still rise across the horizon",
+    ).toBeGreaterThan(base);
   });
 
   it("deflates a far-future corpus to a sane, strictly-smaller today's-₹ value (plausibility)", () => {

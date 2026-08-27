@@ -4,9 +4,9 @@ exports[`A7.2 golden-master — per-persona headline (DEFAULT lens) > iyers: der
 {
   "anchorAge": 38,
   "annualSavings": 1475608,
-  "corpusOnlyYearsToRegular": 18.8333,
+  "corpusOnlyYearsToRegular": 19.8333,
   "effectiveSWR": 0.035,
-  "fireAge": 56.83,
+  "fireAge": 57.83,
   "fireNumber": 80319726,
   "fireWithdrawableCorpus": 17080000,
   "lensedEarners": 2,
@@ -17,7 +17,7 @@ exports[`A7.2 golden-master — per-persona headline (DEFAULT lens) > iyers: der
   "totalCorpus": 17400000,
   "yearsToFat": 19.5833,
   "yearsToLean": 6.25,
-  "yearsToRegular": 18.8333,
+  "yearsToRegular": 19.8333,
 }
 `;
 
@@ -25,9 +25,9 @@ exports[`A7.2 golden-master — per-persona headline (DEFAULT lens) > mauryas: d
 {
   "anchorAge": 44,
   "annualSavings": 1510982,
-  "corpusOnlyYearsToRegular": 24.3333,
+  "corpusOnlyYearsToRegular": 24.9167,
   "effectiveSWR": 0.0325,
-  "fireAge": 68.33,
+  "fireAge": 68.92,
   "fireNumber": 113310486,
   "fireWithdrawableCorpus": 35520000,
   "lensedEarners": 1,
@@ -38,7 +38,7 @@ exports[`A7.2 golden-master — per-persona headline (DEFAULT lens) > mauryas: d
   "totalCorpus": 36000000,
   "yearsToFat": 24.25,
   "yearsToLean": 4.0833,
-  "yearsToRegular": 24.3333,
+  "yearsToRegular": 24.9167,
 }
 `;
 
@@ -46,9 +46,9 @@ exports[`A7.2 golden-master — per-persona headline (DEFAULT lens) > mehtas: de
 {
   "anchorAge": 45,
   "annualSavings": 2765864,
-  "corpusOnlyYearsToRegular": 5.5833,
+  "corpusOnlyYearsToRegular": 6,
   "effectiveSWR": 0.0325,
-  "fireAge": 50.58,
+  "fireAge": 51,
   "fireNumber": 102333391,
   "fireWithdrawableCorpus": 79880000,
   "lensedEarners": 2,
@@ -59,7 +59,7 @@ exports[`A7.2 golden-master — per-persona headline (DEFAULT lens) > mehtas: de
   "totalCorpus": 80600000,
   "yearsToFat": 8.9167,
   "yearsToLean": 0,
-  "yearsToRegular": 5.5833,
+  "yearsToRegular": 6,
 }
 `;
 
@@ -67,9 +67,9 @@ exports[`A7.2 golden-master — per-persona headline (DEFAULT lens) > sharmas: d
 {
   "anchorAge": 30,
   "annualSavings": 1927164,
-  "corpusOnlyYearsToRegular": 24.4167,
+  "corpusOnlyYearsToRegular": 25.4167,
   "effectiveSWR": 0.0325,
-  "fireAge": 54.42,
+  "fireAge": 55.42,
   "fireNumber": 105982068,
   "fireWithdrawableCorpus": 11000000,
   "lensedEarners": 2,
@@ -80,6 +80,6 @@ exports[`A7.2 golden-master — per-persona headline (DEFAULT lens) > sharmas: d
   "totalCorpus": 11000000,
   "yearsToFat": 22.6667,
   "yearsToLean": 9.9167,
-  "yearsToRegular": 24.4167,
+  "yearsToRegular": 25.4167,
 }
 `;

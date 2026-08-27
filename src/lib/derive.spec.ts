@@ -927,7 +927,16 @@ describe("seed-anchor regression locks (gh-issue #17 — catch silent adequacy-l
     //              basket cut the drift from 1.79%/yr to 0.23%/yr
     // The frame leg ALONE (old inputs, new kernel) moves this persona to 36.67y / age 67 — locked
     // separately in `inflation-frame-invariant.spec.ts` assertion 4.
-    expect(k.yearsToRegular).toBeCloseTo(24.42, 2);
+    //
+    // RE-ANCHORED AGAIN 2026-08-27 (ADR-0006 Phase 1c): 24.42y → 25.42y, FIRE age 30 + 25.42 =
+    // 55.42. `fireNumber` is AGAIN unchanged at ₹10.60 Cr — the target's size never moves, only
+    // its trajectory. The +1.00y is the healthcare corpus reservation: it is 20% of the base and
+    // now drifts at `healthcareInflation` (9%) rather than the household basket (6.24%), because
+    // it buffers medical SHOCKS priced at medical inflation while the basket's healthcare bucket
+    // covers recurring healthcare spend inside the base. Over 25 years that leg roughly doubles
+    // relative to the basket path, and the honest FIRE date moves LATER by a year. The Sharmas'
+    // dated goals are small, so decision (b)'s goal cap (which pushes earlier) barely registers.
+    expect(k.yearsToRegular).toBeCloseTo(25.42, 2);
     expect(Math.round(k.fireNumber)).toBe(105_982_068);
   });
 });

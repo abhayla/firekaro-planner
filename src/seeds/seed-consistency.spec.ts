@@ -48,14 +48,23 @@ const PERSONAS: Array<{
   // ADR-0006: 5.4 → 5.7. The frame change (drifting target, true monthly compounding, continuous
   // target resolution) pushes this out ~0.25y net of the new 2% step-up. Still the fastest persona
   // and still comfortably inside "compelling".
-  { name: "mehtas", load: (h, a) => loadMehtasSeed(h, a), savingsRate: [40, 60], maxYearsToFire: 5.7 },
+  // ADR-0006 Phase 1c: 5.7 → 6.1 (measured 6.00). The healthcare corpus reservation now drifts at
+  // healthcare inflation (9%) rather than the household basket (6.24%), so the target this persona
+  // is racing rises faster. Over a horizon this short the effect is small (+0.3y); the band is
+  // re-tightened just above the new value, not widened to hide it.
+  { name: "mehtas", load: (h, a) => loadMehtasSeed(h, a), savingsRate: [40, 60], maxYearsToFire: 6.1 },
   { name: "iyers", load: (h, a) => loadIyersSeed(h, a), savingsRate: [40, 50], maxYearsToFire: 20 }, // ~19y, ≈2y past retire-goal 55
   // Single-income (₹42L CTC) + homemaker spouse + big education goals → honestly
   // behind the age-50 aspiration: ~23y to FIRE (age ~67), ~38% pre-EMI savings rate.
   // ADR-0006: 24 → 24.5 (age ~68). Same net effect as the Mehtas note above. NOT widened to
   // accommodate a breach of the #22 fireAge ≤ 70 gate — that gate still passes with ~2y of margin;
   // this is the seed's own "compelling accumulator" band, tightened back around the new value.
-  { name: "mauryas", load: (h, a) => loadMauryasSeed(h, a), savingsRate: [34, 42], maxYearsToFire: 24.5 },
+  // ADR-0006 Phase 1c: 24.5 → 25.0 (measured 24.92, FIRE age ~68.9 on the default lens). Same
+  // cause as the Mehtas note: the medical reservation on a 25-year horizon at 9% instead of
+  // 6.24%. This persona has the largest education goals, so decision (b)'s goal cap claws some
+  // of it back — the net is +0.4y, not the +2y the reservation leg alone would imply. The #22
+  // fireAge ≤ 70 gate still passes with ~1.1y of margin.
+  { name: "mauryas", load: (h, a) => loadMauryasSeed(h, a), savingsRate: [34, 42], maxYearsToFire: 25.0 },
 ];
 
 const WHOLE_HOUSEHOLD = { isFamilyView: true, viewingMemberId: null, currentFY: "2025-26" };

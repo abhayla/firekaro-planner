@@ -50,9 +50,13 @@ export interface FireBaseline {
   /** Expected REAL return (matches the headline's CPI-real frame). */
   expectedReturn: number;
   /**
-   * ADR-0006. The REAL annual drift of `targetCorpus` — the FIRE number rises in TODAY's rupees
-   * because the household's expense basket outruns general CPI (`derive().realTargetDriftRate`).
-   * Absent/0 ⇒ a fixed target, i.e. the pre-ADR-0006 model. This engine stays in the CPI-REAL
+   * ADR-0006. The annual drift of `targetCorpus` — the FIRE number rises in TODAY's rupees
+   * because the household's expense basket outruns general CPI, the medical reservation outruns
+   * both, and dated goals stop on their due years. That is a CURVE, and this engine takes one
+   * SCALAR, so callers pass `derive().effectiveTargetDriftRate` (or its nominal twin) — the
+   * constant rate that reproduces the kernel's component curve over the SOLVED horizon. Passing
+   * `realTargetDriftRate` instead describes only the base leg and puts the baseline off the
+   * headline. Absent/0 ⇒ a fixed target, i.e. the pre-ADR-0006 model. This engine stays in the CPI-REAL
    * frame (a real `expectedReturn` against a today's-₹ target); dividing the kernel's nominal
    * crossing condition through by (1+CPI)^t gives exactly this. Omitting it made every lever's
    * baseline 1–3 years more OPTIMISTIC than the headline it sits next to.
