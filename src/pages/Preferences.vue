@@ -30,6 +30,7 @@ import { useDismissedNudges } from "@/composables/useDismissedNudges";
 import { useCommsConsent } from "@/composables/useCommsConsent";
 import { useFireDerive } from "@/lib/useFireDerive";
 import { DEFAULT_ASSUMPTIONS } from "@/types/assumptions";
+import { basketSanity, BASKET_SANITY_MAX_EXCESS_BP } from "@/lib/assumption-math";
 
 interface PrefSection {
   id: string;
@@ -99,6 +100,12 @@ const fire = useFireDerive();
 // FIRE target grows at; general CPI (`v.inflation`) is only the display deflator. The two are
 // deliberately shown as different numbers here — collapsing them is gh #167.
 const blendedInflationPct = computed(() => (assumptions.householdInflation() * 100).toFixed(2));
+// ADR-0006 Phase 1b (LOW-10) — the basket is now a HEADLINE-MOVING knob, and two settings are
+// incoherent rather than merely aggressive: below general CPI (the FIRE target would FALL in
+// today's rupees — the optimistic direction) and more than 300 bp above it (the target more than
+// doubles in real terms over a 25-year horizon — the "FIRE at 115" regime #20 panicked over).
+// The predicate is pure and lives in `assumption-math.ts`; nothing is clamped, it is disclosed.
+const basket = computed(() => basketSanity(assumptions.values));
 const generalInflationPct = computed(() => (v.value.inflation * 100).toFixed(2));
 
 // A3.2 — editable 4-bucket inflation WEIGHTS (default 60/20/10/10). Stored as
@@ -483,6 +490,29 @@ const featuresBySection = computed(() => {
             General CPI ({{ generalInflationPct }}%) is a different number: it is only what we deflate
             by to show you figures in today's rupees. Because your basket runs a little above it, the
             target creeps up even in today's money.
+          </v-alert>
+          <v-alert
+            v-if="!basket.ok"
+            type="warning"
+            variant="tonal"
+            density="compact"
+            class="mt-2"
+            data-testid="pref-basket-sanity-warning"
+          >
+            <template v-if="basket.verdict === 'below-cpi'">
+              Your basket is <strong>{{ Math.abs(basket.excessBasisPoints) }} bp BELOW</strong>
+              general CPI, which means your FIRE target would shrink every year in today's money.
+              General CPI is the all-items index and the other three buckets are parts of it, so a
+              household basket can sit level with it or a little above — not below. Planning on
+              this makes your number look smaller than it is.
+            </template>
+            <template v-else>
+              Your basket is <strong>{{ basket.excessBasisPoints }} bp above</strong> general CPI
+              — beyond the {{ BASKET_SANITY_MAX_EXCESS_BP }} bp we consider usable. At that excess
+              your FIRE target more than doubles in today's money over a 25-year horizon, which is
+              the regime the old 7.9% basket produced before it was re-grounded. Check the bucket
+              rates and the weights above.
+            </template>
           </v-alert>
         </section>
 

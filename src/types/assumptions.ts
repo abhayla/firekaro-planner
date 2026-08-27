@@ -117,7 +117,9 @@ export type Assumptions = z.infer<typeof assumptionsSchema>;
 // already funded as finite lump-sum goals via the family layer (fire-math.calculateFamilyLayerCorpus
 // + adequacy.ts), which STILL inflates them at `educationInflation` (9%, unchanged). Carrying it in
 // the perpetual basket as well was a straight double-count (ADR-0006 open question 2).
-// (Ch 02 §2.2) → household blend ≈ 7.9% at 60/20/10/10 weights.
+// (Ch 02 §2.2) → household blend ≈ 6.24% at the ADR-0006 74/8/0/18 weights. (It was 7.9% at the
+// retired, NON-DISJOINT 60/20/10/10 weights with a 14% healthcare rate — that figure is history,
+// not a target, and must not be quoted as the live basket anywhere.)
 // Returns: equity 12% · gold 7% · real estate 6% (audit Entry #4 A4.1).
 export const DEFAULT_ASSUMPTIONS: Assumptions = {
   inflation: 0.06,

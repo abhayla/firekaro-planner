@@ -31,11 +31,16 @@ import { DEFAULT_ASSUMPTIONS } from "@/types/assumptions";
  * where `yearIndex = point.year − year0` and `year0` = the projection's first year (the
  * SAME origin the kernel uses).
  *
- * Deflator MUST be GENERAL CPI (`assumptions.inflation` ≈6%), NEVER the 4-bucket
- * `householdInflation` (~7.9%) — re-using the healthcare-weighted basket here re-creates
- * the #20 "FIRE-at-115" bug (FinTech-validated 2026-06-03). Because the kernel already
- * inflated the targets at the same general CPI, dividing both corpus and targets by one
- * shared factor PRESERVES the crossover year — a real-terms view never moves the FIRE date.
+ * Deflator MUST be GENERAL CPI (`assumptions.inflation` = 6%), NEVER the 4-bucket
+ * `householdInflation` (≈6.24% since ADR-0006; it was 7.90% under the non-disjoint 60/20/10/10
+ * weights and a 14% healthcare rate) — re-using the household EXPENSE basket as a RETURN deflator
+ * is the #20 "FIRE-at-115" bug (FinTech-validated 2026-06-03), and re-grounding the basket makes
+ * it smaller, not correct.
+ *
+ * ADR-0006: the kernel now grows the target at the BASKET while this deflates at CPI, so the
+ * deflated target line SLOPES UP at `g = (1+b)/(1+CPI) − 1` instead of being flat. The crossover
+ * year is still preserved — corpus and targets are divided by the same factor — but "the real
+ * target is a flat line" is no longer true and must not be re-asserted anywhere.
  */
 export function deflateProjectionPoints(
   points: ProjectionPoint[],

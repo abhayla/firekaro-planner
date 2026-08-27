@@ -142,7 +142,14 @@ export function buildAccelerationLevers(ctx: AccelerationContext): Lever[] {
       key: "nps-80ccd1b",
       label: "Fill your 80CCD(1B) NPS headroom",
       note: `Invest ${formatINRCompact(npsHeadroom)}/yr in NPS under 80CCD(1B) → save ${formatINRCompact(annualTaxSaved)}/yr tax, redirected to investing`,
-      apply: (b) => ({ ...b, monthlySavings: b.monthlySavings + monthlyTaxSaved }),
+      // ADR-0006 Phase 1b: the tax saving is a FLAT extra inflow, not part of the savings
+      // residual — a fixed statutory headroom times a slab rate does not grow with the
+      // household's real wage curve. Adding it to `monthlySavings` handed it the 2% real
+      // step-up and compounded a constant into a rising series, over-stating the lever.
+      apply: (b) => ({
+        ...b,
+        flatExtraMonthlySavings: (b.flatExtraMonthlySavings ?? 0) + monthlyTaxSaved,
+      }),
     });
   }
 

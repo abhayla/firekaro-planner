@@ -7,8 +7,10 @@
  *  - Deflating BOTH corpus and the FIRE targets by the SAME `(1+inflation)^yearIndex`
  *    PRESERVES the crossover year — a real-terms view must never move the FIRE date
  *    (the #47 chart-vs-headline divergence class).
- *  - The deflator is GENERAL CPI (`assumptions.inflation` ≈6%), never the 4-bucket
- *    `householdInflation` (~7.9%) — re-using that basket is the #20 "FIRE-at-115" bug.
+ *  - The deflator is GENERAL CPI (`assumptions.inflation` = 6%), never the 4-bucket
+ *    `householdInflation` (≈6.24% since ADR-0006, 7.90% before it) — re-using the EXPENSE basket
+ *    as a RETURN deflator is the #20 "FIRE-at-115" bug. Since ADR-0006 the deflated Regular target
+ *    RISES at `g`; it is not the flat line this file once asserted.
  *  - Plausibility: a far-future nominal corpus deflates to a sane, strictly-smaller
  *    today's-₹ figure (the whole point — ₹7Cr in 2045 ≈ ₹2.8Cr today, not absurd).
  */

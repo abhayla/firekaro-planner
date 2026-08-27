@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { resolveBaselineSchedules } from "@/lib/lever-impact";
 import {
   buildAccelerationLevers,
   makeSaveMoreLever,
@@ -109,11 +110,26 @@ describe("80CCD(1B) NPS headroom lever — tax-saved-only model (double-count gu
     const headroom = LIMIT_80CCD_1B - CTX.currentNps80ccd1bUsed; // 30k
     const annualTaxSaved = headroom * CTX.marginalTaxRate; // 9k
     const perturbed = lever.apply(BASE);
-    // savings rises by tax-saved/12 — the surplus (₹50k) is ALREADY invested per derive (D-11),
+    // The inflow rises by tax-saved/12 — the surplus (₹50k) is ALREADY invested per derive (D-11),
     // so adding it again would double-count. Only the freed TAX is genuinely new cashflow.
-    expect(perturbed.monthlySavings).toBeCloseTo(BASE.monthlySavings + annualTaxSaved / 12, 6);
-    // explicit anti-double-count assertion: savings did NOT jump by the full headroom/12
-    expect(perturbed.monthlySavings).toBeLessThan(BASE.monthlySavings + headroom / 12);
+    //
+    // ADR-0006 Phase 1b: it lands on `flatExtraMonthlySavings`, NOT `monthlySavings`. A fixed
+    // statutory headroom times a slab rate does not grow with the household's real wage curve, so
+    // it must not inherit the savings step-up — it did, and the step-up compounded a constant into
+    // a rising series, over-stating this lever against every other one in the ranking.
+    expect(perturbed.monthlySavings, "the residual itself is untouched").toBe(BASE.monthlySavings);
+    expect(perturbed.flatExtraMonthlySavings).toBeCloseTo(annualTaxSaved / 12, 6);
+    // explicit anti-double-count assertion: the inflow did NOT jump by the full headroom/12
+    expect(perturbed.flatExtraMonthlySavings!).toBeLessThan(headroom / 12);
+
+    // …and the resolved schedule proves it: the flat part is CPI-grown but NEVER step-up-grown.
+    const stepped = { ...BASE, savingsStepUpPercent: 10, savingsStepUpTaperYears: 20, savingsInflationRate: 0 };
+    const withLever = lever.apply(stepped);
+    const s0 = resolveBaselineSchedules(withLever).savings;
+    const s10 = typeof s0 === "function" ? s0(10) : s0;
+    const expectedAt10 =
+      stepped.monthlySavings * Math.pow(1.1, 10) + annualTaxSaved / 12;
+    expect(s10).toBeCloseTo(expectedAt10, 6);
     // target unchanged (80CCD does not lower the FIRE number)
     expect(perturbed.targetCorpus).toBe(BASE.targetCorpus);
     // NPS lock-in honesty (FinTech 2026-06-06): only the freed TAX (liquid) enters savings — the

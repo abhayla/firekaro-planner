@@ -79,6 +79,18 @@ export interface FireBaseline {
    * ~0.4 years optimistic. Quote the nominal triple.
    */
   savingsInflationRate?: number;
+  /**
+   * ADR-0006 Phase 1b. A FLAT extra monthly inflow that is added to `monthlySavings` but is NOT
+   * subject to `savingsStepUpPercent`.
+   *
+   * The `nps-80ccd1b` lever adds the marginal TAX SAVED on filling the ₹50k sub-limit, redirected
+   * to investing. That saving is a fixed statutory headroom times a slab rate — it does not grow
+   * with the household's real wage curve, so folding it into `monthlySavings` handed it the 2%
+   * real step-up and compounded a constant into a rising series (by the age-50 taper on a 30-year
+   * old that is ~1.5x, entirely fabricated). It DOES still get `savingsInflationRate`, because in
+   * the nominal frame a today's-rupee amount must be grown at CPI just to hold its real value.
+   */
+  flatExtraMonthlySavings?: number;
 }
 
 /** A single lever = a named, bounded perturbation of the baseline inputs. */
@@ -130,12 +142,18 @@ export function resolveBaselineSchedules(b: FireBaseline): {
     ? (b.savingsInflationRate as number)
     : 0;
   const stepUpApplies = stepUp > 0 && taperYears > 0;
+  const flatExtra = Number.isFinite(b.flatExtraMonthlySavings)
+    ? Math.max(0, b.flatExtraMonthlySavings as number)
+    : 0;
   const savings: ContributionSchedule =
-    b.monthlySavings <= 0 || (!stepUpApplies && savingsInflation === 0)
+    (b.monthlySavings <= 0 && flatExtra === 0) ||
+    (flatExtra === 0 && !stepUpApplies && savingsInflation === 0)
       ? b.monthlySavings
       : (y: number) =>
-          b.monthlySavings *
-          (stepUpApplies ? Math.pow(1 + stepUp / 100, Math.min(y, taperYears)) : 1) *
+          (b.monthlySavings *
+            (stepUpApplies ? Math.pow(1 + stepUp / 100, Math.min(y, taperYears)) : 1) +
+            // Flat: CPI only, never the step-up (see `flatExtraMonthlySavings`).
+            flatExtra) *
           Math.pow(1 + savingsInflation, y);
 
   return { target, savings };

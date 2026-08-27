@@ -24,6 +24,56 @@ export function resolveHouseholdInflation(v: Assumptions): number {
 }
 
 /**
+ * ADR-0006 Phase 1b — the documented SANITY BAND for the household expense basket.
+ *
+ * `healthcareInflation`, `educationInflation`, `housingInflation` and `inflationWeights` became
+ * HEADLINE-MOVING knobs when the target started growing at the basket, and /preferences lets a
+ * user edit all of them. Two settings are not merely aggressive, they are incoherent, and the
+ * product should say so rather than silently plan on them:
+ *
+ *   - **basket < general CPI (g < 0)** — the FIRE target would FALL in today's rupees every year.
+ *     `general` is the ALL-ITEMS CPI and the other three buckets are components of it, so a
+ *     disjoint household blend can sit slightly above or level with it, never below: a household
+ *     cannot spend on a cheaper-than-everything basket forever. This is the OPTIMISTIC direction —
+ *     it shrinks the number the user is saving toward.
+ *   - **basket > CPI + 300 bp** — the pre-ADR-0006 7.90% basket sat 190 bp above CPI and was
+ *     already double-counting by construction (FinTech CRITICAL-1); by year 25 a 300 bp excess
+ *     compounds to a target ~2.1x the base in real terms, which is the "FIRE at 115" regime the
+ *     #20 collapse was a panicked response to. Above this the plan is not conservative, it is
+ *     unusable.
+ *
+ * This CLAMPS NOTHING — the user's numbers are their own, and a silent clamp would be its own
+ * dishonesty. It returns a verdict the UI discloses. Pure; no store, no DOM.
+ */
+export const BASKET_SANITY_MAX_EXCESS_BP = 300;
+
+export interface BasketSanity {
+  /** The blended household basket (decimal). */
+  basket: number;
+  /** General CPI (decimal) — the deflator every today's-rupee figure is quoted in. */
+  generalInflation: number;
+  /** basket − CPI, in basis points. Negative ⇒ the real target FALLS. */
+  excessBasisPoints: number;
+  /** True when the basket sits in [CPI, CPI + 300 bp]. */
+  ok: boolean;
+  /** Which side it is out on — `null` when `ok`. */
+  verdict: "below-cpi" | "far-above-cpi" | null;
+}
+
+export function basketSanity(v: Assumptions): BasketSanity {
+  const basket = resolveHouseholdInflation(v);
+  const generalInflation = v.inflation;
+  const excessBasisPoints = Math.round((basket - generalInflation) * 10_000);
+  const verdict: BasketSanity["verdict"] =
+    excessBasisPoints < 0
+      ? "below-cpi"
+      : excessBasisPoints > BASKET_SANITY_MAX_EXCESS_BP
+        ? "far-above-cpi"
+        : null;
+  return { basket, generalInflation, excessBasisPoints, ok: verdict === null, verdict };
+}
+
+/**
  * Horizon-driven effective SWR (audit Entry #1 A1.1). A user `swrOverride`
  * still wins; otherwise the horizon bracket resolves from retire + plan-to age.
  */
