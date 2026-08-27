@@ -51,7 +51,7 @@ export const QUICK_CARDS: readonly QuickCardCopy[] = [
     hint:
       "Everything except your home-loan EMI — school fees, travel, help, groceries, fun. " +
       "If you have a loan we add its EMI from the last card, so leaving it out here keeps it from being counted twice. " +
-      "Around 2.5-3 lakh? Say 2.8.",
+      "Around ₹2.5–3 L a month? Say 2.8.",
   },
   {
     key: "corpus",
@@ -82,7 +82,7 @@ export const QUICK_CARDS: readonly QuickCardCopy[] = [
   {
     key: "goals",
     question: "Their big costs, in today's money?",
-    hint: "Undergrad for all kids (abroad? 75 lakh or more combined), post-grad if likely, and weddings.",
+    hint: "Undergrad for all kids (abroad? ₹75 L+ combined), post-grad if likely, and weddings.",
   },
   {
     key: "house",
@@ -155,7 +155,7 @@ export function whySoBigBullets(input: ExplainerInput): string[] {
     "Healthcare and help cost more with age — and rise faster than everything else (we use 14%, not 6%).",
     "Taxes don't retire. Withdrawals are taxed; we plan post-tax.",
     "Every withdrawal restarts the clock. Pulling money out for a wedding or a house every few years quietly kills the compounding you were counting on.",
-    `Every generation under-estimates by 4–6×. In 2006, people spending 30,000 a month said "1 Cr is enough"; the honest number was about 6 Cr.${guessEcho}`,
+    `Every generation under-estimates by 4–6×. In 2006, people spending ₹30,000 a month said "₹1 Cr is enough"; the honest number was about ₹6 Cr.${guessEcho}`,
   ];
 }
 
