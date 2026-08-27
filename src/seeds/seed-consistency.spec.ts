@@ -69,6 +69,17 @@ const PERSONAS: Array<{
 
 const WHOLE_HOUSEHOLD = { isFamilyView: true, viewingMemberId: null, currentFY: "2025-26" };
 
+/**
+ * ADR-0006 Phase 1d — the calendar year every `derive()` call in this file is evaluated in.
+ *
+ * The kernel no longer reads the wall clock (it used to, at `derive.ts`'s dated-goal handling), so
+ * a pinned year is what makes these baselines DETERMINISTIC: without it they would silently shift
+ * on 1 January, every dated goal a year nearer, hence a year less inflation, hence FIRE earlier —
+ * the optimistic direction, arriving unannounced. 2026 is the year the current baselines were
+ * measured in, so pinning it keeps them byte-identical and frozen from here on.
+ */
+const PINNED_CURRENT_YEAR = 2026;
+
 describe("seed-persona financial consistency (#12)", () => {
   beforeEach(() => setActivePinia(createPinia()));
 
@@ -77,7 +88,7 @@ describe("seed-persona financial consistency (#12)", () => {
       const h = useHouseholdStore();
       const a = useAssumptionsStore();
       persona.load(h, a);
-      const k = derive(h.data, a.values, WHOLE_HOUSEHOLD);
+      const k = derive(h.data, a.values, WHOLE_HOUSEHOLD, { currentYear: PINNED_CURRENT_YEAR });
 
       const sumSip = h.data.investments.reduce((s, i) => s + (i.monthlyContribution ?? 0), 0);
       const surplus = Math.round(k.annualSavings / 12);
@@ -94,7 +105,7 @@ describe("seed-persona financial consistency (#12)", () => {
       const h = useHouseholdStore();
       const a = useAssumptionsStore();
       persona.load(h, a);
-      const k = derive(h.data, a.values, WHOLE_HOUSEHOLD);
+      const k = derive(h.data, a.values, WHOLE_HOUSEHOLD, { currentYear: PINNED_CURRENT_YEAR });
       expect(k.monthlyContribution).toBe(Math.round(k.annualSavings / 12));
     });
 
@@ -110,7 +121,7 @@ describe("seed-persona financial consistency (#12)", () => {
       const h = useHouseholdStore();
       const a = useAssumptionsStore();
       persona.load(h, a);
-      const k = derive(h.data, a.values, WHOLE_HOUSEHOLD);
+      const k = derive(h.data, a.values, WHOLE_HOUSEHOLD, { currentYear: PINNED_CURRENT_YEAR });
       // Aspirational but plausible, per-persona (catches a silent retune).
       const [lo, hi] = persona.savingsRate;
       expect(k.savingsRate, `${persona.name} savingsRate ${k.savingsRate}%`).toBeGreaterThanOrEqual(lo);

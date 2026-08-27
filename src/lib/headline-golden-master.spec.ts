@@ -32,6 +32,17 @@ const PERSONAS: Array<{ name: string; load: (h: H, a: A) => void }> = [
   { name: "mauryas", load: (h, a) => loadMauryasSeed(h, a) },
 ];
 
+/**
+ * ADR-0006 Phase 1d — the calendar year every `derive()` call in this file is evaluated in.
+ *
+ * The kernel no longer reads the wall clock (it used to, at `derive.ts`'s dated-goal handling), so
+ * a pinned year is what makes these baselines DETERMINISTIC: without it they would silently shift
+ * on 1 January, every dated goal a year nearer, hence a year less inflation, hence FIRE earlier —
+ * the optimistic direction, arriving unannounced. 2026 is the year the current baselines were
+ * measured in, so pinning it keeps them byte-identical and frozen from here on.
+ */
+const PINNED_CURRENT_YEAR = 2026;
+
 const r = (x: number, dp = 4) => (Number.isFinite(x) ? Math.round(x * 10 ** dp) / 10 ** dp : x);
 
 describe("A7.2 golden-master — per-persona headline (DEFAULT lens)", () => {
@@ -42,7 +53,7 @@ describe("A7.2 golden-master — per-persona headline (DEFAULT lens)", () => {
       const h = useHouseholdStore();
       const a = useAssumptionsStore();
       persona.load(h, a);
-      const k = derive(h.data, a.values, LENS);
+      const k = derive(h.data, a.values, LENS, { currentYear: PINNED_CURRENT_YEAR });
       const headline = {
         // Lock the lens scope too — a #22-class regression that silently scoped the household to
         // one earner would move this count and trip the golden master (code-review 2026-06-07).

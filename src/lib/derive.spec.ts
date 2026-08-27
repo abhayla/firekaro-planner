@@ -12,11 +12,41 @@ import { useAssumptionsStore } from "@/stores/assumptions";
 import { useUiStore } from "@/stores/ui";
 import { loadSeedPersona } from "@/lib/seed-persona";
 import { useFireDerive } from "@/lib/useFireDerive";
-import { derive, bridgeRentalPostTaxAnnual, SEC_24A_DEDUCTION_RATE, SEC_71_HP_LOSS_SETOFF_CAP } from "@/lib/derive";
+import {
+  derive as deriveKernel,
+  bridgeRentalPostTaxAnnual,
+  SEC_24A_DEDUCTION_RATE,
+  SEC_71_HP_LOSS_SETOFF_CAP,
+  type DeriveLens,
+} from "@/lib/derive";
+import type { DeriveOverrides } from "@/lib/derive-overrides";
+import type { Household } from "@/types/household";
+import type { Assumptions } from "@/types/assumptions";
 import type { OtherIncomeLine } from "@/types/household";
 import { calculateNpsWithdrawal, postTaxAnnuityIncome } from "@/lib/nps-withdrawal";
 import { calculateYearsToTarget, calculateFIRENumber } from "@/lib/fire-math";
 import { toMonthly } from "@/lib/cashflow";
+
+/**
+ * ADR-0006 Phase 1d — the calendar year every `derive()` call in this file is evaluated in.
+ *
+ * The kernel no longer reads the wall clock (it used to, at `derive.ts`'s dated-goal handling), so
+ * a pinned year is what makes these baselines DETERMINISTIC: without it they would silently shift
+ * on 1 January, every dated goal a year nearer, hence a year less inflation, hence FIRE earlier —
+ * the optimistic direction, arriving unannounced. 2026 is the year the current baselines were
+ * measured in, so pinning it keeps them byte-identical and frozen from here on.
+ */
+const PINNED_CURRENT_YEAR = 2026;
+
+/** Every `derive()` below runs through here, so no call in this file can forget the pin. */
+function derive(
+  household: Household,
+  assumptions: Assumptions,
+  lens: DeriveLens,
+  overrides: DeriveOverrides = {},
+) {
+  return deriveKernel(household, assumptions, lens, { currentYear: PINNED_CURRENT_YEAR, ...overrides });
+}
 
 describe("derive() — pure kernel", () => {
   beforeEach(() => setActivePinia(createPinia()));

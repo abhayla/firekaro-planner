@@ -117,8 +117,11 @@ export function captureBaselineFrom(
   lens: Lens,
   capturedAt: string,
   overrides: Partial<PlanBaseline> = {},
+  /** ADR-0006 Phase 1d — the calendar year dated goals are measured from; the kernel never reads
+   *  the wall clock itself. Omitted ⇒ the kernel falls back to `lens.currentFY`'s start year. */
+  currentYear?: number,
 ): PlanBaseline {
-  const d = derive(household, assumptions, lens);
+  const d = derive(household, assumptions, lens, currentYear != null ? { currentYear } : undefined);
   return {
     capturedAt,
     frameVersion: FRAME_VERSION,
@@ -139,14 +142,18 @@ export function computePlanVariance(args: {
   currentAssumptions: Assumptions;
   lens: Lens;
   nowMs: number;
+  /** ADR-0006 Phase 1d — see `captureBaselineFrom`. Both runs below MUST share it, else the
+   *  counterfactual and the live run would disagree about a goal's due date. */
+  currentYear?: number;
 }): PlanVarianceResult {
   const { baseline, household, currentAssumptions, lens, nowMs } = args;
+  const yearOverride = args.currentYear != null ? { currentYear: args.currentYear } : undefined;
 
-  const current = derive(household, currentAssumptions, lens);
+  const current = derive(household, currentAssumptions, lens, yearOverride);
   // Counterfactual: the CURRENT household under the BASELINE assumptions. The gap between this and
   // `current` is the pure ASSUMPTION (goalpost) effect on the target; the gap between this and the
   // stored baseline is the pure EXPENSE/household (reality) effect.
-  const underBaselineAssumptions = derive(household, baseline.assumptions, lens);
+  const underBaselineAssumptions = derive(household, baseline.assumptions, lens, yearOverride);
 
   const inf = Number.isFinite(currentAssumptions.inflation)
     ? currentAssumptions.inflation

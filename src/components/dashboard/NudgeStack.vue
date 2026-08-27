@@ -61,11 +61,13 @@ const nudges = computed(() => {
   // surplus from the unlensed household so it matches the whole-household SIP total
   // the engine sums. Using the lensed `fire.annualSavings` here would false-fire in
   // a member-lens view (one earner's surplus vs the household's total SIPs).
-  const wholeHousehold = derive(household.data, assumptions.values, {
-    isFamilyView: true,
-    viewingMemberId: null,
-    currentFY: ui.currentFY,
-  });
+  const wholeHousehold = derive(
+    household.data,
+    assumptions.values,
+    { isFamilyView: true, viewingMemberId: null, currentFY: ui.currentFY },
+    // ADR-0006 Phase 1d — the wall clock enters at the composable boundary, not in the kernel.
+    { currentYear: new Date().getFullYear() },
+  );
   const all = evaluateNudges({
     household: household.data,
     family: derivedFamilyLayer(household.data),

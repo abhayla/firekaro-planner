@@ -112,11 +112,13 @@ function previewNeed(a: QuickAnswersDraft): number | null {
       a,
       { assumptions: assumptions.values, solveSalary: false },
     );
-    const k = derive(hh, assumptions.values, {
-      isFamilyView: false,
-      viewingMemberId: null,
-      currentFY: ui.currentFY,
-    });
+    const k = derive(
+      hh,
+      assumptions.values,
+      { isFamilyView: false, viewingMemberId: null, currentFY: ui.currentFY },
+      // ADR-0006 Phase 1d — the wall clock enters at the composable boundary, not in the kernel.
+      { currentYear: new Date().getFullYear() },
+    );
     return Number.isFinite(k.fireNumber) && k.fireNumber > 0 ? k.fireNumber : null;
   } catch (err) {
     // Never silent: a kernel throw during intake would otherwise leave the strip on its

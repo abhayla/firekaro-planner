@@ -25,6 +25,18 @@ import { requiredMonthlyContributionFor } from "@/lib/required-contribution";
 
 const LENS = { isFamilyView: false, viewingMemberId: null, currentFY: "2025-26" } as const;
 
+/**
+ * ADR-0006 Phase 1d — the calendar year every `derive()` call in this file is evaluated in.
+ *
+ * The kernel no longer reads the wall clock (it used to, at `derive.ts`'s dated-goal handling), so
+ * a pinned year is what makes these baselines DETERMINISTIC: without it they would silently shift
+ * on 1 January, every dated goal a year nearer, hence a year less inflation, hence FIRE earlier —
+ * the optimistic direction, arriving unannounced. 2026 is the year the current baselines were
+ * measured in, so pinning it keeps them byte-identical and frozen from here on.
+ */
+const PINNED_CURRENT_YEAR = 2026;
+const PINNED = { currentYear: PINNED_CURRENT_YEAR } as const;
+
 /** ₹50 L, one education goal, `dueInYears` from now, and NOTHING else in the family layer. */
 function oneEducationGoal(dueInYears: number) {
   const h = useHouseholdStore();
@@ -35,7 +47,7 @@ function oneEducationGoal(dueInYears: number) {
       id: "test-education-goal",
       label: "Undergraduate degree",
       todayAmount: 5_000_000,
-      targetYear: new Date().getFullYear() + dueInYears,
+      targetYear: PINNED_CURRENT_YEAR + dueInYears,
       isMultiYear: false,
       inflationBucket: "education",
       kind: "education",
@@ -53,7 +65,7 @@ describe("ADR-0006 Phase 1c (b) — a dated goal inflates to its due year and th
 
   it("₹50 L education goal due in 8 years: at a 17-year target it is capped at 8 years of education inflation", () => {
     const { h, a } = oneEducationGoal(8);
-    const k = derive(h.data, a.values, LENS);
+    const k = derive(h.data, a.values, LENS, PINNED);
     const anchorAge = k.anchorAge;
     const targetAge = anchorAge + 17;
 
@@ -62,6 +74,7 @@ describe("ADR-0006 Phase 1c (b) — a dated goal inflates to its due year and th
       assumptions: a.values,
       lens: LENS,
       targetAge,
+      currentYear: PINNED_CURRENT_YEAR,
     });
     expect(r.yearsToTarget, "the fixture must actually be a 17-year plan").toBe(17);
 
@@ -96,7 +109,7 @@ describe("ADR-0006 Phase 1c (b) — a dated goal inflates to its due year and th
     // The schema requires a `targetYear`, so there is no literally undated goal; the case that
     // "inflates throughout" is a goal whose due year sits past the plan's own horizon.
     const { h, a } = oneEducationGoal(40);
-    const k = derive(h.data, a.values, LENS);
+    const k = derive(h.data, a.values, LENS, PINNED);
     const targetAge = k.anchorAge + 17;
 
     const r = requiredMonthlyContributionFor({
@@ -104,6 +117,7 @@ describe("ADR-0006 Phase 1c (b) — a dated goal inflates to its due year and th
       assumptions: a.values,
       lens: LENS,
       targetAge,
+      currentYear: PINNED_CURRENT_YEAR,
     });
 
     const expected = Math.round(
@@ -115,7 +129,7 @@ describe("ADR-0006 Phase 1c (b) — a dated goal inflates to its due year and th
 
   it("the goal leg never grows past its due year — the schedule is flat in nominal ₹ from year 8 on", () => {
     const { h, a } = oneEducationGoal(8);
-    const k = derive(h.data, a.values, LENS);
+    const k = derive(h.data, a.values, LENS, PINNED);
     // Isolate the goal leg by differencing two horizons: everything else in the target grows
     // monotonically, so a flat NOMINAL goal leg is visible as equal successive increments.
     const nominalAt = (t: number) =>

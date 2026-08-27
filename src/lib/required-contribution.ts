@@ -64,6 +64,12 @@ export interface RequiredContributionInput {
   /** QN-5: extra ADR-0004 segments summed onto the savings residual (the roll-the-EMI lever). */
   extraContributionSegments?: ContributionSegments;
   /**
+   * ADR-0006 Phase 1d — the calendar year to evaluate dated goals against, threaded straight into
+   * every `derive()` run below so the four runs this solver makes cannot disagree about how far
+   * away a goal is. Callers supply the wall clock; specs pin it. See `DeriveOverrides.currentYear`.
+   */
+  currentYear?: number;
+  /**
    * `false` skips the bisection (the expensive part) and returns `requiredMonthlyReal = Infinity`
    * with `solved: false` — for callers that only need need / have-by-target / gap (the QN-4 chart
    * samples six ages per render; solving each one made every slider release cost ~300 ms for
@@ -137,7 +143,14 @@ export function requiredMonthlyContributionFor(
 ): RequiredContributionResult {
   const { snapshot, assumptions, lens } = input;
   const extra = input.extraContributionSegments ?? [];
-  const extraOverride = extra.length > 0 ? { extraContributionSegments: extra } : {};
+  // ADR-0006 Phase 1d: `currentYear` rides along with the extra segments so EVERY derive() call in
+  // this solver — baseline, at-target, and each bisection probe — evaluates dated goals against the
+  // same year. A solver whose probes disagreed with its own baseline about a goal's due date would
+  // bisect against a moving target.
+  const extraOverride = {
+    ...(extra.length > 0 ? { extraContributionSegments: extra } : {}),
+    ...(input.currentYear != null ? { currentYear: input.currentYear } : {}),
+  };
   // A non-finite target age can never produce an honest answer — reject it before it can
   // silently fall back to the stored target while the predicate always fails (code-review L6).
   if (!Number.isFinite(input.targetAge)) {

@@ -96,7 +96,7 @@ export function bridgeRentalPostTaxAnnual(
     }, 0);
 }
 
-import { usableOverride, type DeriveOverrides } from "@/lib/derive-overrides";
+import { usableOverride, financialYearStartYear, type DeriveOverrides } from "@/lib/derive-overrides";
 export type { DeriveOverrides } from "@/lib/derive-overrides";
 
 export interface DeriveLens {
@@ -767,7 +767,13 @@ export function derive(
         return generalInflation;
     }
   };
-  const currentCalendarYear = new Date().getFullYear();
+  // ADR-0006 Phase 1d: injected, never read from the wall clock here — `derive()` is a pure
+  // kernel and a golden master that shifts on 1 January (goals one year nearer ⇒ one year less
+  // inflation ⇒ FIRE optimistically earlier) is not a golden master. See `DeriveOverrides.currentYear`.
+  const currentCalendarYear =
+    // Last resort (an unparseable FY): year 0, which puts every dated goal beyond the horizon so
+    // it inflates throughout — the conservative reading, never a goal treated as already paid.
+    usableOverride(overrides?.currentYear, 1900) ?? financialYearStartYear(lens.currentFY) ?? 0;
   /** One dated lump: its today's-₹ size, its own price index, and when it stops rising. */
   const plannedGoalComponents = familyLayer.allPlannedGoals.map((g) => ({
     todayAmount: Math.max(0, g.todayAmount ?? 0),

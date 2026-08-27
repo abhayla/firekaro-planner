@@ -56,11 +56,19 @@ async function defaultLoadSignals(userId: string): Promise<LifecycleSignals | nu
   // No household doc, or an empty one → nothing to evaluate.
   if (!household || !household.members.length) return null;
   const assumptions = await readAssumptions(prisma, userId);
-  const d = derive(household, assumptions, {
-    isFamilyView: true, // whole-household aggregate (no member lens) for the scheduled run
-    viewingMemberId: null,
-    currentFY: financialYearOf(new Date()),
-  });
+  const now = new Date();
+  const d = derive(
+    household,
+    assumptions,
+    {
+      isFamilyView: true, // whole-household aggregate (no member lens) for the scheduled run
+      viewingMemberId: null,
+      currentFY: financialYearOf(now),
+    },
+    // ADR-0006 Phase 1d — the scheduled run is this loop's composable boundary; the kernel it
+    // shares with the frontend never reads the wall clock itself.
+    { currentYear: now.getFullYear() },
+  );
   return {
     progressPercent: d.progressPercent,
     fireWithdrawableCorpus: d.fireWithdrawableCorpus,

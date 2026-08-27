@@ -17,6 +17,20 @@ import { derive } from "@/lib/derive";
 describe("memberFinancials — same-scope FH resolver", () => {
   beforeEach(() => setActivePinia(createPinia()));
 
+  /**
+   * ADR-0006 Phase 1d — these cases compare `useFireDerive()` against a DIRECT `derive()` call, so
+   * both sides must be handed exactly what the composable hands the kernel: the store's own
+   * `currentFY` and the same wall-clock year. Pinning one side while the wrapper reads the clock
+   * would make the comparison break on 1 January for a reason that has nothing to do with the
+   * lens invariance being tested.
+   */
+  const wrapperLens = (ui: ReturnType<typeof useUiStore>) => ({
+    isFamilyView: false,
+    viewingMemberId: null,
+    currentFY: ui.currentFY,
+  });
+  const wrapperOverrides = () => ({ currentYear: new Date().getFullYear() });
+
   function setup() {
     const h = useHouseholdStore();
     const a = useAssumptionsStore();
@@ -26,8 +40,8 @@ describe("memberFinancials — same-scope FH resolver", () => {
   }
 
   it("default lens (Whole household) = the household figures", () => {
-    const { h, a, fire } = setup();
-    const k = derive(h.data, a.values, { isFamilyView: false, viewingMemberId: null, currentFY: "2025-26" });
+    const { h, a, ui, fire } = setup();
+    const k = derive(h.data, a.values, wrapperLens(ui), wrapperOverrides());
     const fh = fire.memberFinancials.value;
     expect(fh.isMemberView).toBe(false);
     expect(fh.annualIncome).toBe(k.householdAnnualIncome);
@@ -64,7 +78,7 @@ describe("memberFinancials — same-scope FH resolver", () => {
 
   it("the household FIRE figures stay INVARIANT to the FH member lens", () => {
     const { h, a, ui, fire } = setup();
-    const whole = derive(h.data, a.values, { isFamilyView: false, viewingMemberId: null, currentFY: "2025-26" });
+    const whole = derive(h.data, a.values, wrapperLens(ui), wrapperOverrides());
     for (const id of ["rohit", "priya"]) {
       ui.setViewingMemberId(id);
       // The resolver lenses FH display, but the household FIRE number/age must not move.

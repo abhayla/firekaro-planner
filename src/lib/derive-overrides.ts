@@ -26,6 +26,32 @@ export interface DeriveOverrides {
    * individual-FIRE path does not read it.
    */
   extraContributionSegments?: ContributionSegments;
+  /**
+   * ADR-0006 Phase 1d — the calendar year the plan is being evaluated in, used to turn a dated
+   * goal's `targetYear` into "years from now".
+   *
+   * The kernel used to read `new Date().getFullYear()` itself. That made `derive()` impure: the
+   * golden master would silently shift on 1 January, and in the EARLIER direction (every goal one
+   * year nearer, so it inflates for one year less), which is the direction an honesty gate must
+   * never move on its own. The wall clock now enters at the COMPOSABLE boundary — `useFireDerive`,
+   * `required-contribution`, `plan-variance`, `QuickNumber`, `NudgeStack` and the server lifecycle
+   * runner all pass it — and the kernel never calls `Date`.
+   *
+   * Absent, the kernel falls back to the START year of `lens.currentFY` (FY "2026-27" -> 2026),
+   * which in production IS the wall clock because `ui.currentFY` is derived from it
+   * (`getCurrentFinancialYear`). Specs PIN this explicitly so their baselines are deterministic.
+   */
+  currentYear?: number;
+}
+
+/**
+ * The calendar year an Indian FY string starts in — "2026-27" -> 2026. Returns null for anything
+ * that is not a parseable `YYYY-YY`, so a caller can fall through rather than compute against NaN.
+ */
+export function financialYearStartYear(fy: string | undefined): number | null {
+  if (typeof fy !== "string") return null;
+  const start = Number.parseInt(fy.slice(0, 4), 10);
+  return Number.isFinite(start) && start > 1900 ? start : null;
 }
 
 /** Finite, in-range guard shared by both override fields (never trusts a caller's number). */

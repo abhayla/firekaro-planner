@@ -107,11 +107,19 @@ export function useFireDerive() {
   // one is EXPLICITLY selected — gh-issue #22 root fix), so no per-consumer flag is
   // needed: every consumer gets the coherent household FIRE number by default.
   const d = computed(() =>
-    derive(h.data, a.values, {
-      isFamilyView: ui.isFamilyView,
-      viewingMemberId: ui.viewingMemberId,
-      currentFY: ui.currentFY,
-    }),
+    derive(
+      h.data,
+      a.values,
+      {
+        isFamilyView: ui.isFamilyView,
+        viewingMemberId: ui.viewingMemberId,
+        currentFY: ui.currentFY,
+      },
+      // ADR-0006 Phase 1d: the wall clock enters HERE, at the composable boundary. The kernel is
+      // pure and never calls Date, so a dated goal's "years from now" cannot silently change under
+      // a golden master on 1 January (see DeriveOverrides.currentYear).
+      { currentYear: new Date().getFullYear() },
+    ),
   );
 
   // #81 Phase 3 — the SAME-SCOPE Financial-Health resolver. When an adult is selected in "Viewing
@@ -314,6 +322,8 @@ export function useFireDerive() {
       lens: solverLens.value,
       targetAge: activePlan.value.targetAge,
       extraContributionSegments: activePlan.value.extraSegments,
+      // ADR-0006 Phase 1d — the wall clock enters at the composable boundary; the kernel is pure.
+      currentYear: new Date().getFullYear(),
     }),
   );
 
@@ -325,6 +335,7 @@ export function useFireDerive() {
       lens: solverLens.value,
       targetAge: activePlan.value.targetAge + 3,
       extraContributionSegments: activePlan.value.extraSegments,
+      currentYear: new Date().getFullYear(),
     }),
   );
 

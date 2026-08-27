@@ -43,6 +43,8 @@ const variance = computed(() => {
     currentAssumptions: a.values,
     lens: { isFamilyView: ui.isFamilyView, viewingMemberId: ui.viewingMemberId, currentFY: ui.currentFY },
     nowMs: Date.now(),
+    // ADR-0006 Phase 1d — the wall clock enters at the component boundary; the kernel is pure.
+    currentYear: new Date().getFullYear(),
   });
 });
 
