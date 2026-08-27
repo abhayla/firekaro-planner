@@ -96,6 +96,11 @@ This standard's **hero + PanelCard + MetricCard** patterns target **dashboard-ov
 - **Score/diagnostic** (`/financial-health` score): a unique score visualization — header conformed, viz kept custom.
 - **Data-table / form** child pages (loans, policies, holdings, salary grid, recurring, etc.): a future **table/form sub-standard** (not yet defined).
 - **Wizard** (`/wizard/*`): its own onboarding flow.
+- **Express intake** (`/quick`, T-378): the ten-card front door. Layout-less like Splash/Login, one
+  question per card, a lakh-denominated money input with a live ₹ preview, progress dots, and a
+  Back/Next pair — deliberately NOT the hero/MetricCard language, because a question is not a
+  verdict. Its RESULT screen is the exception: it renders the SAME `<FireHero />` the dashboard
+  shows (never a copy), so the express number and the planner number cannot drift.
 
 **All archetypes still share:** the page header pattern (LeafPageHeader where a header exists), tokens, numerics, motion, three-state rendering, a11y, and the global `.section-eyebrow`.
 
@@ -129,6 +134,7 @@ Legend: ✅ conformed · 🔄 v1.x follow-up (token-consistent, header not yet o
 
 | Version | Date | Change | Propagated to |
 |---|---|---|---|
+| **v1.4** | 2026-08-27 | **Express-intake pattern** (`/quick`, T-378 / QN-1+QN-4; same mockup SSOT `docs/design/2026-08-27-quick-number-gap-hero/option-c-merged.html`): ten single-question cards → the gap hero. Rules established: (a) card copy lives in ONE testable module (`src/lib/quick-number-copy.ts`) because a "total" question written as a list reads as exclusive — a spec now asserts every total question says ALL, names stocks, and states the single exclusion; (b) the result screen REUSES `<FireHero />` rather than restating it, so rule-26 coherence is structural; (c) the QN-4 explainer ("why so big" + "how we got this") is one component rendered on the quick result AND collapsed inside the dashboard hero, and its steps must ADD UP to the headline beside them; (d) a simplification the screen makes (the single equity line) is stated on the screen, not buried. | quick (✅ new), fire-goals/dashboard (explainer panel ✅). |
 | **v1.3** | 2026-08-27 | **Gap-hero pattern** for the FIRE dashboard (T-377 / QN-2; mockup SSOT `docs/design/2026-08-27-quick-number-gap-hero/option-c-merged.html`): the headline is the age the user WANTS, not the age the current pace produces — "To retire at 50 you'll need ₹X (today's) / ₹Y (2046)" — with need / have-by-target / gap / do-this and a live retirement-age slider bound to the session-only `ui.whatIfTargetAge` shared with `/fire-goals/what-if`. The old headline claim is demoted to the pace annotation; every prior honesty surface is retained. New `GapTone` sits ALONGSIDE the untouched plan-variance `HeroTone` — two signals, two types. | fire-goals/dashboard (✅), fire-goals/what-if (slider binding). |
 | **v1.2** | 2026-06-10 | **Option-D FIRE-dashboard pattern** (Abhay-approved 2026-06-10; mockup SSOT `docs/design/2026-06-10-fire-dashboard-redesign/option-d-merged.html`): verdict hero w/ KPI strip + five reusable SVG viz primitives (`src/components/dashboard/viz/`) replacing the prose-card wall; estate/stress chips → severity suggestions; LifecycleDigest delta folded into the hero subline (card unmounted from the dashboard, deep-link anchor on the hero). Phase-2 propagation of the viz language to Readiness/Decumulation/Stress-test/Goals is the open follow-up. | fire-goals/dashboard (✅). |
 | **v1.1** | 2026-05-29 | Added optional `#actions` slot to `LeafPageHeader` (right-aligned, wraps on mobile, backward-compatible with all existing consumers); brought the 4 bespoke-header screens (FIRE Dashboard, What-If, Stress-Test, Estate Planning) onto it. Stress-Test results list → `EntityRow`. All header-bearing screens now share the standard header (§10b). | fire-dashboard, what-if, stress-test, estate-planning (✅). |
