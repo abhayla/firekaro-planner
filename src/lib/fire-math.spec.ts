@@ -86,10 +86,10 @@ describe("blendedInflation (audit Entry #3 A3.1 — 4-bucket)", () => {
   });
 });
 
-describe("calculateFamilyLayerCorpus (audit Entry #6 A6.10)", () => {
-  it("adds education/marriage lump sums + capitalizes contingency at SWR", () => {
+describe("calculateFamilyLayerCorpus (audit Entry #6 A6.10; T-376/gh-#165: arg renamed to plannedGoalsLumpToday — every plannedFuture kind, not just education/marriage)", () => {
+  it("adds the full planned-goals lump sum + capitalizes contingency at SWR", () => {
     const corpus = calculateFamilyLayerCorpus({
-      educationMarriageLumpToday: 15000000, // ₹1.5 Cr education target (today rupees)
+      plannedGoalsLumpToday: 15000000, // ₹1.5 Cr planned-goals target (today rupees; any kind)
       extendedContingencyAnnual: 100000, // ₹1L/yr contingency
       swr: 0.035,
     });
@@ -98,7 +98,7 @@ describe("calculateFamilyLayerCorpus (audit Entry #6 A6.10)", () => {
   });
   it("returns 0 when no family layer", () => {
     expect(
-      calculateFamilyLayerCorpus({ educationMarriageLumpToday: 0, extendedContingencyAnnual: 0, swr: 0.035 }),
+      calculateFamilyLayerCorpus({ plannedGoalsLumpToday: 0, extendedContingencyAnnual: 0, swr: 0.035 }),
     ).toBe(0);
   });
 });

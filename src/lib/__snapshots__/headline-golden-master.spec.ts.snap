@@ -25,20 +25,20 @@ exports[`A7.2 golden-master — per-persona headline (DEFAULT lens) > mauryas: d
 {
   "anchorAge": 44,
   "annualSavings": 1510982,
-  "corpusOnlyYearsToRegular": 23.0833,
+  "corpusOnlyYearsToRegular": 23.5,
   "effectiveSWR": 0.0325,
-  "fireAge": 67.08,
-  "fireNumber": 111410486,
+  "fireAge": 67.5,
+  "fireNumber": 113310486,
   "fireWithdrawableCorpus": 35520000,
   "lensedEarners": 1,
   "monthlyContribution": 125915,
-  "progressPercent": 32,
+  "progressPercent": 31,
   "savingsRate": 38.1,
   "targetRetirementAge": 50,
   "totalCorpus": 36000000,
   "yearsToFat": 23.5,
   "yearsToLean": 3.8333,
-  "yearsToRegular": 23.0833,
+  "yearsToRegular": 23.5,
 }
 `;
 
@@ -46,20 +46,20 @@ exports[`A7.2 golden-master — per-persona headline (DEFAULT lens) > mehtas: de
 {
   "anchorAge": 45,
   "annualSavings": 2765864,
-  "corpusOnlyYearsToRegular": 4.4167,
+  "corpusOnlyYearsToRegular": 5.3333,
   "effectiveSWR": 0.0325,
-  "fireAge": 49.42,
-  "fireNumber": 98333391,
+  "fireAge": 50.33,
+  "fireNumber": 102333391,
   "fireWithdrawableCorpus": 79880000,
   "lensedEarners": 2,
   "monthlyContribution": 230489,
-  "progressPercent": 81,
+  "progressPercent": 78,
   "savingsRate": 52.2,
   "targetRetirementAge": 47,
   "totalCorpus": 80600000,
   "yearsToFat": 8.5833,
   "yearsToLean": 0,
-  "yearsToRegular": 4.4167,
+  "yearsToRegular": 5.3333,
 }
 `;
 
@@ -67,10 +67,10 @@ exports[`A7.2 golden-master — per-persona headline (DEFAULT lens) > sharmas: d
 {
   "anchorAge": 30,
   "annualSavings": 1927164,
-  "corpusOnlyYearsToRegular": 25.5833,
+  "corpusOnlyYearsToRegular": 25.6667,
   "effectiveSWR": 0.0325,
-  "fireAge": 55.58,
-  "fireNumber": 105482068,
+  "fireAge": 55.67,
+  "fireNumber": 105982068,
   "fireWithdrawableCorpus": 11000000,
   "lensedEarners": 2,
   "monthlyContribution": 160597,
@@ -80,6 +80,6 @@ exports[`A7.2 golden-master — per-persona headline (DEFAULT lens) > sharmas: d
   "totalCorpus": 11000000,
   "yearsToFat": 23.75,
   "yearsToLean": 10,
-  "yearsToRegular": 25.5833,
+  "yearsToRegular": 25.6667,
 }
 `;

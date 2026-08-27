@@ -104,6 +104,48 @@ describe("A7.1 kernel invariants — per-persona metamorphic (fast-check)", () =
       );
     });
 
+    // (T-376/gh-#165) ADDING A PLANNED-FUTURE GOAL (ANY kind) ⇒ FIRE NO EARLIER. A one-shot
+    // today-rupee lump only ever grows the family-layer corpus, so the years-to-FIRE leg must
+    // be monotonic non-decreasing in the added goal's `todayAmount` — regardless of `kind`
+    // (general/education/marriage/medical/undefined). This is the property-level lock for the
+    // Tier-0 honesty fix: a house-upgrade `general` goal silently NOT moving the FIRE age was
+    // the exact bug (derive.ts previously summed only education+marriage kinds).
+    it(`${persona.name}: adding a plannedFuture goal (any kind) never makes FIRE earlier`, () => {
+      const h = useHouseholdStore();
+      const a = useAssumptionsStore();
+      persona.load(h, a);
+      const base = a.values;
+      const kinds = ["general", "education", "marriage", "medical", undefined] as const;
+      fc.assert(
+        fc.property(
+          fc.double({ min: 0, max: 50_000_000, noNaN: true }),
+          fc.double({ min: 0, max: 50_000_000, noNaN: true }),
+          fc.constantFrom(...kinds),
+          (amt1, amt2, kind) => {
+            const lo = Math.min(amt1, amt2);
+            const hi = Math.max(amt1, amt2);
+            const withGoal = (amount: number) => {
+              const hh = JSON.parse(JSON.stringify(h.data));
+              hh.expenses.plannedFuture.push({
+                id: "prop-goal",
+                label: "property-test goal",
+                todayAmount: amount,
+                targetYear: new Date().getFullYear() + 5,
+                isMultiYear: false,
+                kind,
+              });
+              return hh;
+            };
+            const kLo = derive(withGoal(lo), base, LENS);
+            const kHi = derive(withGoal(hi), base, LENS);
+            expect(kHi.corpusOnlyYearsToRegular).toBeGreaterThanOrEqual(kLo.corpusOnlyYearsToRegular - EPS);
+            expect(kHi.fireNumber).toBeGreaterThanOrEqual(kLo.fireNumber - EPS);
+          },
+        ),
+        { numRuns: 60 },
+      );
+    });
+
     // (3) NO ABSURD VALUE for ANY valid perturbation. Whatever step-up + returns a user
     // sets, the flagship numbers stay finite + in-range — or honestly non-finite (the
     // "not within horizon" signal), never NaN/−∞/negative.

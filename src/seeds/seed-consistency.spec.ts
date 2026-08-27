@@ -41,7 +41,11 @@ const PERSONAS: Array<{
   maxYearsToFire: number;
 }> = [
   { name: "sharmas", load: (h, a) => loadSeedPersona(h, a), savingsRate: [40, 55], maxYearsToFire: 27 }, // #21 equity-tilted → ~26y (age 56)
-  { name: "mehtas", load: (h, a) => loadMehtasSeed(h, a), savingsRate: [40, 60], maxYearsToFire: 5 },
+  // T-376/gh-#165: 5 → 5.4 — Mehtas' two kind-less plannedFuture goals ("Retirement world
+  // tour" ₹15L, "Switzerland residency" ₹25L) now correctly enter the FIRE-number lump
+  // (previously silently excluded — the Tier-0 honesty bug this fix closes), pushing the
+  // honest horizon from ~5.0y to ~5.33y. Still a compelling, fast FIRE horizon.
+  { name: "mehtas", load: (h, a) => loadMehtasSeed(h, a), savingsRate: [40, 60], maxYearsToFire: 5.4 },
   { name: "iyers", load: (h, a) => loadIyersSeed(h, a), savingsRate: [40, 50], maxYearsToFire: 20 }, // ~19y, ≈2y past retire-goal 55
   // Single-income (₹42L CTC) + homemaker spouse + big education goals → honestly
   // behind the age-50 aspiration: ~23y to FIRE (age ~67), ~38% pre-EMI savings rate.

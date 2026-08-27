@@ -145,6 +145,8 @@ function saveEdit() {
             label="Kind"
             density="compact"
             data-testid="planned-kind-select"
+            hint="Every planned purchase — including General — counts toward your FIRE number."
+            persistent-hint
           />
         </v-col>
         <v-col cols="6" md="2">

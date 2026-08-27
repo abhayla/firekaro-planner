@@ -908,11 +908,95 @@ describe("seed-anchor regression locks (gh-issue #17 — catch silent adequacy-l
     const a = useAssumptionsStore();
     loadSeedPersona(h, a);
     const k = derive(h.data, a.values, { isFamilyView: false, viewingMemberId: null, currentFY: "2025-26" });
-    // Pinned to the known-good values (anchored 2026-06-04, post-#29 Sec 24a). The byte-identical
+    // Pinned to the known-good values (re-anchored 2026-08-27, T-376/gh-#165). The byte-identical
     // wrapper/kernel test only proves the two agree with EACH OTHER; this anchors the ACTUAL headline
     // so a future adequacy-leg refactor (#23) that silently drifts it is a CI failure. FIRE age ≈ 59
-    // (anchor 33 + ~25.58y), comfortably under the #22 sanity ceiling.
-    expect(k.yearsToRegular).toBeCloseTo(25.58, 2);
-    expect(Math.round(k.fireNumber)).toBe(105_482_068);
+    // (anchor 33 + ~25.67y), comfortably under the #22 sanity ceiling.
+    // Re-anchor note: this moved from 25.58y/₹105,482,068 → 25.67y/₹105,982,068 (a +₹5,00,000 shift)
+    // when T-376 fixed the Tier-0 honesty bug (gh-#165): the Sharmas seed's kind-less "Foreign
+    // vacation" plannedFuture line (`seed-persona.ts`, no `kind` set → defaults to 'general') now
+    // correctly enters the FIRE-number family-layer lump, matching every other planned goal. This is
+    // the EXPECTED, intended effect of the fix, not drift.
+    expect(k.yearsToRegular).toBeCloseTo(25.67, 2);
+    expect(Math.round(k.fireNumber)).toBe(105_982_068);
+  });
+});
+
+describe("T-376/gh-#165 — 'general' planned goals enter the FIRE number (Tier-0 honesty fix)", () => {
+  beforeEach(() => setActivePinia(createPinia()));
+
+  it("a general planned goal (house upgrade) increases fireNumber and pushes FIRE strictly later", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    loadSeedPersona(h, a);
+    const lens = { isFamilyView: false, viewingMemberId: null, currentFY: "2025-26" } as const;
+
+    const before = derive(h.data, a.values, lens);
+
+    h.addPlannedFuture({
+      label: "House upgrade",
+      todayAmount: 10_000_000, // ₹1 Cr
+      targetYear: new Date().getFullYear() + 6,
+      isMultiYear: false,
+      kind: "general",
+    });
+
+    const after = derive(h.data, a.values, lens);
+
+    // The lump is a one-shot addition to the family-layer corpus — not divided by SWR.
+    expect(after.familyLayerCorpus - before.familyLayerCorpus).toBeCloseTo(10_000_000, 0);
+    expect(after.fireNumber).toBeGreaterThan(before.fireNumber);
+    expect(after.corpusOnlyYearsToRegular).toBeGreaterThan(before.corpusOnlyYearsToRegular);
+    expect(after.yearsToRegular).toBeGreaterThan(before.yearsToRegular);
+  });
+
+  it("removing the general goal restores a byte-identical headline to today (no regression)", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    loadSeedPersona(h, a);
+    const lens = { isFamilyView: false, viewingMemberId: null, currentFY: "2025-26" } as const;
+
+    const before = derive(h.data, a.values, lens);
+
+    const added = h.addPlannedFuture({
+      label: "House upgrade",
+      todayAmount: 10_000_000,
+      targetYear: new Date().getFullYear() + 6,
+      isMultiYear: false,
+      kind: "general",
+    });
+    h.removePlannedFuture(added.id);
+
+    const after = derive(h.data, a.values, lens);
+    expect(after.fireNumber).toBe(before.fireNumber);
+    expect(after.yearsToRegular).toBe(before.yearsToRegular);
+  });
+
+  it("a 'medical'-kind and a kind-less (v4-faithful default) planned goal ALSO enter the FIRE number", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    loadSeedPersona(h, a);
+    const lens = { isFamilyView: false, viewingMemberId: null, currentFY: "2025-26" } as const;
+
+    const before = derive(h.data, a.values, lens);
+
+    h.addPlannedFuture({
+      label: "Major surgery reserve",
+      todayAmount: 2_000_000,
+      targetYear: new Date().getFullYear() + 3,
+      isMultiYear: false,
+      kind: "medical",
+    });
+    h.addPlannedFuture({
+      label: "Unclassified goal",
+      todayAmount: 1_000_000,
+      targetYear: new Date().getFullYear() + 2,
+      isMultiYear: false,
+      // kind intentionally omitted — v4-faithful default must still count.
+    });
+
+    const after = derive(h.data, a.values, lens);
+    expect(after.familyLayerCorpus - before.familyLayerCorpus).toBeCloseTo(3_000_000, 0);
+    expect(after.fireNumber).toBeGreaterThan(before.fireNumber);
   });
 });
