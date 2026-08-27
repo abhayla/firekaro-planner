@@ -43,11 +43,38 @@ const PERSONAS: Array<{ name: string; load: (h: Store, a: ASt) => void }> = [
  * ratchet and must never be re-derived from the live kernel — the whole point is that they are frozen.
  */
 const PRE_ADR_0006 = {
-  sharmas: { householdFireAge: 56, needReal: 105_982_068 },
-  mehtas: { householdFireAge: 51, needReal: 102_333_391 },
-  iyers: { householdFireAge: 57, needReal: 80_319_726 },
-  mauryas: { householdFireAge: 68, needReal: 113_310_486 },
+  sharmas: { householdFireAge: 56, needReal: 105_982_068, requiredMonthlyReal: Number.POSITIVE_INFINITY },
+  mehtas: { householdFireAge: 51, needReal: 102_333_391, requiredMonthlyReal: Number.POSITIVE_INFINITY },
+  iyers: { householdFireAge: 57, needReal: 80_319_726, requiredMonthlyReal: 148_264 },
+  mauryas: { householdFireAge: 68, needReal: 113_310_486, requiredMonthlyReal: Number.POSITIVE_INFINITY },
 } as const;
+
+/**
+ * ADR-0006 Phase 1b (MEDIUM-8) — the LIVE-DEFAULTS direction record.
+ *
+ * Assertion 4 below is deliberately scoped to the FRAME leg, because the re-grounded inputs and
+ * the 2% step-up move the headline EARLIER by design. That scoping has a hole: a future change
+ * that made the frame more optimistic could hide behind the step-up on the live path and never
+ * trip anything. So the live-defaults prescription is RECORDED here with an explicit, commented
+ * allowance, and a movement outside it has to be argued in the PR rather than absorbed silently.
+ *
+ * Measured on this branch at each persona's STORED target age, default product lens. Only the
+ * Iyers have a finite figure; the other three are honestly unreachable at their stored age (the
+ * ADR-0006 item-4 state), and "unreachable" is itself the assertion for them — a finite number
+ * appearing there would mean the kernel had started inventing one again.
+ */
+const LIVE_DEFAULTS_REQUIRED_MONTHLY = {
+  sharmas: Number.POSITIVE_INFINITY,
+  mehtas: Number.POSITIVE_INFINITY,
+  iyers: 146_273,
+  mauryas: Number.POSITIVE_INFINITY,
+} as const;
+/**
+ * How far the live figure may move before someone has to explain it. The step-up leg is worth
+ * roughly −1.5% on the Iyers' prescription and the frame leg roughly +2.5%, so a band of ±8%
+ * catches a re-framing large enough to matter while tolerating ordinary re-grounding.
+ */
+const LIVE_DEFAULTS_ALLOWANCE = 0.08;
 
 /**
  * The pre-ADR-0006 INPUTS. Forcing them isolates the FRAME leg of the change from the re-grounded
@@ -197,11 +224,66 @@ describe("ADR-0006 — the FIRE target and the corpus must not share one inflati
         "the re-grounded inputs + the 2% step-up move the headline EARLIER by design.)";
       expect(rc.needReal, `${persona.name}: needReal ${rc.needReal} vs pre-ADR-0006 ${old.needReal} — ${why}`)
         .toBeGreaterThanOrEqual(old.needReal);
+      // …and the PRESCRIPTION itself, which is what the user acts on. `needReal` rising while the
+      // required monthly FELL would be an optimism leak the needReal check alone cannot see
+      // (Infinity >= Infinity holds for the three unreachable personas, which is the right
+      // statement: removing the optimistic frame must not make an unreachable plan reachable).
+      expect(
+        rc.requiredMonthlyReal,
+        `${persona.name}: requiredMonthlyReal ${rc.requiredMonthlyReal} vs pre-ADR-0006 ` +
+          `${old.requiredMonthlyReal} — ${why}`,
+      ).toBeGreaterThanOrEqual(old.requiredMonthlyReal);
       expect(k.householdFireAge, `${persona.name}: FIRE age must stay reachable under the frame leg`).not.toBeNull();
       expect(
         k.householdFireAge as number,
         `${persona.name}: FIRE age ${k.householdFireAge} vs pre-ADR-0006 ${old.householdFireAge} — ${why}`,
       ).toBeGreaterThanOrEqual(old.householdFireAge);
+    });
+  }
+});
+
+/**
+ * ADR-0006 Phase 1b (MEDIUM-8) — the LIVE-DEFAULTS direction case.
+ *
+ * Assertion 4 is frame-only by design. This is the companion that watches the path the user
+ * actually gets, so a future optimistic frame change cannot hide behind the step-up leg.
+ */
+describe("ADR-0006 — the LIVE prescription is recorded, not just the frame leg", () => {
+  beforeEach(() => setActivePinia(createPinia()));
+
+  for (const persona of PERSONAS) {
+    it(`${persona.name}: requiredMonthlyReal on live defaults is where it was recorded`, () => {
+      const h = useHouseholdStore();
+      const a = useAssumptionsStore();
+      persona.load(h, a);
+      const k = derive(h.data, a.values, DEFAULT_PRODUCT_LENS);
+      const rc = requiredMonthlyContributionFor({
+        snapshot: h.data,
+        assumptions: a.values,
+        lens: DEFAULT_PRODUCT_LENS,
+        targetAge: k.targetRetirementAge,
+      });
+      const recorded = LIVE_DEFAULTS_REQUIRED_MONTHLY[persona.name as keyof typeof LIVE_DEFAULTS_REQUIRED_MONTHLY];
+
+      if (!Number.isFinite(recorded)) {
+        expect(
+          Number.isFinite(rc.requiredMonthlyReal),
+          `${persona.name}: this plan is honestly unreachable at its stored target age. A finite ` +
+            "figure here means the kernel has started inventing one again (ADR-0006 item 4).",
+        ).toBe(false);
+        return;
+      }
+
+      const lo = recorded * (1 - LIVE_DEFAULTS_ALLOWANCE);
+      const hi = recorded * (1 + LIVE_DEFAULTS_ALLOWANCE);
+      expect(
+        rc.requiredMonthlyReal,
+        `${persona.name}: the live prescription moved from ${recorded} to ${rc.requiredMonthlyReal}, ` +
+          `outside the ±${LIVE_DEFAULTS_ALLOWANCE * 100}% allowance. That is not automatically wrong — ` +
+          "but it must be explained per persona in the PR and this constant re-recorded, never " +
+          "silently widened. A DOWNWARD move especially: it is the optimistic direction.",
+      ).toBeGreaterThanOrEqual(lo);
+      expect(rc.requiredMonthlyReal).toBeLessThanOrEqual(hi);
     });
   }
 });

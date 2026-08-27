@@ -14,14 +14,25 @@
  * silently-wrong "do this" number is the optimism error the honesty mandate exists to prevent.
  *
  * ADR-0006 RE-STATEMENT OF THAT CONTRACT FOR A MOVING TARGET. The target is no longer a constant:
- * it now grows at the household expense basket while the corpus grows at the nominal return. The
- * monotonicity STILL HOLDS, and for a reason worth writing down rather than re-deriving: for any
- * fixed year `t`, `corpus_t` is strictly increasing in the contribution `C`, while `target_t`
- * depends only on today's expenses and the basket — it is INDEPENDENT of `C`. So the set of years
- * at which `corpus_t >= target_t` can only grow as `C` grows, and its first element (years-to-FIRE)
- * is non-increasing. Nothing in the drift couples the target to the contribution; if a future
- * change ever does couple them (e.g. a lever that trims expenses as a function of the amount
- * invested), this argument breaks and the solver must be re-verified, not assumed.
+ * it now grows at the household expense basket while the corpus grows at the nominal return. For
+ * the CORPUS-ONLY leg the monotonicity argument is easy: for any fixed year `t`, `corpus_t` is
+ * strictly increasing in the contribution `C`, while `target_t` depends only on today's expenses
+ * and the basket — it is INDEPENDENT of `C`. So the set of years at which `corpus_t >= target_t`
+ * can only grow as `C` grows, and its first element is non-increasing.
+ *
+ * THAT ARGUMENT IS NOT SUFFICIENT FOR THE HEADLINE, and the difference is worth naming rather than
+ * glossed. The headline is
+ *     yearsToRegular = max(corpusOnlyYears, bridge.effectiveFireAge − anchorAge)
+ * and the BRIDGE leg is contribution-dependent: `derive.ts` scales every holding by
+ * `corpusScale = driftedTargetReal / totalCorpus` at the ADEQUACY AGE, and that age moves when `C`
+ * moves. So a larger `C` reaches adequacy earlier, at a DIFFERENT scale, over a DIFFERENT bridge
+ * window — there is no target-independence argument to lean on, and in principle a larger
+ * contribution could land on a worse liquidity profile. The soundness of the bisection therefore
+ * rests on the BEHAVIOURAL property test `kernel-invariants.property.spec.ts` (which asserts
+ * monotonicity on the HEADLINE `yearsToRegular`, bridge included, across fast-check perturbations
+ * of every seed AND a deliberately bridge-CONSTRAINED fixture), not on the argument above. If that
+ * property ever goes red the solver must fall back to a monotone scan; the test is not the thing
+ * to relax.
  *
  * FRAME. `needReal`/`haveAtTargetReal`/`requiredMonthlyReal` are TODAY's rupees at the TARGET AGE
  * — i.e. the nominal figure at T deflated at general CPI. `needNominal` is the nominal target at T
