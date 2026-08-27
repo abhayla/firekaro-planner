@@ -209,7 +209,7 @@ export function applyQuickAnswers(
 
   // ---- 2. people ----
   const selfId = `${QUICK_ID_PREFIX}self`;
-  const self: Member = track({
+  const self: Member = {
     id: selfId,
     name: "You",
     dateOfBirth: birthDateFor(answers.age, now),
@@ -219,14 +219,14 @@ export function applyQuickAnswers(
     health: "Healthy",
     riskAppetite: "Moderate",
     marital: answers.includeSpouse ? "Married" : "Single",
-  });
-  hh.members.push(self);
+  };
+  hh.members.push(track(self));
 
   let spouse: Member | null = null;
   if (answers.includeSpouse) {
     // The express path never asks the spouse's age — assuming the user's own keeps it to ten
     // cards, and the spouse card says so out loud ("we'll assume they're your age").
-    spouse = track({
+    spouse = {
       id: `${QUICK_ID_PREFIX}spouse`,
       name: "Spouse",
       dateOfBirth: birthDateFor(answers.age, now),
@@ -236,15 +236,14 @@ export function applyQuickAnswers(
       health: "Healthy",
       riskAppetite: "Moderate",
       marital: "Married",
-    });
-    hh.members.push(spouse);
+    };
+    hh.members.push(track(spouse));
   }
 
   const kidCount = Math.max(0, Math.round(n(answers.kids)));
   const kidAge = Math.max(0, Math.round(n(answers.kidsAge)));
   for (let k = 0; k < kidCount; k += 1) {
-    hh.members.push(
-      track({
+    const kid: Member = {
         id: `${QUICK_ID_PREFIX}kid-${k + 1}`,
         name: `Child ${k + 1}`,
         dateOfBirth: birthDateFor(kidAge, now),
@@ -254,8 +253,8 @@ export function applyQuickAnswers(
         riskAppetite: "Moderate",
         marital: "Single",
         educationStage: educationStageForAge(kidAge),
-      }),
-    );
+    };
+    hh.members.push(track(kid));
   }
   hh.setupMode = answers.includeSpouse
     ? kidCount > 0
