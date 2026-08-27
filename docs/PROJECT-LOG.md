@@ -127,8 +127,8 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
 
 ## §3 — Decision log (append-only, newest first)
 
-### 2026-08-27 (fleet, T-379)
-- **D-2026-08-27-05 — Quick Number wave CLOSED with QN-5 (T-379): the "How to get there" lever card ships,
+### 2026-08-27 (fleet, T-379 — newest)
+- **D-2026-08-27-06 — Quick Number wave CLOSED with QN-5 (T-379): the "How to get there" lever card ships,
   and the stage's own rule-29 reviews caught a Tier-0 optimism error that the green suite did not.**
   QN-5 adds four levers (step-up / delay-3 / direct-plans / no-prepay-roll-emi) beside the retained
   `trim-expenses`, measured in "less to find" ₹/month by RE-SOLVING through `required-contribution.ts`
@@ -158,6 +158,13 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
   number forever — ~₹3.4 Cr on this persona; pre-existing, out of QN-5 scope) and the per-holding
   direct/regular flag the TER lever would need to be exact on a mixed portfolio.
   Contract `docs/goals/2026-08-27-quick-number-front-door.md` §6; matrix rows B4, B6, C6, C7, D2, E6, E7, F6.
+  **Corroboration:** D-2026-08-27-05 records the T-378 checker independently re-deriving the real-kernel
+  Amit — need ₹19.05 Cr in today's money and "Move the age" at 50. That is the same verdict this stage's
+  honest step-up produces, reached by a different route, which is why the lever card now steers to a later
+  age rather than quoting a comfortable number at 50.
+
+### 2026-08-27 (10:15 IST)
+- **D-2026-08-27-05 — Quick Number wave: #166 (QN-3), #168 (QN-2), #175 (T-377 doc fixes) and #173 (QN-1+QN-4, the `/quick` front door) are ALL on `main`**, each behind an independent checker (evidence in `GetWorkDone/evidence/2026-08-27-T-37x/`). T-378's checker PASS-WITH-FINDINGS → fix-round T-378F running (card-3 EMI copy contradiction; loan balance must be the PV annuity via `amortization.ts`, not emi×12×years; sanity line on the result; the Option-C two-column desktop result layout; chart window from current age; QN-5 placeholder; server-mode rule-25 proof now possible with a local `server/.env`). Real-kernel Amit: need ₹19.05 Cr today's money, "Move the age" at 50 — re-derived exactly by the checker; the mock's ₹13.35 Cr was the simplified frame. T-379 (levers) is sequenced behind T-378F; T-380 (gh #167) after that. Costs so far: ≈$23 + $80 + $5 + $93 = **≈$200**; lessons logged (stage sizing, cap-death harvest, haiku context, trust-file race). Needs-Abhay B9 added (Supabase password rotation, low urgency).
 
 ### 2026-08-27 (08:30 IST)
 - **D-2026-08-27-04 — Repo made PUBLIC (Abhay: "make this repo public hence github billing won't be needed").**
@@ -233,8 +240,10 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
   monthly amount that gets them to the age they actually want. QN-2 flips the headline to **the age
   the user WANTS** ("To retire at 47 you'll need ₹10.60 Cr in today's money · ₹28.54 Cr in 2043") and
   adds the four numbers that make it actionable — need · you'll-have-by-then · gap · **do this
-  ₹/month** — plus a live 40–70 retirement-age slider so the trade-off is felt, not explained
-  (Sharmas: retire at 47 → ₹3.11 L/month; drag to 52 → ₹1.94 L/month).
+  ₹/month** — plus a live 40–75 retirement-age slider (dynamic floor `max(40, anchor+1)`, shared
+  with WhatIf's pre-existing ceiling — #64 class) so the trade-off is felt, not explained
+  (Sharmas: retire at 47 → "Move the age" — unreachable within the feasible living-floor ceiling;
+  drag to 52 → ₹1.94 L/month).
   - **How the number is computed (the load-bearing decision):** `src/lib/required-contribution.ts`
     **binary-searches the household real monthly contribution through the REAL `derive()` kernel** —
     NOT a closed-form annuity formula. Every candidate is a full kernel run, so step-up (ADR-0004),
@@ -270,7 +279,7 @@ DPDP/privacy posture for #44 remains a `TODO(5W)` to settle before instrumenting
     so "the age must differ per member" had stopped testing lensing. Re-pointed at the hero **need**
     figure (the member's own individual FIRE number) — the figure that actually carries the lens
     now. 22/22 PASS after the fix. Evidence: `e2e/t377-gap-hero-verify.spec.ts` (slider recomputes
-    47→52 = ₹3.11 L→₹1.94 L; rule-26 hero need ₹10.6 Cr matched the Goals screen exactly; 1280 +
+    47→52 = "Move the age"→₹1.94 L; rule-26 hero need ₹10.6 Cr matched the Goals screen exactly; 1280 +
     390 screenshots; zero new console errors).
   - **Design SSOT:** `docs/design/2026-08-27-quick-number-gap-hero/option-c-merged.html`;
     `SCREEN-STANDARD.md` v1.3 records the pattern. Contract: `docs/goals/2026-08-27-quick-number-front-door.md` §3.

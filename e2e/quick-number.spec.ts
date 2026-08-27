@@ -48,6 +48,47 @@ test.describe("QN-1 — the /quick express path", () => {
     await expect(page.locator('[data-testid="quick-assumptions"]')).toContainText("drawdown");
     await expect(page.locator('[data-testid="quick-chart-card"]')).toBeVisible();
 
+    // ---- the explainer must ADD UP to the headline beside it, before AND after the slider ----
+    // (Blind verification finding 2: the components used to come from a different kernel run than
+    // the headline, so dragging the age silently desynced them.)
+    const stepFigures = async () => {
+      const steps = await page.locator('[data-testid="quick-steps-list"] li').allInnerTexts();
+      // Step 1 quotes the base corpus last, steps 2 and 3 quote the layer and the reservation.
+      const lastMoney = (t: string) => {
+        const all = [...t.matchAll(/₹[\d.]+ (?:Cr|L)/g)].map((m) => parseCompact(m[0]));
+        return all[all.length - 1];
+      };
+      return [lastMoney(steps[0]), lastMoney(steps[1]), lastMoney(steps[2])];
+    };
+    const reconciles = async (expectedNeed: number) => {
+      const [base, goals, medical] = await stepFigures();
+      const sum = base + goals + medical;
+      // 2-dp Cr rounding on four figures — half a percent is the honest tolerance.
+      expect(
+        Math.abs(sum - expectedNeed) / expectedNeed,
+        `steps ${base}+${goals}+${medical}=${sum} must reconcile with the headline ${expectedNeed}`,
+      ).toBeLessThan(0.005);
+    };
+    await reconciles(quickNeed);
+
+    const slider = page
+      .locator('[data-testid="hero-age-slider"]')
+      .locator("[role='slider']")
+      .first();
+    await slider.focus();
+    for (let i = 0; i < 3; i += 1) await page.keyboard.press("ArrowRight");
+    await page.waitForTimeout(1200);
+    const movedNeed = parseCompact(
+      await page.locator('[data-testid="fire-hero-need"]').innerText(),
+    );
+    expect(movedNeed, "dragging the age must actually move the number").not.toBe(quickNeed);
+    await reconciles(movedNeed);
+
+    // Put the age back so the cross-page check below compares like with like.
+    await slider.focus();
+    for (let i = 0; i < 3; i += 1) await page.keyboard.press("ArrowLeft");
+    await page.waitForTimeout(1200);
+
     // ---- rule 26: the full planner shows the same number ----
     await page.locator('[data-testid="quick-open-planner"]').click();
     // SPA pushState fires no `load` event, so waitForURL's default wait never resolves here.
