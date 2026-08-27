@@ -404,6 +404,14 @@ export function projectCorpus(args: {
    * Lean/Fat keep the variant-multiplier basis they already share with the headline.
    */
   regularTargetToday?: number;
+  /**
+   * ADR-0006 Phase 1c. The headline's REGULAR target as a per-year NOMINAL schedule, when the
+   * caller has one. `derive()` passes its component schedule — perpetual legs at the household
+   * basket, each dated goal at its own bucket rate and held flat after its due year — so the
+   * chart's target line is the SAME curve the headline solver crossed, kink for kink. Takes
+   * precedence over `regularTargetToday`; omit both for the legacy expenses ÷ SWR basis.
+   */
+  regularTargetSchedule?: TargetSchedule;
 }): ProjectionPoint[] {
   const {
     currentCorpus,
@@ -416,6 +424,7 @@ export function projectCorpus(args: {
     horizonYears,
     decumulation,
     regularTargetToday,
+    regularTargetSchedule,
   } = args;
 
   const points: ProjectionPoint[] = [];
@@ -434,9 +443,11 @@ export function projectCorpus(args: {
     // ADR-0006: the regular target is the headline FIRE number when supplied, inflated at the
     // SAME rate as the expense line (both are the household's spending basket).
     const regularTarget =
-      regularTargetToday != null && Number.isFinite(regularTargetToday)
-        ? regularTargetToday * inflationFactor
-        : target;
+      regularTargetSchedule != null
+        ? resolveTarget(regularTargetSchedule, y)
+        : regularTargetToday != null && Number.isFinite(regularTargetToday)
+          ? regularTargetToday * inflationFactor
+          : target;
     const inDecumulation = !!decumulation && age >= decumulation.retirementAge;
     points.push({
       year: new Date().getFullYear() + y,
