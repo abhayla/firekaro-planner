@@ -3,7 +3,26 @@
 Branch `feat/adr-0006-honest-inflation-frame`. 7 commits, all `[skip ci]`. Not pushed, no PR, no
 Playwright. Baseline for every figure below is HEAD `eb3af7e` (Phase 1 kernel + Phase 2 UI).
 
-## 1. HIGH-1 — **STOPPED BY THE HARD GUARD. Not landed. Owner decision required.**
+## 1. HIGH-1 — **RESOLVED IN PHASE 1C.** (This section is the Phase-1b record; it stopped here.)
+
+> **RESOLUTION (Phase 1c, owner decision on both forks — see
+> `ADR-0006-PHASE1C-REPORT.md`).** Fork 1: the healthcare reservation **drifts at
+> `healthcareInflation` (9%)** — it buffers medical SHOCKS priced at medical inflation, while the
+> basket's 8%-weighted healthcare bucket covers recurring healthcare spend inside the base;
+> different rupees, no double count. The buffer growing from 20% of the base today toward ~44% by
+> year 30 IS the "healthcare weight rises with age" mechanism, bounded by its own price path.
+> Fork 2: a dated goal inflates at its own bucket rate **until its due year and is then held FLAT
+> IN NOMINAL RUPEES**; a goal falling beyond the horizon inflates throughout.
+>
+> That combination is the last row of the table below — Sharmas 55.42 / Mehtas 51.00 / Iyers 57.83
+> / **Mauryas 68.92**, all under the `fireAge <= 70` guard, every persona LATER than Phase 1, and
+> every `fireNumber` unchanged. The "positive control broken" note on that row was **not a model
+> defect but a mis-stated control**: it asserted the AGGREGATE target has zero drift at all-CPI,
+> which the goal cap correctly falsifies (a paid bill stops inflating while the deflator keeps
+> running, so the goals leg falls in real terms). Phase 1c rewrote the control to assert what
+> actually collapses — the BASE leg's drift is exactly 0, and the headline is identical whichever
+> way the weights reach one rate. The old form could only have been made to pass by deleting the
+> goal cap, i.e. by enforcing the bug.
 
 Implemented exactly as briefed (component target: base at the basket, each planned goal at its own
 `inflationBucket` rate, the healthcare reservation at `healthcareInflation`), measured, and then
@@ -47,7 +66,8 @@ leg. What is verified and reusable when the owner decides: the component resolve
 the horizon-anchored effective-drift scalar (anchoring that scalar on the stored target age instead
 of the solved FIRE horizon put the Monte Carlo p50 ~5 years behind the headline — worth knowing
 before the next attempt). The ADR section-2 education-weight-0 sentence is **unchanged**, because
-the kernel still does what it described.
+the kernel still does what it described. *(Phase 1c update: it has since been extended to describe
+the due-year cap, and decision item (7) — the reservation triple-count audit — is closed there.)*
 
 ## 2. What DID land
 

@@ -1,126 +1,164 @@
-# ADR-0006 Phase 1c — report: **STOPPED at guard (c). Owner decision required.**
+# ADR-0006 Phase 1c — completion report
 
-Branch `feat/adr-0006-honest-inflation-frame`. Baseline HEAD `e668a4e` (Phase 1 + 2 + 1b).
-No push, no PR, no Playwright.
+Branch `feat/adr-0006-honest-inflation-frame`. 5 commits, all `[skip ci]`. Not pushed, no PR, no
+Playwright. Baseline for every figure is HEAD `a9f3c94` (Phase 1 + Phase 2 + Phase 1b).
 
-## 0. Why this stopped
+**Phase 1b's HIGH-1 is resolved.** The fork it stopped on was decided by the FinTech role, and the
+whole component-target model has landed along with items (b) through (g).
 
-Guard (c) of the Phase-1c brief is explicit:
+---
 
-> Expected result … Sharmas ≈ 55.4, Mehtas ≈ 51.0, Iyers ≈ 57.8, Mauryas ≈ 68.9 … **If your
-> implementation lands materially elsewhere (> 0.5 y) STOP and report with numbers rather than
-> adjusting anything.**
+## 1. The decision that unblocked it
 
-Decisions (a) + (b) were implemented **exactly as written**, measured, and land **0.2–2.9 years
-EARLIER** than (c) predicts. Rather than tune anything to hit the number, the kernel diff is
-preserved as a patch and handed back.
+**The healthcare corpus reservation drifts at `healthcareInflation` (9%), not at the household
+basket.** This supersedes decision (a) of the earlier Phase-1c brief, which said the basket.
 
-## 1. The contradiction: (a) and (c) describe DIFFERENT variants
+The reservation buffers **medical shocks** — a hospitalisation, a surgery, a long-term-care
+episode — whose price rises at medical inflation. The household basket's 8%-weighted healthcare
+bucket covers **recurring** healthcare spend (premiums, consultations, medicines) inside the
+ongoing-expenses corpus. Different rupees, so there is no double count, and Phase-1b's suspected
+"triple count" (premium + bucket + reservation) resolves to three distinct obligations.
 
-Decision (a) says the healthcare corpus reservation grows with the **household basket** ("a
-fraction of the base … no change to how it drifts"), and dictates the comment explaining that
-inflating it at `healthcareInflation` would double-count the basket's healthcare bucket.
+The consequence Phase 1b flagged as a worry is the mechanism, not a bug: a buffer that is 20% of
+the base today grows toward **~44% of it by year 30**. That *is* "the healthcare weight of a
+household rises with age" (the FinTech ADR review's own framing), and it is bounded — the weight
+can never exceed the buffer's own price path, because the legs are explicit schedules rather than
+one blended rate.
 
-The numbers in (c) are Phase-1b's measurement table **row 5**. Rows 3, 4 and 5 of that table are
-successive deltas off the *briefed formula* of Phase 1b, which carried the **reservation at 9%**
-(`healthcareInflation`). Only row 2 moved the reservation to the basket, and row 2 is the
-*uncapped* goals variant. So (a)+(b) — capped-then-flat goals **with** a basket-drifted
-reservation — is a variant that was **never measured in Phase 1b**, and (c)'s figures cannot
-describe it.
+**Decision (b) stands as briefed:** a dated goal inflates at its own bucket rate until its due
+year and is then held **flat in nominal rupees** (the money was spent then; holding it flat rather
+than removing it is the conservative half — the corpus had to carry it to the due date and is
+never credited back). A goal falling beyond the horizon inflates throughout.
 
-This was confirmed decisively, not inferred. One two-line probe on the finished implementation,
-moving *only* the reservation leg onto `healthcareInflation` and changing nothing else,
-reproduces (c) to the second decimal:
+### The expectation was hit exactly
 
-| Persona | Phase 1 (HEAD) | **(a)+(b) as briefed** | probe: (b) + reservation at 9% | (c) expected |
-|---|---|---|---|---|
-| Sharmas | 54.42 | **53.75** | 55.42 | 55.4 |
-| Mehtas  | 50.58 | **50.42** | 51.00 | 51.0 |
-| Iyers   | 56.83 | **56.17** | 57.83 | 57.8 |
-| Mauryas | 68.33 | **66.00** | 68.92 | 68.9 |
+| Persona | Expected (probe column) | Measured | delta |
+|---|---|---|---|
+| Sharmas | 55.42 | **55.42** | 0.00 |
+| Mehtas | 51.00 | **51.00** | 0.00 |
+| Iyers | 57.83 | **57.83** | 0.00 |
+| Mauryas | 68.92 | **68.92** | 0.00 |
 
-The probe column *is* (c). The middle column is what the written decision produces. The gap is
-entirely the reservation leg — 20% of the base compounding at 9% instead of 6.24% over 22–30
-years is worth 1.7 / 0.6 / 1.7 / **2.9** years of FIRE age.
+Guards: every persona <= 70 (Mauryas has **1.08 y** of margin) and <= `planToAge`. Every persona is
+**LATER than the pre-ADR headline** — the one apparent exception is the Sharmas (56 -> 55.42), and
+that is the step-up leg: the frame leg alone puts them at 73, locked separately as assertion 4 of
+`inflation-frame-invariant.spec.ts`. No bound was widened to accommodate anything.
 
-## 2. Why this gap matters (it is the optimistic direction)
+---
 
-Every persona under (a)+(b) lands **EARLIER than the Phase-1 baseline it is replacing** —
-Sharmas −0.67, Mehtas −0.16, Iyers −0.66, Mauryas −2.33 years. The capping half of (b) is a
-genuine model correction (a goal paid in year 8 must stop inflating), and it is the honest thing
-to do; but combined with a basket-drifted reservation it makes the headline *more* optimistic
-than the frame ADR-0006 set out to de-optimise. Optimistic movement on the headline is Tier-0
-(`goal-anchored-decisions.md`) and is not something to absorb silently under a re-baseline.
+## 2. Per-persona: pre-ADR -> Phase 1 -> Phase 1c
 
-Nothing here trips the hard guards — all four personas are ≤ 70 and ≤ `planToAge` under
-(a)+(b) (66.0 is the worst). The stop is guard (c), not the ≤ 70 guard that stopped Phase 1b.
+Default product lens, stored target age. `needReal` / `needNominal` / `requiredMonthlyReal` from
+`requiredMonthlyContributionFor` at the stored target age; MC p50 from the production
+`useFireDerive().monteCarlo`.
 
-## 3. The fork this hands back (one question)
+| Persona | metric | pre-ADR-0006 | Phase 1 | **Phase 1c** | why |
+|---|---|---|---|---|---|
+| **Sharmas** (30 -> 47) | fireAge | 56 | 54.42 | **55.42** | +1.00 y: the reservation leg at 9% instead of 6.24% over 25 y. Their dated goals are small, so (b)'s cap barely offsets it. |
+| | needReal | Rs 10.60 Cr | Rs 11.01 Cr | **Rs 12.17 Cr** | +10.5% on Phase 1 — same cause, compounded over T = 17. |
+| | needNominal | Rs 28.54 Cr | Rs 29.66 Cr | **Rs 32.76 Cr** | the same figure in target-year rupees. |
+| | requiredMonthlyReal | Inf | Inf | **Inf** | honestly unreachable at 47; the hero says "move the age". |
+| | MC p50 | — | 25.83 | **26.83** | tracks the +1 y headline; gap to deterministic 1.42 y. |
+| **Mehtas** (45 -> 47) | fireAge | 51 | 50.58 | **51.00** | +0.42 y: same cause, but a 6-year horizon gives it little room. |
+| | needReal | Rs 10.23 Cr | Rs 10.28 Cr | **Rs 10.35 Cr** | +0.7% — T = 2, so almost nothing compounds. |
+| | needNominal | Rs 11.50 Cr | Rs 11.55 Cr | **Rs 11.63 Cr** | |
+| | requiredMonthlyReal | Inf | Inf | **Inf** | |
+| | MC p50 | — | 6.00 | **6.17** | gap to deterministic 0.17 y. |
+| **Iyers** (38 -> 55) | fireAge | 57 | 56.83 | **57.83** | +1.00 y: reservation leg over a 20-year horizon; small family layer. |
+| | needReal | Rs 8.03 Cr | Rs 8.35 Cr | **Rs 8.74 Cr** | +4.7% on Phase 1. |
+| | needNominal | Rs 21.63 Cr | Rs 22.48 Cr | **Rs 23.54 Cr** | |
+| | requiredMonthlyReal | Rs 1,48,264 | Rs 1,46,273 | **Rs 1,58,421** | +8.3%, **upward** = conservative. Re-recorded in the live-defaults lock with this reason; the +/-8% allowance was NOT widened. |
+| | MC p50 | — | 20.58 | **21.58** | gap to deterministic 1.75 y. |
+| **Mauryas** (44 -> 50) | fireAge | 68 | 68.33 | **68.92** | +0.59 y only. The reservation leg alone is worth ~+2 y here; (b)'s goal cap claws most of it back — this persona has the largest education goals of the four. That interaction is exactly why the two halves had to land together. |
+| | needReal | Rs 11.33 Cr | Rs 11.49 Cr | **Rs 11.90 Cr** | +3.6% on Phase 1. |
+| | needNominal | Rs 16.07 Cr | Rs 16.29 Cr | **Rs 16.88 Cr** | |
+| | requiredMonthlyReal | Inf | Inf | **Inf** | |
+| | MC p50 | — | 25.92 | **26.67** | gap to deterministic **1.75 y**, down from the 3.25 y measured before the band was moved onto the effective drift. |
 
-**Does the healthcare corpus reservation drift at the household basket, or at
-`healthcareInflation`?**
+**`fireNumber` is byte-identical to pre-ADR for all four personas** (Rs 10.60 / 10.23 / 8.03 /
+11.33 Cr). The target's *size* has never moved in any phase of ADR-0006 — only its trajectory.
+Two-frame agreement (assertion 3) still holds: the chart crossover is 56 / 51 / 58 / 69 against
+headline ages 55.42 / 51.00 / 57.83 / 68.92.
 
-- **Basket (decision (a) as written)** — internally consistent with the "fraction of the base"
-  framing and avoids double-counting the basket's 8%-weighted healthcare bucket. Cost: the
-  headline moves earlier than Phase 1 on every persona; (c)'s numbers are wrong and the golden
-  master re-baselines in the optimistic direction.
-- **`healthcareInflation` (what (c) actually measured)** — the reservation funds *medical shocks*,
-  whose price genuinely rises at healthcare inflation, so a 9% drift is defensible on its own
-  terms; this is also the only variant that reproduces the briefed expectation. Cost: the
-  reservation goes from 20% of base today to ~44% by year 30 on a "20%" calibration that was not
-  set with that in mind (Phase 1b's own fork-1 caveat), and the healthcare bucket is arguably
-  counted twice.
+---
 
-The two are one line apart in the patch. Everything else in 1c — items (d) through (g) — depends
-on which one is chosen, because all of them re-baseline against it.
+## 3. What landed, item by item
 
-## 4. What is built, verified, and preserved
-
-`docs/goals/.run/ADR-0006-PHASE1C-STOPPED-kernel.patch` (240 lines, applies cleanly to `e668a4e`)
-contains the complete (a)+(b) kernel:
-
-- **`derive.ts`** — the family layer split into its two differently-drifting halves
-  (`plannedGoalsToday` + `extendedContingencyCorpusToday`, summing to `familyLayerCorpus` by
-  construction); `bucketInflationRate()` resolving `inflationBucket` → education / healthcare /
-  housing / general(CPI); `plannedGoalComponents` carrying each goal's `todayAmount`, its own
-  rate, and `dueYears = max(0, targetYear − currentYear)`; and the component target
-  `regularTargetSchedule(t) = (base + reservation + contingency)·(1+b)^t + Σ
-  goal_i·(1+rate_i)^min(t, dueYears_i)`, exact to `fireNumber` at t = 0. Plus
-  `regularTargetComponentsRealAt(t)` (the today's-₹ three-way split that sums to the total — the
-  seam item (b) needs for `required-contribution`), and `effectiveTargetDriftRate` /
-  `effectiveTargetGrowthNominal` anchored on the **solved** horizon (Phase 1b's recorded trap).
-  The solver, the bridge `corpusScale` and `projectCorpus` all read the schedule.
-- **`fire-math.ts`** — `projectCorpus` gains an optional `regularTargetSchedule` that takes
-  precedence over `regularTargetToday`, so the chart's target line kinks where the goal legs stop.
-- The decision-(a) rationale comment is in place at the reservation site, worded as briefed.
-
-`npm run type-check` is **clean** on the patched tree.
-
-**Not started** (each is downstream of the fork): (b)'s `required-contribution.ts` mirror, (d) the
-positive-control rewrite, (e) the new education-goal spec, (f) `CoastTrajectoryChart.vue`, (g) the
-re-baselines and the ADR §2 / Phase-1b-report edits. The Phase-1b report's HIGH-1 section is
-therefore **unchanged** — HIGH-1 is not resolved.
-
-## 5. Blast radius already measured (so the next round does not rediscover it)
-
-Targeted run on the patched tree — 9 failures, all expected and all owned by unstarted 1c items:
-
-| Spec | Failures | Owned by |
+| Item | Commit | One line |
 |---|---|---|
-| `headline-golden-master.spec.ts` | 4 (all personas) | (g) re-baseline |
-| `headline-plausibility.spec.ts` | 4 — mauryas MC p50 tracking (3.25 y vs the 2.0 bound); the acceleration-card baseline on sharmas / mehtas / mauryas | (b) — the MC + lever baselines still read the scalar `realTargetDriftRate`; they must move to `effectiveTargetDriftRate` / `effectiveTargetGrowthNominal`, which the patch already exports |
-| `inflation-frame-invariant.spec.ts` | 1 — assertion 2 `yearsToRegular` 22.33 vs 23.17 | (d), exactly as the brief predicted |
+| (a)+(b) kernel | `c9ddd03` | `target(t) = (base + contingency)(1+b)^t + reservation(1+healthcare)^t + sum goal_i(1+rate_i)^min(t, due_i)`, exact to `fireNumber` at t = 0. `regularTargetComponentsRealAt(t)` is the today's-Rs three-way split summing to the total; `effectiveTargetDriftRate` / `...GrowthNominal` are the scalar equivalents anchored on the **solved** horizon. The solver, the bridge `corpusScale` and `projectCorpus` all read the one schedule. |
+| (b) solver mirror | `4caeb43` | `required-contribution.ts` reads `needReal` + all three narrated components off the component schedule. `(1+g)^T` over-states the need for any household whose goals fall due inside the horizon, and the steps would stop summing to the headline the moment one did. |
+| (d) positive control | `4caeb43` | Rewritten — see section 4. |
+| (e) education-goal spec | `4caeb43` | New `planned-goal-drift.spec.ts`: Rs 50 L due in 8 years at a 17-year target is exactly `5,000,000 x 1.09^8 / 1.06^17` = **Rs 36,99,834**, asserted as that literal AND as the formula; a beyond-horizon goal inflates throughout; the leg is provably flat in nominal Rs from year 8 to year 30. |
+| (f) Coast chart | `f620207` | `coastTrajectory` takes `fireTargetRealAt`; `FireMilestonesCard` passes the kernel's curve; legend copy is "FIRE target (rising with your costs)"; a non-finite reading falls back to the flat number rather than a NaN axis. Also moved the coast-corpus discount and the Monte Carlo `targetGrowthRate` off the base-leg-only `realTargetDriftRate`. |
+| (g) re-baselines | `1f19484` | Golden master (4 snapshots), `derive.spec` Sharmas pin, seed-consistency bands, the live-defaults record, the deflation origin-alignment guard, `useAcceleration`'s baseline. Reasons per persona in section 2 and in the file comments. |
 
-Assertions 1, 3 and 4 and the live-defaults case all **pass** unchanged; the Iyers' live
-prescription moves ₹1,46,273 → ₹1,39,303 (−4.8%, inside the ±8% allowance).
+Docs: ADR Decision item (2) now describes the due-year cap, and item (7) — the reservation
+triple-count audit — is closed there with the decision and its cost. The Phase-1b report's HIGH-1
+section is marked resolved with the decision and the mis-stated-control finding.
+
+`docs/goals/.run/ADR-0006-PHASE1C-STOPPED-kernel.patch` was applied and deleted.
+
+---
+
+## 4. The two assertions that were rewritten, and why that is not loosening
+
+**The ADR positive control** used to say: with all four buckets at CPI, the headline equals a
+reference run whose weights are 100% general. That reference kept the LIVE bucket rates, so it
+still ran a 9% reservation — the two sides were never the same plan once the reservation got its
+own rate. The rewritten control asserts what actually collapses:
+
+- the **base** leg's drift is exactly 0 (`toBeCloseTo(0, 12)`), *and* the base component is flat in
+  today's rupees across the whole horizon — a zero rate that the schedule then ignored would pass
+  the first check and fail the second;
+- the headline is identical **field for field** against a reference computed by the same kernel from
+  the same flat bucket rates with the weights forced to 100% general.
+
+It deliberately does **not** assert the AGGREGATE target has zero drift. It cannot: a dated goal
+stops inflating while the deflator keeps running, so the goals leg *falls* in real terms after its
+due year. The only way to make that assertion pass would be to delete the goal cap — the assertion
+would be enforcing the bug. This is Phase 1b's "positive control broken" note, re-diagnosed: the
+control was mis-stated, the model was right.
+
+**The deflation origin-alignment guard** used to assert the deflated target sits on `(1+g)^i`. `g`
+is now only the base leg's drift, so the Sharmas' line sits ~0.8% above that curve by year 1. It
+now asserts the deflated point equals the kernel's own today's-Rs target **point for point**, which
+is strictly sharper: it still catches an origin shift (the thing the test exists for) and it also
+catches any divergence between the display curve and the solver's curve, which `(1+g)^i` could not.
+
+Everything else was re-recorded, not relaxed: the +/-8% live-defaults allowance is unchanged, the
+`fireAge <= 70` gate is unchanged, the 2.0 y MC tracking bound is unchanged, and the
+seed-consistency bands were re-tightened just above their new values.
+
+---
+
+## 5. Deviations
+
+1. **Decision (a) as originally written was not implemented** — the owner brief supersedes it with
+   the `healthcareInflation` variant, which is what landed. Recorded here because the earlier stop
+   report argued the other side.
+2. **`required-contribution.spec`'s Sharmas re-feed proof moved from target age 50 to 52.** At 50
+   their need is now Rs 12.00 Cr and the honest answer is Infinity, so there is no solved amount to
+   re-feed. 52 is the first reachable age. The proof itself — feed the answer back into `derive()`
+   and the target must be reached, and one tolerance-step less must not reach it — is unchanged.
+3. **Two consumers moved off `realTargetDriftRate` beyond the brief's letter**: the coast-corpus
+   discount in `FireMilestonesCard` and the Monte Carlo band's `targetGrowthRate`. Both take one
+   scalar and both were reading the base leg only, i.e. under-stating the target — the optimistic
+   direction, which is Tier-0. They now read the effective drift. Without the MC move the Mauryas
+   p50 sat 3.25 y from the headline it brackets (the plausibility spec's pre-measured failure).
+4. **`src/lib/lever-impact.ts`'s `targetGrowthRate` doc contract was updated** (no behaviour
+   change) so the next caller does not repeat the base-leg mistake.
+5. **`e2e/t380-ui-verify.spec.ts` is untracked in the worktree** and was left alone — it predates
+   this round, and no Playwright was run.
+
+---
 
 ## 6. Gates
 
 | Gate | Result |
 |---|---|
-| `npm run type-check` (root, patched tree) | clean |
-| `npx vitest run` (root) | not run to completion — the tree is intentionally reverted to `e668a4e`, where Phase 1b's 98 files / 1460 tests remain green |
-| server gates | untouched by this round |
-
-Branch HEAD is left at the Phase-1b state plus this report and the patch, so the committed tree is
-green while nothing built in this round is lost.
+| `npm run type-check` (root) | clean |
+| `npx vitest run` (root) | **98 files / 1465 tests passed, 0 failed** (1460 -> 1465; +5 net new) |
+| `cd server && npm run type-check` | clean |
+| `cd server && npm run lint` | clean |
+| `cd server && npm run test:unit` | **21 files / 179 passed, 1 skipped** (the `DATABASE_URL`-gated live integration spec) |
