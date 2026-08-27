@@ -15,24 +15,32 @@
  * the effective FIRE age moves LATER.
  *
  * CONSERVATIVE BY CONSTRUCTION: the liquid pool earns NO return during the bridge
- * (drawn money doesn't compound), expenses are flat in today's rupees, and every
- * income stream is post-tax — so the check errs toward declaring a gap, never
- * hiding one. Pure — no store/DOM access.
+ * (drawn money doesn't compound) and every income stream is post-tax — so the check
+ * errs toward declaring a gap, never hiding one. Pure — no store/DOM access.
  *
- * ADR-0006 item (6) — DELIBERATELY UNCHANGED, and this is the record of that decision.
- * ADR-0006 makes the household's expenses grow at the basket, so "expenses flat in today's
- * rupees over the bridge window" is now an OPTIMISTIC simplification: at g ≈ 0.23%/yr it
- * understates bridge-year spending by roughly 1–4% over a 5–15 year window. It is retained
- * because it is PAIRED with an equal-and-opposite PESSIMISTIC one — the drawn pool earns zero
- * return for the whole window, which understates the money available by considerably more than
- * a fraction of a percent a year. The NET direction of the pair is ambiguous, and closing only
- * the optimistic half would leave the bridge strictly more pessimistic than it is today for no
- * measured reason. So the two are treated as ONE decision: revisit them together, with numbers,
- * or not at all. Do not "consistency-fix" the expense line on its own.
+ * ADR-0006 PHASE 1D — THE EXPENSE SIDE NOW DRIFTS, AND THIS IS THE RECORD OF WHY.
  *
- * (The one thing ADR-0006 DID change for the bridge is upstream, in `derive.ts`: `corpusScale`
- * now scales holdings by the DRIFTED real target at the adequacy age, so the bridge starts from
- * the same corpus the adequacy leg actually reaches.)
+ * ADR-0006 item (6) originally kept expenses FLAT in today's rupees here, paired with the
+ * zero-return-on-the-drawn-pool simplification, as one ambiguous-net decision to revisit
+ * together. That reasoning does not survive Phase 1c, because the two halves of this check
+ * stopped sharing a frame: `derive.ts` scales the incoming holdings by the DRIFTED component
+ * target at the adequacy age (`corpusScale`), while the expenses those holdings had to fund
+ * stood still. A rising target therefore made the bridge look BETTER covered — the resources
+ * grew and the bill did not. That is not a conservative simplification, it is a mixed frame
+ * that leans optimistic exactly where the honesty layer is supposed to lean the other way.
+ *
+ * So the caller passes `annualExpensesAt`: today's-rupee spending at year `t`, taken from the
+ * BASE leg of the kernel's component target — the perpetual ongoing-spend leg, which is what a
+ * retiree actually spends. Dated goals and the medical-shock reservation are deliberately NOT in
+ * it: a goal is a lump paid on its own date, and the reservation is a buffer, neither is bridge
+ * spending.
+ *
+ * THE PAIR, RESTATED. What remains, and stays stated rather than fixed, is the ZERO RETURN ON
+ * THE DRAWN POOL: money already drawn to live on earns nothing for the whole window, which
+ * understates the resources available by considerably more than the expense drift understated
+ * the bill. The bridge is therefore still net-pessimistic — as intended — but it is now
+ * pessimistic in ONE frame instead of optimistic in a mixed one. Revisit the zero-return half on
+ * its own numbers if ever, and never re-flatten the expense line to "restore the pair".
  */
 import type { Investment } from "@/types/household";
 import { accessibleAtAge, type AssumptionNote } from "@/lib/accessibility";
@@ -63,6 +71,14 @@ export interface BridgeInput {
   planToAge: number;
   /** Gross household annual expenses to fund in retirement (today ₹). */
   annualExpenses: number;
+  /**
+   * ADR-0006 Phase 1d — gross household annual expenses in TODAY's rupees at `t` years past
+   * `anchorAge`, i.e. the same figure as `annualExpenses` re-priced along the household's own
+   * spending basket (the BASE leg of the kernel's component target — see the header). Optional:
+   * when omitted the flat `annualExpenses` is used at every age, which is the pre-Phase-1d
+   * behaviour every existing fixture asserts.
+   */
+  annualExpensesAt?: (yearsFromAnchor: number) => number;
   income: BridgeIncome;
   /** Post-tax exit lump (gratuity) received AT the retirement age. */
   exitLumpNet: number;
@@ -188,6 +204,18 @@ export function computeBridgeCoverage(input: BridgeInput): BridgeCoverage {
     return { reachableCorpus, lockedCorpus, tranches, npsStreams, assumptions };
   }
 
+  /**
+   * ADR-0006 Phase 1d — today's-₹ spending at `age`, re-priced along the household basket via the
+   * caller's resolver. Falls back to the flat figure when no resolver was supplied, and to it
+   * again if the resolver ever returns a non-finite or negative number (rule 31 — a bad
+   * assumption must never reach the coverage verdict as NaN).
+   */
+  function expensesAtAge(age: number): number {
+    if (!input.annualExpensesAt) return input.annualExpenses;
+    const v = input.annualExpensesAt(Math.max(0, age - input.anchorAge));
+    return Number.isFinite(v) && v >= 0 ? v : input.annualExpenses;
+  }
+
   function incomeAtAge(age: number, npsStreams: AnnuityStream[]): number {
     let income = input.income.rentalAnnualPostTax;
     for (const s of npsStreams) if (age >= s.startAge) income += s.annualPostTax;
@@ -214,7 +242,7 @@ export function computeBridgeCoverage(input: BridgeInput): BridgeCoverage {
       // dominated by the bridge's no-returns-during-drawdown assumption, so the net check
       // stays conservative. (Reviewer: no code change required for correctness.)
       for (const t of c.tranches) if (t.age === age) cumResources += t.netAmount;
-      cumExpenses += Math.max(0, input.annualExpenses - incomeAtAge(age, c.npsStreams));
+      cumExpenses += Math.max(0, expensesAtAge(age) - incomeAtAge(age, c.npsStreams));
       const surplus = cumResources - cumExpenses;
       if (surplus < 0) underwaterYears++;
       if (surplus < minSurplus) minSurplus = surplus;

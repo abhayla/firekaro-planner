@@ -921,6 +921,19 @@ export function derive(
       // Tier-0 honesty error). The adequacy leg separately uses netAnnualExpenses for the
       // FIRE number — locked by derive.spec's "annuity-once" magnitude test.
       annualExpenses: annualExpensesToday,
+      // ADR-0006 Phase 1d: …and the SAME expenses re-priced year by year, so the bridge stops
+      // being a mixed frame. `corpusScale` above already scales the holdings by the DRIFTED
+      // target; leaving the bill flat meant a rising target made the bridge look BETTER covered,
+      // which is optimistic in the one layer whose whole job is to be pessimistic.
+      //
+      // The drift is the BASE leg's alone — `regularTargetComponentsRealAt(t).base / baseFireNumber`
+      // — because the base leg IS the perpetual ongoing-spend the retiree lives on. Dated goals
+      // are lumps paid on their own dates and the medical reservation is a shock buffer; neither
+      // is bridge spending, and folding either in would inflate the retiree's grocery bill at
+      // education or medical inflation.
+      annualExpensesAt: (t: number) =>
+        annualExpensesToday *
+        (baseFireNumber > 0 ? regularTargetComponentsRealAt(t).base / baseFireNumber : 1),
       income: {
         rentalAnnualPostTax: Math.round(rentalAnnualPostTax),
         // EPS pension is fully taxable (no Sec 24a) — postTax() taxes the full gross, correct here.
