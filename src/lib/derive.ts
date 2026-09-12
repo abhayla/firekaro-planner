@@ -82,7 +82,7 @@ export function bridgeRentalPostTaxAnnual(
     }, 0);
 }
 
-import { usableOverride, type DeriveOverrides } from "@/lib/derive-overrides";
+import { usableOverride, usableExtraContribution, type DeriveOverrides } from "@/lib/derive-overrides";
 export type { DeriveOverrides } from "@/lib/derive-overrides";
 
 export interface DeriveLens {
@@ -583,8 +583,14 @@ export function derive(
   // real step-up is net-of-inflation growth on top of the constant-real baseline). The flattening
   // lives in lib/contribution-schedule.ts (single-kernel rule), not inline here.
   const householdSavingsStepUpPct = assumptions.householdSavingsStepUpPercent ?? 0;
+  // T-379 (QN-5): the `no-prepay-roll-emi` lever adds the freed EMI from the loan's end age as a
+  // SECOND segment. Segment selection is "latest-starting wins" (contribution-schedule.ts), so the
+  // rolled segment must carry the step-up-grown base PLUS the EMI — otherwise the step-up would
+  // silently restart at the boundary and adding money could read as a penalty.
+  const rollExtra = usableExtraContribution(overrides?.extraMonthlyFromAge, anchorAge);
+  const stepUpRate = householdSavingsStepUpPct / 100;
   const householdContributionSchedule: ContributionSchedule =
-    householdSavingsStepUpPct > 0 && monthlyContribution > 0
+    (householdSavingsStepUpPct > 0 || rollExtra != null) && monthlyContribution > 0
       ? buildContributionResolver(
           [
             {
@@ -592,6 +598,17 @@ export function derive(
               startAtAge: anchorAge,
               stepUpPercentPerYear: householdSavingsStepUpPct,
             },
+            ...(rollExtra
+              ? [
+                  {
+                    amount:
+                      monthlyContribution * (1 + stepUpRate) ** (rollExtra.fromAge - anchorAge) +
+                      rollExtra.amount,
+                    startAtAge: rollExtra.fromAge,
+                    stepUpPercentPerYear: householdSavingsStepUpPct,
+                  },
+                ]
+              : []),
           ],
           anchorAge,
         )

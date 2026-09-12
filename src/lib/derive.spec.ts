@@ -1075,3 +1075,68 @@ describe("T-377/QN-2 — the additive `overrides` seam the required-contribution
     expect(later.fireNumber).toBeLessThanOrEqual(base.fireNumber);
   });
 });
+
+describe("T-379/QN-5 — `extraMonthlyFromAge`: the ADR-0004 roll-EMI contribution segment", () => {
+  beforeEach(() => setActivePinia(createPinia()));
+
+  const lens = (ui: ReturnType<typeof useUiStore>) => ({
+    isFamilyView: ui.isFamilyView,
+    viewingMemberId: ui.viewingMemberId,
+    currentFY: ui.currentFY,
+  });
+
+  it("is ignored when absent, non-finite or non-positive (default kernel byte-identical — rule 31)", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    const ui = useUiStore();
+    loadSeedPersona(h, a);
+
+    const base = derive(h.data, a.values, lens(ui));
+    for (const bad of [
+      undefined,
+      { amount: Number.NaN, fromAge: 55 },
+      { amount: 0, fromAge: 55 },
+      { amount: -5000, fromAge: 55 },
+      { amount: 50_000, fromAge: Number.NaN },
+    ]) {
+      const out = derive(h.data, a.values, lens(ui), { extraMonthlyFromAge: bad as never });
+      expect(out.yearsToRegular).toBe(base.yearsToRegular);
+      expect(out.householdFireAge).toBe(base.householdFireAge);
+    }
+  });
+
+  it("rolling a freed EMI into investing from a future age never makes FIRE later, and never moves the FIRE number", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    const ui = useUiStore();
+    loadSeedPersona(h, a);
+
+    const base = derive(h.data, a.values, lens(ui));
+    const rolled = derive(h.data, a.values, lens(ui), {
+      extraMonthlyFromAge: { amount: 60_000, fromAge: base.anchorAge + 5 },
+    });
+
+    // The target is expense-driven — adding future contributions must never move it.
+    expect(rolled.fireNumber).toBe(base.fireNumber);
+    // STRICT: the segment must actually reach the kernel — an ignored field would leave this equal
+    // (the no-inert-seam guard; a silently-dropped override is the whole failure mode here).
+    expect(rolled.yearsToRegular).toBeLessThan(base.yearsToRegular);
+  });
+
+  it("keeps the household step-up compounding across the segment boundary (no silent reset)", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    const ui = useUiStore();
+    loadSeedPersona(h, a);
+    a.values.householdSavingsStepUpPercent = 10;
+
+    const withStepUp = derive(h.data, a.values, lens(ui));
+    const withStepUpAndRoll = derive(h.data, a.values, lens(ui), {
+      extraMonthlyFromAge: { amount: 60_000, fromAge: withStepUp.anchorAge + 5 },
+    });
+
+    // Adding money can only help; a segment that reset the step-up compounding would make the
+    // post-boundary contribution SMALLER than the step-up-only path and could push FIRE later.
+    expect(withStepUpAndRoll.yearsToRegular).toBeLessThanOrEqual(withStepUp.yearsToRegular);
+  });
+});
