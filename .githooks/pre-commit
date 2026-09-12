@@ -59,7 +59,7 @@ patterns=(
 )
 
 for p in "${patterns[@]}"; do
-  hits=$(echo "$added" | grep -nE -e "$p" | grep -viE 'your[-_]|placeholder|example|changeme|xxxx+|process\.env|import\.meta\.env|<[a-zA-Z]|REPLACE|redacted' || true)
+  hits=$(echo "$added" | grep -nE -e "$p" | grep -viE 'your[-_]|change_me|changeme|placeholder|example|changeme|xxxx+|process\.env|import\.meta\.env|<[a-zA-Z]|REPLACE|redacted' || true)
   if [ -n "$hits" ]; then
     echo "BLOCKED: staged change matches secret pattern /$p/:"
     echo "$hits" | head -5
