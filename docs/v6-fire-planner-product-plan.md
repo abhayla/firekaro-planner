@@ -326,9 +326,16 @@ standard 24/25/26 + TDD gates) when its predecessor is verified.
 **Primary wedge — the urban salaried accumulator.** Optimize FireKaro hardest for this user first
 and let the product stay opinionated around them:
 
-- Age **28–45**, **salaried** in IT / tech / finance / consulting / MNCs
-- **Metro / Tier-1**, household income **₹15L–₹1Cr+**, equity-comfortable, English-literate
-- Often **DINK or young-family / sandwich-gen** — exactly the seeded **Sharmas / Iyers / Mehtas**
+- Age **20–60**, **salaried** (any sector)
+- Household income **₹2.5L–₹1Cr+** (no city, sector, language, or equity-comfort filter)
+- Often **DINK or young-family / sandwich-gen** — the seeded **Sharmas / Iyers / Mehtas / Mauryas**
+  sit in the ₹18L–₹45L band of this range; **no seed yet represents the ₹2.5L–₹10L band**
+
+> **Revised 2026-09-13 (Abhay, D-2026-09-13-02).** Was: age 28–45, IT/finance/consulting, metro /
+> Tier-1, ₹15L–₹1Cr+, equity-comfortable, English-literate. The persona is still ONE salaried
+> accumulator, but the age and income bands are much wider and the city/sector/language filters are
+> gone. The **Basis** paragraph below and Tier-3 "vernacular mass-market" were written for the old
+> band and have NOT been re-argued — see the PROJECT-LOG entry for what this widening costs.
 
 **Basis:** (1) FIRE adoption in India is, observably, an affluent urban-salaried movement, not a
 mass-market one — "cover all of India" would dilute a FIRE planner into a commodity budgeting app;
