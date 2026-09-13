@@ -13,7 +13,7 @@ standalone personas: each role's real work is done by the named agents/skills (p
 
 > **Now (production-live, 2026-06-01):** FireKaro is LIVE at https://firekaro.com (Hostinger VPS,
 > PM2 + nginx → Supabase; Google OAuth working). The v6 backend (Hono/Prisma document API +
-> ServerAdapter) shipped. **Primary target persona is LOCKED: the urban salaried accumulator**
+> ServerAdapter) shipped. **Primary target persona is LOCKED: the salaried accumulator, lower-middle to upper-middle class (age 20–60, ₹2.5L–₹1Cr+ household; not the affluent — D-2026-09-13-02/03)**
 > (`docs/v6-fire-planner-product-plan.md` §9). Focus has shifted from "ship it" to **serve that
 > wedge across their whole FIRE lifecycle** (the 5 objectives, §9: set-up · honesty ·
 > get-there-faster · readiness-to-stop · stay-free-post-FIRE):

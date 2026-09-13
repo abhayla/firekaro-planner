@@ -15,7 +15,9 @@ serving the goal + the target user is. Requested by Abhay 2026-06-03.
 - **Product goal:** a research-grounded Indian **FIRE** planning SaaS — *planning & tracking, not
   advice* — that is **correct, honest, sticky, and friction-free** (`CLAUDE.md` "What this is";
   `docs/v6-fire-planner-product-plan.md`).
-- **Primary user (LOCKED):** the **urban salaried accumulator** — someone in the *accumulation*
+- **Primary user (LOCKED; bands revised 2026-09-13, D-2026-09-13-02/03):** the **salaried accumulator,
+  lower-middle to upper-middle class — age 20–60, household income ₹2.5L–₹1Cr+, any city / sector /
+  language; NOT the affluent / HNI earner, who is already independent** — someone in the *accumulation*
   phase (still earning, building corpus), whose headline number is the **FIRE date / years-to-FIRE**
   (`docs/v6-fire-planner-product-plan.md` §9). FireKaro serves this *same person across their whole
   lifecycle* — accumulate → transition off salary → live free post-FIRE (the **5 objectives** in
