@@ -334,10 +334,15 @@ and let the product stay opinionated around them:
 > **Revised 2026-09-13 (Abhay, D-2026-09-13-02).** Was: age 28–45, IT/finance/consulting, metro /
 > Tier-1, ₹15L–₹1Cr+, equity-comfortable, English-literate. The persona is still ONE salaried
 > accumulator, but the age and income bands are much wider and the city/sector/language filters are
-> gone. The **Basis** paragraph below and Tier-3 "vernacular mass-market" were written for the old
-> band and have NOT been re-argued — see the PROJECT-LOG entry for what this widening costs.
+> gone. **Basis re-argued 2026-09-13 (D-2026-09-13-03):** the product is for the lower-middle,
+> middle and upper-middle class salaried earner. The affluent / HNI earner is already financially
+> independent and is NOT the customer. A low income today is a starting point, not a verdict: the
+> plan must show how income growth (job switches, raises) and NEW income sources get the user to
+> FIRE, never a bare "not reachable".
 
-**Basis:** (1) FIRE adoption in India is, observably, an affluent urban-salaried movement, not a
+**Basis (SUPERSEDED 2026-09-13, D-2026-09-13-03 — kept for history; point (1) is reversed: the
+customer is the lower-middle → upper-middle class earner, not the affluent):** (1) FIRE adoption in
+India is, observably, an affluent urban-salaried movement, not a
 mass-market one — "cover all of India" would dilute a FIRE planner into a commodity budgeting app;
 (2) the product is already deepest here; (3) Abhay's own household is the archetype (dogfood + the
 5W Financial data-layer role); (4) YAGNI — build for the next real user, not a speculative one.
@@ -382,7 +387,7 @@ calculator into a companion.
   Principle 3), persona-templated onboarding (reuse seeds), salaried/family/DINK polish.
 - **Tier 2 — adjacent, after the wedge is excellent:** freelancer (44ADA, partly done), **NRI**,
   **HUF**.
-- **Tier 3 — deprioritised (maybe never):** rural / agricultural, vernacular mass-market, pure
+- **Tier 3 — deprioritised ("maybe never" withdrawn 2026-09-13, D-2026-09-13-03 — vernacular / lower-income salaried is now IN the persona; sequencing, not exclusion):** rural / agricultural, vernacular mass-market, pure
   already-retired seniors. Different products. *(Distinct from objective 4 above: post-FIRE
   management for **our own** accumulator who reaches FIRE is in-scope and sequenced; **acquiring**
   already-retired strangers as new users is the out-of-scope item here.)*
