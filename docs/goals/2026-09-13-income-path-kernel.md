@@ -2,7 +2,7 @@
 
 **Status:** SPEC ONLY — parked 2026-09-13 for token budget. Nothing below is started.
 **Owner decision:** Abhay, 2026-09-13 (D-2026-09-13-02/03/04 in `docs/PROJECT-LOG.md`).
-**Tracking issue:** gh #185 (label `must-have`).
+**Tracking issue:** gh #185 (labels `must-have`, `spec-ready`). All parked specs: `gh issue list --label spec-ready`.
 **Tier:** must-have (Tier-0 honesty for the LOCKED persona).
 **Read first:** `CLAUDE.md` → Goal; `docs/v6-fire-planner-product-plan.md` §9; `docs/adr/0004-temporal-contribution-model.md`; `docs/adr/0006-*` (real frame); `src/lib/derive.ts`; `src/lib/fire-math.ts`; `src/types/assumptions.ts`.
 
@@ -192,3 +192,7 @@ irreversible step, do it on a proven kernel). Steps 1–5 ≈ 400–600k tokens 
   setup).
 - Per-investment `contributionSchedule` feeding the headline (gh #46, separate).
 - Any catalog feature currently mislabelled must-have (#97–#146 range).
+
+## 9. Revisions (append-only, dated)
+
+- 2026-09-13 — spec written and parked (Abhay: no token budget now).

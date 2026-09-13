@@ -40,6 +40,7 @@
 without Abhay's explicit per-item approval (`.claude/rules/must-have-only-focus.md`).
 
 **▶ NEXT WHEN BUDGET ALLOWS (2026-09-13, D-2026-09-13-04): #185 banded income path in the kernel** — spec `docs/goals/2026-09-13-income-path-kernel.md`, 8 approval-gated steps (seeds first, kernel second, schema last). Also open for the new persona: re-tier the 43 `must-have` labels (step 8). No step starts without Abhay's per-step approval.
+**How parked specs are found (convention set 2026-09-13):** every parked spec = one file `docs/goals/YYYY-MM-DD-<slug>.md` + one GitHub issue carrying the label **`spec-ready`** (plus its tier label). The live list is the query `gh issue list --label spec-ready`; this §2 names only the single NEXT item, CLAUDE.md names it too. A new requirement that belongs to an existing spec is appended to that spec under a dated "Revisions" heading; anything else gets its own spec file + issue. Never a second list.
 
 **Prior active (2026-08-27, D-2026-08-27-01): the Quick Number front door — spec `docs/goals/2026-08-27-quick-number-front-door.md`, stages QN-3→QN-2→QN-1→QN-4→QN-5 via `/get-work-done`.**
 
