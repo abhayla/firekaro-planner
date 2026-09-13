@@ -338,7 +338,10 @@ and let the product stay opinionated around them:
 > middle and upper-middle class salaried earner. The affluent / HNI earner is already financially
 > independent and is NOT the customer. A low income today is a starting point, not a verdict: the
 > plan must show how income growth (job switches, raises) and NEW income sources get the user to
-> FIRE, never a bare "not reachable".
+> FIRE, never a bare "not reachable". **D-2026-09-13-04:** income is a time series in the kernel with
+> a conservative band (the headline) and an expected band from the user's own hike % (shown beside it);
+> salary growth, taper age, expense creep and an age-band schedule are user-configurable. Spec:
+> `docs/goals/2026-09-13-income-path-kernel.md`, gh #185 (parked for budget).
 
 **Basis (SUPERSEDED 2026-09-13, D-2026-09-13-03 — kept for history; point (1) is reversed: the
 customer is the lower-middle → upper-middle class earner, not the affluent):** (1) FIRE adoption in
