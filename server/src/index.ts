@@ -20,6 +20,7 @@ import whatsappWebhookRoutes from "./routes/whatsapp-webhook";
 import commsConsentRoutes from "./routes/comms-consent-route";
 import lifecycleInternalRoutes from "./routes/lifecycle-internal";
 import smokeInternalRoutes from "./routes/smoke-internal";
+import eventsRoutes from "./routes/events";
 
 /**
  * v6 backend entry — Hono app for the mvp/ FIRE Planner. Structure copy-adapted
@@ -96,6 +97,10 @@ app.all("/api/auth/*", (c) => auth.handler(c.req.raw));
 
 // The planner document endpoints.
 app.route("/api/planner", plannerRoutes);
+
+// #44 funnel counters. Mounted OUTSIDE authMiddleware on purpose — the first two events happen on
+// the public /quick route (#187). The route owns its own per-IP rate limit + event allow-list.
+app.route("/api/events", eventsRoutes);
 
 // Wati delivery webhooks (no auth — external caller; optional shared-secret).
 app.route("/api/webhooks", whatsappWebhookRoutes);
