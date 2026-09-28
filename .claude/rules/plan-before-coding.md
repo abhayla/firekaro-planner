@@ -1,4 +1,6 @@
-# Scope: global
+---
+paths: ["src/**", "server/src/**"]
+---
 
 # Plan Before Coding
 

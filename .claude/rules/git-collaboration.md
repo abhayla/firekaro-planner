@@ -1,4 +1,6 @@
-# Scope: global
+---
+paths: [".github/**", ".githooks/**"]
+---
 
 # Git Collaboration
 

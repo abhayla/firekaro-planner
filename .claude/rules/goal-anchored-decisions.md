@@ -1,4 +1,6 @@
-# Scope: global
+---
+paths: ["docs/goals/**", "docs/PROJECT-LOG.md"]
+---
 
 # Goal-Anchored Decisions
 
