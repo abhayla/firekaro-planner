@@ -3,7 +3,7 @@ import { ref, watch, computed } from "vue";
 import { DEFAULT_ASSUMPTIONS, type Assumptions } from "@/types/assumptions";
 import { getAdjustedSWR } from "@/lib/fire-math";
 import {
-  resolveHouseholdInflation,
+  resolveHouseholdBasket,
   resolveEffectiveSWRByHorizon,
   blendPortfolioReturn,
   type PortfolioReturnWeights,
@@ -120,11 +120,15 @@ export const useAssumptionsStore = defineStore("assumptions", () => {
   }
 
   /**
-   * Household 4-bucket blended inflation (audit Entry #3 A3.1 + A3.2). Thin
-   * wrapper over the pure resolver shared with the derive() kernel.
+   * The household expense basket — the SAME rate `derive().householdInflation` plans with
+   * (ADR-0006 one-basket, ADR-0007 (d) creep folded in). Thin wrapper over the ONE shared
+   * resolver: with lifestyle creep > 0 this used to return the creep-FREE blend while the kernel
+   * grew the target at the creep-adjusted one, putting a different number on the expense-trend
+   * chart and the /preferences readout from the number in the plan (the gh #180 class). Locked by
+   * the creep ∈ {0, 1, 5} equality tests in `src/stores/assumptions.spec.ts`.
    */
   function householdInflation(): number {
-    return resolveHouseholdInflation(values.value);
+    return resolveHouseholdBasket(values.value);
   }
 
   /**

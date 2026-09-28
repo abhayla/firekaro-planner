@@ -81,19 +81,61 @@ describe("householdInflation is the SAME basket the kernel plans with (ADR-0006)
 
   beforeEach(() => setActivePinia(createPinia()));
 
+  // ADR-0007 (d) — the equality must hold AT EVERY CREEP SETTING, not only at the default.
+  // The review of the #185 review found `derive()` folding lifestyle creep into the basket while
+  // the store's `householdInflation()` returned the creep-FREE blend: at creep = 1%/yr the
+  // expense-trend chart and the /preferences readout quoted ~6.2% while the plan grew the target at
+  // ~7.0%. Creep = 0 (the shipped default) is exactly the case that CANNOT catch that, which is how
+  // it reached review. 1 is the smallest on-setting; 5 is the schema maximum.
+  const CREEP_CASES = [0, 1, 5] as const;
+
   for (const p of PERSONAS) {
-    it(`${p.name}: store basket === derive().householdInflation`, () => {
+    for (const creep of CREEP_CASES) {
+      it(`${p.name}: store basket === derive().householdInflation (creep ${creep}%/yr)`, () => {
+        const h = useHouseholdStore();
+        const a = useAssumptionsStore();
+        p.load(h, a);
+        a.set("expenseGrowthAboveInflationPercent", creep);
+        const k = derive(h.data, a.values, DEFAULT_PRODUCT_LENS);
+        expect(a.householdInflation()).toBeCloseTo(k.householdInflation, 12);
+        // ...and it is strictly ABOVE general CPI, which is what makes the target drift real.
+        expect(k.householdInflation).toBeGreaterThan(a.values.inflation);
+        expect(k.realTargetDriftRate).toBeCloseTo(
+          (1 + k.householdInflation) / (1 + a.values.inflation) - 1,
+          12,
+        );
+      });
+    }
+
+    // Creep MOVES the shared basket — the guard against "they agree because neither reads creep",
+    // which a pure equality test would pass forever.
+    it(`${p.name}: creep raises BOTH the store basket and the kernel's by the same amount`, () => {
       const h = useHouseholdStore();
       const a = useAssumptionsStore();
       p.load(h, a);
-      const k = derive(h.data, a.values, DEFAULT_PRODUCT_LENS);
-      expect(a.householdInflation()).toBeCloseTo(k.householdInflation, 12);
-      // ...and it is strictly ABOVE general CPI, which is what makes the target drift real.
-      expect(k.householdInflation).toBeGreaterThan(a.values.inflation);
-      expect(k.realTargetDriftRate).toBeCloseTo(
-        (1 + k.householdInflation) / (1 + a.values.inflation) - 1,
-        12,
-      );
+      a.set("expenseGrowthAboveInflationPercent", 0);
+      const storeOff = a.householdInflation();
+      const kernelOff = derive(h.data, a.values, DEFAULT_PRODUCT_LENS).householdInflation;
+      a.set("expenseGrowthAboveInflationPercent", 2);
+      const storeOn = a.householdInflation();
+      const kernelOn = derive(h.data, a.values, DEFAULT_PRODUCT_LENS).householdInflation;
+      expect(storeOn).toBeGreaterThan(storeOff);
+      expect(kernelOn).toBeGreaterThan(kernelOff);
+      expect(storeOn - storeOff).toBeCloseTo(kernelOn - kernelOff, 12);
+    });
+
+    // Year-0 figures stay UNCREPT: creep is a growth RATE applied from year 1, so today's expense
+    // total (and therefore the tax path that reads it) must not move when the knob does.
+    it(`${p.name}: today's expenses and tax are unchanged by the creep setting (year-0 is uncrept)`, () => {
+      const h = useHouseholdStore();
+      const a = useAssumptionsStore();
+      p.load(h, a);
+      a.set("expenseGrowthAboveInflationPercent", 0);
+      const off = derive(h.data, a.values, DEFAULT_PRODUCT_LENS);
+      a.set("expenseGrowthAboveInflationPercent", 5);
+      const on = derive(h.data, a.values, DEFAULT_PRODUCT_LENS);
+      expect(on.annualExpensesToday).toBe(off.annualExpensesToday);
+      expect(on.annualTax).toBe(off.annualTax);
     });
   }
 });

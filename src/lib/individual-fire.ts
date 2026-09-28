@@ -39,7 +39,7 @@ import { returnBucketKey } from "@/lib/investment-traits";
 import {
   resolveEffectiveSWRByHorizon,
   blendPortfolioReturn,
-  resolveHouseholdInflation,
+  resolveHouseholdBasket,
 } from "@/lib/assumption-math";
 import { EXPENSE_OWNER_HOUSEHOLD } from "@/lib/expense-attribution";
 
@@ -206,7 +206,11 @@ export function computeIndividualFire(
   // real frame, the same person's household and individual FIRE ages would drift apart — the
   // cross-screen incoherence class `feedback_cross_screen_figure_coherence` names.
   const realReturn = (1 + blendedReturn) / (1 + generalInflation) - 1;
-  const householdBasket = resolveHouseholdInflation(assumptions);
+  // The CREEP-INCLUSIVE basket (`resolveHouseholdBasket`), identical to the one `derive()` grows the
+  // household target at (ADR-0007 (d)). The creep-free blend here would have grown this member's
+  // individual target more slowly than the household target it is a share of — the same
+  // cross-screen incoherence the comment above names, with creep > 0 as the trigger.
+  const householdBasket = resolveHouseholdBasket(assumptions);
 
   const effectiveSWR = resolveEffectiveSWRByHorizon(assumptions, targetRetirementAge, planToAge);
   const individualFireNumber = Math.round(

@@ -68,6 +68,7 @@ import {
  */
 export const STEP_UP_TAPER_AGE = 50;
 import {
+  resolveHouseholdBasket,
   resolveHouseholdInflation,
   resolveEffectiveSWRByHorizon,
   blendPortfolioReturn,
@@ -447,7 +448,9 @@ export function derive(
         }));
     const conservativePaths = buildEarnerPaths(() => conservativeGrowthPct);
     // The EXPECTED band reads the user's OWN typed nominal `salary.hikePercent`, de-inflated to real
-    // and floored at the conservative default (spec §3.2: the hike NEVER moves the headline).
+    // and clamped to [0, INCOME_GROWTH_MAX_PERCENT] — floored at ZERO, not at the conservative
+    // default, so a typed hike BELOW inflation yields a flat real income path rather than silently
+    // inheriting the 2% headline assumption (spec §3.2: the hike NEVER moves the headline).
     const expectedPaths = buildEarnerPaths((m) =>
       expectedRealGrowthPercent(m.salary?.hikePercent, generalInflationForPath),
     );
@@ -753,13 +756,9 @@ export function derive(
   // expense line, the Floor/Ceiling decumulation overlay, `effectiveTargetDriftRate` and the Monte
   // Carlo band — inherits exactly one rate. ADR-0007 (c) settled which BUCKET creep attaches to and
   // was silent on which LEG consumes it; this is that gap closed.
-  const householdInflation = resolveHouseholdInflation({
-    ...assumptions,
-    inflation: generalInflationWithCreep(
-      assumptions.inflation,
-      assumptions.expenseGrowthAboveInflationPercent,
-    ),
-  });
+  // ONE formula, shared with the store's `householdInflation()` (see `resolveHouseholdBasket`) so
+  // the rate on the screen and the rate in the plan cannot diverge.
+  const householdInflation = resolveHouseholdBasket(assumptions);
   const generalInflation = assumptions.inflation;
   const toRealReturn = (nominal: number) => (1 + nominal) / (1 + generalInflation) - 1;
   const realReturnSchedule: ReturnSchedule =
@@ -843,8 +842,9 @@ export function derive(
             conservativeSurplusAt(yearIndex, householdScope.conservativePaths) * stepUpFactor(yearIndex);
   /**
    * The EXPECTED-band inflow — identical except each earner grows at their own typed
-   * `salary.hikePercent` (de-inflated to real, floored at the conservative default). This NEVER
-   * feeds the headline (spec §3.2); it feeds `expectedFireAge` alone.
+   * `salary.hikePercent` (de-inflated to real, floored at ZERO — see `expectedRealGrowthPercent`;
+   * a sub-inflation hike gives a flat real path, it does not fall back to the 2% default). This
+   * NEVER feeds the headline (spec §3.2); it feeds `expectedFireAge` alone.
    */
   const expectedContributionSchedule: ContributionSchedule =
     contributionOverride != null || monthlyContribution <= 0

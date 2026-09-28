@@ -731,19 +731,19 @@ describe("#81 individual FIRE plausibility — every adult, every persona", () =
 // 57.2** (-12.9 years) — the income path working exactly as the RCA predicted. The four existing
 // seeds each moved 0.2-1.6 years EARLIER, listed in the PR body.
 //
-// WHY NO NEW NUMERIC BAND IS PINNED HERE YET. The independent FinTech review of this change
+// THE BAND PINNED BELOW IS 54-62, and its derivation is in the test itself. The independent FinTech
+// review of this change
 // (2026-09-29) found a PRE-EXISTING optimistic error that Ravi is uniquely exposed to:
 // `assumption-math.ts` `blendPortfolioReturn` falls back to `equityReturn` (12% nominal) whenever
 // the value-weighted portfolio total is zero, and Ravi's only holding is an auto-flowed EPF line
 // created with `value: 0`. So his EPF-only contribution stream is projected at an ALL-EQUITY return.
-// 57.2 is therefore, if anything, too EARLY. Pinning a band around it now would freeze an optimistic
-// number as the honesty contract — the precise failure this file exists to prevent (rule 31). The
-// band is re-derived once that fallback is settled (ADR-0007 revision (f) carries it forward as a
-// separate, product-level change: the fallback should key off the CONTRIBUTION mix, not the empty
-// value mix).
+// 57.2 is therefore, if anything, too EARLY — which is why the band's CEILING sits at 62, ~5y above
+// it: issue #194's fix (the fallback should key off the CONTRIBUTION mix, not the empty value mix —
+// ADR-0007 revision (f)) pushes Ravi LATER and must land without re-baselining this lock. A band that
+// hugged 57.2 would have frozen an optimistic number as the honesty contract (rule 31); a band that
+// is asymmetric AROUND it, in the direction the known defect moves, does not.
 //
-// What IS locked below is everything that does not depend on that unsettled return: Ravi is
-// REACHABLE at all (the pre-Step-4 kernel's honest answer for this persona was "70+", and "not
+// Also locked below, independent of that unsettled return: Ravi is REACHABLE at all (the pre-Step-4 kernel's honest answer for this persona was "70+", and "not
 // reachable" is a product defect per spec §3.1), he is reachable within the #22 age-70 ceiling, his
 // savings rate is in the per-seed 10-25% band, and no NaN/-Infinity reaches him. The income path's
 // own correctness is locked by SUBSTANCE, not by a magic age: the non-vacuity and creep-coherence
@@ -767,14 +767,36 @@ describe("headline plausibility — Ravi, the lower-band fixture (#185, Step 4 l
     // defect. The floor of 45 guards the other direction: an implausibly EARLY number for a
     // household saving ₹0.5L/yr would mean the income path had run away with itself.
     expect(fireAge, `${ctx} — must be inside the #22 age-70 plausibility ceiling`).toBeLessThanOrEqual(70);
-    expect(fireAge, `${ctx} — an age below 45 for this household would be implausibly early`).toBeGreaterThanOrEqual(
-      45,
+    // THE BAND: 54-62, DERIVED FROM THE SHIPPED KERNEL, not from the spec's §2 worked example.
+    //
+    // The measured value is 57.2. The band is the derivation of that number term by term, so a
+    // regression in any one term fails here instead of silently re-basing the honesty contract:
+    //   - SWR resolves BY HORIZON to 3.25% (not the spec table's 3.5%), so the base target is
+    //     ₹76.9L rather than ₹71.4L;
+    //   - the HEALTHCARE CORPUS RESERVATION is the DOMINANT term the spec omits — a 20%
+    //     reservation drifting at 9% against a 6.24% basket takes the total target to ₹98.1L,
+    //     ~34% of which is the reservation alone; it is why 57 and not ~50;
+    //   - the target grows at the household BASKET (6.24%), i.e. real drift +0.226%/yr over
+    //     general CPI (ADR-0006), not flat CPI;
+    //   - real salary growth of 2%/yr TAPERS at age 50, so the last stretch compounds nothing.
+    // Every one of those four pushes LATER, which is why the spec's 45-55 band was unreachable on
+    // a correct kernel (see the note above this describe).
+    //
+    // WIDTH. The floor of 54 is ~3y below the measured 57.2: below that the income path would have
+    // to be compounding faster than 2% real or the reservation would have dropped out — both
+    // OPTIMISTIC, the Tier-0 direction for this persona. The ceiling of 62 deliberately leaves ~5y
+    // of headroom ABOVE 57.2 for issue #194 (`blendPortfolioReturn` falls back to `equityReturn`
+    // when the value-weighted portfolio total is zero, so Ravi's ₹0-valued auto-flowed EPF line is
+    // currently projected at an all-equity 12% nominal). Fixing that pushes him LATER, and the fix
+    // must not have to re-baseline this lock to land. A move past 62 means something OTHER than
+    // #194 changed and wants re-deriving; the #22 ceiling assertion above still stands on its own.
+    expect(fireAge, `${ctx} — below 54 means the income path is running optimistically hot`).toBeGreaterThanOrEqual(
+      54,
     );
-    // And Step 4 must have MOVED him a lot: the pre-change value was 70.1, so anything at or above
-    // 65 means the income path has been disconnected.
-    expect(fireAge, `${ctx} — Step 4 moved this seed from 70.1; >=65 means the income path is inert`).toBeLessThan(
-      65,
-    );
+    expect(
+      fireAge,
+      `${ctx} — above 62 means more than issue #194's EPF-return fix has moved; re-derive the band`,
+    ).toBeLessThanOrEqual(62);
   });
 
   it("Ravi: savings rate sits in 10-25% (spec §4.5 per-seed bound)", () => {
