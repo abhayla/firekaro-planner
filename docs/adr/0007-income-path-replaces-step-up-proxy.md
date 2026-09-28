@@ -1,6 +1,6 @@
 # ADR-0007: Income path replaces the savings step-up proxy
 
-- **Status:** Proposed
+- **Status:** Accepted (joint decision — Abhay + FinTech review, 2026-09-29)
 - **Date:** 2026-09-29
 - **Deciders:** Abhay (product decision, D-2026-09-13-02/03/04), Claude (FinTech + Architect roles)
 - **Supersedes / relates:** gh #185 (tracking), `docs/goals/2026-09-13-income-path-kernel.md` (the
@@ -65,23 +65,31 @@ which includes workers with zero bargaining power and high informalisation risk.
 
 **Decision (conservative, defensible default):** the kernel's CONSERVATIVE default —
 `salaryGrowthRealPercent` — is set to **2% real/year**, unchanged from the spec's worked-example
-number. This is deliberately **below** the Aon nominal-minus-CPI real figure (≈3–4%) precisely
-because Aon's panel is not this persona, and the PLFS figure (≈0% or negative) is the honest floor
-for the *median* regular-salaried worker in a *bad* macro window (FY22–24, high inflation, weak real
-wage growth). **2% sits between the honest floor (≈0%, PLFS) and the optimistic corporate-panel
-figure (≈3–4%, Aon)** — a deliberately conservative middle, disclosed as such, never as a precise
-research figure. **If the sourced PLFS figure is taken literally (≈0% real), the income path
-collapses toward today's proxy for the conservative band** — exactly the contingency the spec names
-in §7.1. We do NOT take PLFS literally as the headline default because (i) it is a 2-year window
-during an unusually weak real-wage stretch, not a structural forecast, and (ii) the product rule
-(spec §3.1) is "a low income today is a starting point, never a verdict" — collapsing the
-conservative band to ~0% growth would make the headline read as "never" for the exact persona this
-goal exists to serve, which is itself a plausibility red flag requiring the "unreachable" first-class
-state (ADR-0006 item 4), not silent starvation of the growth term. **This is a disclosed judgment
-call, not a single cited number** — the honest position is: real wage growth for this band is
-somewhere between ~0% (PLFS, pessimistic, recent) and ~3–4% (Aon, optimistic, wrong population); 2%
-is the stated middle, flagged in the Preferences tooltip as "conservative default — see ADR-0007 for
-the range and sources," never presented as precisely measured.
+number.
+
+**The basis, restated (FinTech review of this ADR, 2026-09-29 — this REPLACES an earlier "midpoint of
+PLFS and Aon" framing, which was wrong):** an **individual incumbent's age-earnings path is steeply
+positive even when the population aggregate is ~0% real.** The two numbers above measure different
+objects and must not be averaged. PLFS measures the *cross-sectional population aggregate* of all
+regular-salaried workers — a figure that nets out compositional churn, informalisation, job loss, and
+the entry of new low-wage workers at the bottom; it is **not** the path any one continuously-employed
+person walks. Aon measures the *increment given to a continuing employee at surveyed corporate firms*
+— an individual-path number, but for a population (IT/BFSI/consulting) well above this persona's
+₹3L entry CTC. The relevant quantity for a FIRE plan is the **individual path**, and **every**
+individual-path estimate available (Aon ≈3–4% real for corporates; 8–15% nominal first-appraisal
+hikes for freshers, i.e. ≈2–9% real against 6% CPI) is **materially positive**. **2% real sits BELOW
+any individual-path estimate we found** — that is the whole basis for choosing it. It is a
+deliberately sub-estimate floor on the individual path, not a midpoint between two incommensurable
+series, and **no PLFS by-age or by-cohort real-wage series was consulted** (none at the needed
+granularity was located — see the age-band paragraph below).
+
+**Mandatory caveat, verbatim, at every point of use (Preferences tooltip, ADR, PR body):**
+> "assumes continuous employment; real wage growth for this band was ~0% in FY22–24"
+
+That caveat is what keeps the 2% honest: it names the two conditions under which the individual path
+does not hold (a break in employment; a macro window like FY22–24 in which even continuing employees'
+real earnings stalled). The default is disclosed as a **conservative floor on an individual path
+under continuous employment**, never as a measured population figure.
 
 **Age-band taper:** no age-banded real-wage-growth series specific to Indian salaried workers was
 found in this pass (PLFS publishes by broad employment category, not by age × real-wage-growth
@@ -105,43 +113,57 @@ per the spec's monotonicity invariant — see spec §4.5, "creep monotonicity"),
 researched. The Preferences tooltip MUST say "unsourced assumption, not a research figure" verbatim
 — this is a Tier-0 honesty requirement, not a cosmetic detail.
 
-### (c) Creep applies to ALL expense buckets, not "discretionary only"
+### (c) Creep applies to the `general` bucket ONLY (FinTech review, 2026-09-29 — supersedes the earlier "uniformly to ALL buckets" decision)
 
-Read (this ADR, read-only, no edit) of `src/types/household.ts` and `src/lib/derive.ts`: FireKaro's
-expense model has **no discretionary/non-discretionary split**. Expenses are one lump
-(`expenses.avgMonthly`, a single number) plus a `recurring[]` list, each optionally tagged with an
-`inflationBucket` (`healthcare | education | housing | general`, `derive.ts` lines ~807–817) that
-governs **which of the four PRICE-inflation rates** that line grows at. This is a price-inflation
-axis (what does this category of spending cost more of, per year), not a discretionary-spending axis
-(would the household cut this if income didn't grow). There is no field, bucket, or existing
-convention anywhere in `derive.ts` that distinguishes "discretionary" line items from "necessary"
-ones — building that split now, only to serve one small creep multiplier, would be new kernel
-surface area the spec explicitly defers past step 4 (YAGNI, `claude-behavior.md` rule 21; the spec
-itself only asks for it "if the 4-bucket model allows").
+Read of `src/types/household.ts` and `src/lib/derive.ts`: FireKaro's expense model is one lump
+(`expenses.avgMonthly`) plus a `recurring[]` list, each optionally tagged with an `inflationBucket`
+(`healthcare | education | housing | general`) that selects which of the four PRICE-inflation rates
+that line grows at. The household basket is the weighted blend of those four
+(`resolveHouseholdInflation`, default weights general 74 / healthcare 8 / education 0 / housing 18).
 
-**Decision: `expenseGrowthAboveInflationPercent` applies uniformly to ALL expense lines** — i.e. it
-adds a flat `+creep%` on top of whichever of the four bucket-inflation rates a line already uses
-(`general`, `healthcare`, `education`, `housing`), rather than being scoped to a subset. This is the
-only shape the current 4-bucket model supports without inventing a new field, and it matches the
-spec's own worked example (§2 table: "Expense growth: +6% (inflation)" vs "+8%" for the
-creep-inclusive row — a flat addition on top of the existing per-line inflation rate, not a
-bucket-selective one).
+**Decision: `expenseGrowthAboveInflationPercent` (lifestyle creep) is added to the `general` bucket
+rate only** — i.e. the expense/target path grows at `blendedInflation({general: CPI + creep,
+healthcare, education, housing}, weights)`, never at `basket + creep`.
+
+**Why (this is the correction):** creep is a *volitional* behaviour — the household chooses to spend
+more as income rises. The other three buckets are **non-volitional and already carry their own
+escalation**: healthcare at 9%, education at 9%, housing at 6% are *price* indices already set above
+general CPI precisely because those costs rise faster than the household controls. Adding a
+behavioural creep term on top of a non-volitional price escalator double-counts the same effect
+twice: the household is charged medical price inflation AND charged for "choosing" more medical
+spending. Scoping creep to `general` is the only reading that keeps each rate measuring one thing.
+
+**Direction and honesty:** general-only creep makes the headline **EARLIER** than uniform creep
+would (the creep term is multiplied by the general weight, 0.74 by default, instead of 1.0). That is
+the optimistic direction, so it needs justifying, and it is justified: the uniform version was
+**double-counting** escalation on the non-volitional buckets, which made the headline *pessimistic
+for the wrong reason*. Correcting a double-count in the optimistic direction is not the same class of
+error as inventing optimism — the creep term itself remains a disclosed unsourced assumption and the
+creep-monotonicity invariant (higher creep never pulls FIRE earlier) still holds exactly, because the
+general weight is strictly positive.
+
+No new schema field is introduced: the existing `inflationBucket` axis carries the whole decision.
 
 ## Consequences
 
 - If Step 4 (the kernel) implements `salaryGrowthRealPercent` at 2% default, the worked-example
   numbers in spec §2 hold unchanged (Ravi's conservative band: FIRE age 51; the spec's own example
   already used 2% for the conservative band's real-terms growth).
-- The 2% default is a disclosed judgment call bounded by two real sources that disagree (PLFS ≈0%,
-  Aon ≈3–4% for a different population) — this MUST be stated in the Preferences tooltip, not
-  presented as a single precise citation. A future revision with age-banded, persona-matched wage
+- The 2% default is a disclosed **conservative floor on an individual incumbent's age-earnings path**
+  — below every individual-path estimate found — and MUST carry the verbatim caveat "assumes
+  continuous employment; real wage growth for this band was ~0% in FY22–24" at every point of use
+  (Preferences tooltip, ADR, PR body). It is NOT a midpoint of two series and NOT a measured
+  population figure. A future revision with age-banded, persona-matched wage
   data (e.g. a bespoke PLFS age×income-band extract) would tighten this; it does not exist today.
 - `expenseGrowthAboveInflationPercent` (1%, unsourced) is the ONLY unsourced default introduced by
   this goal, and it is disclosed as such at the point of use (Preferences tooltip), per the
   Evidence-before-claims and spec-first rules.
-- Creep is uniform across buckets — no new discretionary/non-discretionary schema is introduced by
-  this ADR or by Step 4. If a future goal wants creep scoped to "wants" vs "needs," that is a new,
-  separately-justified schema change, not a side effect of this one.
+- Creep applies to the `general` bucket ONLY — no new discretionary/non-discretionary schema is
+  introduced by this ADR or by Step 4; the existing `inflationBucket` axis carries it. This makes the
+  headline EARLIER than a uniform-creep reading would, and that is correct: the non-volitional
+  buckets (healthcare 9%, education 9%, housing 6%) already carry their own escalation above general
+  CPI, so adding a behavioural creep term on top of them double-counted the same effect. Creep
+  monotonicity still holds exactly (the general weight is strictly positive).
 - This ADR does not change any code path. It is the settled input Step 4 (Tier A, Opus, per spec §5)
   consumes when building the actual `IncomeSchedule` in `derive.ts` / `fire-math.ts` /
   `contribution-schedule.ts`.
