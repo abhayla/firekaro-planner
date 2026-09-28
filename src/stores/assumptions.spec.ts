@@ -35,9 +35,13 @@ describe("assumptions store — householdInflation (A3.2 editable weights)", () 
     expect(a.householdInflation() - a.values.inflation).toBeLessThanOrEqual(0.01);
   });
 
-  it("a stored step-up of exactly 0 (the pre-ADR-0006 default) is treated as unset on hydrate", () => {
+  it("the step-up default is 0 (ADR-0007: the income path, not the step-up, carries wage growth)", () => {
+    // RE-BASELINED (ADR-0007 / gh #185): ADR-0006 moved this default 0 -> 2 as a WAGE-GROWTH proxy.
+    // `derive()` now grows each earner's INCOME instead, so leaving the step-up at 2 would compound
+    // the same wage growth twice. The default is back to 0 and the field's ONLY remaining meaning is
+    // a deliberate "invest a growing share of my surplus" decision (the `step-up-10` plan lever).
     const a = useAssumptionsStore();
-    expect(a.values.householdSavingsStepUpPercent).toBe(2);
+    expect(a.values.householdSavingsStepUpPercent).toBe(0);
   });
 
   it("shifting weight toward healthcare raises the blended rate", () => {
@@ -77,19 +81,61 @@ describe("householdInflation is the SAME basket the kernel plans with (ADR-0006)
 
   beforeEach(() => setActivePinia(createPinia()));
 
+  // ADR-0007 (d) — the equality must hold AT EVERY CREEP SETTING, not only at the default.
+  // The review of the #185 review found `derive()` folding lifestyle creep into the basket while
+  // the store's `householdInflation()` returned the creep-FREE blend: at creep = 1%/yr the
+  // expense-trend chart and the /preferences readout quoted ~6.2% while the plan grew the target at
+  // ~7.0%. Creep = 0 (the shipped default) is exactly the case that CANNOT catch that, which is how
+  // it reached review. 1 is the smallest on-setting; 5 is the schema maximum.
+  const CREEP_CASES = [0, 1, 5] as const;
+
   for (const p of PERSONAS) {
-    it(`${p.name}: store basket === derive().householdInflation`, () => {
+    for (const creep of CREEP_CASES) {
+      it(`${p.name}: store basket === derive().householdInflation (creep ${creep}%/yr)`, () => {
+        const h = useHouseholdStore();
+        const a = useAssumptionsStore();
+        p.load(h, a);
+        a.set("expenseGrowthAboveInflationPercent", creep);
+        const k = derive(h.data, a.values, DEFAULT_PRODUCT_LENS);
+        expect(a.householdInflation()).toBeCloseTo(k.householdInflation, 12);
+        // ...and it is strictly ABOVE general CPI, which is what makes the target drift real.
+        expect(k.householdInflation).toBeGreaterThan(a.values.inflation);
+        expect(k.realTargetDriftRate).toBeCloseTo(
+          (1 + k.householdInflation) / (1 + a.values.inflation) - 1,
+          12,
+        );
+      });
+    }
+
+    // Creep MOVES the shared basket — the guard against "they agree because neither reads creep",
+    // which a pure equality test would pass forever.
+    it(`${p.name}: creep raises BOTH the store basket and the kernel's by the same amount`, () => {
       const h = useHouseholdStore();
       const a = useAssumptionsStore();
       p.load(h, a);
-      const k = derive(h.data, a.values, DEFAULT_PRODUCT_LENS);
-      expect(a.householdInflation()).toBeCloseTo(k.householdInflation, 12);
-      // ...and it is strictly ABOVE general CPI, which is what makes the target drift real.
-      expect(k.householdInflation).toBeGreaterThan(a.values.inflation);
-      expect(k.realTargetDriftRate).toBeCloseTo(
-        (1 + k.householdInflation) / (1 + a.values.inflation) - 1,
-        12,
-      );
+      a.set("expenseGrowthAboveInflationPercent", 0);
+      const storeOff = a.householdInflation();
+      const kernelOff = derive(h.data, a.values, DEFAULT_PRODUCT_LENS).householdInflation;
+      a.set("expenseGrowthAboveInflationPercent", 2);
+      const storeOn = a.householdInflation();
+      const kernelOn = derive(h.data, a.values, DEFAULT_PRODUCT_LENS).householdInflation;
+      expect(storeOn).toBeGreaterThan(storeOff);
+      expect(kernelOn).toBeGreaterThan(kernelOff);
+      expect(storeOn - storeOff).toBeCloseTo(kernelOn - kernelOff, 12);
+    });
+
+    // Year-0 figures stay UNCREPT: creep is a growth RATE applied from year 1, so today's expense
+    // total (and therefore the tax path that reads it) must not move when the knob does.
+    it(`${p.name}: today's expenses and tax are unchanged by the creep setting (year-0 is uncrept)`, () => {
+      const h = useHouseholdStore();
+      const a = useAssumptionsStore();
+      p.load(h, a);
+      a.set("expenseGrowthAboveInflationPercent", 0);
+      const off = derive(h.data, a.values, DEFAULT_PRODUCT_LENS);
+      a.set("expenseGrowthAboveInflationPercent", 5);
+      const on = derive(h.data, a.values, DEFAULT_PRODUCT_LENS);
+      expect(on.annualExpensesToday).toBe(off.annualExpensesToday);
+      expect(on.annualTax).toBe(off.annualTax);
     });
   }
 });
@@ -140,8 +186,11 @@ describe("assumptions store — the step-up migration is ONE-SHOT (ADR-0006 Phas
 
     const a = useAssumptionsStore();
     a.hydrate();
-    expect(a.values.householdSavingsStepUpPercent, "fresh user gets the new default").toBe(2);
-    a.set("householdSavingsStepUpPercent", 0);
+    // ADR-0007: the default is 0, so this scenario is now "a fresh user types a NON-zero value and
+    // it survives" — the same one-shot property, exercised from the other side. Using 5 (a value
+    // neither migration treats as a default) keeps the test about the STAMP, not about the number.
+    expect(a.values.householdSavingsStepUpPercent, "fresh user gets the new default").toBe(0);
+    a.set("householdSavingsStepUpPercent", 5);
     // The deep watch persists asynchronously; write the document the way the watch would.
     store.set("assumptions", JSON.stringify(a.values));
 
@@ -151,8 +200,8 @@ describe("assumptions store — the step-up migration is ONE-SHOT (ADR-0006 Phas
       reloaded.hydrate();
       expect(
         reloaded.values.householdSavingsStepUpPercent,
-        `reload ${reload + 1}: the 0 the user typed in /preferences must still be 0`,
-      ).toBe(0);
+        `reload ${reload + 1}: the 5 the user typed in /preferences must still be 5`,
+      ).toBe(5);
       store.set("assumptions", JSON.stringify(reloaded.values));
     }
     setAdapter(null);

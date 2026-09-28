@@ -2,7 +2,6 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import { householdSchema } from "@planner/types/household";
-import { assumptionsSchema } from "@planner/types/assumptions";
 import { authMiddleware } from "../middleware/auth";
 import { apiSuccess, apiError, ErrorCode } from "../lib/api-utils";
 import { logger } from "../lib/logger";
@@ -10,6 +9,7 @@ import { prisma } from "../lib/prisma";
 import { readHousehold, applyHouseholdPlan } from "../lib/household-repo";
 import { mapAssumptionsRow, buildAssumptionsWriteData } from "../lib/planner-read";
 import { diffHousehold } from "../lib/household-diff";
+import { onAuthenticatedMe, onPlannerDocumentWrite } from "../lib/activation-triggers";
 import {
   scenariosBodySchema,
   featuresBodySchema,
@@ -17,6 +17,7 @@ import {
   quickPrefsSchema,
   expenseHistoryBodySchema,
   planBaselineSchema,
+  persistedAssumptionsSchema,
 } from "../lib/planner-schemas";
 
 /**
@@ -89,6 +90,8 @@ app.put("/household", async (c) => {
     const current = await readHousehold(prisma, userId);
     const plan = diffHousehold(current, parsed.data);
     const updatedAt = await applyHouseholdPlan(prisma, userId, plan);
+    // #44 — any PUT after the account's first write is a `data_refreshed`. Fire-and-forget.
+    void onPlannerDocumentWrite(prisma, userId);
     return apiSuccess(c, { updatedAt });
   } catch (err) {
     logger.error({ err, userId }, "PUT /planner/household failed");
@@ -118,7 +121,11 @@ app.put("/assumptions", async (c) => {
   } catch {
     return apiError(c, "Invalid JSON body", 400, ErrorCode.VALIDATION_ERROR);
   }
-  const parsed = assumptionsSchema.safeParse(body);
+  // `persistedAssumptionsSchema`, NOT the canonical frontend schema: the three ADR-0007 income-path
+  // knobs have no `user_assumptions` column until #185 step 6. This schema is a plain Zod object
+  // (default STRIP mode), so a client sending one of the three is NOT 422'd — it is silently
+  // stripped at the parse boundary and never stored. See planner-schemas.ts for the full reasoning.
+  const parsed = persistedAssumptionsSchema.safeParse(body);
   if (!parsed.success) {
     return apiError(c, `Invalid assumptions: ${parsed.error.message}`, 422, ErrorCode.VALIDATION_ERROR);
   }
@@ -443,6 +450,10 @@ app.delete("/all", async (c) => {
 // ============================ me ============================
 
 app.get("/me", (c) => {
+  // #44 — the first authenticated request any signed-in client makes is where `signed_up` and
+  // `returned_7d` are derived from the account's own createdAt. Fire-and-forget: the counter must
+  // never delay or fail /me, which every boot awaits before mount.
+  void onAuthenticatedMe(prisma, c.get("userId"));
   return apiSuccess(c, c.get("user"));
 });
 

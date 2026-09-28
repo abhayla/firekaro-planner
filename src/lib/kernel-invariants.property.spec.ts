@@ -33,6 +33,7 @@ import { loadSeedPersona } from "@/lib/seed-persona";
 import { loadMehtasSeed } from "@/seeds/mehtas";
 import { loadIyersSeed } from "@/seeds/iyers";
 import { loadMauryasSeed } from "@/seeds/mauryas";
+import { loadRaviSeed } from "@/seeds/ravi";
 import { derive } from "@/lib/derive";
 import { isEarningMember } from "@/lib/member-earning";
 import { computeTax, AVAILABLE_FYS } from "@/lib/tax";
@@ -658,6 +659,326 @@ describe("T-377/QN-2 — the precondition holds where the BRIDGE binds, not just
         },
       ),
       { numRuns: 60 },
+    );
+  });
+});
+
+// gh #185 — the income-path invariants (`docs/goals/2026-09-13-income-path-kernel.md` §4.5),
+// written against the PUBLIC `derive()` interface.
+//
+// STEP 4 HAS LANDED (2026-09-29), SO THESE ARE LIVE, NOT VACUOUS. They were authored before the
+// kernel read `salary.hikePercent` or the income-path assumption fields, at which point a non-strict
+// `<=`/`>=` bound was trivially satisfied by an unchanged headline. `derive()` now grows each
+// earner's income (`salaryGrowthRealPercent`, tapering at `salaryGrowthTaperAge`) and folds
+// lifestyle creep into the household basket, so both properties below exercise real kernel logic
+// and will fail if the direction is ever wrong. Because a non-strict bound still cannot distinguish
+// "the invariant holds" from "the input went back to being ignored", the NON-VACUITY GUARD describe
+// at the bottom of this file asserts STRICT movement on the same seed — that is the test that goes
+// red if a refactor silently disconnects the income path.
+describe("gh #185 income-path invariants — live since Step 4 (public derive() interface)", () => {
+  beforeEach(() => setActivePinia(createPinia()));
+
+  // (7) INCOME MONOTONICITY — higher earner hikePercent ⇒ FIRE no later. Exercises the existing
+  // `salary.hikePercent` field on the Ravi fixture (the seed this property is written for, per spec
+  // §4.5) by perturbing every earning member's hike% upward and asserting the household FIRE date
+  // never gets WORSE. Load-bearing since Step 4: `hikePercent` drives the EXPECTED band, so a
+  // higher typed hike moves `expectedFireAge` earlier and must never move the headline later.
+  it("ravi: higher salary.hikePercent never makes FIRE later", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    loadRaviSeed(h, a);
+    const base = a.values;
+    fc.assert(
+      fc.property(
+        fc.double({ min: 0, max: 25, noNaN: true }),
+        fc.double({ min: 0, max: 25, noNaN: true }),
+        (hike1, hike2) => {
+          const lo = Math.min(hike1, hike2);
+          const hi = Math.max(hike1, hike2);
+          const withHike = (pct: number) => {
+            const snapshot = JSON.parse(JSON.stringify(h.data)) as typeof h.data;
+            for (const m of snapshot.members) {
+              if (m.salary) m.salary = { ...m.salary, hikePercent: pct };
+            }
+            return snapshot;
+          };
+          const kLo = derive(withHike(lo), base, LENS);
+          const kHi = derive(withHike(hi), base, LENS);
+          expect(
+            kHi.corpusOnlyYearsToRegular,
+            "a higher hikePercent must never push the corpus-only FIRE leg later",
+          ).toBeLessThanOrEqual(kLo.corpusOnlyYearsToRegular + EPS);
+        },
+      ),
+      { numRuns: 60 },
+    );
+  });
+
+  // (8) CREEP MONOTONICITY — higher lifestyle-creep (expense growth above inflation) ⇒ FIRE no
+  // earlier. Live since Step 4: the field is declared on `Assumptions` and folded into the ONE
+  // household basket (ADR-0007 (c)/(d)), so it grows the expense line AND the FIRE target.
+  //
+  // An EARLIER attempt used `assumptions.inflation` itself as a stand-in proxy. That was WRONG and
+  // is recorded here so nobody re-tries it: raising general inflation also raises the real-return
+  // deflator (ADR-0006's `toRealReturn`), which is not a clean monotonic stand-in for creep and
+  // produced a real counterexample (fireAge 46.25 < 46.33) — an unsound proxy, not a kernel bug.
+  it("ravi: higher expenseGrowthAboveInflationPercent never makes FIRE earlier", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    loadRaviSeed(h, a);
+    const base = a.values;
+    type WithCreep = typeof base & { expenseGrowthAboveInflationPercent: number };
+    fc.assert(
+      fc.property(
+        fc.double({ min: 0, max: 5, noNaN: true }),
+        fc.double({ min: 0, max: 5, noNaN: true }),
+        (c1, c2) => {
+          const lo = Math.min(c1, c2);
+          const hi = Math.max(c1, c2);
+          const kLo = derive(h.data, { ...base, expenseGrowthAboveInflationPercent: lo } as WithCreep, LENS);
+          const kHi = derive(h.data, { ...base, expenseGrowthAboveInflationPercent: hi } as WithCreep, LENS);
+          if (Number.isFinite(kLo.yearsToRegular) && Number.isFinite(kHi.yearsToRegular)) {
+            expect(
+              kHi.yearsToRegular,
+              "higher lifestyle-creep must never pull FIRE earlier",
+            ).toBeGreaterThanOrEqual(kLo.yearsToRegular - EPS);
+          }
+        },
+      ),
+      { numRuns: 60 },
+    );
+  });
+});
+
+// ADR-0007 / gh #185 step 4 — NON-VACUITY GUARD for the two invariants above.
+//
+// The two properties above were deliberately written to COMPILE and pass by VACUITY before Step 4
+// (the kernel ignored `hikePercent` and the creep field, so a non-strict `<=`/`>=` bound was
+// trivially satisfied by an unchanged headline). Step 4 has landed, so they must now be EXERCISING
+// real kernel logic — and a non-strict bound cannot tell the difference between "the invariant
+// holds" and "the input is still ignored". This lock closes that hole with STRICT inequalities on
+// the real seed: if a future refactor silently disconnects the income path, the properties above go
+// quietly vacuous again while THIS test goes red.
+//
+// It also locks the product rule the whole goal exists for (spec §3.2): the user's own
+// `hikePercent` moves the SECOND number and NEVER the headline. An optimistic headline makes this
+// persona under-save, which is the Tier-0 failure mode.
+describe("gh #185 income-path NON-VACUITY — the new inputs genuinely move the kernel (Step 4 landed)", () => {
+  beforeEach(() => setActivePinia(createPinia()));
+
+  it("ravi: hikePercent moves the EXPECTED number only; creep and salary growth both move the headline", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    loadRaviSeed(h, a);
+    const withHike = (pct: number) => {
+      const snapshot = JSON.parse(JSON.stringify(h.data)) as typeof h.data;
+      for (const m of snapshot.members) {
+        if (m.salary) m.salary = { ...m.salary, hikePercent: pct };
+      }
+      return snapshot;
+    };
+
+    // (1) hikePercent: the HEADLINE is immune (spec §3.2) and the EXPECTED number moves STRICTLY.
+    const noHike = derive(withHike(0), a.values, LENS);
+    const bigHike = derive(withHike(25), a.values, LENS);
+    expect(
+      bigHike.corpusOnlyYearsToRegular,
+      "a hike% may NEVER move the conservative headline (Tier-0: optimism makes this persona under-save)",
+    ).toBe(noHike.corpusOnlyYearsToRegular);
+    expect(
+      bigHike.expectedYearsToRegular,
+      "a higher hike% MUST pull the EXPECTED number strictly earlier — else the field is inert",
+    ).toBeLessThan(noHike.expectedYearsToRegular);
+    // A hike ABOVE the conservative default beats the headline; the basis is then the typed hike.
+    expect(bigHike.expectedYearsToRegular).toBeLessThan(bigHike.corpusOnlyYearsToRegular);
+    expect(bigHike.expectedFireAgeBasis).toBe(25);
+
+    // A hike of 0 means the user is telling us their income does not grow at all, and since the
+    // FinTech review removed the floor-at-the-conservative-default clamp from
+    // `expectedRealGrowthPercent` (it was a presentation rule enforced in a math function), the
+    // expected run is now HONESTLY WORSE than the headline here. That is the point: the arithmetic
+    // tells the truth, and `expectedFireAgeBasis` is NULL so the UI shows ONE number instead of
+    // labelling a worse figure as the user's own expectation. Asserting `expected <= headline`
+    // unconditionally would re-introduce the clamp through the test suite.
+    expect(
+      noHike.expectedYearsToRegular,
+      "a 0% hike must produce an honestly WORSE expected run, not a clamped one",
+    ).toBeGreaterThan(noHike.corpusOnlyYearsToRegular);
+    expect(
+      noHike.expectedFireAgeBasis,
+      "a second number that is worse than the headline must NOT be offered to the UI",
+    ).toBeNull();
+
+    // A hike BELOW the conservative default (4% nominal vs 6% CPI = negative real) is the case the
+    // clamp used to hide: the basis must still be null, so no user is ever shown a pessimistic
+    // number presented as their own optimistic scenario.
+    const lowHike = derive(withHike(4), a.values, LENS);
+    expect(lowHike.expectedFireAgeBasis).toBeNull();
+
+    // (2) creep: STRICTLY later. (3) salary growth: STRICTLY earlier.
+    const creep0 = derive(h.data, { ...a.values, expenseGrowthAboveInflationPercent: 0 }, LENS);
+    const creep5 = derive(h.data, { ...a.values, expenseGrowthAboveInflationPercent: 5 }, LENS);
+    expect(
+      creep5.yearsToRegular,
+      "more lifestyle creep MUST push FIRE strictly later — else the creep field is inert",
+    ).toBeGreaterThan(creep0.yearsToRegular);
+
+    const growth0 = derive(h.data, { ...a.values, salaryGrowthRealPercent: 0 }, LENS);
+    const growth5 = derive(h.data, { ...a.values, salaryGrowthRealPercent: 5 }, LENS);
+    expect(
+      growth5.yearsToRegular,
+      "more real salary growth MUST pull FIRE strictly earlier — else the income path is inert",
+    ).toBeLessThan(growth0.yearsToRegular);
+  });
+});
+
+// ADR-0007 / gh #185 — the CREEP-COHERENCE invariant (the C1 guard).
+//
+// WHY THIS EXISTS. The first pass at the income path added lifestyle creep to the basket used for
+// the SURPLUS's expense line but not to the one the FIRE TARGET grows at. Nothing in the suite
+// noticed: every monotonicity property still held, every seed still produced a plausible number,
+// and the golden master simply re-baselined. The kernel was declaring a household FIRE-ready on a
+// corpus that funded ~₹2.73L/yr of real spending while its own projection had that household
+// spending ~₹3.57L/yr — a 31% shortfall AT THE MOMENT OF THE VERDICT, in the optimistic direction.
+// A FinTech review found it; no test could have.
+//
+// THE CLASS, stated generally: ANY rate that grows what the household SPENDS must also grow what
+// the corpus must FUND. The two legs of an adequacy verdict cannot run on two different inflation
+// models — that is not a tuning difference, it is the verdict comparing two different households.
+// This property is the detection upgrade for that whole class, not just for creep: it would also
+// catch a future bucket, weight or goal change that moved one leg without the other.
+describe("gh #185 creep coherence — the spend leg and the fund leg grow at ONE rate", () => {
+  beforeEach(() => setActivePinia(createPinia()));
+
+  it("ravi: the real expense level at the verdict equals the real spend the base target funds, at EVERY creep", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    loadRaviSeed(h, a);
+    for (const creep of [0, 1, 2.5, 5]) {
+      const k = derive(h.data, { ...a.values, expenseGrowthAboveInflationPercent: creep }, LENS);
+      if (!Number.isFinite(k.corpusOnlyYearsToRegular)) continue;
+      const T = k.corpusOnlyYearsToRegular;
+      // What the household is projected to be SPENDING, in today's rupees, at the verdict.
+      const realDrift = (1 + k.householdInflation) / (1 + a.values.inflation) - 1;
+      const spendAtVerdict = k.annualExpensesToday * Math.pow(1 + realDrift, T);
+      // What the BASE leg of the target funds at the resolved SWR, in today's rupees, at the verdict.
+      const fundedAtVerdict = k.regularTargetComponentsRealAt(T).base * k.effectiveSWR;
+      // Within 1%: the two are the same quantity computed through two different code paths (the
+      // expense schedule vs the target schedule), so they must agree to arithmetic noise, not to a
+      // loose band. A creep that rides only one leg blows this out by tens of percent.
+      expect(
+        Math.abs(fundedAtVerdict - spendAtVerdict) / spendAtVerdict,
+        `creep=${creep}%: at the verdict (T=${T.toFixed(2)}y) the household spends ₹${Math.round(spendAtVerdict)}/yr real ` +
+          `but the base target funds ₹${Math.round(fundedAtVerdict)}/yr real — the two legs are on different inflation models`,
+      ).toBeLessThan(0.01);
+    }
+  });
+});
+
+// gh #194 — zero-value portfolio never blends to a rate ABOVE the max of its instruments' returns,
+// and adding a zero-value/zero-contribution line never moves an already-positive-value blend.
+//
+// These are the two invariants the #194 issue's detection upgrade calls for: (1) an all-zero-value
+// portfolio's fallback (contribution mix, or debt when even contribution is zero) can never exceed
+// the single highest per-bucket rate/σ present in EITHER weight map — so the fallback can never
+// silently reproduce the all-equity optimism the issue fixes; (2) a positive-value household's
+// blend is unaffected by a line that carries neither value nor contribution (a closed/dormant
+// instrument, or a not-yet-funded goal placeholder).
+import {
+  blendPortfolioReturn,
+  blendPortfolioVolatility,
+  type PortfolioReturnWeights,
+} from "@/lib/assumption-math";
+import { RETURN_BUCKET_VOLATILITY } from "@/lib/monte-carlo";
+import { DEFAULT_ASSUMPTIONS } from "@/types/assumptions";
+
+const ZERO_WEIGHTS: PortfolioReturnWeights = {
+  equity: 0, debt: 0, realEstate: 0, gold: 0, nps: 0, ppf: 0, epf: 0,
+  international: 0, reit: 0, crypto: 0, other: 0,
+};
+
+const BUCKET_KEYS = Object.keys(ZERO_WEIGHTS) as Array<keyof PortfolioReturnWeights>;
+
+function weightsFrom(entries: Partial<Record<keyof PortfolioReturnWeights, number>>): PortfolioReturnWeights {
+  return { ...ZERO_WEIGHTS, ...entries };
+}
+
+const returnRateOf = (bucket: keyof PortfolioReturnWeights): number => {
+  const v = DEFAULT_ASSUMPTIONS;
+  switch (bucket) {
+    case "equity": return v.equityReturn;
+    case "debt": return v.debtReturn;
+    case "realEstate": return v.realEstateReturn;
+    case "gold": return v.goldReturn;
+    case "nps": return v.npsReturn;
+    case "ppf": return v.ppfReturn;
+    case "epf": return v.epfReturn;
+    case "international": return v.internationalReturn;
+    case "reit": return v.reitReturn;
+    case "crypto": return v.cryptoReturn;
+    case "other": return v.debtReturn;
+  }
+};
+
+describe("gh #194 — zero-value portfolio fallback never exceeds the max instrument rate/σ present", () => {
+  it("blendPortfolioReturn on an all-zero-value portfolio never exceeds the max rate across value+contribution buckets", () => {
+    fc.assert(
+      fc.property(
+        fc.record(Object.fromEntries(BUCKET_KEYS.map((k) => [k, fc.double({ min: 0, max: 100_000, noNaN: true })]))) as fc.Arbitrary<
+          Record<keyof PortfolioReturnWeights, number>
+        >,
+        (contributionEntries) => {
+          const contributionWeights = weightsFrom(contributionEntries);
+          const blended = blendPortfolioReturn(DEFAULT_ASSUMPTIONS, ZERO_WEIGHTS, undefined, contributionWeights);
+          const presentBuckets = BUCKET_KEYS.filter((k) => contributionWeights[k] > 0);
+          const maxRate =
+            presentBuckets.length > 0
+              ? Math.max(...presentBuckets.map(returnRateOf))
+              : DEFAULT_ASSUMPTIONS.debtReturn; // truly empty ⇒ debt fallback, its own ceiling
+          expect(blended).toBeLessThanOrEqual(maxRate + 1e-9);
+        },
+      ),
+      { numRuns: 200 },
+    );
+  });
+
+  it("blendPortfolioVolatility on an all-zero-value portfolio never exceeds the max σ across value+contribution buckets", () => {
+    fc.assert(
+      fc.property(
+        fc.record(Object.fromEntries(BUCKET_KEYS.map((k) => [k, fc.double({ min: 0, max: 100_000, noNaN: true })]))) as fc.Arbitrary<
+          Record<keyof PortfolioReturnWeights, number>
+        >,
+        (contributionEntries) => {
+          const contributionWeights = weightsFrom(contributionEntries);
+          const blended = blendPortfolioVolatility(ZERO_WEIGHTS, contributionWeights);
+          const presentBuckets = BUCKET_KEYS.filter((k) => contributionWeights[k] > 0);
+          const maxSigma =
+            presentBuckets.length > 0
+              ? Math.max(...presentBuckets.map((k) => RETURN_BUCKET_VOLATILITY[k]))
+              : RETURN_BUCKET_VOLATILITY.debt;
+          expect(blended).toBeLessThanOrEqual(maxSigma + 1e-9);
+        },
+      ),
+      { numRuns: 200 },
+    );
+  });
+
+  it("a positive-value blend is UNCHANGED by adding a zero-value, zero-contribution line", () => {
+    fc.assert(
+      fc.property(
+        fc.constantFrom(...BUCKET_KEYS),
+        fc.double({ min: 1, max: 1_000_000, noNaN: true }),
+        (bucket, value) => {
+          const base = weightsFrom({ [bucket]: value });
+          const before = blendPortfolioReturn(DEFAULT_ASSUMPTIONS, base);
+          // Adding a zero-value/zero-contribution line changes nothing about the weight totals —
+          // simulated here as the SAME weights map (a dormant/closed instrument contributes 0 to
+          // both), so the blend must be byte-identical.
+          const after = blendPortfolioReturn(DEFAULT_ASSUMPTIONS, base, undefined, ZERO_WEIGHTS);
+          expect(after).toBeCloseTo(before, 9);
+        },
+      ),
+      { numRuns: 100 },
     );
   });
 });

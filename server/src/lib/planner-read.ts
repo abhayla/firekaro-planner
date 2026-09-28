@@ -44,6 +44,13 @@ export function mapAssumptionsRow(row: UserAssumptions): Assumptions {
     // byte-identical to their old behaviour (they used to ALWAYS get the default here).
     householdSavingsStepUpPercent:
       row.householdSavingsStepUpPercent ?? DEFAULT_ASSUMPTIONS.householdSavingsStepUpPercent,
+    // ADR-0007 / gh #185 — the income-path knobs. NO Prisma column exists for these yet (schema is
+    // step 6 of the spec, deliberately separate because it is the only irreversible step), so a row
+    // never carries them and they resolve to the research defaults here. This keeps the server's
+    // shared strip-mode Zod round-trip complete the moment the columns land.
+    salaryGrowthRealPercent: DEFAULT_ASSUMPTIONS.salaryGrowthRealPercent,
+    salaryGrowthTaperAge: DEFAULT_ASSUMPTIONS.salaryGrowthTaperAge,
+    expenseGrowthAboveInflationPercent: DEFAULT_ASSUMPTIONS.expenseGrowthAboveInflationPercent,
     householdSplitPercent: row.householdSplitPercent ?? DEFAULT_ASSUMPTIONS.householdSplitPercent,
     // ADR-0006 one-shot migration STAMP. Deliberately NOT defaulted: its ABSENCE is the signal
     // the client store uses to decide the migration has not run, so a NULL column must map back
@@ -53,11 +60,22 @@ export function mapAssumptionsRow(row: UserAssumptions): Assumptions {
 }
 
 /**
+ * The subset of `Assumptions` the DB can actually hold today — everything except the three
+ * ADR-0007 / gh #185 income-path knobs, which have no `user_assumptions` column until step 6 of
+ * that spec (the Prisma migration, deliberately separate because it is the only irreversible step).
+ * Mirrors `persistedAssumptionsSchema` in `planner-schemas.ts`, which is what PUT validates against.
+ */
+export type PersistedAssumptions = Omit<
+  Assumptions,
+  "salaryGrowthRealPercent" | "salaryGrowthTaperAge" | "expenseGrowthAboveInflationPercent"
+>;
+
+/**
  * Assumptions → the `user_assumptions` upsert payload. Every field of `Assumptions` MUST be
  * represented here; optional fields map to an explicit `null` so a cleared value overwrites a
  * previously-stored one instead of silently persisting the old value.
  */
-export function buildAssumptionsWriteData(a: Assumptions) {
+export function buildAssumptionsWriteData(a: PersistedAssumptions) {
   return {
     inflation: a.inflation,
     equityReturn: a.equityReturn,

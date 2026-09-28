@@ -49,14 +49,67 @@ describe("blendPortfolioVolatility (#18) — value-weighted portfolio σ for the
   it("an all-PPF portfolio blends to the ~cash σ", () => {
     expect(blendPortfolioVolatility({ ...zero, ppf: 100 })).toBeCloseTo(RETURN_BUCKET_VOLATILITY.ppf, 6);
   });
-  it("an empty portfolio defaults to equity σ — a not-yet-invested saver still bears risk", () => {
-    expect(blendPortfolioVolatility(zero)).toBeCloseTo(RETURN_BUCKET_VOLATILITY.equity, 6);
+  it("a fully-empty portfolio (no value, no contribution) defaults to debt σ — never equity (#194)", () => {
+    expect(blendPortfolioVolatility(zero)).toBeCloseTo(RETURN_BUCKET_VOLATILITY.debt, 6);
   });
   it("value-weights buckets — a 50/50 equity/PPF split sits exactly between the two", () => {
     const mix = blendPortfolioVolatility({ ...zero, equity: 50, ppf: 50 });
     expect(mix).toBeGreaterThan(RETURN_BUCKET_VOLATILITY.ppf);
     expect(mix).toBeLessThan(RETURN_BUCKET_VOLATILITY.equity);
     expect(mix).toBeCloseTo((RETURN_BUCKET_VOLATILITY.equity + RETURN_BUCKET_VOLATILITY.ppf) / 2, 6);
+  });
+});
+
+// gh #194 — zero-VALUE portfolios blend by CONTRIBUTION mix, never fall back to all-equity.
+//
+// RCA: `blendPortfolioReturn`/`blendPortfolioVolatility` blended by VALUE weights and returned
+// the all-equity rate/σ whenever total value ≤ 0. Every new user and the whole ₹2.5L-₹10L band
+// carries ONLY an auto-flowed EPF line created with `value: 0` (household.ts) — so their honest
+// EPF-return contribution stream was projected at an optimistic all-equity 12% nominal.
+describe("blendPortfolioReturn / blendPortfolioVolatility — zero-value fallback (#194)", () => {
+  it("value=0, contribution>0 (EPF-only line, e.g. Ravi) blends by CONTRIBUTION mix, not equity", () => {
+    const contributionWeights: PortfolioReturnWeights = { ...zero, epf: 5000 };
+    const blended = blendPortfolioReturn(v, zero, undefined, contributionWeights);
+    expect(blended).toBeCloseTo(v.epfReturn, 6);
+    expect(blended).not.toBeCloseTo(v.equityReturn, 6);
+  });
+
+  it("value=0, mixed contribution (EPF + equity SIP) blends the CONTRIBUTION mix", () => {
+    const contributionWeights: PortfolioReturnWeights = { ...zero, epf: 3000, equity: 1000 };
+    const blended = blendPortfolioReturn(v, zero, undefined, contributionWeights);
+    const expected = (3000 * v.epfReturn + 1000 * v.equityReturn) / 4000;
+    expect(blended).toBeCloseTo(expected, 6);
+  });
+
+  it("value=0 AND contribution=0 (truly empty) falls back to the debt return, never equity", () => {
+    const blended = blendPortfolioReturn(v, zero, undefined, zero);
+    expect(blended).toBeCloseTo(v.debtReturn, 6);
+    expect(blended).not.toBeCloseTo(v.equityReturn, 6);
+  });
+
+  it("value=0, contribution=0, NO contribution arg supplied at all (back-compat) still falls back to debt, never equity", () => {
+    const blended = blendPortfolioReturn(v, zero);
+    expect(blended).toBeCloseTo(v.debtReturn, 6);
+  });
+
+  it("a household with positive value is UNAFFECTED by the fix (value weights still win)", () => {
+    const valueWeights: PortfolioReturnWeights = { ...zero, equity: 100 };
+    const contributionWeights: PortfolioReturnWeights = { ...zero, epf: 5000 };
+    const blended = blendPortfolioReturn(v, valueWeights, undefined, contributionWeights);
+    expect(blended).toBeCloseTo(v.equityReturn, 6);
+  });
+
+  it("volatility mirrors the same fallback order: contribution mix, then debt σ, never equity σ", () => {
+    const contributionWeights: PortfolioReturnWeights = { ...zero, epf: 5000 };
+    const vol = blendPortfolioVolatility(zero, contributionWeights);
+    expect(vol).toBeCloseTo(RETURN_BUCKET_VOLATILITY.epf, 6);
+
+    const emptyVol = blendPortfolioVolatility(zero, zero);
+    expect(emptyVol).toBeCloseTo(RETURN_BUCKET_VOLATILITY.debt, 6);
+
+    // positive value is unaffected
+    const valuedVol = blendPortfolioVolatility({ ...zero, equity: 100 }, contributionWeights);
+    expect(valuedVol).toBeCloseTo(RETURN_BUCKET_VOLATILITY.equity, 6);
   });
 });
 

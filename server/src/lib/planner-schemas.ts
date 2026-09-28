@@ -108,4 +108,34 @@ export const planBaselineSchema = z.object({
   frameVersion: z.string().optional(),
 });
 
+/**
+ * ADR-0006 PARITY — the schema PUT /api/planner/assumptions validates against.
+ *
+ * The canonical `assumptionsSchema` (frontend, `src/types/assumptions.ts`) declares the ADR-0007 /
+ * gh #185 income-path knobs (`salaryGrowthRealPercent`, `salaryGrowthTaperAge`,
+ * `expenseGrowthAboveInflationPercent`) because `derive()` and the `Assumptions` TYPE need them.
+ * `user_assumptions` has NO column for any of the three — the Prisma migration is step 6 of the
+ * #185 spec, deliberately separate because it is the only irreversible step of that goal.
+ *
+ * A field a route ACCEPTS but cannot STORE is exactly the ADR-0006 bug class: Zod says yes, PUT
+ * returns 200, the upsert silently discards it, and GET hands back the research default forever.
+ * So the server omits the three from what it accepts. `persistedAssumptionsSchema` is a plain Zod
+ * object (default STRIP mode, no `.strict()`), so the route's `safeParse` does NOT 422 a client
+ * that sends one of the three — a 422 here would break every `/preferences` save, since the UI
+ * sends the full canonical `Assumptions` shape on every PUT. Instead the field is silently
+ * STRIPPED at the boundary and never stored (never a false 200 with data loss the client didn't
+ * cause — the client's own copy of the value is untouched, only the server round-trip drops it).
+ * `/preferences` renders those knobs read-only in server mode (`Preferences.vue`,
+ * `isServerMode()`) so the UI never lets a user believe an edit to them was saved.
+ *
+ * STEP 6 (the columns) re-adds all three here AND to `buildAssumptionsWriteData` +
+ * `mapAssumptionsRow` in the same change; the mapping spec's structural check over
+ * `persistedAssumptionsSchema.shape` is what forces those to land together.
+ */
+export const persistedAssumptionsSchema = assumptionsSchema.omit({
+  salaryGrowthRealPercent: true,
+  salaryGrowthTaperAge: true,
+  expenseGrowthAboveInflationPercent: true,
+});
+
 export { householdSchema, assumptionsSchema };

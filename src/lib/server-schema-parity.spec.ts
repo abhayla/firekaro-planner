@@ -13,10 +13,17 @@
  * server-adapter-persisted document that has its own (non-shared) server schema,
  * build a FULLY-POPULATED sample by hand from the frontend TYPE — every optional
  * field set — run it through the matching server Zod schema, and assert NO key was
- * lost. `household` and `assumptions` are excluded on purpose: their server schemas
- * (`householdSchema` / `assumptionsSchema`) are the SAME schema object the frontend
- * types are built from (imported from `src/types/*`), so there is no drift surface
- * to test — the frontend type IS the schema there.
+ * lost. `household` is excluded on purpose: its server schema (`householdSchema`) is the SAME
+ * schema object the frontend type is built from (imported from `src/types/*`), so there is no
+ * drift surface to test — the frontend type IS the schema there.
+ *
+ * `assumptions` is excluded for a DIFFERENT and deliberate reason (ADR-0007 / gh #185): its server
+ * schema is `persistedAssumptionsSchema`, which OMITS the three income-path knobs because
+ * `user_assumptions` has no column for them until #185 step 6. That omission is intentional — a
+ * field the server accepts but cannot store is the ADR-0006 silent-drop bug — so a "no key lost"
+ * parity check would fail by design here. The narrower contract that DOES hold (accepted set ===
+ * column set, and the three knobs accepted by neither) is locked in
+ * `server/src/lib/planner-assumptions-mapping.spec.ts`.
  *
  * Import note: this file imports server/src/lib/planner-schemas.ts — a PURE file
  * (Zod schemas only, no Hono/Prisma/auth imports) specifically so it is importable

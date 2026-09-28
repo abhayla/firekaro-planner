@@ -4,9 +4,9 @@ exports[`A7.2 golden-master — per-persona headline (DEFAULT lens) > iyers: der
 {
   "anchorAge": 38,
   "annualSavings": 1475608,
-  "corpusOnlyYearsToRegular": 19.8333,
+  "corpusOnlyYearsToRegular": 18.25,
   "effectiveSWR": 0.035,
-  "fireAge": 57.83,
+  "fireAge": 56.25,
   "fireNumber": 80319726,
   "fireWithdrawableCorpus": 17080000,
   "lensedEarners": 2,
@@ -15,9 +15,9 @@ exports[`A7.2 golden-master — per-persona headline (DEFAULT lens) > iyers: der
   "savingsRate": 43.2,
   "targetRetirementAge": 55,
   "totalCorpus": 17400000,
-  "yearsToFat": 19.5833,
-  "yearsToLean": 6.25,
-  "yearsToRegular": 19.8333,
+  "yearsToFat": 18,
+  "yearsToLean": 6.0833,
+  "yearsToRegular": 18.25,
 }
 `;
 
@@ -25,9 +25,9 @@ exports[`A7.2 golden-master — per-persona headline (DEFAULT lens) > mauryas: d
 {
   "anchorAge": 44,
   "annualSavings": 1510982,
-  "corpusOnlyYearsToRegular": 22.5833,
+  "corpusOnlyYearsToRegular": 21.6667,
   "effectiveSWR": 0.0325,
-  "fireAge": 66.58,
+  "fireAge": 65.67,
   "fireNumber": 105335102,
   "fireWithdrawableCorpus": 35520000,
   "lensedEarners": 1,
@@ -36,9 +36,9 @@ exports[`A7.2 golden-master — per-persona headline (DEFAULT lens) > mauryas: d
   "savingsRate": 38.1,
   "targetRetirementAge": 50,
   "totalCorpus": 36000000,
-  "yearsToFat": 24.25,
-  "yearsToLean": 4.0833,
-  "yearsToRegular": 22.5833,
+  "yearsToFat": 23.3333,
+  "yearsToLean": 4,
+  "yearsToRegular": 21.6667,
 }
 `;
 
@@ -46,9 +46,9 @@ exports[`A7.2 golden-master — per-persona headline (DEFAULT lens) > mehtas: de
 {
   "anchorAge": 45,
   "annualSavings": 2765864,
-  "corpusOnlyYearsToRegular": 6,
+  "corpusOnlyYearsToRegular": 5.8333,
   "effectiveSWR": 0.0325,
-  "fireAge": 51,
+  "fireAge": 50.83,
   "fireNumber": 102333391,
   "fireWithdrawableCorpus": 79880000,
   "lensedEarners": 2,
@@ -57,9 +57,9 @@ exports[`A7.2 golden-master — per-persona headline (DEFAULT lens) > mehtas: de
   "savingsRate": 52.2,
   "targetRetirementAge": 47,
   "totalCorpus": 80600000,
-  "yearsToFat": 8.9167,
+  "yearsToFat": 8.6667,
   "yearsToLean": 0,
-  "yearsToRegular": 6,
+  "yearsToRegular": 5.8333,
 }
 `;
 
@@ -67,9 +67,9 @@ exports[`A7.2 golden-master — per-persona headline (DEFAULT lens) > sharmas: d
 {
   "anchorAge": 31,
   "annualSavings": 1927164,
-  "corpusOnlyYearsToRegular": 22.0833,
+  "corpusOnlyYearsToRegular": 21,
   "effectiveSWR": 0.0325,
-  "fireAge": 53.08,
+  "fireAge": 52,
   "fireNumber": 87372837,
   "fireWithdrawableCorpus": 11000000,
   "lensedEarners": 2,
@@ -78,8 +78,8 @@ exports[`A7.2 golden-master — per-persona headline (DEFAULT lens) > sharmas: d
   "savingsRate": 48.1,
   "targetRetirementAge": 47,
   "totalCorpus": 11000000,
-  "yearsToFat": 22.6667,
-  "yearsToLean": 9.9167,
-  "yearsToRegular": 22.0833,
+  "yearsToFat": 21.4167,
+  "yearsToLean": 9.5833,
+  "yearsToRegular": 21,
 }
 `;

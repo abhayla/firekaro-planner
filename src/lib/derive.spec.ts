@@ -978,19 +978,15 @@ describe("seed-anchor regression locks (gh-issue #17 — catch silent adequacy-l
     // relative to the basket path, and the honest FIRE date moves LATER by a year. The Sharmas'
     // dated goals are small, so decision (b)'s goal cap (which pushes earlier) barely registers.
     //
-    // RE-ANCHORED 2026-09-29 (#176): 25.42y/₹105,982,068 → 22.08y/₹87,372,837. The Sharmas seed
-    // carries a ₹42,000/mo home-loan EMI (`seed-persona.ts`, ₹38L @ 8.5%) ending ~2037 (see
-    // `derivedEndYear(3_800_000, 42_000, 8.5, 2025, 4) === 2037`, pinned in
-    // `amortization.spec.ts`), well before the household's retirement (anchorAge 31 + ~16y to
-    // target retirement age 47 ⇒ retirement calendar year ~2042 on this FY pin) — so the EMI is
-    // now correctly excluded from the RETIREMENT expense base: measured
-    // `annualExpensesToday - retirementAnnualExpensesToday` = ₹5,04,000/yr (exactly the EMI's
-    // ₹42,000×12), ÷ effectiveSWR 0.0325 ≈ ₹1.55 Cr — the drop in `baseFireNumber` from no longer
-    // capitalising a payment the household will already have finished making. FIRE arrives
-    // EARLIER because the corpus no longer has to fund an EMI that will already be paid off — the
-    // correct direction: before this fix the plan over-stated what the household needs by
-    // capitalising a loan payment nobody will be making in retirement (gh #176).
-    expect(k.yearsToRegular).toBeCloseTo(22.08, 2);
+    // RE-ANCHORED 2026-09-29 (#176 EMI-exclusion fix + ADR-0007/#185 income-path, merged): both
+    // land on this branch. #176 excludes the ended home-loan EMI from the retirement expense base
+    // (see derivedEndYear pin in amortization.spec.ts) -- moving FIRE EARLIER because the corpus no
+    // longer capitalises a payment the household will have finished making. ADR-0007/#185 replaces
+    // the savings-residual step-up proxy with a real per-earner income-growth path (2%/yr real,
+    // tapering at 50; lifestyle creep defaults to 0) -- also moving FIRE earlier, since income is a
+    // larger base than the residual. Values below are the ACTUAL merged-kernel output, MEASURED
+    // (not hand-derived) -- see the evidence table in the merge commit.
+    expect(k.yearsToRegular).toBeCloseTo(21, 2);
     expect(Math.round(k.fireNumber)).toBe(87_372_837);
   });
 });

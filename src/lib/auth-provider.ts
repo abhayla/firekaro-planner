@@ -72,6 +72,31 @@ export class UnauthenticatedAuthProvider implements AuthProvider {
 }
 
 /**
+ * v6 SaaS — server mode, NO session, but the visitor is on a PUBLIC route (`/quick`, #187).
+ *
+ * The difference from UnauthenticatedAuthProvider is the userId: a guest gets the stable
+ * `"anon"` id, so `makeAdapter()` builds a valid `LocalStorageAdapter("anon")` and the express
+ * path runs on the v5 demo persistence path exactly as the GitHub-Pages demo does. Nothing
+ * reaches the backend (no session ⇒ no ServerAdapter is installed by main.ts).
+ *
+ * `isAuthenticated()` is still FALSE — that is what keeps the router's auth gate closed on every
+ * non-public route (only the names in PUBLIC_ROUTE_NAMES are exempt), so a guest can answer the
+ * ten cards and see a number, and still cannot reach the planner without signing in.
+ */
+export class AnonymousAuthProvider implements AuthProvider {
+  getCurrentUserId(): string {
+    return ANON_USER_ID;
+  }
+
+  isAuthenticated(): boolean {
+    return false;
+  }
+}
+
+/** The storage namespace a signed-out visitor's answers live under (`firekaro-mvp:anon:*`). */
+export const ANON_USER_ID = "anon";
+
+/**
  * Singleton — every consumer imports this. Replaced with a real provider
  * in v6 SaaS by swapping this one export.
  *

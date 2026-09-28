@@ -3,6 +3,7 @@ import { setActivePinia, createPinia } from "pinia";
 import { useHouseholdStore } from "@/stores/household";
 import { useAssumptionsStore } from "@/stores/assumptions";
 import { loadSeedPersona } from "@/lib/seed-persona";
+import { loadRaviSeed } from "@/seeds/ravi";
 import { derive } from "@/lib/derive";
 import { computeIndividualFire } from "@/lib/individual-fire";
 
@@ -35,6 +36,22 @@ describe("computeIndividualFire (#81 Phase 2 — standalone per-adult FIRE)", ()
     expect(Number.isFinite(r.yearsToIndividualFire)).toBe(true);
     expect(r.individualFireAge).toBeGreaterThanOrEqual(r.anchorAge);
     expect(r.individualFireAge).toBeLessThan(90);
+  });
+
+  it("gh #194 — a Solo member's zero-value-portfolio blend equals the household's (cross-screen coherence)", () => {
+    // Ravi is Solo (one adult, no dependents) with an auto-flowed EPF line at `value: 0` plus a
+    // SIP contribution line — exactly the class this bug hit: `corpusWeightOf`'s VALUE weights
+    // total zero for this member, so before this fix `blendPortfolioReturn` fell through to ITS
+    // OWN truly-empty debt default (individual-fire.ts had no contributionWeights to hand), while
+    // `derive()`'s household path already resolved off the CONTRIBUTION mix (gh #194, 24f9c0a).
+    // Since Ravi IS the whole household, the member-lens blended rate must equal the household's.
+    const { h, a } = setup();
+    loadRaviSeed(h, a);
+    const householdDerived = derive(h.data, a.values, { isFamilyView: false, viewingMemberId: null, currentFY: "2025-26" });
+    const memberId = h.data.members.find((m) => m.role === "ADULT")!.id;
+    const member = computeIndividualFire(h.data, a.values, memberId, "2025-26")!;
+    expect(member).not.toBeNull();
+    expect(member.nominalReturn).toBeCloseTo(householdDerived.blendedReturn, 9);
   });
 
   it("EXCLUDES ring-3 (dependents) costs from every adult's attributable expenses", () => {

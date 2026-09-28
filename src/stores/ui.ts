@@ -23,6 +23,10 @@ interface UiPersistedShape {
   // the /quick express path (QN-1). Rides the existing `ui` document (userUiPrefs.prefs JSON)
   // — no new entity key, no Prisma migration. Older shapes lacking it backfill to null.
   quick?: QuickPrefs | null;
+  // #44 — the stable anonymous visitor id the funnel counters are grouped by. Generated ONCE per
+  // browser and persisted through the storage adapter (never a direct localStorage call —
+  // storage-invariant.spec.ts enforces that). Carries no PII: a random uuid, nothing else.
+  anonId?: string | null;
 }
 
 /**
@@ -46,6 +50,17 @@ export const SHARED_TARGET_AGE_MAX = 75;
 
 // Q10.1 (v3) — dark mode removed. darkMode field dropped from this store; older
 // localStorage shapes are tolerated by hydrate (extra keys are simply ignored).
+/**
+ * #44 — a uuid v4 for the anonymous visitor. `crypto.randomUUID` needs a secure context, so the
+ * fallback keeps the counter honest on plain http (a dev box) rather than throwing.
+ */
+function newAnonId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `anon-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
+}
+
 export const useUiStore = defineStore("ui", () => {
   const isFamilyView = ref(false);
   const viewingMemberId = ref<string | null>(null);
@@ -57,6 +72,8 @@ export const useUiStore = defineStore("ui", () => {
   const lifecycleSnapshot = ref<LifecycleSnapshot | null>(null);
   // T-377: Quick-Number metadata (persisted — see UiPersistedShape).
   const quick = ref<QuickPrefs | null>(null);
+  // #44: the anonymous visitor id for the funnel counters (persisted — see UiPersistedShape).
+  const anonId = ref<string | null>(null);
   // T-377: the ONE retirement-age the hero slider and /fire-goals/what-if share (#64 class —
   // two controls for the same idea must never drift). SESSION-ONLY: deliberately NOT in
   // UiPersistedShape, NOT in persist(), NOT in the watch list below — dragging the slider is a
@@ -87,7 +104,19 @@ export const useUiStore = defineStore("ui", () => {
           : null;
       // Migration-on-hydrate: absent (every pre-T-377 blob) → null.
       quick.value = parsed.quick && typeof parsed.quick === "object" ? parsed.quick : null;
+      // Migration-on-hydrate: absent (every pre-#44 blob) → null; minted on first use below.
+      anonId.value = typeof parsed.anonId === "string" && parsed.anonId ? parsed.anonId : null;
     }
+  }
+
+  /**
+   * #44 — the stable anonymous id for the funnel counters. Minted lazily on first read and
+   * persisted with the rest of the `ui` blob, so a visitor who opens /quick, leaves, and returns
+   * a week later is counted as the SAME person (that is what makes `returned_7d` meaningful).
+   */
+  function ensureAnonId(): string {
+    if (!anonId.value) anonId.value = newAnonId();
+    return anonId.value;
   }
 
   function persist() {
@@ -100,12 +129,15 @@ export const useUiStore = defineStore("ui", () => {
       viewingMemberId: viewingMemberId.value,
       lifecycleSnapshot: lifecycleSnapshot.value,
       ...(quick.value != null ? { quick: quick.value } : {}),
+      // Same omit-when-null discipline as `quick`: the server merges, so sending null would
+      // clobber a stored anonId on any pre-hydrate write.
+      ...(anonId.value != null ? { anonId: anonId.value } : {}),
     });
   }
 
   // currentFY is derived (not user state) → not watched/persisted. whatIfTargetAge is a
   // session-only what-if → deliberately excluded from BOTH the blob and this watch list.
-  watch([isFamilyView, viewingMemberId, lifecycleSnapshot, quick], persist, { deep: true });
+  watch([isFamilyView, viewingMemberId, lifecycleSnapshot, quick, anonId], persist, { deep: true });
 
   function toggleFamilyView() {
     isFamilyView.value = !isFamilyView.value;
@@ -153,6 +185,8 @@ export const useUiStore = defineStore("ui", () => {
     currentFY,
     lifecycleSnapshot,
     quick,
+    anonId,
+    ensureAnonId,
     whatIfTargetAge,
     whatIfLevers,
     toggleWhatIfLever,
