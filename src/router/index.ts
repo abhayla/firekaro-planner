@@ -5,6 +5,7 @@ import { useAssumptionsStore } from "@/stores/assumptions";
 import { useUiStore } from "@/stores/ui";
 import { featuresGuardingRoute } from "@/lib/features";
 import { getAuthProvider } from "@/lib/auth-provider";
+import { isPublicRouteName } from "./public-routes";
 import { releaseStuckScrollLock } from "@/lib/scroll-lock-recovery";
 
 function realRoute(
@@ -134,9 +135,11 @@ const router = createRouter({
 // isAuthenticated() is false → bounce to /login before any store hydrates. In
 // demo/localStorage mode the provider is LocalAuthProvider (always authed), so this
 // guard is a no-op and the demo flow is UNCHANGED (the non-negotiable spine).
+// #187 — the PUBLIC route carve-out lives in ./public-routes.ts (see router-auth-gate.spec.ts,
+// which asserts /fire-goals/dashboard STILL redirects an unauthenticated visitor to /login).
 router.beforeEach((to) => {
   const authed = getAuthProvider().isAuthenticated();
-  if (!authed && to.name !== "login") return { name: "login" };
+  if (!authed && !isPublicRouteName(to.name)) return { name: "login" };
   if (authed && to.name === "login") return { name: "splash" };
   return true;
 });

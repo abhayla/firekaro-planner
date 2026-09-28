@@ -15,8 +15,9 @@ import vuetify from "./plugins/vuetify";
 import "./styles/tokens.css";
 import "./styles/motion.css";
 import { setAdapter } from "./lib/storage-adapter";
-import { setAuthProvider, ServerAuthProvider, UnauthenticatedAuthProvider } from "./lib/auth-provider";
+import { setAuthProvider, ServerAuthProvider, AnonymousAuthProvider } from "./lib/auth-provider";
 import { ServerAdapter } from "./lib/server-adapter";
+import { claimGuestPlan } from "./lib/guest-plan-claim";
 
 /**
  * v6 boot seam (the ONLY async point). When VITE_USE_SERVER_ADAPTER is on, resolve
@@ -42,20 +43,27 @@ async function installServerAdapter(): Promise<void> {
       headers,
     });
     if (!meRes.ok) {
-      // Reachable but no valid session → force the login gate (router redirects to /login).
-      console.warn("[boot] not authenticated — routing to /login");
-      setAuthProvider(new UnauthenticatedAuthProvider());
+      // Reachable but no valid session. #187: a guest is NOT dead-ended at /login any more —
+      // AnonymousAuthProvider gives them the `anon` storage namespace so the PUBLIC routes
+      // (/quick) run on the v5 localStorage path, while isAuthenticated()===false keeps the
+      // router's auth gate closed on every other route.
+      console.warn("[boot] no session — guest mode (public routes only)");
+      setAuthProvider(new AnonymousAuthProvider());
       return;
     }
     const { data } = (await meRes.json()) as { data?: { id?: string } };
     const userId = data?.id;
     if (!userId) {
-      console.warn("[boot] /me returned no userId — routing to /login");
-      setAuthProvider(new UnauthenticatedAuthProvider());
+      console.warn("[boot] /me returned no userId — guest mode (public routes only)");
+      setAuthProvider(new AnonymousAuthProvider());
       return;
     }
     const adapter = new ServerAdapter(userId, { baseUrl, devBypass });
     await adapter.hydrateAll(); // warm cache before mount (rejects -> fallback)
+    // #187 sign-up handoff — a visitor who answered /quick while signed OUT has their plan in the
+    // `anon` localStorage namespace, which hydrateAll() (a server read) knows nothing about. Carry
+    // it up ONCE, and only into an account with no plan of its own (see guest-plan-claim.ts).
+    claimGuestPlan(adapter);
     setAuthProvider(new ServerAuthProvider(userId));
     setAdapter(adapter);
   } catch (err) {
