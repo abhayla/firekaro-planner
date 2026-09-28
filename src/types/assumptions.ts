@@ -73,7 +73,61 @@ export const assumptionsSchema = z.object({
   // takes the new default — ONCE, gated on the `assumptionsMigratedV` stamp
   // (`src/stores/assumptions.ts`), so a 0 the user deliberately sets in /preferences survives
   // every later reload.
-  householdSavingsStepUpPercent: z.number().min(0).max(15).default(2),
+  // ADR-0007 / gh #185 step 4: DEPRECATED from the HEADLINE path. The kernel now grows each
+  // earner's INCOME (`salaryGrowthRealPercent` below) and lets the savings residual fall out year
+  // by year, which is the honest model for a household whose surplus is small relative to income
+  // (a 2% step-up on a Rs 50k surplus is Rs 1k/yr; 2% on a Rs 3L income is Rs 6k/yr, and nearly
+  // every rupee of income growth is surplus). The FIELD IS KEPT for hydrate/round-trip
+  // compatibility (every persisted document carries it, the server's strip-mode Zod reads it, and
+  // the `assumptionsMigratedV` ADR-0006 migration still writes it) and it is still read by the
+  // What-If / lever surfaces that model "save more each year" as an explicit plan action
+  // (`lever-catalog.ts`, `lever-impact.ts`, `useAcceleration.ts`). It NO LONGER feeds
+  // `derive()`'s headline corpus inflow.
+  householdSavingsStepUpPercent: z.number().min(0).max(15).default(0),
+
+  // ===== ADR-0007 / gh #185 — the income path (replaces the savings step-up proxy) =====
+  /**
+   * CONSERVATIVE real (net-of-general-CPI) salary growth per year, per earner, used for the
+   * HEADLINE FIRE date. 2% is a deliberately conservative FLOOR on an individual incumbent's
+   * age-earnings path: an individual's path is steeply positive even when the PLFS population
+   * aggregate is ~0% real, and 2% sits BELOW every individual-path estimate found (Aon ~3-4% real
+   * for corporates; 8-15% nominal fresher first-appraisal hikes). It is NOT a midpoint of two
+   * series and NOT a measured population figure. Mandatory caveat wherever this is surfaced:
+   * "assumes continuous employment; real wage growth for this band was ~0% in FY22-24".
+   * Full basis + sources: `docs/adr/0007-income-path-replaces-step-up-proxy.md` (a).
+   *
+   * The user's OWN `salary.hikePercent` never moves the headline — it drives the second,
+   * "expected" number only (spec §3.2), because an optimistic headline makes this persona
+   * UNDER-SAVE (Tier-0).
+   */
+  salaryGrowthRealPercent: z.number().min(0).max(10).default(2),
+  /**
+   * The age at which real salary growth stops compounding. Real income then HOLDS flat (it never
+   * drops) while expenses keep rising, so the surplus falls — intended, and the reason a plan
+   * never compounds a promotion curve into a household's sixties. Replaces the hard-coded
+   * `STEP_UP_TAPER_AGE = 50` in `derive.ts`.
+   */
+  salaryGrowthTaperAge: z.number().min(40).max(65).default(50),
+  /**
+   * Lifestyle creep: expense growth ABOVE price inflation, in percentage points per year.
+   *
+   * **UNSOURCED ASSUMPTION, not a research figure** — no India-specific quantified study was
+   * found (ADR-0007 (b)); the Preferences tooltip MUST say so verbatim. Applied to the
+   * **`general` inflation bucket ONLY** (ADR-0007 (c)): healthcare/education/housing are
+   * non-volitional PRICE indices already set above general CPI, so adding a behavioural creep
+   * term on top of them would double-count the same escalation. Folded into the ONE household
+   * basket, so it grows the FIRE target as well as the expense line (ADR-0007 (d)) — creep is a
+   * permanent lifestyle ratchet and the corpus must fund the crept level.
+   *
+   * **DEFAULT IS 0, and that is a Tier-0 honesty decision, not laziness (ADR-0007 (g)).** Measured
+   * at the moment creep was correctly wired to BOTH legs: 1%/yr costs sharmas +2.8y, mehtas +1.0y,
+   * iyers +2.8y, ravi +7.0y and mauryas +7.0y — pushing mauryas to age 75.1, past the #22 age-70
+   * plausibility ceiling. An UNSOURCED term must not be the single largest lever in a model whose
+   * SOURCED income-growth default (2% real) moves the same seeds by less. So the knob ships fully
+   * functional, fully disclosed, and OFF: a user or a future sourced revision turns it on
+   * deliberately. Shipping it at 1% would have made the headline rest on a guess.
+   */
+  expenseGrowthAboveInflationPercent: z.number().min(0).max(5).default(0),
   // #81 Phase 2 — the unified "household split" %: the share of SHARED costs/assets (ring-2
   // expenses + "Joint" corpus/debt + joint income streams) attributed to EACH adult when
   // computing that adult's STANDALONE individual FIRE. Default 50 (a two-adult 50/50 split).
@@ -140,6 +194,9 @@ export const DEFAULT_ASSUMPTIONS: Assumptions = {
   leanMultiplier: 0.6,
   fatMultiplier: 1.5,
   withdrawalRule: "Constant",
-  householdSavingsStepUpPercent: 2,
+  householdSavingsStepUpPercent: 0,
+  salaryGrowthRealPercent: 2,
+  salaryGrowthTaperAge: 50,
+  expenseGrowthAboveInflationPercent: 0,
   householdSplitPercent: 50,
 };

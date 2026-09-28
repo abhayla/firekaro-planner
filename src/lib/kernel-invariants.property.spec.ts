@@ -681,3 +681,128 @@ describe("gh #185 income-path invariants — future kernel, vacuous-until-Step-4
     );
   });
 });
+
+// ADR-0007 / gh #185 step 4 — NON-VACUITY GUARD for the two invariants above.
+//
+// The two properties above were deliberately written to COMPILE and pass by VACUITY before Step 4
+// (the kernel ignored `hikePercent` and the creep field, so a non-strict `<=`/`>=` bound was
+// trivially satisfied by an unchanged headline). Step 4 has landed, so they must now be EXERCISING
+// real kernel logic — and a non-strict bound cannot tell the difference between "the invariant
+// holds" and "the input is still ignored". This lock closes that hole with STRICT inequalities on
+// the real seed: if a future refactor silently disconnects the income path, the properties above go
+// quietly vacuous again while THIS test goes red.
+//
+// It also locks the product rule the whole goal exists for (spec §3.2): the user's own
+// `hikePercent` moves the SECOND number and NEVER the headline. An optimistic headline makes this
+// persona under-save, which is the Tier-0 failure mode.
+describe("gh #185 income-path NON-VACUITY — the new inputs genuinely move the kernel (Step 4 landed)", () => {
+  beforeEach(() => setActivePinia(createPinia()));
+
+  it("ravi: hikePercent moves the EXPECTED number only; creep and salary growth both move the headline", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    loadRaviSeed(h, a);
+    const withHike = (pct: number) => {
+      const snapshot = JSON.parse(JSON.stringify(h.data)) as typeof h.data;
+      for (const m of snapshot.members) {
+        if (m.salary) m.salary = { ...m.salary, hikePercent: pct };
+      }
+      return snapshot;
+    };
+
+    // (1) hikePercent: the HEADLINE is immune (spec §3.2) and the EXPECTED number moves STRICTLY.
+    const noHike = derive(withHike(0), a.values, LENS);
+    const bigHike = derive(withHike(25), a.values, LENS);
+    expect(
+      bigHike.corpusOnlyYearsToRegular,
+      "a hike% may NEVER move the conservative headline (Tier-0: optimism makes this persona under-save)",
+    ).toBe(noHike.corpusOnlyYearsToRegular);
+    expect(
+      bigHike.expectedYearsToRegular,
+      "a higher hike% MUST pull the EXPECTED number strictly earlier — else the field is inert",
+    ).toBeLessThan(noHike.expectedYearsToRegular);
+    // A hike ABOVE the conservative default beats the headline; the basis is then the typed hike.
+    expect(bigHike.expectedYearsToRegular).toBeLessThan(bigHike.corpusOnlyYearsToRegular);
+    expect(bigHike.expectedFireAgeBasis).toBe(25);
+
+    // A hike of 0 means the user is telling us their income does not grow at all, and since the
+    // FinTech review removed the floor-at-the-conservative-default clamp from
+    // `expectedRealGrowthPercent` (it was a presentation rule enforced in a math function), the
+    // expected run is now HONESTLY WORSE than the headline here. That is the point: the arithmetic
+    // tells the truth, and `expectedFireAgeBasis` is NULL so the UI shows ONE number instead of
+    // labelling a worse figure as the user's own expectation. Asserting `expected <= headline`
+    // unconditionally would re-introduce the clamp through the test suite.
+    expect(
+      noHike.expectedYearsToRegular,
+      "a 0% hike must produce an honestly WORSE expected run, not a clamped one",
+    ).toBeGreaterThan(noHike.corpusOnlyYearsToRegular);
+    expect(
+      noHike.expectedFireAgeBasis,
+      "a second number that is worse than the headline must NOT be offered to the UI",
+    ).toBeNull();
+
+    // A hike BELOW the conservative default (4% nominal vs 6% CPI = negative real) is the case the
+    // clamp used to hide: the basis must still be null, so no user is ever shown a pessimistic
+    // number presented as their own optimistic scenario.
+    const lowHike = derive(withHike(4), a.values, LENS);
+    expect(lowHike.expectedFireAgeBasis).toBeNull();
+
+    // (2) creep: STRICTLY later. (3) salary growth: STRICTLY earlier.
+    const creep0 = derive(h.data, { ...a.values, expenseGrowthAboveInflationPercent: 0 }, LENS);
+    const creep5 = derive(h.data, { ...a.values, expenseGrowthAboveInflationPercent: 5 }, LENS);
+    expect(
+      creep5.yearsToRegular,
+      "more lifestyle creep MUST push FIRE strictly later — else the creep field is inert",
+    ).toBeGreaterThan(creep0.yearsToRegular);
+
+    const growth0 = derive(h.data, { ...a.values, salaryGrowthRealPercent: 0 }, LENS);
+    const growth5 = derive(h.data, { ...a.values, salaryGrowthRealPercent: 5 }, LENS);
+    expect(
+      growth5.yearsToRegular,
+      "more real salary growth MUST pull FIRE strictly earlier — else the income path is inert",
+    ).toBeLessThan(growth0.yearsToRegular);
+  });
+});
+
+// ADR-0007 / gh #185 — the CREEP-COHERENCE invariant (the C1 guard).
+//
+// WHY THIS EXISTS. The first pass at the income path added lifestyle creep to the basket used for
+// the SURPLUS's expense line but not to the one the FIRE TARGET grows at. Nothing in the suite
+// noticed: every monotonicity property still held, every seed still produced a plausible number,
+// and the golden master simply re-baselined. The kernel was declaring a household FIRE-ready on a
+// corpus that funded ~₹2.73L/yr of real spending while its own projection had that household
+// spending ~₹3.57L/yr — a 31% shortfall AT THE MOMENT OF THE VERDICT, in the optimistic direction.
+// A FinTech review found it; no test could have.
+//
+// THE CLASS, stated generally: ANY rate that grows what the household SPENDS must also grow what
+// the corpus must FUND. The two legs of an adequacy verdict cannot run on two different inflation
+// models — that is not a tuning difference, it is the verdict comparing two different households.
+// This property is the detection upgrade for that whole class, not just for creep: it would also
+// catch a future bucket, weight or goal change that moved one leg without the other.
+describe("gh #185 creep coherence — the spend leg and the fund leg grow at ONE rate", () => {
+  beforeEach(() => setActivePinia(createPinia()));
+
+  it("ravi: the real expense level at the verdict equals the real spend the base target funds, at EVERY creep", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    loadRaviSeed(h, a);
+    for (const creep of [0, 1, 2.5, 5]) {
+      const k = derive(h.data, { ...a.values, expenseGrowthAboveInflationPercent: creep }, LENS);
+      if (!Number.isFinite(k.corpusOnlyYearsToRegular)) continue;
+      const T = k.corpusOnlyYearsToRegular;
+      // What the household is projected to be SPENDING, in today's rupees, at the verdict.
+      const realDrift = (1 + k.householdInflation) / (1 + a.values.inflation) - 1;
+      const spendAtVerdict = k.annualExpensesToday * Math.pow(1 + realDrift, T);
+      // What the BASE leg of the target funds at the resolved SWR, in today's rupees, at the verdict.
+      const fundedAtVerdict = k.regularTargetComponentsRealAt(T).base * k.effectiveSWR;
+      // Within 1%: the two are the same quantity computed through two different code paths (the
+      // expense schedule vs the target schedule), so they must agree to arithmetic noise, not to a
+      // loose band. A creep that rides only one leg blows this out by tens of percent.
+      expect(
+        Math.abs(fundedAtVerdict - spendAtVerdict) / spendAtVerdict,
+        `creep=${creep}%: at the verdict (T=${T.toFixed(2)}y) the household spends ₹${Math.round(spendAtVerdict)}/yr real ` +
+          `but the base target funds ₹${Math.round(fundedAtVerdict)}/yr real — the two legs are on different inflation models`,
+      ).toBeLessThan(0.01);
+    }
+  });
+});

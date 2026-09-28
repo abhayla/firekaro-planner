@@ -22,22 +22,37 @@ describe("derive — time-varying household savings schedule (#46 Stage C)", () 
     return { h, a };
   }
 
-  it("0% household step-up leaves the inflow a plain scalar (the schedule resolver stays inert)", () => {
-    // RE-BASELINED (ADR-0006): the default moved 0 → 2, so "0% reproduces the default headline" is
-    // no longer a statement about a no-op — it would be a statement that the new default does
-    // nothing. What #46 actually locked, and what still matters, is that 0% bypasses the resolver
-    // entirely (which is what preserves the `monthlyContribution <= 0 → Infinity` empty-state
-    // sentinel in calculateYearsToTarget) and never touches the FIRE number.
+  it("the inflow is ALWAYS a resolver for an earning household (ADR-0007 income path), and 0% step-up is the no-op", () => {
+    // RE-BASELINED TWICE.
+    //  - #46: 0% step-up bypassed the resolver, so the inflow was a plain scalar.
+    //  - ADR-0006: the default moved 0 → 2, so 0% became a non-default setting.
+    //  - ADR-0007 / gh #185 (HERE): the inflow is the INCOME-PATH surplus residual, which is
+    //    time-varying for EVERY earning household — income grows per earner and creep-adjusted
+    //    expenses eat into the residual — so it is ALWAYS a resolver, never a scalar. The
+    //    `monthlyContribution <= 0 → Infinity` empty-state sentinel that the old scalar path
+    //    protected is now preserved EXPLICITLY in `derive.ts` (a non-positive residual passes
+    //    through as a scalar), which is a stronger guarantee than relying on the 0%-step-up branch.
+    //    That sentinel has its own lock below.
+    // What still matters and is locked here: with the step-up back at its ADR-0007 default of 0, it
+    // is a genuine NO-OP (the income path alone drives the inflow) and it never touches the FIRE
+    // number; and a positive step-up is still earlier-or-equal.
     const { h, a } = sharmas();
     const base = derive(h.data, a.values, DEFAULT_LENS);
     const zeroStepUp = derive(h.data, { ...a.values, householdSavingsStepUpPercent: 0 }, DEFAULT_LENS);
-    expect(typeof zeroStepUp.householdContributionSchedule).toBe("number");
-    expect(zeroStepUp.householdContributionSchedule).toBe(zeroStepUp.monthlyContribution);
+    expect(typeof zeroStepUp.householdContributionSchedule).toBe("function");
+    // The ADR-0007 default IS 0, so 0% must reproduce the default headline byte-for-byte.
+    expect(zeroStepUp.corpusOnlyYearsToRegular).toBe(base.corpusOnlyYearsToRegular);
     expect(zeroStepUp.fireNumber).toBe(base.fireNumber);
     // The exposed scalar monthlyContribution is unchanged (MC / What-If baseline / retire-by-age read it).
     expect(zeroStepUp.monthlyContribution).toBe(base.monthlyContribution);
-    // …and the default step-up can only be earlier-or-equal.
-    expect(base.corpusOnlyYearsToRegular).toBeLessThanOrEqual(zeroStepUp.corpusOnlyYearsToRegular);
+    // A household with NO surplus still short-circuits to the scalar sentinel (empty-state guard).
+    const noSurplus = derive(
+      { ...h.data, expenses: { ...h.data.expenses, avgMonthly: 10_000_000 } },
+      a.values,
+      DEFAULT_LENS,
+    );
+    expect(typeof noSurplus.householdContributionSchedule).toBe("number");
+    expect(noSurplus.corpusOnlyYearsToRegular).toBe(Number.POSITIVE_INFINITY);
   });
 
   it("a positive REAL household step-up pulls the FIRE date earlier-or-equal (never later)", () => {

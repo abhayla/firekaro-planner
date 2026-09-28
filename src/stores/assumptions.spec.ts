@@ -35,9 +35,13 @@ describe("assumptions store — householdInflation (A3.2 editable weights)", () 
     expect(a.householdInflation() - a.values.inflation).toBeLessThanOrEqual(0.01);
   });
 
-  it("a stored step-up of exactly 0 (the pre-ADR-0006 default) is treated as unset on hydrate", () => {
+  it("the step-up default is 0 (ADR-0007: the income path, not the step-up, carries wage growth)", () => {
+    // RE-BASELINED (ADR-0007 / gh #185): ADR-0006 moved this default 0 -> 2 as a WAGE-GROWTH proxy.
+    // `derive()` now grows each earner's INCOME instead, so leaving the step-up at 2 would compound
+    // the same wage growth twice. The default is back to 0 and the field's ONLY remaining meaning is
+    // a deliberate "invest a growing share of my surplus" decision (the `step-up-10` plan lever).
     const a = useAssumptionsStore();
-    expect(a.values.householdSavingsStepUpPercent).toBe(2);
+    expect(a.values.householdSavingsStepUpPercent).toBe(0);
   });
 
   it("shifting weight toward healthcare raises the blended rate", () => {
@@ -140,8 +144,11 @@ describe("assumptions store — the step-up migration is ONE-SHOT (ADR-0006 Phas
 
     const a = useAssumptionsStore();
     a.hydrate();
-    expect(a.values.householdSavingsStepUpPercent, "fresh user gets the new default").toBe(2);
-    a.set("householdSavingsStepUpPercent", 0);
+    // ADR-0007: the default is 0, so this scenario is now "a fresh user types a NON-zero value and
+    // it survives" — the same one-shot property, exercised from the other side. Using 5 (a value
+    // neither migration treats as a default) keeps the test about the STAMP, not about the number.
+    expect(a.values.householdSavingsStepUpPercent, "fresh user gets the new default").toBe(0);
+    a.set("householdSavingsStepUpPercent", 5);
     // The deep watch persists asynchronously; write the document the way the watch would.
     store.set("assumptions", JSON.stringify(a.values));
 
@@ -151,8 +158,8 @@ describe("assumptions store — the step-up migration is ONE-SHOT (ADR-0006 Phas
       reloaded.hydrate();
       expect(
         reloaded.values.householdSavingsStepUpPercent,
-        `reload ${reload + 1}: the 0 the user typed in /preferences must still be 0`,
-      ).toBe(0);
+        `reload ${reload + 1}: the 5 the user typed in /preferences must still be 5`,
+      ).toBe(5);
       store.set("assumptions", JSON.stringify(reloaded.values));
     }
     setAdapter(null);

@@ -20,7 +20,7 @@ const ENTITY_KEY = "assumptions";
  * The migration version stamped into every hydrated assumptions document. Bump ONLY when adding
  * a new one-shot migration below, and give that migration its own `< N` guard.
  */
-export const ASSUMPTIONS_MIGRATION_VERSION = 1;
+export const ASSUMPTIONS_MIGRATION_VERSION = 2;
 
 /**
  * ADR-0006 migration-on-hydrate: `householdSavingsStepUpPercent`'s default moved 0 → 2.
@@ -41,11 +41,33 @@ export const ASSUMPTIONS_MIGRATION_VERSION = 1;
  * Pure + exported so the idempotence is unit-testable without a storage round-trip.
  */
 export function migrateStepUpDefault(parsed: Partial<Assumptions>): Partial<Assumptions> {
-  const alreadyMigrated = (parsed.assumptionsMigratedV ?? 0) >= 1;
+  const storedV = parsed.assumptionsMigratedV ?? 0;
   const stamped = { ...parsed, assumptionsMigratedV: ASSUMPTIONS_MIGRATION_VERSION };
-  if (alreadyMigrated || parsed.householdSavingsStepUpPercent !== 0) return stamped;
-  const { householdSavingsStepUpPercent: _legacyZero, ...rest } = stamped;
-  return rest;
+
+  // --- v2 (ADR-0007 / gh #185): the step-up is no longer the WAGE-GROWTH proxy ---
+  // `derive()` now grows each earner's INCOME (`salaryGrowthRealPercent`, default 2% real) and lets
+  // the savings residual fall out. A stored `householdSavingsStepUpPercent` of exactly 2 — the v1
+  // default, written out by this very migration or by the deep `watch` for every household hydrated
+  // since 2026-08-27 — was never a CHOICE either: it is the old proxy. Merging it verbatim would
+  // compound the same wage growth TWICE (once through income, once through the residual) and pull
+  // every existing user's FIRE date optimistically in, which is the Tier-0 direction. So a stored
+  // value of exactly the v1 default is DROPPED so the new default (0) applies. A value the user
+  // deliberately typed (anything but 2) survives untouched, and once the v2 stamp is written this
+  // never runs again — so a user who later chooses 2 on purpose keeps it.
+  if (storedV < 2 && parsed.householdSavingsStepUpPercent === 2) {
+    const { householdSavingsStepUpPercent: _v1ProxyDefault, ...rest } = stamped;
+    return rest;
+  }
+
+  // --- v1 (ADR-0006): a stored 0 was the pre-ADR-0006 default, not a choice ---
+  // Kept for documents that have never been hydrated since v1 landed. With the default now back at
+  // 0 this is a no-op in VALUE terms (dropping a stored 0 re-applies a default of 0); it is retained
+  // so the one-shot semantics and the unit locks around it stay honest rather than silently deleted.
+  if (storedV < 1 && parsed.householdSavingsStepUpPercent === 0) {
+    const { householdSavingsStepUpPercent: _legacyZero, ...rest } = stamped;
+    return rest;
+  }
+  return stamped;
 }
 
 export const useAssumptionsStore = defineStore("assumptions", () => {

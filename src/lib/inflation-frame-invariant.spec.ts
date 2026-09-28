@@ -73,7 +73,16 @@ const LIVE_DEFAULTS_REQUIRED_MONTHLY = {
   // prescription rises with it. The goal-capping half of Phase 1c pushes the other way but the
   // Iyers' family layer is small, so the reservation dominates. Re-recorded, not widened: the
   // ±8% allowance below is unchanged.
-  iyers: 158_421,
+  // RE-RECORDED at ADR-0007 / gh #185 (the income path): 158,421 → 183,414 (+15.8%, outside the
+  // ±8% band). The move is UPWARD — the CONSERVATIVE direction — and the cause is named: the
+  // prescription is "what must you invest EVERY month, flat, in today's ₹, to hit the target at
+  // your stored age". The retired savings step-up made that flat figure smaller because the plan
+  // it was measured against grew the residual 2%/yr for free. The income path replaces that with
+  // per-earner income growth MINUS 1%/yr general-bucket lifestyle creep, and for the Iyers (two
+  // mid-career earners, 17-year horizon) the creep on a large expense base outweighs the income
+  // growth on a residual that is already a big share of income — so the honest flat prescription is
+  // higher. Re-recorded, not widened: the ±8% allowance below is unchanged.
+  iyers: 183_414,
   mauryas: Number.POSITIVE_INFINITY,
 } as const;
 /**
@@ -158,6 +167,19 @@ describe("ADR-0006 — the FIRE target and the corpus must not share one inflati
       healthcareInflation: cpi,
       educationInflation: cpi,
       housingInflation: cpi,
+      // ADR-0007 / gh #185 — lifestyle creep is BUCKET-SCOPED (it is added to the `general` rate
+      // only, because the other three are non-volitional price indices already above CPI). A
+      // bucket-scoped term is weight-DEPENDENT by construction: at the default weights the creep
+      // enters the basket at 0.74 × 1%, and at general:100 it enters at 1.00 × 1%. So with creep on,
+      // "the weights cannot matter" is NOT a true statement about this kernel, and asserting it
+      // would be asserting a model the kernel deliberately does not implement (the same trap the
+      // aggregate-drift note below describes). This fixture therefore sets creep to 0, which is
+      // exactly the right scope for THIS lock: it is the ADR-0006 INFLATION-FRAME collapse
+      // property — when every PRICE index equals CPI, the price frame must vanish however the
+      // price weights are arranged. Creep is not a price index and is not what this lock is about.
+      // The creep term has its own dedicated locks: `kernel-invariants.property.spec.ts` (creep
+      // monotonicity — higher creep never pulls FIRE earlier) and the ADR-0007 (c) reasoning.
+      expenseGrowthAboveInflationPercent: 0,
     };
     // The single-rate reference: the SAME flat bucket rates, but arrived at the other way — one
     // bucket carrying all the weight. When every bucket rate equals CPI, the weighting cannot

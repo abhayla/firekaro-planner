@@ -436,6 +436,14 @@ export function useFireDerive() {
     regularTargetComponentsRealAt: computed(() => d.value.regularTargetComponentsRealAt),
     effectiveTargetDriftRate: computed(() => d.value.effectiveTargetDriftRate),
     effectiveTargetGrowthNominal: computed(() => d.value.effectiveTargetGrowthNominal),
+    // ADR-0007 / gh #185 — the income path's effective real inflow growth (the acceleration card /
+    // lever bands read this instead of the retired `householdSavingsStepUpPercent`).
+    effectiveInflowRealGrowthPercent: computed(() => d.value.effectiveInflowRealGrowthPercent),
+    // ADR-0007 / gh #185 — the SECOND number ("or 42 if your 12% hikes continue"). Never the
+    // headline: `expectedFireAgeBasis` is null when no earner typed a hike% above the conservative
+    // default, in which case the UI shows ONE number.
+    expectedFireAge: computed(() => d.value.expectedFireAge),
+    expectedFireAgeBasis: computed(() => d.value.expectedFireAgeBasis),
     // ADR-0006: the REAL (today's-₹) corpus-inflow schedule the headline was solved with.
     householdContributionSchedule: computed(() => d.value.householdContributionSchedule),
     bandContributionSchedule: computed(() => d.value.bandContributionSchedule),

@@ -168,6 +168,90 @@ No new schema field is introduced: the existing `inflationBucket` axis carries t
   consumes when building the actual `IncomeSchedule` in `derive.ts` / `fire-math.ts` /
   `contribution-schedule.ts`.
 
+## Revision 2026-09-29 (b) — settled during Step 4 by the FinTech review of the implementation
+
+Three things the decisions above did not settle, found by an adversarial FinTech review of the Step-4
+kernel code itself (not of this ADR). Recorded here because each changes what Step 4 ships.
+
+### (d) Creep rides BOTH legs of the adequacy verdict, or neither — CRITICAL, was a real bug
+
+Decision (c) settled which *bucket* creep attaches to and was **silent on which LEG consumes it**.
+The first implementation pass therefore added creep to the basket used for the household's **expense
+line** (which sets the savings surplus) but not to the basket the **FIRE target** grows at. Measured
+on the Ravi fixture: at the headline verdict age the kernel had the household **spending ~₹3.57L/yr
+real** while the base target funded only **~₹2.73L/yr real** — a **31% shortfall at the exact moment
+the plan declared FIRE reached**, in the **OPTIMISTIC** direction, which is the Tier-0 failure mode
+for this persona. Five further surfaces read the no-creep basket and inherited the same split
+(`effectiveTargetDriftRate`, `effectiveTargetGrowthNominal`, the bridge's expense line, the
+Floor/Ceiling decumulation overlay, and the Monte Carlo drift).
+
+**Decision: creep is folded into `householdInflation` itself**, the one household basket, so every
+consumer — target schedule, bridge, decumulation, effective drift, MC band — inherits exactly one
+rate. The justification is not merely coherence: **creep is a permanent lifestyle ratchet.** A
+household that creeps its way to ₹3.57L of real spending does not revert to ₹2.73L on retirement
+day, so the corpus must capitalise the crept level. Detection upgrade shipped with the fix: a
+creep-coherence property in `src/lib/kernel-invariants.property.spec.ts` asserting, at every creep
+value, that the real spend at the verdict equals the real spend the base target funds to within 1%.
+That property covers the whole class (any future bucket/weight/goal change that moves one leg and not
+the other), not just creep.
+
+### (e) The "expected" band is honest arithmetic; whether to SHOW it is the UI's call — was a bug
+
+The first pass floored `expectedRealGrowthPercent` at the conservative default so the second number
+could never read worse than the headline beside it. That is a **presentation rule enforced inside a
+math function**: it made the second figure `max(user, default)` rather than the user's own, so the
+copy "42 if your 12% hikes continue" was false for every user whose hike sat below CPI + the default.
+
+**Decision:** `expectedRealGrowthPercent` returns the honest Fisher conversion
+`((1+hike)/(1+CPI)) − 1`, clamped to [0, 15] only (a negative rate is not a shape the income path
+models — income holds flat, it never shrinks). `derive()` sets **`expectedFireAgeBasis` from the
+SOLVED result**: non-null only when the user typed a hike AND the expected run genuinely beats the
+headline. A null basis is the UI's instruction to show ONE number. Spec §4.5's "expected <
+conservative, always" is therefore a **presentation** invariant from now on, not a model one.
+
+### (g) `expenseGrowthAboveInflationPercent` DEFAULT: 1% -> 0% — supersedes (b)'s "default = 1%"
+
+Decision (b) set the creep default to 1% on the reasoning that it was "deliberately small and
+directionally conservative". That reasoning was made **before creep was wired to both legs** (decision
+(d)). Once it was, the term stopped being small. Measured on the five seeds at the moment (d) landed,
+default lens, conservative band:
+
+| Seed | creep 0% | creep 0.5% | creep 1% | cost of 1% |
+|---|---|---|---|---|
+| sharmas | 54.17 | 55.50 | 57.00 | +2.83y |
+| mehtas | 50.92 | 51.33 | 51.92 | +1.00y |
+| iyers | 56.33 | 57.58 | 59.08 | +2.75y |
+| mauryas | 68.08 | 70.83 | **75.08** | +7.00y |
+| ravi | 57.17 | 60.17 | 64.17 | +7.00y |
+
+At 1% the Mauryas breach the **#22 age-70 plausibility ceiling** (75.08), and the **unsourced** creep
+term moves every seed further than the **sourced** 2% real income-growth default does. That inverts
+the evidence hierarchy this ADR exists to protect: a disclosed guess must not be the single largest
+lever in a Tier-0 honesty headline.
+
+**Decision: the default is 0.** The knob ships fully implemented, fully wired to both legs, fully
+disclosed in the Preferences copy ("unsourced assumption, not a research figure... so we do not put it
+in your headline unasked"), and OFF. A user turns it on deliberately to see what gradually spending
+more costs them; a future revision with real Indian consumer-spending panel data turns it on with a
+citation. This supersedes (b)'s default only — (b)'s disclosure requirement stands in full, and (c)'s
+general-bucket scoping and (d)'s both-legs wiring are unchanged.
+
+**Note on (c)'s "makes the headline earlier" claim:** that comparison (general-only vs uniform creep)
+is now moot at the default, since the default creep is 0 and both readings collapse to the same
+number. It remains correct for any user who turns creep on.
+
+### (f) Carried forward, NOT fixed in Step 4 — the empty-portfolio return fallback (pre-existing)
+
+`assumption-math.ts` `blendPortfolioReturn` returns `equityReturn` (12% nominal) whenever the
+value-weighted portfolio total is zero. Ravi's only holding is an auto-flowed EPF line created with
+`value: 0`, so his weights sum to zero and his **EPF-only contribution stream is projected at an
+all-equity return** — an optimistic error that flatters his headline. This is **pre-existing** (it
+predates this ADR and this goal) and is **not** introduced or changed by Step 4, so it is recorded
+here and left to a separate change: the fallback should key off the CONTRIBUTION mix, not the
+(empty) value mix, and that is a product call about what a not-yet-invested user is assumed to buy.
+Consequence for Step 4's own numbers: **Ravi's measured FIRE age is if anything too EARLY**, not too
+late, and the acceptance band must be re-derived on a corrected return before it is trusted.
+
 ## Open questions carried forward (not blocking Step 3)
 
 - Should the conservative default vary by age band (e.g. lower for 45+ near typical raise

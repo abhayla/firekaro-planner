@@ -44,6 +44,13 @@ export function mapAssumptionsRow(row: UserAssumptions): Assumptions {
     // byte-identical to their old behaviour (they used to ALWAYS get the default here).
     householdSavingsStepUpPercent:
       row.householdSavingsStepUpPercent ?? DEFAULT_ASSUMPTIONS.householdSavingsStepUpPercent,
+    // ADR-0007 / gh #185 — the income-path knobs. NO Prisma column exists for these yet (schema is
+    // step 6 of the spec, deliberately separate because it is the only irreversible step), so a row
+    // never carries them and they resolve to the research defaults here. This keeps the server's
+    // shared strip-mode Zod round-trip complete the moment the columns land.
+    salaryGrowthRealPercent: DEFAULT_ASSUMPTIONS.salaryGrowthRealPercent,
+    salaryGrowthTaperAge: DEFAULT_ASSUMPTIONS.salaryGrowthTaperAge,
+    expenseGrowthAboveInflationPercent: DEFAULT_ASSUMPTIONS.expenseGrowthAboveInflationPercent,
     householdSplitPercent: row.householdSplitPercent ?? DEFAULT_ASSUMPTIONS.householdSplitPercent,
     // ADR-0006 one-shot migration STAMP. Deliberately NOT defaulted: its ABSENCE is the signal
     // the client store uses to decide the migration has not run, so a NULL column must map back

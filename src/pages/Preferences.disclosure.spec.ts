@@ -77,11 +77,32 @@ describe("Preferences — ADR-0006 savings step-up", () => {
     expect(src).toMatch(/Math\.min\(15, Math\.max\(0, Number\(val\) \|\| 0\)\)/);
   });
 
-  it("says what the default is AND why it tapers at 50", () => {
-    expect(template).toMatch(/2% a year above inflation, tapering to 0 by age 50/);
-    expect(template).toMatch(/Why 2%, and why it stops at 50/);
-    expect(template, "the pessimism it corrects must be named").toMatch(/zero real growth/);
-    expect(template).toMatch(/3–4% above inflation/);
+  it("ADR-0007: discloses the income path, the 2% basis WITH its continuous-employment caveat, and creep-off", () => {
+    // RE-BASELINED (ADR-0007 / gh #185). The old copy explained a SAVINGS step-up of 2% tapering at
+    // 50. `derive()` now grows each earner's INCOME instead, so the panel had to be rewritten. What
+    // this locks is the DISCLOSURE, which is the Tier-0 part:
+    //  1. the model change is explained in the user's own terms (income, not savings);
+    //  2. the 2% default carries the FinTech-mandated caveat VERBATIM — without it the default reads
+    //     as a measured figure, which it is not;
+    //  3. the user's own hike % is named as moving the SECOND number, never the headline;
+    //  4. lifestyle creep is named as UNSOURCED and as shipped OFF.
+    expect(template, "the model change must be explained in the user's terms").toMatch(
+      /Why we grow your income, not your savings/,
+    );
+    expect(template, "the 2% basis must be disclosed").toMatch(/Why 2%/);
+    // The mandated caveat, verbatim. This is the single most important string on the page: it is the
+    // condition under which the individual-path reasoning behind 2% holds at all.
+    expect(
+      template.replace(/\s+/g, " "),
+      "the continuous-employment caveat must appear VERBATIM (ADR-0007 (a))",
+    ).toContain("assumes continuous employment; real wage growth for this band was ~0% in FY22-24");
+    expect(template, "the hike % must be named as the SECOND number, never the headline").toMatch(
+      /never the headline/,
+    );
+    expect(template, "creep must be disclosed as an unsourced assumption").toMatch(
+      /unsourced assumption, not a research figure/,
+    );
+    expect(template, "creep must be disclosed as shipped OFF").toMatch(/we ship it OFF/);
   });
 });
 

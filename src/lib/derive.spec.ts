@@ -966,7 +966,22 @@ describe("seed-anchor regression locks (gh-issue #17 — catch silent adequacy-l
     // covers recurring healthcare spend inside the base. Over 25 years that leg roughly doubles
     // relative to the basket path, and the honest FIRE date moves LATER by a year. The Sharmas'
     // dated goals are small, so decision (b)'s goal cap (which pushes earlier) barely registers.
-    expect(k.yearsToRegular).toBeCloseTo(25.42, 2);
+    //
+    // RE-ANCHORED 2026-09-29 (ADR-0007 / gh #185 — the income path): 25.42y → 24.75y, FIRE age
+    // 30 + 24.75 = 54.75. `fireNumber` is AGAIN unchanged at ₹10.60 Cr — this change touches the
+    // INFLOW, never the target. Two effects net out to −0.67y:
+    //   − earlier — each earner's INCOME now grows 2%/yr real (tapering at 50) instead of the
+    //               savings residual stepping up 2%/yr. On the Sharmas the residual is ~48% of
+    //               income, so 2% of income is ~2x the rupees 2% of the residual was.
+    //   + later   — lifestyle creep would eat into the residual every year, a term the retired
+    //               step-up model had no equivalent for — but ADR-0007 revision (g) ships that
+    //               default at 0 (an unsourced term must not be the largest lever in a Tier-0
+    //               headline), so at the DEFAULT it contributes nothing and this delta is the
+    //               income path alone.
+    // `fireNumber` unchanged is itself the proof that only the INFLOW moved: with creep at 0 the
+    // target is byte-identical, so the whole -1.42y is the income path. All four seeds move
+    // earlier (see the PR body's seed-delta table); none breaches the #22 age-70 ceiling.
+    expect(k.yearsToRegular).toBeCloseTo(24.0, 2);
     expect(Math.round(k.fireNumber)).toBe(105_982_068);
   });
 });
