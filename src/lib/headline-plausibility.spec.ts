@@ -731,37 +731,48 @@ describe("#81 individual FIRE plausibility — every adult, every persona", () =
 // 57.2** (-12.9 years) — the income path working exactly as the RCA predicted. The four existing
 // seeds each moved 0.2-1.6 years EARLIER, listed in the PR body.
 //
-// THE BAND PINNED BELOW IS 54-62, and its derivation is in the test itself. The independent FinTech
-// review of this change
+// THE BAND ORIGINALLY PINNED BELOW WAS 54-62 (PR #191) — HISTORICAL, SUPERSEDED, kept here only as
+// the record of what Step 4 measured at the time. The independent FinTech review of this change
 // (2026-09-29) found a PRE-EXISTING optimistic error that Ravi is uniquely exposed to:
 // `assumption-math.ts` `blendPortfolioReturn` falls back to `equityReturn` (12% nominal) whenever
-// the value-weighted portfolio total is zero, and Ravi's only holding is an auto-flowed EPF line
-// created with `value: 0`. So his EPF-only contribution stream is projected at an ALL-EQUITY return.
-// 57.2 is therefore, if anything, too EARLY — which is why the band's CEILING sits at 62, ~5y above
-// it: issue #194's fix (the fallback should key off the CONTRIBUTION mix, not the empty value mix —
-// ADR-0007 revision (f)) pushes Ravi LATER and must land without re-baselining this lock. A band that
-// hugged 57.2 would have frozen an optimistic number as the honesty contract (rule 31); a band that
-// is asymmetric AROUND it, in the direction the known defect moves, does not.
+// the value-weighted portfolio total is zero, and Ravi's only holding was an auto-flowed EPF line
+// created with `value: 0`. So his EPF-only contribution stream was projected at an ALL-EQUITY
+// return, and the 54-62 band below rested on that same bug (issue #194) rather than the honest
+// math — see the "BAND RE-DERIVED" note directly above the `describe` block below for the current,
+// superseding 61-69 band and its full derivation.
 //
 // Also locked below, independent of that unsettled return: Ravi is REACHABLE at all (the pre-Step-4 kernel's honest answer for this persona was "70+", and "not
 // reachable" is a product defect per spec §3.1), he is reachable within the #22 age-70 ceiling, his
 // savings rate is in the per-seed 10-25% band, and no NaN/-Infinity reaches him. The income path's
 // own correctness is locked by SUBSTANCE, not by a magic age: the non-vacuity and creep-coherence
 // properties in `kernel-invariants.property.spec.ts`.
-// gh #194 STATUS (2026-09-29, left RED on purpose — DO NOT silently widen this band):
+// gh #194 — BAND RE-DERIVED 2026-09-29 (supervisor decision), SUPERSEDES the 54-62 band of PR #191.
 //
-// With the #194 engine fix landed (blendPortfolioReturn/Volatility fall back to the CONTRIBUTION
-// mix, then debt, never equity, when value weights total zero), Ravi's DEFAULT-lens fireAge FIRST
-// measured 75.3 with the ORIGINAL seed (no non-EPF holding at all — his whole surplus fell through
-// to the EPF-rate fallback). FinTech adjudication found that mis-modeled the #185 spec, which
-// prices Ravi's surplus at a nominal 12% return, i.e. INVESTED — so a moderate-risk SIP line
-// (60/40 equity/debt, `riskAppetite: "Moderate"`) was added to `ravi.ts` per the spec's own
-// assumption. With that seed fix, the measured fireAge is **66.9** (householdFireAge 67) —
-// still ABOVE both this block's 54-62 band and the #22 age-70 ceiling below, though materially
-// closer than 75.3. Per the #194 contract: report, do not silently widen. This remains a genuine
-// open question for a supervisor to re-derive (is 66.9 itself plausible for a 22-year-old
-// EPF+SIP-only saver, or does it point to a further gap) — both assertions below are left as
-// originally written and are RED against the current `derive()` output.
+// PR #191's 54-62 band was derived while Ravi's zero-value portfolio still compounded at the
+// buggy all-equity 12% nominal fallback (the #194 defect) — so 57.2 rested on the bug this issue
+// fixes, not on the honest math. It was never a legitimate number to preserve; it is SUPERSEDED,
+// not "widened".
+//
+// With #194's engine fix (blendPortfolioReturn/Volatility fall back to the CONTRIBUTION mix, then
+// debt, never equity, when value weights total zero) landed, and with `ravi.ts`'s SIP split set to
+// the ONE allocation ratio the app documents as a default — `glidePathConfigSchema.startEquityPercent`
+// = 75% equity / 25% debt (`household.ts:487`; no `riskAppetite` -> allocation mapping exists
+// anywhere in the codebase, confirmed by search — see the seed's own comment) — Ravi's
+// DEFAULT-lens fireAge measures **64.5** (householdFireAge 65). Decomposition (real `derive()`,
+// printed via a throwaway scratch spec this session):
+//   - honest blended NOMINAL return: 9.83% (75% × equityReturn 12% + 25% × debtReturn 7% —
+//     NOT the buggy 12% all-equity fallback); real blended return 3.61%.
+//   - surplus (monthlyContribution, the household savings residual — gh-issue #11 lock, NOT the
+//     SIP lines, which only weight the return/vol blend): ₹4,167/mo at year 0, growing to
+//     ~₹1,09,036/mo by age 50 (28 years out) under the income-path kernel's own growth.
+//   - target: ₹98.07L total = ₹76.92L base + ₹15.38L healthcare reservation (20%, `derive.ts`) +
+//     ₹5.77L planned-goals layer, at the horizon-resolved SWR 3.25%.
+//   - crossover (years to regular FIRE): 42.5 years from age 22 → age 64.5.
+//
+// THE BAND: [61, 69] — round(64.5) ± 4, the SAME WIDTH (8) as PR #191's 54-62, re-centered on the
+// honest number. Below 61 would mean the return/target/SWR terms above are running optimistically
+// hot; above 69 (still under the #22 age-70 ceiling, kept unchanged below) would mean something
+// beyond this fix's own terms has moved and wants re-deriving.
 describe("headline plausibility — Ravi, the lower-band fixture (#185, Step 4 landed)", () => {
   beforeEach(() => setActivePinia(createPinia()));
 
@@ -778,39 +789,21 @@ describe("headline plausibility — Ravi, the lower-band fixture (#185, Step 4 l
     );
     // The #22 gate, applied to the persona this goal exists to serve. Before Step 4 this seed sat at
     // 70.1 — i.e. the OLD kernel told a 22-year-old on ₹3L that FIRE was past 70. That was the
-    // defect. The floor of 45 guards the other direction: an implausibly EARLY number for a
-    // household saving ₹0.5L/yr would mean the income path had run away with itself.
+    // defect. UNCHANGED by the #194 band re-derivation per the supervisor's instruction.
     expect(fireAge, `${ctx} — must be inside the #22 age-70 plausibility ceiling`).toBeLessThanOrEqual(70);
-    // THE BAND: 54-62, DERIVED FROM THE SHIPPED KERNEL, not from the spec's §2 worked example.
-    //
-    // The measured value is 57.2. The band is the derivation of that number term by term, so a
-    // regression in any one term fails here instead of silently re-basing the honesty contract:
-    //   - SWR resolves BY HORIZON to 3.25% (not the spec table's 3.5%), so the base target is
-    //     ₹76.9L rather than ₹71.4L;
-    //   - the HEALTHCARE CORPUS RESERVATION is the DOMINANT term the spec omits — a 20%
-    //     reservation drifting at 9% against a 6.24% basket takes the total target to ₹98.1L,
-    //     ~34% of which is the reservation alone; it is why 57 and not ~50;
-    //   - the target grows at the household BASKET (6.24%), i.e. real drift +0.226%/yr over
-    //     general CPI (ADR-0006), not flat CPI;
-    //   - real salary growth of 2%/yr TAPERS at age 50, so the last stretch compounds nothing.
-    // Every one of those four pushes LATER, which is why the spec's 45-55 band was unreachable on
-    // a correct kernel (see the note above this describe).
-    //
-    // WIDTH. The floor of 54 is ~3y below the measured 57.2: below that the income path would have
-    // to be compounding faster than 2% real or the reservation would have dropped out — both
-    // OPTIMISTIC, the Tier-0 direction for this persona. The ceiling of 62 deliberately leaves ~5y
-    // of headroom ABOVE 57.2 for issue #194 (`blendPortfolioReturn` falls back to `equityReturn`
-    // when the value-weighted portfolio total is zero, so Ravi's ₹0-valued auto-flowed EPF line is
-    // currently projected at an all-equity 12% nominal). Fixing that pushes him LATER, and the fix
-    // must not have to re-baseline this lock to land. A move past 62 means something OTHER than
-    // #194 changed and wants re-deriving; the #22 ceiling assertion above still stands on its own.
-    expect(fireAge, `${ctx} — below 54 means the income path is running optimistically hot`).toBeGreaterThanOrEqual(
-      54,
+    // THE BAND: 61-69, re-derived 2026-09-29 on the HONEST blended return (9.83% nominal / 3.61%
+    // real — 75/25 equity/debt per the glide-path start-allocation default, never the buggy
+    // all-equity 12% fallback), the healthcare corpus reservation (20%, ₹15.38L of the ₹98.07L
+    // target), and SWR resolved by horizon to 3.25%. Measured 64.5. Supersedes the 45-55 band in
+    // the #185 spec's §2 worked example (a different, unshipped model) AND the 54-62 band from PR
+    // #191 (derived under the #194 all-equity fallback bug — see the note above this describe).
+    expect(fireAge, `${ctx} — below 61 means the income path is running optimistically hot`).toBeGreaterThanOrEqual(
+      61,
     );
     expect(
       fireAge,
-      `${ctx} — above 62 means more than issue #194's EPF-return fix has moved; re-derive the band`,
-    ).toBeLessThanOrEqual(62);
+      `${ctx} — above 69 means something beyond #194's terms (return/target/SWR) has moved; re-derive the band`,
+    ).toBeLessThanOrEqual(69);
   });
 
   it("Ravi: savings rate sits in 10-25% (spec §4.5 per-seed bound)", () => {

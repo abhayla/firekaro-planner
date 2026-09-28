@@ -49,24 +49,36 @@ export function loadRaviSeed(household: HStore, assumptions: AStore) {
   // Year-0 saves ~₹0.5L (₹3.0L income − ₹2.5L expenses).
   household.setAvgMonthly(Math.round(250000 / 12));
 
-  // gh #194 — the surplus left after EPF is INVESTED (spec §2 models the whole surplus growing at
-  // a nominal 12% return), not left sitting uninvested. A moderate-risk SIP (60/40 equity/debt,
-  // consistent with `riskAppetite: "Moderate"`) at ~₹4,100/mo (~₹49.2k/yr, close to the spec's
-  // ₹32k/yr surplus-after-EPF once EPF's own ₹2,400/mo employer+employee flow is accounted for).
-  // `value: 0` — a fresh SIP with no accumulated corpus yet, same as the EPF line.
+  // gh #194 (supervisor follow-up, 2026-09-29) — the surplus left after EPF is INVESTED (spec §2
+  // models the whole surplus growing at a nominal 12% return), not left sitting uninvested. The
+  // equity/debt split is NOT ad hoc: searched for a `riskAppetite` -> allocation mapping (the only
+  // candidate is `src/lib/glide-path.ts`'s `computeGlidePath`/`equityPercentAtYear`) and found NONE
+  // — `riskAppetite` is captured on the member profile (`src/types/household.ts:91`) and displayed
+  // (`MembersForm.vue:114`) but is never read by `derive.ts`, `glide-path.ts`, or any allocation
+  // logic; a household's `glidePath` config is `enabled: false` unless the user turns it on, and
+  // Ravi's seed does not. Per the fallback instruction, this uses the ONE allocation ratio the app
+  // itself documents as a default: `glidePathConfigSchema.startEquityPercent` (`household.ts:487`,
+  // default 75 — the Pfau-Kitces "rising equity" path's START-of-horizon equity %, the natural
+  // choice for a 22-year-old at the very start of their horizon even with the glide path off).
+  // 75/25 equity/debt of the ~₹4,100/mo surplus-after-EPF => ₹3,075 MF (equity) + ₹1,025 FD (debt).
+  // `value: 0` — a fresh SIP with no accumulated corpus yet, same as the EPF line. NOTE: these
+  // `monthlyContribution` values feed ONLY the #194 zero-value RETURN/VOLATILITY blend weighting
+  // (`returnBucketKey` in `assumption-math.ts`) — they are display/weighting metadata, never
+  // additive to the corpus inflow, which stays the single household savings residual
+  // (`derive.ts` gh-issue #11 lock, ~line 400-408).
   household.addInvestment({
     type: "MutualFunds",
-    label: "Starter SIP (equity)",
+    label: "Starter SIP (equity, 75% per glide-path start allocation)",
     value: 0,
-    monthlyContribution: 2460,
+    monthlyContribution: 3075,
     ownerId: "ravi",
     isAutomated: true,
   });
   household.addInvestment({
     type: "FD",
-    label: "Starter SIP (debt)",
+    label: "Starter SIP (debt, 25% per glide-path start allocation)",
     value: 0,
-    monthlyContribution: 1640,
+    monthlyContribution: 1025,
     ownerId: "ravi",
     isAutomated: true,
   });
