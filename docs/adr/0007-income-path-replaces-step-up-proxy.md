@@ -252,6 +252,51 @@ here and left to a separate change: the fallback should key off the CONTRIBUTION
 Consequence for Step 4's own numbers: **Ravi's measured FIRE age is if anything too EARLY**, not too
 late, and the acceptance band must be re-derived on a corrected return before it is trusted.
 
+### (g-server) The three new knobs are NOT persisted per account until step 6 (added 2026-09-29)
+
+`user_assumptions` has no column for `salaryGrowthRealPercent`, `salaryGrowthTaperAge` or
+`expenseGrowthAboveInflationPercent`. The Prisma migration is **step 6 of the #185 spec, kept
+separate because it is the only irreversible step of the goal**. The first pass of this change
+declared all three on the schema the server VALIDATES against while adding neither a column nor a
+write-payload entry — exactly the ADR-0006 bug class (Zod says yes, PUT returns 200, the upsert
+discards the field, GET returns the research default forever).
+
+Resolution, until step 6 lands:
+
+- PUT `/api/planner/assumptions` validates **`persistedAssumptionsSchema`**
+  (`server/src/lib/planner-schemas.ts`), the canonical schema with those three `.omit()`-ed. The
+  server does not accept what it cannot store; a client sending one gets a 422 naming the field
+  instead of a false 200.
+- `/preferences` renders the three knobs **disabled in server mode** (`isServerMode()`), each hint
+  and a visible section note carrying: *"Saved per account after the next release; the plan already
+  uses the research default."* Nothing is silently dropped in the UI either.
+- The demo / localStorage deployment keeps them editable — its adapter stores them fine.
+- `server/src/lib/planner-assumptions-mapping.spec.ts` locks the invariant as an EQUALITY in both
+  directions (accepted set === column set) plus the three knobs' deliberate absence, so **step 6
+  cannot land the schema half without the column half**, and the read-only UI gate is locked by
+  `src/pages/Preferences.disclosure.spec.ts`.
+
+**Step 6 therefore is:** the Prisma migration + columns, re-add the three to
+`persistedAssumptionsSchema`, to `buildAssumptionsWriteData` and to `mapAssumptionsRow` (dropping
+the `DEFAULT_ASSUMPTIONS` fallbacks there), delete the `incomePathKnobsReadOnly` computed and its
+disclosure note, and update both specs above in the same change.
+
+### (d-store) One basket means one FORMULA, not two that agree at the default (added 2026-09-29)
+
+(d) wired creep into the basket the kernel plans with. The review of that review found the store's
+`assumptions.householdInflation()` — what the expense-trend chart and the /preferences readout show
+— still returning the creep-FREE blend, so at creep = 1%/yr the screen quoted ~6.2% while the plan
+grew the target at ~7.0% (the gh #180 two-numbers-one-store class, one layer out). The same gap sat
+in `individual-fire.ts`, whose per-member target grew more slowly than the household target it is a
+share of. The fix is structural: **`resolveHouseholdBasket` in `assumption-math.ts` is the ONE
+formula**, called by `derive()`, the store and `individual-fire.ts`; `resolveHouseholdInflation`
+remains the creep-free blend for the two places that genuinely need the price-only basket (the
+basket-sanity verdict, and `derive()`'s internal drift computation which supplies its own
+creep-adjusted `inflation`). Locked at creep ∈ {0, 1, 5} in `src/stores/assumptions.spec.ts`, with a
+companion test that creep MOVES both by the same amount (so they cannot agree by both ignoring it)
+and one that year-0 expenses and tax stay **uncrept**. Creep = 0 — the shipped default — is exactly
+the case that cannot catch this class, which is how it reached review.
+
 ## Open questions carried forward (not blocking Step 3)
 
 - Should the conservative default vary by age band (e.g. lower for 45+ near typical raise

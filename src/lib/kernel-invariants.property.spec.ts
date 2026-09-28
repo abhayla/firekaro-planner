@@ -591,26 +591,27 @@ describe("T-377/QN-2 — the precondition holds where the BRIDGE binds, not just
   });
 });
 
-// gh #185 — future income-path invariants (`docs/goals/2026-09-13-income-path-kernel.md` §4.5).
-// Written against the PUBLIC `derive()` interface so they COMPILE today. Today's kernel has no
-// `salaryGrowthRealPercent` / `expenseGrowthAboveInflationPercent` assumption fields and never reads
-// `salary.hikePercent` (spec §1 verified fact) — so these properties are exercised through the ONE
-// income-shaped lever that already exists on the household type, `salary.hikePercent`, which the
-// kernel currently ignores. Until Step 4 lands the real `IncomeSchedule`, changing `hikePercent` has
-// NO effect on `derive()`'s output, so BOTH properties below are VACUOUSLY TRUE today (the assertion
-// is `<=`/`>=`, and an unchanged headline trivially satisfies a non-strict monotonicity bound). They
-// are not disabled/pending — they are real, compiling, currently-passing-by-vacuity locks that will
-// start EXERCISING the real kernel logic (and could then fail if Step 4 gets the direction wrong)
-// the moment `derive.ts` starts reading `hikePercent` / the new assumption fields. This is the
-// intended halfway state named in the task brief: "may be vacuous until step 4".
-describe("gh #185 income-path invariants — future kernel, vacuous-until-Step-4 (compiles against public derive())", () => {
+// gh #185 — the income-path invariants (`docs/goals/2026-09-13-income-path-kernel.md` §4.5),
+// written against the PUBLIC `derive()` interface.
+//
+// STEP 4 HAS LANDED (2026-09-29), SO THESE ARE LIVE, NOT VACUOUS. They were authored before the
+// kernel read `salary.hikePercent` or the income-path assumption fields, at which point a non-strict
+// `<=`/`>=` bound was trivially satisfied by an unchanged headline. `derive()` now grows each
+// earner's income (`salaryGrowthRealPercent`, tapering at `salaryGrowthTaperAge`) and folds
+// lifestyle creep into the household basket, so both properties below exercise real kernel logic
+// and will fail if the direction is ever wrong. Because a non-strict bound still cannot distinguish
+// "the invariant holds" from "the input went back to being ignored", the NON-VACUITY GUARD describe
+// at the bottom of this file asserts STRICT movement on the same seed — that is the test that goes
+// red if a refactor silently disconnects the income path.
+describe("gh #185 income-path invariants — live since Step 4 (public derive() interface)", () => {
   beforeEach(() => setActivePinia(createPinia()));
 
   // (7) INCOME MONOTONICITY — higher earner hikePercent ⇒ FIRE no later. Exercises the existing
   // `salary.hikePercent` field on the Ravi fixture (the seed this property is written for, per spec
   // §4.5) by perturbing every earning member's hike% upward and asserting the household FIRE date
-  // never gets WORSE. Vacuous today (hikePercent unread); becomes load-bearing at Step 4.
-  it("ravi: higher salary.hikePercent never makes FIRE later (vacuous until Step 4 reads hikePercent)", () => {
+  // never gets WORSE. Load-bearing since Step 4: `hikePercent` drives the EXPECTED band, so a
+  // higher typed hike moves `expectedFireAge` earlier and must never move the headline later.
+  it("ravi: higher salary.hikePercent never makes FIRE later", () => {
     const h = useHouseholdStore();
     const a = useAssumptionsStore();
     loadRaviSeed(h, a);
@@ -642,19 +643,14 @@ describe("gh #185 income-path invariants — future kernel, vacuous-until-Step-4
   });
 
   // (8) CREEP MONOTONICITY — higher lifestyle-creep (expense growth above inflation) ⇒ FIRE no
-  // earlier. No `expenseGrowthAboveInflationPercent` assumption field exists yet (ADR-0007 settles
-  // the DEFAULT; Step 4 adds the field to `src/types/assumptions.ts`). An EARLIER attempt at this
-  // invariant used `assumptions.inflation` itself as a stand-in proxy — that was WRONG and is why it
-  // is not used here: raising general inflation also raises the real-return deflator (ADR-0006's
-  // `toRealReturn`), which is not a clean monotonic stand-in for creep and produced a genuine
-  // (not vacuous) counterexample when first run (fireAge 46.25 < 46.33 — a real interaction, not a
-  // bug in this test, proving the proxy was unsound). The CORRECT way to keep this compiling today
-  // while being genuinely vacuous is to pass the not-yet-declared field straight through: `derive()`
-  // destructures only the assumption keys it knows about, so an extra
-  // `expenseGrowthAboveInflationPercent` key is silently ignored by the kernel today (vacuous) and
-  // will start being READ the moment Step 4 adds it to the `Assumptions` type + `derive.ts` — at
-  // which point this same code exercises the real invariant with zero changes needed.
-  it("ravi: higher expenseGrowthAboveInflationPercent never makes FIRE earlier (vacuous until Step 4 reads it)", () => {
+  // earlier. Live since Step 4: the field is declared on `Assumptions` and folded into the ONE
+  // household basket (ADR-0007 (c)/(d)), so it grows the expense line AND the FIRE target.
+  //
+  // An EARLIER attempt used `assumptions.inflation` itself as a stand-in proxy. That was WRONG and
+  // is recorded here so nobody re-tries it: raising general inflation also raises the real-return
+  // deflator (ADR-0006's `toRealReturn`), which is not a clean monotonic stand-in for creep and
+  // produced a real counterexample (fireAge 46.25 < 46.33) — an unsound proxy, not a kernel bug.
+  it("ravi: higher expenseGrowthAboveInflationPercent never makes FIRE earlier", () => {
     const h = useHouseholdStore();
     const a = useAssumptionsStore();
     loadRaviSeed(h, a);
