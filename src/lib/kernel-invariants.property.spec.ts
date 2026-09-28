@@ -802,3 +802,111 @@ describe("gh #185 creep coherence — the spend leg and the fund leg grow at ONE
     }
   });
 });
+
+// gh #194 — zero-value portfolio never blends to a rate ABOVE the max of its instruments' returns,
+// and adding a zero-value/zero-contribution line never moves an already-positive-value blend.
+//
+// These are the two invariants the #194 issue's detection upgrade calls for: (1) an all-zero-value
+// portfolio's fallback (contribution mix, or debt when even contribution is zero) can never exceed
+// the single highest per-bucket rate/σ present in EITHER weight map — so the fallback can never
+// silently reproduce the all-equity optimism the issue fixes; (2) a positive-value household's
+// blend is unaffected by a line that carries neither value nor contribution (a closed/dormant
+// instrument, or a not-yet-funded goal placeholder).
+import {
+  blendPortfolioReturn,
+  blendPortfolioVolatility,
+  type PortfolioReturnWeights,
+} from "@/lib/assumption-math";
+import { RETURN_BUCKET_VOLATILITY } from "@/lib/monte-carlo";
+import { DEFAULT_ASSUMPTIONS } from "@/types/assumptions";
+
+const ZERO_WEIGHTS: PortfolioReturnWeights = {
+  equity: 0, debt: 0, realEstate: 0, gold: 0, nps: 0, ppf: 0, epf: 0,
+  international: 0, reit: 0, crypto: 0, other: 0,
+};
+
+const BUCKET_KEYS = Object.keys(ZERO_WEIGHTS) as Array<keyof PortfolioReturnWeights>;
+
+function weightsFrom(entries: Partial<Record<keyof PortfolioReturnWeights, number>>): PortfolioReturnWeights {
+  return { ...ZERO_WEIGHTS, ...entries };
+}
+
+const returnRateOf = (bucket: keyof PortfolioReturnWeights): number => {
+  const v = DEFAULT_ASSUMPTIONS;
+  switch (bucket) {
+    case "equity": return v.equityReturn;
+    case "debt": return v.debtReturn;
+    case "realEstate": return v.realEstateReturn;
+    case "gold": return v.goldReturn;
+    case "nps": return v.npsReturn;
+    case "ppf": return v.ppfReturn;
+    case "epf": return v.epfReturn;
+    case "international": return v.internationalReturn;
+    case "reit": return v.reitReturn;
+    case "crypto": return v.cryptoReturn;
+    case "other": return v.debtReturn;
+  }
+};
+
+describe("gh #194 — zero-value portfolio fallback never exceeds the max instrument rate/σ present", () => {
+  it("blendPortfolioReturn on an all-zero-value portfolio never exceeds the max rate across value+contribution buckets", () => {
+    fc.assert(
+      fc.property(
+        fc.record(Object.fromEntries(BUCKET_KEYS.map((k) => [k, fc.double({ min: 0, max: 100_000, noNaN: true })]))) as fc.Arbitrary<
+          Record<keyof PortfolioReturnWeights, number>
+        >,
+        (contributionEntries) => {
+          const contributionWeights = weightsFrom(contributionEntries);
+          const blended = blendPortfolioReturn(DEFAULT_ASSUMPTIONS, ZERO_WEIGHTS, undefined, contributionWeights);
+          const presentBuckets = BUCKET_KEYS.filter((k) => contributionWeights[k] > 0);
+          const maxRate =
+            presentBuckets.length > 0
+              ? Math.max(...presentBuckets.map(returnRateOf))
+              : DEFAULT_ASSUMPTIONS.debtReturn; // truly empty ⇒ debt fallback, its own ceiling
+          expect(blended).toBeLessThanOrEqual(maxRate + 1e-9);
+        },
+      ),
+      { numRuns: 200 },
+    );
+  });
+
+  it("blendPortfolioVolatility on an all-zero-value portfolio never exceeds the max σ across value+contribution buckets", () => {
+    fc.assert(
+      fc.property(
+        fc.record(Object.fromEntries(BUCKET_KEYS.map((k) => [k, fc.double({ min: 0, max: 100_000, noNaN: true })]))) as fc.Arbitrary<
+          Record<keyof PortfolioReturnWeights, number>
+        >,
+        (contributionEntries) => {
+          const contributionWeights = weightsFrom(contributionEntries);
+          const blended = blendPortfolioVolatility(ZERO_WEIGHTS, contributionWeights);
+          const presentBuckets = BUCKET_KEYS.filter((k) => contributionWeights[k] > 0);
+          const maxSigma =
+            presentBuckets.length > 0
+              ? Math.max(...presentBuckets.map((k) => RETURN_BUCKET_VOLATILITY[k]))
+              : RETURN_BUCKET_VOLATILITY.debt;
+          expect(blended).toBeLessThanOrEqual(maxSigma + 1e-9);
+        },
+      ),
+      { numRuns: 200 },
+    );
+  });
+
+  it("a positive-value blend is UNCHANGED by adding a zero-value, zero-contribution line", () => {
+    fc.assert(
+      fc.property(
+        fc.constantFrom(...BUCKET_KEYS),
+        fc.double({ min: 1, max: 1_000_000, noNaN: true }),
+        (bucket, value) => {
+          const base = weightsFrom({ [bucket]: value });
+          const before = blendPortfolioReturn(DEFAULT_ASSUMPTIONS, base);
+          // Adding a zero-value/zero-contribution line changes nothing about the weight totals —
+          // simulated here as the SAME weights map (a dormant/closed instrument contributes 0 to
+          // both), so the blend must be byte-identical.
+          const after = blendPortfolioReturn(DEFAULT_ASSUMPTIONS, base, undefined, ZERO_WEIGHTS);
+          expect(after).toBeCloseTo(before, 9);
+        },
+      ),
+      { numRuns: 100 },
+    );
+  });
+});
