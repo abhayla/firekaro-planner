@@ -16,7 +16,7 @@ Abhay went to sleep ~00:30 IST with the direction "implement whatever is clear a
 4. **Public /quick share previews:** crawlers see the generic site OG tags, not the person's number (single-page-app limit). Recommended: accept for now; per-result previews need server rendering, file as good-to-have. Say no if the personalised preview is the whole point of sharing.
 
 ## Overnight queue (authorised) — status
-- [ ] PR #190 public /quick + counters: review fixes → merge
+- [x] PR #190 public /quick + counters — MERGED `68307c6` (~01:45 IST). Tier A review round 1 (2 MAJOR: guest data cleared before confirmed flush; rate-limit keyed on spoofable X-Forwarded-For) → both fixed → round 2: MERGEABLE. Leftover nits filed as #192. **Not proven live:** the signed-out /quick Playwright run and the sign-up handoff both write to the DB and the only DB is prod, so they were NOT re-run after the fixes (the worker's first core-proof run at ~00:20 did pass: `1 passed`, `/me → 401`, FIRE age rendered). Deploy still owner-gated.
 - [ ] #176 endYear honesty bug: fix + FinTech review → PR
 - [ ] #185 steps 2–3 (ADR + seeds + invariants, red on main) → PR
 - [ ] Item c draft PR for morning read
