@@ -11,7 +11,7 @@ Abhay went to sleep ~00:30 IST with the direction "implement whatever is clear a
 ## Questions (one line each, recommended answer first)
 
 1. **Apply the `ActivationEvent` migration + deploy PR #190 in tonight's or tomorrow's prod window?** Recommended: tomorrow 21:00–23:30 IST window, after you read the PR. Nothing is applied to any DB until you say so (one-deploy-a-day rule R6).
-2. **#185 step 4 — change the kernel so salary growth feeds the headline?** Recommended: yes, after steps 2–3 land tonight and you read the ADR's cited wage-growth default. This moves every user's headline FIRE age; it is Tier A and needs your explicit go.
+2. ~~#185 step 4~~ — built under your default direction with two reviewers (D-2026-09-29-03). **What you should read before it merges:** the seed-delta table in PR #191 and the three decisions above; say STOP if you want the band or the creep default different.
 3. ~~Item c~~ — done under your default-to-recommendation direction (see status below); read the diff in PR #193 if you want to spot-check.
 4. **Public /quick share previews:** crawlers see the generic site OG tags, not the person's number (single-page-app limit). Recommended: accept for now; per-result previews need server rendering, file as good-to-have. Say no if the personalised preview is the whole point of sharing.
 
@@ -20,5 +20,5 @@ Abhay went to sleep ~00:30 IST with the direction "implement whatever is clear a
 ## Overnight queue (authorised) — status
 - [x] PR #190 public /quick + counters — MERGED `68307c6` (~01:45 IST). Tier A review round 1 (2 MAJOR: guest data cleared before confirmed flush; rate-limit keyed on spoofable X-Forwarded-For) → both fixed → round 2: MERGEABLE. Leftover nits filed as #192. **Not proven live:** the signed-out /quick Playwright run and the sign-up handoff both write to the DB and the only DB is prod, so they were NOT re-run after the fixes (the worker's first core-proof run at ~00:20 did pass: `1 passed`, `/me → 401`, FIRE age rendered). Deploy still owner-gated.
 - [ ] #176 endYear honesty bug: fix + FinTech review → PR
-- [ ] #185 steps 2–3 (ADR + seeds + invariants, red on main) → PR
+- [x] #185 steps 2–3 landed on branch (PR #191 draft); step 4 kernel BUILT on the same branch after FinTech review of the ADR; review-fix round in progress (server parity, creep coherence, Ravi band 54–62). Decisions: PROJECT-LOG D-2026-09-29-03. Ravi 70.1 → 57.2; four seeds move 0.2–1.6 years earlier. NOT merged yet. New must-have bug found: #194.
 - [x] Item c — MERGED `375bff1` (PR #193). engineering-roles 27,210→12,134 bytes; claude-behavior 26,250→12,035; history in `docs/rules-history.md`. Independent review found rule 4's staff-engineer self-check lost, I found the Tier 0–3 ladder lost; both restored before merge. All 33 rule numbers kept.
