@@ -679,10 +679,24 @@ export function derive(
     equity: 0, debt: 0, realEstate: 0, gold: 0, nps: 0, ppf: 0, epf: 0,
     international: 0, reit: 0, crypto: 0, other: 0,
   };
+  // gh #194 — the CONTRIBUTION-weighted fallback mix, used by blendPortfolioReturn/Volatility only
+  // when `returnWeights` totals zero (every new user + the ₹2.5L-₹10L band, whose only holding is
+  // an auto-flowed EPF line at `value: 0`). Built alongside the value weights so a household with
+  // no accumulated corpus yet is still blended by what it's actually funding, never all-equity.
+  const contributionWeights = {
+    equity: 0, debt: 0, realEstate: 0, gold: 0, nps: 0, ppf: 0, epf: 0,
+    international: 0, reit: 0, crypto: 0, other: 0,
+  };
   for (const inv of fireCorpusInvestments) {
     returnWeights[returnBucketKey(inv)] += inv.value;
+    contributionWeights[returnBucketKey(inv)] += inv.monthlyContribution ?? 0;
   }
-  const blendedReturn = blendPortfolioReturn(assumptions, returnWeights, epfAfterTaxReturn);
+  const blendedReturn = blendPortfolioReturn(
+    assumptions,
+    returnWeights,
+    epfAfterTaxReturn,
+    contributionWeights,
+  );
 
   // M1 (#9): when the glide path is enabled, the corpus must compound each year
   // at a DE-RISKED return reflecting that year's equity allocation, not one static
@@ -781,7 +795,7 @@ export function derive(
   // + a value-weighted portfolio volatility. Deterministic + cheap to expose here;
   // the heavy simulation stays out of the kernel (the server nudge loop never pays).
   const realBlendedReturn = toRealReturn(blendedReturn);
-  const portfolioVolatility = blendPortfolioVolatility(returnWeights);
+  const portfolioVolatility = blendPortfolioVolatility(returnWeights, contributionWeights);
 
   // ----- #46 the SINGLE corpus inflow: the household savings residual, now time-varying -----
   // gh-issue #11 LOCK (non-negotiable): corpus inflow is the household savings RESIDUAL alone

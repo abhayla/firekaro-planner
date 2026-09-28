@@ -126,17 +126,8 @@ export interface PortfolioReturnWeights {
   other: number;
 }
 
-/**
- * Blended expected return for the whole portfolio, weighted by asset values.
- * `epfReturnOverride` (audit A15.3) swaps the EPF bucket for its after-tax
- * effective yield when supplied.
- */
-export function blendPortfolioReturn(
-  v: Assumptions,
-  weights: PortfolioReturnWeights,
-  epfReturnOverride?: number,
-): number {
-  const total =
+function portfolioWeightTotal(weights: PortfolioReturnWeights): number {
+  return (
     weights.equity +
     weights.debt +
     weights.realEstate +
@@ -147,21 +138,83 @@ export function blendPortfolioReturn(
     weights.international +
     weights.reit +
     weights.crypto +
-    weights.other;
-  if (total <= 0) return v.equityReturn;
+    weights.other
+  );
+}
+
+/**
+ * gh #194 — the shared fallback-selection helper for `blendPortfolioReturn` and
+ * `blendPortfolioVolatility`.
+ *
+ * RCA: both functions used to key their "is the portfolio empty?" check off VALUE weights alone
+ * and, when the value total was ≤ 0, fell back to the all-equity rate/σ. That is correct for a
+ * TRULY empty household (no assets, no savings), but every new user and the whole ₹2.5L-₹10L
+ * accumulator band carries a non-zero `monthlyContribution` against an auto-flowed EPF line that
+ * starts at `value: 0` (`household.ts`) — so their honest EPF-only savings stream was projected
+ * at an optimistic all-equity 12% nominal instead of the EPF rate they actually earn.
+ *
+ * Resolution order, never falling back to equity as a DEFAULT:
+ *   1. Value weights, when their total is positive (unchanged — households with holdings).
+ *   2. Contribution weights, when supplied and their total is positive (the CONTRIBUTION mix —
+ *      what the household is actually funding, before any value has accumulated).
+ *   3. The conservative-of-types present in EITHER weight map (never equity by default); when
+ *      neither map has anything to blend, `debt` — the fixed-income floor, not equity.
+ */
+function resolvePortfolioWeights(
+  valueWeights: PortfolioReturnWeights,
+  contributionWeights?: PortfolioReturnWeights,
+): { weights: PortfolioReturnWeights; total: number } {
+  const valueTotal = portfolioWeightTotal(valueWeights);
+  if (valueTotal > 0) return { weights: valueWeights, total: valueTotal };
+
+  if (contributionWeights) {
+    const contributionTotal = portfolioWeightTotal(contributionWeights);
+    if (contributionTotal > 0) return { weights: contributionWeights, total: contributionTotal };
+  }
+
+  // Truly empty (no value, no contribution in either map) — fall back to a single debt-weighted
+  // "portfolio" rather than equity. Debt is the conservative, honesty-safe floor for a household
+  // with nothing yet committed to any instrument.
+  return {
+    weights: { ...ZERO_PORTFOLIO_WEIGHTS, debt: 1 },
+    total: 1,
+  };
+}
+
+const ZERO_PORTFOLIO_WEIGHTS: PortfolioReturnWeights = {
+  equity: 0, debt: 0, realEstate: 0, gold: 0, nps: 0, ppf: 0, epf: 0,
+  international: 0, reit: 0, crypto: 0, other: 0,
+};
+
+/**
+ * Blended expected return for the whole portfolio, weighted by asset values.
+ * `epfReturnOverride` (audit A15.3) swaps the EPF bucket for its after-tax
+ * effective yield when supplied.
+ *
+ * `contributionWeights` (gh #194) is the optional fallback mix used when the household's VALUE
+ * weights total zero — see `resolvePortfolioWeights` above. Omitting it preserves the truly-empty
+ * fallback (debt, not equity) for existing callers that have no contribution mix to hand.
+ */
+export function blendPortfolioReturn(
+  v: Assumptions,
+  weights: PortfolioReturnWeights,
+  epfReturnOverride?: number,
+  contributionWeights?: PortfolioReturnWeights,
+): number {
+  const { weights: w, total } = resolvePortfolioWeights(weights, contributionWeights);
   const epfRate = epfReturnOverride ?? v.epfReturn;
   const weighted =
-    weights.equity * v.equityReturn +
-    weights.debt * v.debtReturn +
-    weights.realEstate * v.realEstateReturn +
-    weights.gold * v.goldReturn +
-    weights.nps * v.npsReturn +
-    weights.ppf * v.ppfReturn +
-    weights.epf * epfRate +
-    weights.international * v.internationalReturn +
-    weights.reit * v.reitReturn +
-    weights.crypto * v.cryptoReturn +
-    weights.other * v.debtReturn; // treat "other" as debt-like
+    w.equity * v.equityReturn +
+    w.debt * v.debtReturn +
+    w.realEstate * v.realEstateReturn +
+    w.gold * v.goldReturn +
+    w.nps * v.npsReturn +
+    w.ppf * v.ppfReturn +
+    w.epf * epfRate +
+    w.international * v.internationalReturn +
+    w.reit * v.reitReturn +
+    w.crypto * v.cryptoReturn +
+    w.other * v.debtReturn; // treat "other" as debt-like
   return weighted / total;
 }
 
@@ -169,38 +222,34 @@ export function blendPortfolioReturn(
  * Blended portfolio annual return volatility (stdev), value-weighted over the SAME
  * `PortfolioReturnWeights` buckets as `blendPortfolioReturn`, using
  * `RETURN_BUCKET_VOLATILITY`. Feeds the Monte Carlo headline confidence band (#18).
- * Empty/zero portfolio → equity σ (a sane default for a not-yet-invested accumulator).
+ *
+ * gh #194: the empty-portfolio fallback used to be the equity σ (the widest band, argued as
+ * "a not-yet-invested saver still bears risk"). That argument doesn't hold once the household DOES
+ * have a committed contribution mix — a household saving only into EPF is not bearing equity risk.
+ * Fallback order mirrors `blendPortfolioReturn` via `resolvePortfolioWeights`: value weights, then
+ * `contributionWeights` when supplied, then debt σ (never equity) for a truly empty household.
  *
  * It is a value-weighted average of per-bucket stdevs and INTENTIONALLY omits the
  * cross-asset covariance term. For a long-horizon FIRE band that errs HIGH (assumes
  * perfect correlation = the widest, most honest band) rather than netting risk
  * away — the non-understatement direction the honesty goal requires.
  */
-export function blendPortfolioVolatility(weights: PortfolioReturnWeights): number {
-  const total =
-    weights.equity +
-    weights.debt +
-    weights.realEstate +
-    weights.gold +
-    weights.nps +
-    weights.ppf +
-    weights.epf +
-    weights.international +
-    weights.reit +
-    weights.crypto +
-    weights.other;
-  if (total <= 0) return RETURN_BUCKET_VOLATILITY.equity;
+export function blendPortfolioVolatility(
+  weights: PortfolioReturnWeights,
+  contributionWeights?: PortfolioReturnWeights,
+): number {
+  const { weights: w, total } = resolvePortfolioWeights(weights, contributionWeights);
   const weighted =
-    weights.equity * RETURN_BUCKET_VOLATILITY.equity +
-    weights.debt * RETURN_BUCKET_VOLATILITY.debt +
-    weights.realEstate * RETURN_BUCKET_VOLATILITY.realEstate +
-    weights.gold * RETURN_BUCKET_VOLATILITY.gold +
-    weights.nps * RETURN_BUCKET_VOLATILITY.nps +
-    weights.ppf * RETURN_BUCKET_VOLATILITY.ppf +
-    weights.epf * RETURN_BUCKET_VOLATILITY.epf +
-    weights.international * RETURN_BUCKET_VOLATILITY.international +
-    weights.reit * RETURN_BUCKET_VOLATILITY.reit +
-    weights.crypto * RETURN_BUCKET_VOLATILITY.crypto +
-    weights.other * RETURN_BUCKET_VOLATILITY.other;
+    w.equity * RETURN_BUCKET_VOLATILITY.equity +
+    w.debt * RETURN_BUCKET_VOLATILITY.debt +
+    w.realEstate * RETURN_BUCKET_VOLATILITY.realEstate +
+    w.gold * RETURN_BUCKET_VOLATILITY.gold +
+    w.nps * RETURN_BUCKET_VOLATILITY.nps +
+    w.ppf * RETURN_BUCKET_VOLATILITY.ppf +
+    w.epf * RETURN_BUCKET_VOLATILITY.epf +
+    w.international * RETURN_BUCKET_VOLATILITY.international +
+    w.reit * RETURN_BUCKET_VOLATILITY.reit +
+    w.crypto * RETURN_BUCKET_VOLATILITY.crypto +
+    w.other * RETURN_BUCKET_VOLATILITY.other;
   return weighted / total;
 }
