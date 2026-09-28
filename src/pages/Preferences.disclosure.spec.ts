@@ -92,14 +92,18 @@ describe("Preferences — ADR-0006 savings step-up", () => {
     expect(template, "the 2% basis must be disclosed").toMatch(/Why 2%/);
     // The mandated caveat, verbatim. This is the single most important string on the page: it is the
     // condition under which the individual-path reasoning behind 2% holds at all.
+    // `src`, not `template`: the three knobs' hint copy moved into the script's
+    // `INCOME_PATH_HINTS` constants when the read-only disclosure prefix was added (ADR-0007 /
+    // #185 server parity) so the prefix is applied in exactly one place. The copy still reaches the
+    // user — bound via `:hint="incomePathHint(...)"`, which the server-mode describe below locks.
     expect(
-      template.replace(/\s+/g, " "),
+      src.replace(/\s+/g, " "),
       "the continuous-employment caveat must appear VERBATIM (ADR-0007 (a))",
     ).toContain("assumes continuous employment; real wage growth for this band was ~0% in FY22-24");
-    expect(template, "the hike % must be named as the SECOND number, never the headline").toMatch(
+    expect(src, "the hike % must be named as the SECOND number, never the headline").toMatch(
       /never the headline/,
     );
-    expect(template, "creep must be disclosed as an unsourced assumption").toMatch(
+    expect(src, "creep must be disclosed as an unsourced assumption").toMatch(
       /unsourced assumption, not a research figure/,
     );
     expect(template, "creep must be disclosed as shipped OFF").toMatch(/we ship it OFF/);
@@ -122,5 +126,60 @@ describe("Preferences — ADR-0006 real return is shown in the frame the plan us
     );
     expect(template).toContain('data-testid="pref-return-real-basket"');
     expect(template).toMatch(/For information/);
+  });
+});
+
+/**
+ * ADR-0007 / gh #185 — the three income-path knobs cannot be SAVED in server mode until the
+ * Prisma columns land (#185 step 6), so PUT /api/planner/assumptions does not accept them
+ * (`persistedAssumptionsSchema`). An editable field whose value is discarded is a silent drop with
+ * a nicer face: the user types 4%, reloads, reads 2%, and is told nothing. These locks pin that the
+ * page disables the three and SAYS why, gated on `isServerMode()` — never an inline
+ * `import.meta.env` check (the gh #36 non-negotiable).
+ *
+ * Step 6 deletes this describe together with the `incomePathKnobsReadOnly` computed.
+ */
+describe("Preferences — the #185 income-path knobs are read-only in server mode", () => {
+  const script = src.slice(0, src.indexOf("<template>"));
+
+  it("gates on isServerMode() from runtime-mode, not on import.meta.env (gh #36)", () => {
+    expect(script).toMatch(/import \{ isServerMode \} from "@\/lib\/runtime-mode"/);
+    expect(script).toMatch(/incomePathKnobsReadOnly\s*=\s*computed\(\(\)\s*=>\s*isServerMode\(\)\)/);
+    const gateLine = script.slice(script.indexOf("incomePathKnobsReadOnly"));
+    expect(gateLine.slice(0, 120)).not.toMatch(/import\.meta\.env/);
+  });
+
+  it("disables all THREE knobs on that one gate", () => {
+    for (const testid of ["pref-salary-growth", "pref-salary-taper-age", "pref-expense-creep"]) {
+      const field = template.slice(template.indexOf(`data-testid="${testid}"`) - 700);
+      expect(
+        field.slice(0, 760),
+        `${testid} must carry :disabled="incomePathKnobsReadOnly"`,
+      ).toMatch(/:disabled="incomePathKnobsReadOnly"/);
+    }
+  });
+
+  it("carries the persistence disclosure in every knob's hint AND as a visible section note", () => {
+    // The exact copy the owner approved — a user must be told the value is not saved yet AND that
+    // the plan is already using the research default (i.e. nothing is broken meanwhile).
+    expect(script).toMatch(
+      /Saved per account after the next release; the plan already uses the research default/,
+    );
+    // Applied in ONE place (the hint helper), so a fourth knob cannot be added without it.
+    expect(script).toMatch(
+      /incomePathKnobsReadOnly\.value\s*\?\s*`\$\{INCOME_PATH_READONLY_NOTE\}\. \$\{base\}`/,
+    );
+    for (const key of ["salaryGrowth", "taperAge", "creep"]) {
+      expect(template).toContain(`:hint="incomePathHint('${key}')"`);
+    }
+    expect(template).toContain('data-testid="pref-income-path-readonly-note"');
+  });
+
+  it("leaves the DEMO deployment editable (the localStorage adapter stores them fine)", () => {
+    // The gate is the ONLY thing disabling them — no unconditional `disabled` anywhere near the three.
+    for (const testid of ["pref-salary-growth", "pref-salary-taper-age", "pref-expense-creep"]) {
+      const field = template.slice(template.indexOf(`data-testid="${testid}"`) - 700, template.indexOf(`data-testid="${testid}"`) + 300);
+      expect(field, `${testid} must not be hard-disabled`).not.toMatch(/\n\s+disabled\b/);
+    }
   });
 });

@@ -31,6 +31,7 @@ import { useCommsConsent } from "@/composables/useCommsConsent";
 import { useFireDerive } from "@/lib/useFireDerive";
 import { DEFAULT_ASSUMPTIONS } from "@/types/assumptions";
 import { basketSanity, BASKET_SANITY_MAX_EXCESS_BP } from "@/lib/assumption-math";
+import { isServerMode } from "@/lib/runtime-mode";
 
 interface PrefSection {
   id: string;
@@ -141,6 +142,38 @@ const weightedRealPct = computed(() => (realVsCpi.value * 100).toFixed(2));
 const weightedRealVsBasketPct = computed(() => (realVsBasket.value * 100).toFixed(2));
 const realReturnNegative = computed(() => realVsCpi.value < 0);
 const realBelowBasket = computed(() => realVsBasket.value < 0 && realVsCpi.value >= 0);
+
+/**
+ * ADR-0007 / gh #185 — the three income-path knobs are READ-ONLY in server (logged-in) mode.
+ *
+ * `user_assumptions` has no column for `salaryGrowthRealPercent`, `salaryGrowthTaperAge` or
+ * `expenseGrowthAboveInflationPercent` until step 6 of the #185 spec (the Prisma migration, kept
+ * separate because it is the only irreversible step). PUT /api/planner/assumptions therefore does
+ * not ACCEPT them (`persistedAssumptionsSchema`, server/src/lib/planner-schemas.ts). An editable
+ * field whose value cannot be saved is a silent-drop in the UI — the user types 4%, reloads, and
+ * finds 2% with no explanation. So in server mode the fields render disabled with the disclosure
+ * below; the demo/localStorage deployment keeps them editable (the adapter stores them fine).
+ *
+ * Gated on `isServerMode()` per the project non-negotiable — never an inline `import.meta.env`
+ * check (gh #36). Step 6 deletes this computed and its `:disabled` bindings.
+ */
+const incomePathKnobsReadOnly = computed(() => isServerMode());
+const INCOME_PATH_READONLY_NOTE =
+  "Saved per account after the next release; the plan already uses the research default";
+/** The three knobs' hints, declared once so the read-only prefix is applied in ONE place. */
+const INCOME_PATH_HINTS = {
+  salaryGrowth:
+    "Default: 2% a year above inflation, for the FIRE date we headline. Assumes continuous employment; real wage growth for this band was ~0% in FY22-24. Your own hike % on the Income page moves the second number, never the headline.",
+  taperAge:
+    "Default: 50. After this age your income holds flat in real terms (it never drops) while prices keep rising, so your surplus falls. Promotions and job moves slow down late-career.",
+  creep:
+    "Default: OFF (0%) — this is an unsourced assumption, not a research figure, so we do not put it in your headline unasked. Turn it on to see what gradually spending more each year costs you. Applied to your general spending only, never to healthcare, education or housing (those already rise faster than inflation on their own).",
+} as const;
+/** The hint a user reads: prefixed with the persistence disclosure while the knob is read-only. */
+function incomePathHint(key: keyof typeof INCOME_PATH_HINTS): string {
+  const base = INCOME_PATH_HINTS[key];
+  return incomePathKnobsReadOnly.value ? `${INCOME_PATH_READONLY_NOTE}. ${base}` : base;
+}
 
 // Per-section reset handlers.
 function resetSection(id: string) {
@@ -346,10 +379,11 @@ const featuresBySection = computed(() => {
                 label="Salary growth (% real per year)"
                 type="number"
                 :model-value="v.salaryGrowthRealPercent"
-                hint="Default: 2% a year above inflation, for the FIRE date we headline. Assumes continuous employment; real wage growth for this band was ~0% in FY22-24. Your own hike % on the Income page moves the second number, never the headline."
+                :hint="incomePathHint('salaryGrowth')"
                 persistent-hint
                 variant="outlined"
                 density="comfortable"
+                :disabled="incomePathKnobsReadOnly"
                 data-testid="pref-salary-growth"
                 @update:model-value="(val: string) => assumptions.set('salaryGrowthRealPercent', Math.min(10, Math.max(0, Number(val) || 0)))"
               />
@@ -359,10 +393,11 @@ const featuresBySection = computed(() => {
                 label="Salary growth stops at age"
                 type="number"
                 :model-value="v.salaryGrowthTaperAge"
-                hint="Default: 50. After this age your income holds flat in real terms (it never drops) while prices keep rising, so your surplus falls. Promotions and job moves slow down late-career."
+                :hint="incomePathHint('taperAge')"
                 persistent-hint
                 variant="outlined"
                 density="comfortable"
+                :disabled="incomePathKnobsReadOnly"
                 data-testid="pref-salary-taper-age"
                 @update:model-value="(val: string) => assumptions.set('salaryGrowthTaperAge', Math.min(65, Math.max(40, Number(val) || 50)))"
               />
@@ -372,15 +407,26 @@ const featuresBySection = computed(() => {
                 label="Lifestyle creep (% above inflation per year)"
                 type="number"
                 :model-value="v.expenseGrowthAboveInflationPercent"
-                hint="Default: OFF (0%) — this is an unsourced assumption, not a research figure, so we do not put it in your headline unasked. Turn it on to see what gradually spending more each year costs you. Applied to your general spending only, never to healthcare, education or housing (those already rise faster than inflation on their own)."
+                :hint="incomePathHint('creep')"
                 persistent-hint
                 variant="outlined"
                 density="comfortable"
+                :disabled="incomePathKnobsReadOnly"
                 data-testid="pref-expense-creep"
                 @update:model-value="(val: string) => assumptions.set('expenseGrowthAboveInflationPercent', Math.min(5, Math.max(0, Number(val) || 0)))"
               />
             </v-col>
           </v-row>
+          <v-alert
+            v-if="incomePathKnobsReadOnly"
+            type="info"
+            variant="tonal"
+            density="compact"
+            class="mt-2"
+            data-testid="pref-income-path-readonly-note"
+          >
+            {{ INCOME_PATH_READONLY_NOTE }}.
+          </v-alert>
           <v-alert type="info" variant="tonal" density="compact" class="mt-2">
             <strong>Why we grow your income, not your savings.</strong> The plan used to grow your
             <em>savings</em> by 2% a year above inflation. For a household whose surplus is small next

@@ -2,7 +2,6 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import { householdSchema } from "@planner/types/household";
-import { assumptionsSchema } from "@planner/types/assumptions";
 import { authMiddleware } from "../middleware/auth";
 import { apiSuccess, apiError, ErrorCode } from "../lib/api-utils";
 import { logger } from "../lib/logger";
@@ -17,6 +16,7 @@ import {
   quickPrefsSchema,
   expenseHistoryBodySchema,
   planBaselineSchema,
+  persistedAssumptionsSchema,
 } from "../lib/planner-schemas";
 
 /**
@@ -118,7 +118,10 @@ app.put("/assumptions", async (c) => {
   } catch {
     return apiError(c, "Invalid JSON body", 400, ErrorCode.VALIDATION_ERROR);
   }
-  const parsed = assumptionsSchema.safeParse(body);
+  // `persistedAssumptionsSchema`, NOT the canonical frontend schema: the three ADR-0007 income-path
+  // knobs have no `user_assumptions` column until #185 step 6, so accepting them would be the
+  // ADR-0006 silent-drop bug (200 + discarded). See planner-schemas.ts for the full reasoning.
+  const parsed = persistedAssumptionsSchema.safeParse(body);
   if (!parsed.success) {
     return apiError(c, `Invalid assumptions: ${parsed.error.message}`, 422, ErrorCode.VALIDATION_ERROR);
   }

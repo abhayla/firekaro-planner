@@ -60,11 +60,22 @@ export function mapAssumptionsRow(row: UserAssumptions): Assumptions {
 }
 
 /**
+ * The subset of `Assumptions` the DB can actually hold today — everything except the three
+ * ADR-0007 / gh #185 income-path knobs, which have no `user_assumptions` column until step 6 of
+ * that spec (the Prisma migration, deliberately separate because it is the only irreversible step).
+ * Mirrors `persistedAssumptionsSchema` in `planner-schemas.ts`, which is what PUT validates against.
+ */
+export type PersistedAssumptions = Omit<
+  Assumptions,
+  "salaryGrowthRealPercent" | "salaryGrowthTaperAge" | "expenseGrowthAboveInflationPercent"
+>;
+
+/**
  * Assumptions → the `user_assumptions` upsert payload. Every field of `Assumptions` MUST be
  * represented here; optional fields map to an explicit `null` so a cleared value overwrites a
  * previously-stored one instead of silently persisting the old value.
  */
-export function buildAssumptionsWriteData(a: Assumptions) {
+export function buildAssumptionsWriteData(a: PersistedAssumptions) {
   return {
     inflation: a.inflation,
     equityReturn: a.equityReturn,
