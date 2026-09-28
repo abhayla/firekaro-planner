@@ -33,6 +33,7 @@ import { loadSeedPersona } from "@/lib/seed-persona";
 import { loadMehtasSeed } from "@/seeds/mehtas";
 import { loadIyersSeed } from "@/seeds/iyers";
 import { loadMauryasSeed } from "@/seeds/mauryas";
+import { loadRaviSeed } from "@/seeds/ravi";
 import { derive } from "@/lib/derive";
 import { isEarningMember } from "@/lib/member-earning";
 import { computeTax, AVAILABLE_FYS } from "@/lib/tax";
@@ -583,6 +584,97 @@ describe("T-377/QN-2 — the precondition holds where the BRIDGE binds, not just
           const kLo = derive(h.data, base, LENS, { monthlyContributionReal: lo });
           const kUp = derive(h.data, base, LENS, { monthlyContributionReal: up });
           expect(kUp.yearsToRegular).toBeLessThanOrEqual(kLo.yearsToRegular + EPS);
+        },
+      ),
+      { numRuns: 60 },
+    );
+  });
+});
+
+// gh #185 — future income-path invariants (`docs/goals/2026-09-13-income-path-kernel.md` §4.5).
+// Written against the PUBLIC `derive()` interface so they COMPILE today. Today's kernel has no
+// `salaryGrowthRealPercent` / `expenseGrowthAboveInflationPercent` assumption fields and never reads
+// `salary.hikePercent` (spec §1 verified fact) — so these properties are exercised through the ONE
+// income-shaped lever that already exists on the household type, `salary.hikePercent`, which the
+// kernel currently ignores. Until Step 4 lands the real `IncomeSchedule`, changing `hikePercent` has
+// NO effect on `derive()`'s output, so BOTH properties below are VACUOUSLY TRUE today (the assertion
+// is `<=`/`>=`, and an unchanged headline trivially satisfies a non-strict monotonicity bound). They
+// are not disabled/pending — they are real, compiling, currently-passing-by-vacuity locks that will
+// start EXERCISING the real kernel logic (and could then fail if Step 4 gets the direction wrong)
+// the moment `derive.ts` starts reading `hikePercent` / the new assumption fields. This is the
+// intended halfway state named in the task brief: "may be vacuous until step 4".
+describe("gh #185 income-path invariants — future kernel, vacuous-until-Step-4 (compiles against public derive())", () => {
+  beforeEach(() => setActivePinia(createPinia()));
+
+  // (7) INCOME MONOTONICITY — higher earner hikePercent ⇒ FIRE no later. Exercises the existing
+  // `salary.hikePercent` field on the Ravi fixture (the seed this property is written for, per spec
+  // §4.5) by perturbing every earning member's hike% upward and asserting the household FIRE date
+  // never gets WORSE. Vacuous today (hikePercent unread); becomes load-bearing at Step 4.
+  it("ravi: higher salary.hikePercent never makes FIRE later (vacuous until Step 4 reads hikePercent)", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    loadRaviSeed(h, a);
+    const base = a.values;
+    fc.assert(
+      fc.property(
+        fc.double({ min: 0, max: 25, noNaN: true }),
+        fc.double({ min: 0, max: 25, noNaN: true }),
+        (hike1, hike2) => {
+          const lo = Math.min(hike1, hike2);
+          const hi = Math.max(hike1, hike2);
+          const withHike = (pct: number) => {
+            const snapshot = JSON.parse(JSON.stringify(h.data)) as typeof h.data;
+            for (const m of snapshot.members) {
+              if (m.salary) m.salary = { ...m.salary, hikePercent: pct };
+            }
+            return snapshot;
+          };
+          const kLo = derive(withHike(lo), base, LENS);
+          const kHi = derive(withHike(hi), base, LENS);
+          expect(
+            kHi.corpusOnlyYearsToRegular,
+            "a higher hikePercent must never push the corpus-only FIRE leg later",
+          ).toBeLessThanOrEqual(kLo.corpusOnlyYearsToRegular + EPS);
+        },
+      ),
+      { numRuns: 60 },
+    );
+  });
+
+  // (8) CREEP MONOTONICITY — higher lifestyle-creep (expense growth above inflation) ⇒ FIRE no
+  // earlier. No `expenseGrowthAboveInflationPercent` assumption field exists yet (ADR-0007 settles
+  // the DEFAULT; Step 4 adds the field to `src/types/assumptions.ts`). An EARLIER attempt at this
+  // invariant used `assumptions.inflation` itself as a stand-in proxy — that was WRONG and is why it
+  // is not used here: raising general inflation also raises the real-return deflator (ADR-0006's
+  // `toRealReturn`), which is not a clean monotonic stand-in for creep and produced a genuine
+  // (not vacuous) counterexample when first run (fireAge 46.25 < 46.33 — a real interaction, not a
+  // bug in this test, proving the proxy was unsound). The CORRECT way to keep this compiling today
+  // while being genuinely vacuous is to pass the not-yet-declared field straight through: `derive()`
+  // destructures only the assumption keys it knows about, so an extra
+  // `expenseGrowthAboveInflationPercent` key is silently ignored by the kernel today (vacuous) and
+  // will start being READ the moment Step 4 adds it to the `Assumptions` type + `derive.ts` — at
+  // which point this same code exercises the real invariant with zero changes needed.
+  it("ravi: higher expenseGrowthAboveInflationPercent never makes FIRE earlier (vacuous until Step 4 reads it)", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    loadRaviSeed(h, a);
+    const base = a.values;
+    type WithCreep = typeof base & { expenseGrowthAboveInflationPercent: number };
+    fc.assert(
+      fc.property(
+        fc.double({ min: 0, max: 5, noNaN: true }),
+        fc.double({ min: 0, max: 5, noNaN: true }),
+        (c1, c2) => {
+          const lo = Math.min(c1, c2);
+          const hi = Math.max(c1, c2);
+          const kLo = derive(h.data, { ...base, expenseGrowthAboveInflationPercent: lo } as WithCreep, LENS);
+          const kHi = derive(h.data, { ...base, expenseGrowthAboveInflationPercent: hi } as WithCreep, LENS);
+          if (Number.isFinite(kLo.yearsToRegular) && Number.isFinite(kHi.yearsToRegular)) {
+            expect(
+              kHi.yearsToRegular,
+              "higher lifestyle-creep must never pull FIRE earlier",
+            ).toBeGreaterThanOrEqual(kLo.yearsToRegular - EPS);
+          }
         },
       ),
       { numRuns: 60 },

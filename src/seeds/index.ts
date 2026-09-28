@@ -10,11 +10,13 @@ import { loadEmptySeed } from "./empty";
 import { loadMehtasSeed } from "./mehtas";
 import { loadIyersSeed } from "./iyers";
 import { loadMauryasSeed } from "./mauryas";
+import { loadRaviSeed } from "./ravi";
 import { makeAdapter } from "@/lib/storage-adapter";
 import { getAuthProvider } from "@/lib/auth-provider";
 
 // Phase 8 Stage V — 4 personas including new "Iyers" (Q7 grill resolution).
-export type SeedName = "sharmas" | "empty" | "mehtas" | "iyers" | "mauryas";
+// gh #185 — "Ravi" added as the lower-band accumulator acceptance fixture (income-path kernel spec).
+export type SeedName = "sharmas" | "empty" | "mehtas" | "iyers" | "mauryas" | "ravi";
 
 export interface SeedMeta {
   id: SeedName;
@@ -54,6 +56,12 @@ export const SEED_META: Record<SeedName, SeedMeta> = {
     description: "Single-income mid-40s · homemaker spouse · school-age child · full-spread portfolio",
     icon: "mdi-home-account",
   },
+  ravi: {
+    id: "ravi",
+    label: "Ravi",
+    description: "22, ₹3L CTC · lower-band accumulator · early career, no assets yet",
+    icon: "mdi-account-arrow-up",
+  },
 };
 
 const ACTIVE_SEED_ENTITY_KEY = "active-seed";
@@ -70,6 +78,8 @@ export function loadSeed(name: SeedName) {
     loadIyersSeed(household, assumptions);
   } else if (name === "mauryas") {
     loadMauryasSeed(household, assumptions);
+  } else if (name === "ravi") {
+    loadRaviSeed(household, assumptions);
   } else {
     loadEmptySeed(household, assumptions);
   }
@@ -89,6 +99,7 @@ export function isSeedName(value: unknown): value is SeedName {
     value === "empty" ||
     value === "mehtas" ||
     value === "iyers" ||
-    value === "mauryas"
+    value === "mauryas" ||
+    value === "ravi"
   );
 }

@@ -27,6 +27,7 @@ import { loadSeedPersona } from "@/lib/seed-persona";
 import { loadMehtasSeed } from "@/seeds/mehtas";
 import { loadIyersSeed } from "@/seeds/iyers";
 import { loadMauryasSeed } from "@/seeds/mauryas";
+import { loadRaviSeed } from "@/seeds/ravi";
 import { derive } from "@/lib/derive";
 import { requiredMonthlyContributionFor } from "@/lib/required-contribution";
 import { isEarningMember } from "@/lib/member-earning";
@@ -688,6 +689,70 @@ describe("#81 individual FIRE plausibility — every adult, every persona", () =
       }
     });
   }
+});
+
+// gh #185 — Ravi, the lower-band accumulator acceptance fixture
+// (`docs/goals/2026-09-13-income-path-kernel.md` §2, §6). RED-FIRST ON PURPOSE (spec §4.5): today's
+// kernel only grows SAVINGS (`householdSavingsStepUpPercent`, default 2% real, tapering at 50) and
+// never grows Ravi's INCOME. On today's kernel Ravi's conservative FIRE age comes out around 58 (the
+// spec's own worked-example row for "today's kernel"), which is OUTSIDE the 45-55 band below — so
+// this block is EXPECTED to fail until Step 4 (the income-path kernel change, ADR-0007) lands. This
+// is the proof-before-fix per the Defect-fix contract + "prove the core first" rules: a failing test
+// on the real function is required BEFORE the fix, not a fixture typed to already pass.
+//
+// No red-first pending-test convention (e.g. `it.fails`/`describe.todo`) exists elsewhere in this
+// spec file or `kernel-invariants.property.spec.ts` — every other lock in this repo is a plain `it`
+// that is expected to be green. Introducing a special-cased soft-fail wrapper here would hide the
+// red from `npm run test:unit`'s summary count, which defeats the point of a red-first lock (it
+// must show up as a failing test until Step 4 turns it green). So this is left as a PLAIN `it` that
+// IS RED on main — confirmed via `npm run test:unit -- ravi` in the PR evidence table.
+describe("headline plausibility — Ravi, the lower-band acceptance fixture (#185, RED until Step 4)", () => {
+  beforeEach(() => setActivePinia(createPinia()));
+
+  it("Ravi: conservative FIRE age is 45-55 on the DEFAULT lens (income-path kernel, not yet built)", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    loadRaviSeed(h, a);
+    const k = derive(h.data, a.values, DEFAULT_PRODUCT_LENS);
+    const fireAge = k.anchorAge + k.yearsToRegular;
+    const ctx = `ravi default-lens: fireAge=${fireAge.toFixed(1)} householdFireAge=${k.householdFireAge}`;
+
+    expect(Number.isFinite(k.yearsToRegular), `${ctx} — yearsToRegular finite (Ravi must be reachable)`).toBe(
+      true,
+    );
+    // Spec §6 acceptance bound — the CONSERVATIVE band, on today's kernel this is the savings-only
+    // step-up proxy (no income growth), which the spec's own worked example puts at age 58: OUTSIDE
+    // this 45-55 band, so this assertion is RED on main by design.
+    expect(fireAge, `${ctx} — conservative FIRE age must be 45-55 (spec §6)`).toBeGreaterThanOrEqual(45);
+    expect(fireAge, `${ctx} — conservative FIRE age must be 45-55 (spec §6)`).toBeLessThanOrEqual(55);
+  });
+
+  it("Ravi: savings rate sits in 10-25% (spec §4.5 per-seed bound)", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    loadRaviSeed(h, a);
+    const k = derive(h.data, a.values, DEFAULT_PRODUCT_LENS);
+    const ctx = `ravi savings%=${k.savingsRate}`;
+    // Year-0 surplus is ~₹0.5L on ~₹3.0L income (spec §2) ≈ 17% — this is a real-data check on the
+    // seed's own numbers, independent of the income-path kernel, so it is expected GREEN today.
+    expect(k.savingsRate, `${ctx} — savings rate 10-25%`).toBeGreaterThanOrEqual(10);
+    expect(k.savingsRate, `${ctx} — savings rate 10-25%`).toBeLessThanOrEqual(25);
+  });
+
+  it("Ravi: corpus is finite and non-negative (no NaN/-Infinity reaching the user)", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    loadRaviSeed(h, a);
+    const k = derive(h.data, a.values, DEFAULT_PRODUCT_LENS);
+    expect(Number.isFinite(k.totalCorpus)).toBe(true);
+    expect(k.totalCorpus).toBeGreaterThanOrEqual(0);
+    expect(Number.isFinite(k.fireNumber)).toBe(true);
+    expect(k.fireNumber).toBeGreaterThan(0);
+  });
+
+  // Spec §4.5's "expected FIRE age (12% hikes) 36-46" and "expected < conservative" rows are NOT
+  // assertable yet — `expectedFireAge`/`expectedFireAgeBasis` (spec §4.3) do not exist on the
+  // `derive()` return type until Step 4. Documented here rather than silently omitted.
 });
 
 describe("T-377/QN-2 — the 'do this' monthly amount is plausible (rule 31 flinch test)", () => {
