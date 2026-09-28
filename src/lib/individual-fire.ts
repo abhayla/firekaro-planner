@@ -113,15 +113,28 @@ export function computeIndividualFire(
     equity: 0, debt: 0, realEstate: 0, gold: 0, nps: 0, ppf: 0, epf: 0,
     international: 0, reit: 0, crypto: 0, other: 0,
   };
+  // gh #194 — the member-lens CONTRIBUTION-weighted fallback mix, mirroring derive.ts's household
+  // `contributionWeights` (l.686-693 there). Without this, `blendPortfolioReturn` below fell back to
+  // its OWN truly-empty debt default whenever this member's attributed VALUE weights totalled zero —
+  // which is every member whose only holding is an auto-flowed EPF line at `value: 0` (Ravi) — instead
+  // of using what this member is actually FUNDING, same as the household path does. Attributed by the
+  // SAME ownership split as the corpus value weights above (own full / joint × split).
+  const contributionWeights = {
+    equity: 0, debt: 0, realEstate: 0, gold: 0, nps: 0, ppf: 0, epf: 0,
+    international: 0, reit: 0, crypto: 0, other: 0,
+  };
   let attributableEpfAnnualContribution = 0;
   for (const inv of fireInvestments) {
+    const contribWeight = inv.ownerId === memberId ? 1 : inv.ownerId === JOINT ? split : 0;
+    if (contribWeight > 0) {
+      contributionWeights[returnBucketKey(inv)] += (inv.monthlyContribution ?? 0) * contribWeight;
+    }
     const w = corpusWeightOf(inv.ownerId, inv.value);
     if (w <= 0) continue;
     attributableCorpus += w;
     returnWeights[returnBucketKey(inv)] += w;
     if (inv.type === "EPF_VPF") {
       // EPF contribution is attributed the same way as its corpus weight (own full / joint split).
-      const contribWeight = inv.ownerId === memberId ? 1 : inv.ownerId === JOINT ? split : 0;
       attributableEpfAnnualContribution += (inv.monthlyContribution ?? 0) * 12 * contribWeight;
     }
   }
@@ -198,7 +211,12 @@ export function computeIndividualFire(
     marginalSlabRate: marginalRate,
     epfRate: assumptions.epfReturn,
   });
-  const blendedReturn = blendPortfolioReturn(assumptions, returnWeights, epfAfterTaxReturn);
+  const blendedReturn = blendPortfolioReturn(
+    assumptions,
+    returnWeights,
+    epfAfterTaxReturn,
+    contributionWeights,
+  );
   const generalInflation = assumptions.inflation;
   // ADR-0006: `realReturn` is still the CPI-deflated return every DISPLAY surface (and the
   // solver's have-by-target projection) reads, but the individual FIRE age itself is now solved
