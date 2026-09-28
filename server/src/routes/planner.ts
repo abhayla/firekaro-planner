@@ -10,6 +10,7 @@ import { prisma } from "../lib/prisma";
 import { readHousehold, applyHouseholdPlan } from "../lib/household-repo";
 import { mapAssumptionsRow, buildAssumptionsWriteData } from "../lib/planner-read";
 import { diffHousehold } from "../lib/household-diff";
+import { onAuthenticatedMe, onPlannerDocumentWrite } from "../lib/activation-triggers";
 import {
   scenariosBodySchema,
   featuresBodySchema,
@@ -89,6 +90,8 @@ app.put("/household", async (c) => {
     const current = await readHousehold(prisma, userId);
     const plan = diffHousehold(current, parsed.data);
     const updatedAt = await applyHouseholdPlan(prisma, userId, plan);
+    // #44 — any PUT after the account's first write is a `data_refreshed`. Fire-and-forget.
+    void onPlannerDocumentWrite(prisma, userId);
     return apiSuccess(c, { updatedAt });
   } catch (err) {
     logger.error({ err, userId }, "PUT /planner/household failed");
@@ -443,6 +446,10 @@ app.delete("/all", async (c) => {
 // ============================ me ============================
 
 app.get("/me", (c) => {
+  // #44 — the first authenticated request any signed-in client makes is where `signed_up` and
+  // `returned_7d` are derived from the account's own createdAt. Fire-and-forget: the counter must
+  // never delay or fail /me, which every boot awaits before mount.
+  void onAuthenticatedMe(prisma, c.get("userId"));
   return apiSuccess(c, c.get("user"));
 });
 

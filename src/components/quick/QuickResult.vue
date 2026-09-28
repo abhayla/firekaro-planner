@@ -11,7 +11,7 @@
  * same component the dashboard's AccelerationCard embeds, driven by the same session-only
  * `ui.whatIfLevers`, so a move switched on here is still on in the full planner.
  */
-import { computed } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { RouterLink } from "vue-router";
 import FireHero from "@/components/dashboard/FireHero.vue";
 import QuickExplainer from "@/components/quick/QuickExplainer.vue";
@@ -23,6 +23,13 @@ import { requiredMonthlyContributionFor } from "@/lib/required-contribution";
 import { FULL_PLANNER_ADDS, QUICK_PORTFOLIO_CAVEAT, overCommitmentWarning } from "@/lib/quick-number-copy";
 import { formatINRCompact } from "@/lib/formatters";
 import type { QuickAnswers } from "@/types/quick-number";
+import {
+  buildShareUrl,
+  shareText,
+  shareOgTitle,
+  SHARE_OG_DESCRIPTION,
+} from "@/lib/quick-share";
+import { getAuthProvider } from "@/lib/auth-provider";
 
 const props = defineProps<{ answers: QuickAnswers }>();
 defineEmits<{ (e: "edit"): void }>();
@@ -129,6 +136,74 @@ const answerRows = computed(() => {
     ],
   ] as const;
 });
+
+/* ------------------------------------------------------------------ #187 share ---------------- */
+
+/** The FIRE age the share copy quotes — the SAME number the hero renders (one source, rule 26). */
+const fireAge = computed(() => fire.heroHeadline.value.fireAge);
+const shareUrl = computed(() =>
+  typeof window === "undefined" ? "" : buildShareUrl(props.answers, window.location.origin),
+);
+/** "" = nothing said yet; set to the outcome of the last share attempt so the user always knows. */
+const shareStatus = ref("");
+const signedOut = computed(() => !getAuthProvider().isAuthenticated());
+
+/**
+ * Share on mobile via the OS sheet; fall back to the clipboard on desktop. Both outcomes are
+ * REPORTED — a silent "nothing happened" after pressing Share is the failure mode to avoid. A
+ * user who dismisses the OS sheet gets no message (that is not an error).
+ */
+async function onShare() {
+  const url = shareUrl.value;
+  if (!url) return;
+  const text = shareText(fireAge.value);
+  const nav = navigator as Navigator & { share?: (d: ShareData) => Promise<void> };
+  if (typeof nav.share === "function") {
+    try {
+      await nav.share({ title: shareOgTitle(fireAge.value), text, url });
+      shareStatus.value = "";
+      return;
+    } catch (err) {
+      // AbortError = the user dismissed the sheet; anything else falls through to the clipboard.
+      if ((err as DOMException)?.name === "AbortError") return;
+    }
+  }
+  try {
+    await navigator.clipboard.writeText(`${text} ${url}`);
+    shareStatus.value = "Link copied — paste it anywhere.";
+  } catch {
+    shareStatus.value = "Could not copy automatically — the link is in the box below.";
+  }
+}
+
+/**
+ * Stamp the Open-Graph tags for THIS result onto the live DOM.
+ *
+ * SPA LIMIT, stated rather than hidden: a crawler fetching /quick gets the STATIC index.html and
+ * never runs this script, so a link preview shows the generic site card, not the per-result one.
+ * True per-result previews need server-side rendering of the OG tags — out of scope for #187.
+ * This still helps anything that renders after JS (in-app webviews, the tab title, a11y).
+ */
+function setMeta(property: string, content: string) {
+  if (typeof document === "undefined") return;
+  let el = document.head.querySelector<HTMLMetaElement>(`meta[property="${property}"]`);
+  if (!el) {
+    el = document.createElement("meta");
+    el.setAttribute("property", property);
+    document.head.appendChild(el);
+  }
+  el.setAttribute("content", content);
+}
+
+function applyOgTags() {
+  setMeta("og:title", shareOgTitle(fireAge.value));
+  setMeta("og:description", SHARE_OG_DESCRIPTION);
+  if (shareUrl.value) setMeta("og:url", shareUrl.value);
+  if (typeof document !== "undefined") document.title = shareOgTitle(fireAge.value);
+}
+
+onMounted(applyOgTags);
+watch(fireAge, applyOgTags);
 </script>
 
 <template>
@@ -238,6 +313,56 @@ const answerRows = computed(() => {
         </v-expansion-panels>
       </v-card>
 
+      <!-- #187 — share the number, and (for a signed-out visitor) the sign-up handoff. -->
+      <v-card variant="outlined" class="pa-6 mt-4" data-testid="quick-share-card">
+        <h3 class="text-subtitle-1 font-weight-bold font-display mb-1">Share your number</h3>
+        <p class="text-body-2 text-medium-emphasis mb-4">
+          Whoever opens the link sees this same result — no account needed.
+        </p>
+        <div class="d-flex flex-wrap ga-2 align-center">
+          <v-btn
+            color="fire-orange"
+            variant="flat"
+            prepend-icon="mdi-share-variant"
+            data-testid="quick-share-button"
+            @click="onShare"
+          >
+            Share your number
+          </v-btn>
+          <v-btn
+            v-if="signedOut"
+            color="primary"
+            variant="flat"
+            :to="{ name: 'login' }"
+            data-testid="quick-save-plan"
+          >
+            Save this plan
+          </v-btn>
+        </div>
+        <p
+          v-if="shareStatus"
+          class="text-caption mt-3"
+          role="status"
+          data-testid="quick-share-status"
+        >
+          {{ shareStatus }}
+        </p>
+        <v-text-field
+          :model-value="shareUrl"
+          label="Your link"
+          variant="outlined"
+          density="compact"
+          hide-details
+          readonly
+          class="mt-4"
+          data-testid="quick-share-url"
+        />
+        <p v-if="signedOut" class="text-caption text-medium-emphasis mt-3" data-testid="quick-save-hint">
+          Your answers are saved in this browser only. Sign in and they carry straight into the full
+          planner.
+        </p>
+      </v-card>
+
       <v-card variant="outlined" class="pa-6 mt-4 quick-result__cta">
       <div>
         <b>Happy with the shape?</b>
@@ -248,10 +373,10 @@ const answerRows = computed(() => {
       <v-btn
         color="primary"
         variant="flat"
-        :to="{ name: 'fire-dashboard' }"
+        :to="signedOut ? { name: 'login' } : { name: 'fire-dashboard' }"
         data-testid="quick-open-planner"
       >
-        Open full planner
+        {{ signedOut ? "Sign in to open the planner" : "Open full planner" }}
         <v-icon icon="mdi-arrow-right" class="ml-1" />
       </v-btn>
       </v-card>
