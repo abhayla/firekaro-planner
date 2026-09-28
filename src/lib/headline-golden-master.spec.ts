@@ -45,6 +45,11 @@ const PINNED_CURRENT_YEAR = 2026;
 
 const r = (x: number, dp = 4) => (Number.isFinite(x) ? Math.round(x * 10 ** dp) / 10 ** dp : x);
 
+// RE-ANCHORED 2026-09-29 (#176): sharmas + mauryas headlines moved EARLIER (FIRE age 55.42→52.08
+// and 68.92→66.58) — both seeds carry a home-loan EMI (`seed-persona.ts` / `mauryas.ts`) ending
+// before their household's retirement age, now correctly excluded from the retirement expense
+// base instead of being capitalised forever. iyers (loan has no endYear) and mehtas (no loan)
+// snapshots are unchanged — the no-op guarantee for lines that don't end early.
 describe("A7.2 golden-master — per-persona headline (DEFAULT lens)", () => {
   beforeEach(() => setActivePinia(createPinia()));
 
