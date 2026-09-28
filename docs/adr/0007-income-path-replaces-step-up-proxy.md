@@ -264,9 +264,11 @@ discards the field, GET returns the research default forever).
 Resolution, until step 6 lands:
 
 - PUT `/api/planner/assumptions` validates **`persistedAssumptionsSchema`**
-  (`server/src/lib/planner-schemas.ts`), the canonical schema with those three `.omit()`-ed. The
-  server does not accept what it cannot store; a client sending one gets a 422 naming the field
-  instead of a false 200.
+  (`server/src/lib/planner-schemas.ts`), the canonical schema with those three `.omit()`-ed. It is
+  a plain Zod object (default STRIP mode, no `.strict()`), so a client sending one of the three is
+  NOT rejected with a 422 — a 422 would break every normal `/preferences` save, since the UI always
+  sends the full canonical shape. The field is silently stripped at the parse boundary instead and
+  never reaches the write payload.
 - `/preferences` renders the three knobs **disabled in server mode** (`isServerMode()`), each hint
   and a visible section note carrying: *"Saved per account after the next release; the plan already
   uses the research default."* Nothing is silently dropped in the UI either.

@@ -119,8 +119,9 @@ app.put("/assumptions", async (c) => {
     return apiError(c, "Invalid JSON body", 400, ErrorCode.VALIDATION_ERROR);
   }
   // `persistedAssumptionsSchema`, NOT the canonical frontend schema: the three ADR-0007 income-path
-  // knobs have no `user_assumptions` column until #185 step 6, so accepting them would be the
-  // ADR-0006 silent-drop bug (200 + discarded). See planner-schemas.ts for the full reasoning.
+  // knobs have no `user_assumptions` column until #185 step 6. This schema is a plain Zod object
+  // (default STRIP mode), so a client sending one of the three is NOT 422'd — it is silently
+  // stripped at the parse boundary and never stored. See planner-schemas.ts for the full reasoning.
   const parsed = persistedAssumptionsSchema.safeParse(body);
   if (!parsed.success) {
     return apiError(c, `Invalid assumptions: ${parsed.error.message}`, 422, ErrorCode.VALIDATION_ERROR);

@@ -22,10 +22,13 @@ import { buildAssumptionsWriteData, mapAssumptionsRow } from "./planner-read";
  * ADR-0007 / gh #185 — the three income-path knobs (`salaryGrowthRealPercent`,
  * `salaryGrowthTaperAge`, `expenseGrowthAboveInflationPercent`) are declared on the CANONICAL
  * frontend `assumptionsSchema` (the `Assumptions` type and `derive()` need them) and have no
- * column yet. The resolution is that the server does not ACCEPT what it cannot STORE: PUT
- * validates `persistedAssumptionsSchema`, which omits them, so a client sending one gets a 422
- * naming the field instead of a false 200. The third test below locks that omission both ways, so
- * step 6 (the columns) cannot land the schema half without the column half.
+ * column yet. PUT validates against `persistedAssumptionsSchema`, which omits them — that schema
+ * is a plain Zod object (default STRIP mode, no `.strict()`), so a client sending one of the three
+ * is NOT rejected with a 422; the field is silently STRIPPED at the parse boundary and never
+ * stored (a 422 here would break every `/preferences` save, since the UI sends the full canonical
+ * shape on every PUT). `/preferences` disables those three knobs in server mode so the UI never
+ * implies the edit was saved. The third test below locks the actual strip behaviour, so step 6
+ * (the columns) cannot land the schema half without the column half.
  */
 
 // A FULLY-populated Assumptions — every field non-default, including both optionals, so a
@@ -97,7 +100,7 @@ describe("assumptions persistence mapping (no DB)", () => {
   // The three ADR-0007 income-path knobs: on the canonical frontend schema (derive() reads them),
   // OFF the accepted schema until #185 step 6 adds the columns. Step 6 deletes this test's
   // `not.toContain` half and adds all three to both mapping sides in the same change.
-  it("the #185 income-path knobs are declared frontend-side but NOT accepted by PUT (step 6 adds columns)", () => {
+  it("the #185 income-path knobs are declared frontend-side but stripped (not stored) by PUT (step 6 adds columns)", () => {
     const INCOME_PATH_FIELDS = [
       "salaryGrowthRealPercent",
       "salaryGrowthTaperAge",
@@ -109,11 +112,17 @@ describe("assumptions persistence mapping (no DB)", () => {
       expect(canonical, `${f} must stay on the canonical frontend schema`).toContain(f);
       expect(accepted, `${f} has no user_assumptions column — accepting it would silently drop it`).not.toContain(f);
     }
-    // ...and a PUT body carrying one is REJECTED, not accepted-and-discarded (Zod strips unknown
-    // keys by default, so the omission alone would be a silent drop of a different colour).
+    // ...and a PUT body carrying one PARSES (the route uses the schema as-is, no `.strict()` — a
+    // 422 here would break every real save, since the client always sends the full canonical
+    // shape), but the field is STRIPPED from the parsed output and therefore never reaches the
+    // write payload. This is the actual route behaviour — proving it against `.strict()` (a schema
+    // the route never uses) would prove nothing about what really happens.
     const body = { ...FULL, salaryGrowthRealPercent: 7 };
-    const parsed = persistedAssumptionsSchema.strict().safeParse(body);
-    expect(parsed.success, "a body carrying an unstorable knob must not validate under .strict()").toBe(false);
+    const parsed = persistedAssumptionsSchema.safeParse(body);
+    expect(parsed.success, "the route's safeParse must accept a body carrying an unstorable knob (never 422 a normal save)").toBe(true);
+    for (const f of INCOME_PATH_FIELDS) {
+      expect(parsed.data, `${f} must be stripped from the parsed output, not persisted`).not.toHaveProperty(f);
+    }
   });
 
   it("a fully-populated Assumptions round-trips through write payload → row → Assumptions", () => {

@@ -119,9 +119,14 @@ export const planBaselineSchema = z.object({
  *
  * A field a route ACCEPTS but cannot STORE is exactly the ADR-0006 bug class: Zod says yes, PUT
  * returns 200, the upsert silently discards it, and GET hands back the research default forever.
- * So the server omits the three from what it accepts. A client that sends them gets a 422 naming
- * the field rather than a false 200, and `/preferences` renders those knobs read-only in server
- * mode (`Preferences.vue`, `isServerMode()`) so nothing is silently dropped in the UI either.
+ * So the server omits the three from what it accepts. `persistedAssumptionsSchema` is a plain Zod
+ * object (default STRIP mode, no `.strict()`), so the route's `safeParse` does NOT 422 a client
+ * that sends one of the three — a 422 here would break every `/preferences` save, since the UI
+ * sends the full canonical `Assumptions` shape on every PUT. Instead the field is silently
+ * STRIPPED at the boundary and never stored (never a false 200 with data loss the client didn't
+ * cause — the client's own copy of the value is untouched, only the server round-trip drops it).
+ * `/preferences` renders those knobs read-only in server mode (`Preferences.vue`,
+ * `isServerMode()`) so the UI never lets a user believe an edit to them was saved.
  *
  * STEP 6 (the columns) re-adds all three here AND to `buildAssumptionsWriteData` +
  * `mapAssumptionsRow` in the same change; the mapping spec's structural check over
