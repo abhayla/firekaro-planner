@@ -31,12 +31,45 @@ export function shouldClaim(guest: HouseholdLike | null, server: HouseholdLike |
   return guestMembers > 0 && serverMembers === 0;
 }
 
+/** An adapter that can flush its pending writes and report whether they landed. */
+interface FlushableAdapter {
+  flushAllPending(): Promise<void>;
+}
+
+function isFlushable(adapter: StorageAdapter): adapter is StorageAdapter & FlushableAdapter {
+  return typeof (adapter as Partial<FlushableAdapter>).flushAllPending === "function";
+}
+
+/**
+ * Optional hook the caller wires to the adapter's own failure signal (e.g. `ServerAdapter`'s
+ * `onFlushError` constructor option). `flushAllPending()` never throws on a failed PUT — a failed
+ * flush is deliberately re-queued, not surfaced as a rejection (`server-adapter.ts` flush()) — so
+ * this is the only way `claimGuestPlan` can tell a flush actually failed vs. merely completed.
+ */
+export interface ClaimGuestPlanOptions {
+  /** Returns true once ANY flush attempted during this claim has failed. */
+  hasFlushFailed?: () => boolean;
+}
+
 /**
  * Copy the guest's plan into the authenticated adapter, once. Returns whether anything moved.
  * Never throws — a failed handoff must leave the user signed in with an empty plan they can refill,
  * not on a crashed boot screen.
+ *
+ * SAFETY (the ONLY copy of the guest's answers — MUST NOT be deleted early): `authedAdapter.set()`
+ * on a `ServerAdapter` is a synchronous in-memory cache write with a DEBOUNCED (1500ms) PUT behind
+ * it (`server-adapter.ts`) — the write is not actually on the server the instant `set()` returns. A
+ * tab close, navigation, or failed flush inside that debounce window would leave the account still
+ * empty on the server while `guest.clearForCurrentUser()` had already deleted the only surviving
+ * copy — permanent silent data loss. So: when the adapter exposes `flushAllPending()` (ServerAdapter
+ * does), it is AWAITED — and its resolution treated as confirmation the writes reached the server —
+ * before the guest namespace is cleared. Adapters without a flush hook (LocalStorageAdapter, tests)
+ * are synchronous already, so clearing immediately after `set()` is safe for them.
  */
-export function claimGuestPlan(authedAdapter: StorageAdapter): boolean {
+export async function claimGuestPlan(
+  authedAdapter: StorageAdapter,
+  options: ClaimGuestPlanOptions = {},
+): Promise<boolean> {
   try {
     const guest = new LocalStorageAdapter(ANON_USER_ID);
     const guestHousehold = guest.get<HouseholdLike>("household");
@@ -47,6 +80,19 @@ export function claimGuestPlan(authedAdapter: StorageAdapter): boolean {
       const value = guest.get<unknown>(key);
       if (value !== null && value !== undefined) authedAdapter.set(key, value);
     }
+
+    if (isFlushable(authedAdapter)) {
+      // flushAllPending() itself NEVER rejects on a failed PUT — a failed flush is deliberately
+      // re-queued on a backoff, not thrown (server-adapter.ts flush()) — so its resolution alone is
+      // NOT confirmation the writes reached the server. `hasFlushFailed` (wired by the caller to the
+      // adapter's onFlushError) is the only real signal; without it, we can only await the attempt.
+      await authedAdapter.flushAllPending();
+      if (options.hasFlushFailed?.()) {
+        console.warn("[boot] guest plan handoff: server flush failed — guest namespace kept for retry");
+        return false;
+      }
+    }
+
     guest.clearForCurrentUser();
     return true;
   } catch (err) {
