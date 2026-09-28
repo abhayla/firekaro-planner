@@ -12,8 +12,8 @@
  * `ui.quick` metadata blob (gut feel, when, which rows we own, direct-plans) which rides the
  * existing `ui` document — no schema change anywhere.
  */
-import { computed, ref } from "vue";
-import { useRouter } from "vue-router";
+import { computed, onMounted, ref } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import QuickCard from "@/components/quick/QuickCard.vue";
 import LakhInput from "@/components/quick/LakhInput.vue";
 import QuickResult from "@/components/quick/QuickResult.vue";
@@ -29,10 +29,14 @@ import { useHouseholdStore } from "@/stores/household";
 import { useAssumptionsStore } from "@/stores/assumptions";
 import { useFeaturesStore } from "@/stores/features";
 import { useUiStore } from "@/stores/ui";
+import { getAuthProvider } from "@/lib/auth-provider";
 import { derive } from "@/lib/derive";
 import { formatINRCompact } from "@/lib/formatters";
+import { decodeQuickAnswers } from "@/lib/quick-share";
+import { reportActivationEvent } from "@/lib/activation-events";
 
 const router = useRouter();
+const route = useRoute();
 const household = useHouseholdStore();
 const assumptions = useAssumptionsStore();
 const features = useFeaturesStore();
@@ -47,9 +51,23 @@ const CR = 1e7;
 // Re-entering /quick must never start blank over a real plan: ten clicks of Next would then
 // overwrite it with zeros (code-review H2). Everything the express path wrote carries a stable
 // `quick-` id, so the previous answers are recoverable from the household itself.
+/**
+ * #187 — a SHARED link (`/quick?r=<token>`) wins over whatever is in this browser: the recipient
+ * came to see the sender's number, not their own half-finished run. A malformed or tampered token
+ * decodes to null and we fall through to the normal precedence (own plan → blank cards).
+ */
+const shared = decodeQuickAnswers(route.query.r as string | undefined);
 const answers = ref<QuickAnswersDraft>(
-  quickAnswersFromHousehold(household.data, ui.quick?.guess) ?? emptyQuickAnswers(),
+  shared ?? quickAnswersFromHousehold(household.data, ui.quick?.guess) ?? emptyQuickAnswers(),
 );
+/**
+ * A recipient of a shared link lands straight on the result, not on card 1 — but ONLY when they are
+ * signed OUT. `finish()` writes real household data, so auto-running it for a SIGNED-IN recipient
+ * would overwrite their own plan with the sender's answers. A signed-in recipient gets the sender's
+ * answers pre-filled in the cards and decides for themselves whether to press through.
+ */
+const openedFromShare = shared !== null;
+const autoShowSharedResult = openedFromShare && !getAuthProvider().isAuthenticated();
 /** Set when the user tries to finish without the one answer the whole number rests on. */
 const blockedReason = ref("");
 const step = ref(0);
@@ -188,8 +206,17 @@ function finish() {
     directPlans: answers.value.directPlans === true,
   });
   showResult.value = true;
+  // #44 — funnel event 2 of 5: the number is on screen.
+  void reportActivationEvent("quick_completed", ui.ensureAnonId());
   window.scrollTo({ top: 0 });
 }
+
+onMounted(() => {
+  // #44 — funnel event 1 of 5. Fire-and-forget; a dropped counter never blocks the page.
+  void reportActivationEvent("quick_opened", ui.ensureAnonId());
+  // #187 — a shared link renders the sender's result immediately (no ten clicks to see it).
+  if (autoShowSharedResult) finish();
+});
 
 function editAnswers() {
   showResult.value = false;
