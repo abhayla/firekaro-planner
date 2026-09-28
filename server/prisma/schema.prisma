@@ -143,27 +143,27 @@ model Member {
   userId   String
   entityId String // household-document member id (e.g. "you")
 
-  name                 String
-  dateOfBirth          String // ISO YYYY-MM-DD
-  role                 String // gh #67: ADULT | DEPENDENT (earning is DERIVED from income, not stored)
-  targetRetirementAge  Int?
-  planToAge            Int?
-  relation             String?
+  name                String
+  dateOfBirth         String // ISO YYYY-MM-DD
+  role                String // gh #67: ADULT | DEPENDENT (earning is DERIVED from income, not stored)
+  targetRetirementAge Int?
+  planToAge           Int?
+  relation            String?
 
   // memberSalarySchema (optional) -> flat columns, nullable.
-  salaryAnnualCTC        Float?
-  salaryHikePercent      Float?
-  salaryVpfTopUpPercent  Float?
+  salaryAnnualCTC         Float?
+  salaryHikePercent       Float?
+  salaryVpfTopUpPercent   Float?
   salaryEmployerNpsAnnual Float? // Sec 80CCD(2) employer NPS (gh-issue #2)
   salaryBasicAnnual       Float? // Basic+DA, caps 80CCD(2) at 10%/14% (gh-issue #3)
   salaryEmployerSector    String? // "private" | "government" — govt gets 14% OLD ceiling (gh-issue #4)
 
   // Q2.1 onboarding fields.
-  city            String  @default("Metro")
-  health          String  @default("Healthy")
-  educationStage  String? // dependents only
-  riskAppetite    String  @default("Moderate")
-  marital         String  @default("Married")
+  city             String  @default("Metro")
+  health           String  @default("Healthy")
+  educationStage   String? // dependents only
+  riskAppetite     String  @default("Moderate")
+  marital          String  @default("Married")
   employmentStatus String? // earners only
 
   createdAt DateTime @default(now())
@@ -202,14 +202,14 @@ model OtherIncomeLine {
   userId   String
   entityId String
 
-  type          String // Rental | Dividend | Interest | CapitalGains | Other
-  source        String
+  type           String // Rental | Dividend | Interest | CapitalGains | Other
+  source         String
   sourceEntityId String?
-  label         String?
-  amount        Float
-  frequency     String // M | Q | A
-  ownerId       String // member id OR "Joint" — plain TEXT, NO FK
-  isTaxExempt   Boolean
+  label          String?
+  amount         Float
+  frequency      String // M | Q | A
+  ownerId        String // member id OR "Joint" — plain TEXT, NO FK
+  isTaxExempt    Boolean
 
   // §24(b) home-loan interest + municipal taxes — let-out rental only (annual amounts). gh-issue #32.
   homeLoanInterest Float? @default(0)
@@ -401,9 +401,9 @@ model ExpenseSnapshot {
   id     String @id @default(cuid())
   userId String
 
-  period     String // YYYY-MM (the de-dup key)
-  fy         String // YYYY-YY
-  capturedAt String // ISO timestamp (stored as captured)
+  period      String // YYYY-MM (the de-dup key)
+  fy          String // YYYY-YY
+  capturedAt  String // ISO timestamp (stored as captured)
   totalAnnual Float
 
   // byBucket: Record<InflationBucket, number> — nested -> JSON.
@@ -478,8 +478,8 @@ model Scenario {
   userId   String
   entityId String
 
-  name        String
-  leverValues Json
+  name         String
+  leverValues  Json
   // Scenario.createdAt is a numeric epoch in the document model; keep it as a
   // distinct column so PUT round-trips it faithfully (DB createdAt is separate).
   docCreatedAt BigInt
@@ -601,4 +601,38 @@ model WhatsAppSendLog {
   // model a partial unique index. It's the DB-level dedup backstop (gh-issue #10); recordSend catches
   // its P2002 as "already deduped". Do NOT `prisma migrate dev` against it (would drop the index).
   @@map("whatsapp_send_log")
+}
+
+// ============================================================================
+// activation_event — #44, the five funnel counters.
+//
+// ONE row per event, never an aggregate: a counter is a COUNT over rows, so the
+// funnel can be re-sliced later (by day, by cohort) without a schema change.
+// `anonId` is always present (a uuid minted in the browser and persisted in the
+// `ui` document); `userId` is null for the two pre-signup events and set for the
+// three that require a session. No PII in either column.
+//
+// Bare userId, like every other v6 table — no FK, per the document-model convention.
+// ============================================================================
+enum ActivationEventType {
+  quick_opened
+  quick_completed
+  signed_up
+  returned_7d
+  data_refreshed
+}
+
+model ActivationEvent {
+  id        String              @id @default(cuid())
+  /// Null for the unauthenticated events (quick_opened, quick_completed).
+  userId    String?
+  /// The browser-minted anonymous id — the key that joins a visit to a later signup.
+  anonId    String
+  event     ActivationEventType
+  createdAt DateTime            @default(now())
+
+  @@index([event, createdAt])
+  @@index([anonId])
+  @@index([userId])
+  @@map("activation_event")
 }
