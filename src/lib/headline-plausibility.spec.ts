@@ -750,18 +750,18 @@ describe("#81 individual FIRE plausibility — every adult, every persona", () =
 // properties in `kernel-invariants.property.spec.ts`.
 // gh #194 STATUS (2026-09-29, left RED on purpose — DO NOT silently widen this band):
 //
-// With the #194 fix landed (blendPortfolioReturn/Volatility fall back to the CONTRIBUTION mix,
-// then debt, never equity, when value weights total zero), Ravi's DEFAULT-lens fireAge measures
-// **75.3** (householdFireAge 76) — ABOVE both this block's 54-62 band AND the #22 age-70 ceiling
-// below. That is the fix working as intended on the RETURN axis (his EPF-only stream now earns the
-// EPF rate, not an all-equity 12%), but it exposes that the pre-#194 band (57.2, inside 54-62) was
-// propped up by the very defect #194 fixes — the honest number is materially later than anyone had
-// re-derived. This is a genuine, not a mechanical, regression: it needs a supervisor decision on
-// whether 75.3 is itself plausible for a 22-year-old EPF-only saver (it may indicate a SEPARATE,
-// still-live optimism gap elsewhere, e.g. the age-70 ceiling assumption itself, or it may be the
-// correct honest answer for a household with no non-EPF assets) before this band or the #22 ceiling
-// is touched. Per the #194 contract: report, do not silently widen. Both assertions below are left
-// as originally written and are RED against the current `derive()` output.
+// With the #194 engine fix landed (blendPortfolioReturn/Volatility fall back to the CONTRIBUTION
+// mix, then debt, never equity, when value weights total zero), Ravi's DEFAULT-lens fireAge FIRST
+// measured 75.3 with the ORIGINAL seed (no non-EPF holding at all — his whole surplus fell through
+// to the EPF-rate fallback). FinTech adjudication found that mis-modeled the #185 spec, which
+// prices Ravi's surplus at a nominal 12% return, i.e. INVESTED — so a moderate-risk SIP line
+// (60/40 equity/debt, `riskAppetite: "Moderate"`) was added to `ravi.ts` per the spec's own
+// assumption. With that seed fix, the measured fireAge is **66.9** (householdFireAge 67) —
+// still ABOVE both this block's 54-62 band and the #22 age-70 ceiling below, though materially
+// closer than 75.3. Per the #194 contract: report, do not silently widen. This remains a genuine
+// open question for a supervisor to re-derive (is 66.9 itself plausible for a 22-year-old
+// EPF+SIP-only saver, or does it point to a further gap) — both assertions below are left as
+// originally written and are RED against the current `derive()` output.
 describe("headline plausibility — Ravi, the lower-band fixture (#185, Step 4 landed)", () => {
   beforeEach(() => setActivePinia(createPinia()));
 

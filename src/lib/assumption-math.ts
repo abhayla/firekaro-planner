@@ -157,8 +157,8 @@ function portfolioWeightTotal(weights: PortfolioReturnWeights): number {
  *   1. Value weights, when their total is positive (unchanged — households with holdings).
  *   2. Contribution weights, when supplied and their total is positive (the CONTRIBUTION mix —
  *      what the household is actually funding, before any value has accumulated).
- *   3. The conservative-of-types present in EITHER weight map (never equity by default); when
- *      neither map has anything to blend, `debt` — the fixed-income floor, not equity.
+ *   3. `debt` alone — the fixed-income floor, never equity — when BOTH maps total zero (a truly
+ *      empty household: no holdings, no committed contribution in either map).
  */
 function resolvePortfolioWeights(
   valueWeights: PortfolioReturnWeights,
