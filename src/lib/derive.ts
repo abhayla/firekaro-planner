@@ -53,6 +53,12 @@ import { deriveEpsPensionForMember, EPS_NORMAL_START_AGE } from "@/lib/eps-pensi
 import { deriveGratuityForMember } from "@/lib/gratuity";
 import type { ReturnSchedule, ContributionSchedule } from "@/lib/fire-math";
 import { buildContributionResolver } from "@/lib/contribution-schedule";
+import {
+  expectedRealGrowthPercent,
+  generalInflationWithCreep,
+  householdRealIncomeAt,
+  type EarnerIncomePath,
+} from "@/lib/income-path";
 
 /**
  * ADR-0006: the age at which the household savings step-up stops compounding. The contribution
@@ -62,6 +68,7 @@ import { buildContributionResolver } from "@/lib/contribution-schedule";
  */
 export const STEP_UP_TAPER_AGE = 50;
 import {
+  resolveHouseholdBasket,
   resolveHouseholdInflation,
   resolveEffectiveSWRByHorizon,
   blendPortfolioReturn,
@@ -402,6 +409,94 @@ export function derive(
     const monthlyTakeHome = Math.round((annualIncome.total - annualTax) / 12);
     const savingsRate = calculateSavingsRate(monthlyTakeHome, Math.round(annualSavings / 12));
 
+    // ===== ADR-0007 / gh #185 — the per-earner INCOME path (replaces the savings step-up proxy) ==
+    //
+    // THE FORMULA (all REAL, today's rupees — `derive.ts` re-inflates at the one existing
+    // `toNominalContribution` seam):
+    //
+    //   income(t)   = Σ_earners CTC_e · (1 + g_e)^min(t, taperAge − age_e)          [income-path.ts]
+    //   expense(t)  = expenses₀ · (1 + b_creep)^t / (1 + CPI)^t
+    //                 where b_creep = blend({general: CPI + creep, healthcare, education, housing})
+    //   surplus(t)  = max(0, income(t) + otherIncome₀ − tax(t) − expense(t))
+    //   tax(t)      = tax₀ · income(t) / income(0)        (effective rate held at year 0 — see below)
+    //
+    // WHY THE TAX APPROXIMATION IS SAFE AND WHICH WAY IT ERRS. Re-running `computeTax` per projection
+    // year would need the whole deduction bundle re-derived per year (and the slab config for a
+    // future FY, which does not exist). Holding the year-0 EFFECTIVE rate and scaling it with income
+    // is CONSERVATIVE for the persona this change exists to serve: real bracket creep is a fiction
+    // in the real frame (slabs are indexed in practice), and for a household below ₹12L the year-0
+    // rate is ZERO under the new regime, so scaling zero stays zero — exactly right. For a
+    // high-income household the year-0 effective rate is already near the marginal rate, so the
+    // error is second-order. Documented as an accepted simplification, not hidden.
+    //
+    // WHY INCOME AND NOT SAVINGS (the RCA). A 2% step-up on a ₹50k surplus is ₹1k/yr; the same 2% on
+    // a ₹3L income is ₹6k/yr, and nearly every rupee of income growth is surplus because expenses
+    // only track prices. Growing the residual instead of the income understated future surplus by
+    // roughly income ÷ surplus for the whole lower-middle band.
+    const conservativeGrowthPct = assumptions.salaryGrowthRealPercent ?? 0;
+    const taperAge = assumptions.salaryGrowthTaperAge ?? 50;
+    const generalInflationForPath = assumptions.inflation;
+    /** Build this scope's earner income paths at a given real growth rate per earner. */
+    const buildEarnerPaths = (growthFor: (m: (typeof scopeEarners)[number]) => number): EarnerIncomePath[] =>
+      scopeEarners
+        .filter((m) => (m.salary?.annualCTC ?? 0) > 0)
+        .map((m) => ({
+          annualAmount: m.salary?.annualCTC ?? 0,
+          ageAtYear0: ageFromDOB(m.dateOfBirth),
+          realGrowthPercent: growthFor(m),
+          taperAge,
+        }));
+    const conservativePaths = buildEarnerPaths(() => conservativeGrowthPct);
+    // The EXPECTED band reads the user's OWN typed nominal `salary.hikePercent`, de-inflated to real
+    // and clamped to [0, INCOME_GROWTH_MAX_PERCENT] — floored at ZERO, not at the conservative
+    // default, so a typed hike BELOW inflation yields a flat real income path rather than silently
+    // inheriting the 2% headline assumption (spec §3.2: the hike NEVER moves the headline).
+    const expectedPaths = buildEarnerPaths((m) =>
+      expectedRealGrowthPercent(m.salary?.hikePercent, generalInflationForPath),
+    );
+    /**
+     * The highest typed nominal hike% among this scope's earners — the number the UI quotes as the
+     * BASIS of the second figure ("...if your 12% hikes continue"). It is the raw user input, not a
+     * derived rate, because that is what the copy names. Whether the second figure is worth showing
+     * at all is decided below from the SOLVED result, never from this number.
+     */
+    const expectedBasisPercent = scopeEarners.reduce(
+      (best, m) => Math.max(best, m.salary?.hikePercent ?? 0),
+      0,
+    );
+    // Creep rides the GENERAL bucket only (ADR-0007 (c)) and it is folded into the ONE household
+    // basket (see the `householdInflation` block above), so the surplus's expense line and the FIRE
+    // target grow at exactly the same rate — the coherence the FinTech review found missing in the
+    // first pass. Recomputed here rather than closed over because `computeScope` runs before that
+    // block; the two expressions are identical by construction and the coherence invariant in
+    // `kernel-invariants.property.spec.ts` asserts they stay that way.
+    const creepPercent = assumptions.expenseGrowthAboveInflationPercent ?? 0;
+    const basketWithCreep = resolveHouseholdInflation({
+      ...assumptions,
+      inflation: generalInflationWithCreep(generalInflationForPath, creepPercent),
+    });
+    /** REAL expense growth rate: the creep-adjusted basket, deflated at general CPI. */
+    const realExpenseDrift = (1 + basketWithCreep) / (1 + generalInflationForPath) - 1;
+    const income0 = conservativePaths.reduce((sum, p) => sum + p.annualAmount, 0);
+    const nonSalaryIncome0 = Math.max(0, annualIncome.total - income0);
+    const effectiveTaxRate0 = income0 > 0 ? annualTax / (income0 + nonSalaryIncome0) : 0;
+    /**
+     * REAL ₹/month flowing to the corpus at `yearIndex` — the surplus RESIDUAL, now time-varying
+     * because INCOME grows and expenses creep, rather than because the residual was stepped up.
+     * Floored at 0: a household whose expenses outrun its income does not contribute a negative
+     * amount, it contributes nothing (and the FIRE date goes to Infinity via the solver).
+     */
+    const realMonthlySurplusAt = (yearIndex: number, paths: EarnerIncomePath[]): number => {
+      if (!Number.isFinite(yearIndex)) return 0;
+      const t = Math.max(0, yearIndex);
+      const income = householdRealIncomeAt(paths, t) + nonSalaryIncome0;
+      const tax = income * effectiveTaxRate0;
+      const expense = annualExpensesToday * Math.pow(1 + realExpenseDrift, t);
+      const surplus = income - tax - expense;
+      const monthly = surplus / 12;
+      return Number.isFinite(monthly) && monthly > 0 ? monthly : 0;
+    };
+
     // Primary-residence exclusion (A20.2).
     const fireCorpusInvestments = scopeInvestments.filter(
       (i) => !(i.type === "RealEstate" && i.realEstateRole === "PrimaryResidence"),
@@ -426,6 +521,11 @@ export function derive(
       monthlyContribution,
       monthlyTakeHome,
       savingsRate,
+      realMonthlySurplusAt,
+      conservativePaths,
+      expectedPaths,
+      expectedBasisPercent,
+      realExpenseDrift,
       fireCorpusInvestments,
       totalCorpus,
       totalLiabilitiesValue,
@@ -641,7 +741,24 @@ export function derive(
   // `realReturnSchedule` / `realBlendedReturn` REMAIN exported. They are no longer the headline
   // solver's return, but they are the ONE real return every display surface and the Monte Carlo
   // band must read (ADR-0006 item 5 / gh #180) — deflated at GENERAL CPI, never at the basket.
-  const householdInflation = resolveHouseholdInflation(assumptions);
+  // ADR-0007 / gh #185 — CREEP RIDES BOTH LEGS, or neither.
+  //
+  // FinTech review of this change (2026-09-29) found a CRITICAL coherence bug in the first pass:
+  // lifestyle creep was added to the basket used for the SURPLUS's expense line but NOT to the one
+  // the FIRE TARGET grows at. That declared Ravi FIRE-ready at 60.5 on a corpus funding ~₹2.73L/yr
+  // real while his own projection had him spending ~₹3.57L/yr — a 31% shortfall AT THE MOMENT OF
+  // THE VERDICT, in the OPTIMISTIC direction, which is the Tier-0 failure mode for this persona.
+  //
+  // Creep is a permanent lifestyle RATCHET: a household that creeps its way to ₹3.57L of real
+  // spending does not revert to ₹2.73L on retirement day, so the corpus must capitalise the crept
+  // level. The fix is therefore structural, not a second creep term: the creep is folded into
+  // `householdInflation` ITSELF, so every consumer of the basket — the target schedule, the bridge's
+  // expense line, the Floor/Ceiling decumulation overlay, `effectiveTargetDriftRate` and the Monte
+  // Carlo band — inherits exactly one rate. ADR-0007 (c) settled which BUCKET creep attaches to and
+  // was silent on which LEG consumes it; this is that gap closed.
+  // ONE formula, shared with the store's `householdInflation()` (see `resolveHouseholdBasket`) so
+  // the rate on the screen and the rate in the plan cannot diverge.
+  const householdInflation = resolveHouseholdBasket(assumptions);
   const generalInflation = assumptions.inflation;
   const toRealReturn = (nominal: number) => (1 + nominal) / (1 + generalInflation) - 1;
   const realReturnSchedule: ReturnSchedule =
@@ -676,36 +793,65 @@ export function derive(
   // The step-up is REAL (no inflation added — derive.ts grows the corpus in the real frame, so a
   // real step-up is net-of-inflation growth on top of the constant-real baseline). The flattening
   // lives in lib/contribution-schedule.ts (single-kernel rule), not inline here.
-  const householdSavingsStepUpPct = assumptions.householdSavingsStepUpPercent ?? 0;
-  // ADR-0006: the step-up TAPERS TO ZERO at 50. A real step-up is a wage-growth proxy, and
-  // Indian salaried real wage growth flattens well before retirement; compounding 2%/yr real
-  // from 30 to 65 would inflate the inflow ~2x and pull the FIRE date in optimistically. Two
-  // segments do it without ever DROPPING the contribution: the first steps up to age 50, the
-  // second starts at 50 from the level the first REACHED and holds it flat (real) thereafter.
-  const stepUpApplies = householdSavingsStepUpPct > 0 && monthlyContribution > 0;
-  const taperYears = Math.max(0, STEP_UP_TAPER_AGE - anchorAge);
-  const baseContributionSchedule: ContributionSchedule = !stepUpApplies
-    ? monthlyContribution // scalar ⇒ preserves the `monthlyContribution <= 0 → Infinity`
-    : // empty-state guard in calculateYearsToTarget.
-      buildContributionResolver(
-        taperYears <= 0
-          ? // Already at/over the taper age — no step-up left to apply.
-            [{ amount: monthlyContribution, startAtAge: anchorAge }]
-          : [
-              {
-                amount: monthlyContribution,
-                startAtAge: anchorAge,
-                endAtAge: STEP_UP_TAPER_AGE,
-                stepUpPercentPerYear: householdSavingsStepUpPct,
-              },
-              {
-                amount:
-                  monthlyContribution * Math.pow(1 + householdSavingsStepUpPct / 100, taperYears),
-                startAtAge: STEP_UP_TAPER_AGE,
-              },
-            ],
-        anchorAge,
-      );
+  // ADR-0007 / gh #185 step 4 — the inflow is now the INCOME-PATH surplus residual, not a stepped-up
+  // scalar. `householdSavingsStepUpPercent` is RETIRED from this headline path (the field survives for
+  // hydrate/round-trip compatibility and is still read by the explicit "save more each year" lever
+  // surfaces — `lever-catalog.ts`, `lever-impact.ts`, `useAcceleration.ts`). The formula and the
+  // conservative/expected split live in `computeScope` above (`realMonthlySurplusAt`); the flattening
+  // of the per-year values into a resolver stays out of the inline path (single-kernel rule).
+  //
+  // T-377 contract preserved: when the solver passes a `contributionOverride`, the inflow is that
+  // fixed scalar — the override REPLACES the residual, so it must not be re-grown by the income path.
+  const conservativeSurplusAt = householdScope.realMonthlySurplusAt;
+  // `householdSavingsStepUpPercent` is no longer the WAGE-GROWTH proxy — the income path is. Its
+  // DEFAULT therefore moves 2 -> 0 (`types/assumptions.ts`): leaving it at 2 would compound wage
+  // growth twice, once through each earner's income and once again through the residual. What the
+  // field now means, and the ONLY thing it means, is a DELIBERATE household decision to invest a
+  // growing SHARE of its surplus — the "Raise investing 10% every year" plan lever
+  // (`lever-catalog.ts`, `PLAN_STEP_UP_PERCENT`) and the What-If slider. That lever must keep
+  // moving the solver (its own no-inert-lever guard), so the field stays LIVE in the kernel as a
+  // multiplier ON TOP OF the income-path residual, tapering at the same age real wage growth does.
+  const deliberateStepUpPct = assumptions.householdSavingsStepUpPercent ?? 0;
+  const stepUpTaperAge = assumptions.salaryGrowthTaperAge ?? 50;
+  const stepUpFactor = (yearIndex: number): number => {
+    if (deliberateStepUpPct <= 0) return 1;
+    const years = Math.max(0, Math.min(Math.max(0, yearIndex), stepUpTaperAge - anchorAge));
+    const f = Math.pow(1 + deliberateStepUpPct / 100, years);
+    return Number.isFinite(f) && f > 0 ? f : 1;
+  };
+  /**
+   * The HEADLINE inflow: the conservative income-path surplus residual, times any DELIBERATE
+   * step-up the user (or a lever) set. T-377 contract preserved — when the solver passes a
+   * `contributionOverride` the inflow is that fixed scalar, because the override REPLACES the
+   * residual and must not be re-grown by the income path. A non-positive scalar passes through so
+   * `calculateYearsToTarget`'s `monthlySavings <= 0 -> Infinity` empty-state sentinel still fires.
+   */
+  const baseContributionSchedule: ContributionSchedule =
+    monthlyContribution <= 0
+      ? monthlyContribution
+      : contributionOverride != null
+        ? // T-377: the solver REPLACES the residual with a fixed real amount, so the income path
+          // must not re-grow it — but the DELIBERATE step-up still applies, because the solver is
+          // answering "what flat amount must I start at, given my plan", and the plan includes
+          // stepping that amount up. Dropping the step-up here made the `step-up-10` plan lever
+          // INERT in `requiredMonthlyContributionFor` (its own no-inert-lever guard caught it).
+          deliberateStepUpPct <= 0
+          ? monthlyContribution
+          : (yearIndex: number) => monthlyContribution * stepUpFactor(yearIndex)
+        : (yearIndex: number) =>
+            conservativeSurplusAt(yearIndex, householdScope.conservativePaths) * stepUpFactor(yearIndex);
+  /**
+   * The EXPECTED-band inflow — identical except each earner grows at their own typed
+   * `salary.hikePercent` (de-inflated to real, floored at ZERO — see `expectedRealGrowthPercent`;
+   * a sub-inflation hike gives a flat real path, it does not fall back to the 2% default). This
+   * NEVER feeds the headline (spec §3.2); it feeds `expectedFireAge` alone.
+   */
+  const expectedContributionSchedule: ContributionSchedule =
+    contributionOverride != null || monthlyContribution <= 0
+      ? baseContributionSchedule
+      : (yearIndex: number) =>
+          conservativeSurplusAt(yearIndex, householdScope.expectedPaths) * stepUpFactor(yearIndex);
+
   // QN-5 (T-379): optional EXTRA segments from the override seam (the "roll the EMI into
   // investing when the loan ends" lever) are SUMMED onto the base inflow — each segment gets
   // its own resolver because `buildContributionResolver` picks the latest-starting segment on
@@ -877,6 +1023,20 @@ export function derive(
         expectedReturnSchedule,
       )
     : Number.POSITIVE_INFINITY;
+  // ADR-0007 / gh #185 — the SECOND number: "FIRE at 51, or 42 if your 12% hikes continue".
+  // Same solver, same target, same return schedule — ONLY the income growth rate differs. It is a
+  // separate field and never substituted into the headline: an optimistic headline makes this
+  // persona UNDER-SAVE, which is the Tier-0 failure mode (spec §3.2, `goal-anchored-decisions.md`).
+  const expectedNominalContributionSchedule = toNominalContribution(expectedContributionSchedule);
+  const expectedYearsToRegular = hasFireTarget
+    ? calculateYearsToTarget(
+        fireWithdrawableCorpus,
+        regularTargetSchedule,
+        expectedNominalContributionSchedule,
+        expectedReturnSchedule,
+      )
+    : Number.POSITIVE_INFINITY;
+
   const yearsToLean = hasFireTarget
     ? calculateYearsToTarget(
         fireWithdrawableCorpus,
@@ -1024,6 +1184,60 @@ export function derive(
   /** The same effective drift quoted in the NOMINAL frame, for nominal-triple callers. */
   const effectiveTargetGrowthNominal = (1 + effectiveTargetDriftRate) * (1 + generalInflation) - 1;
 
+  /**
+   * ADR-0007 / gh #185 — the INFLOW's effective REAL growth rate over the solved horizon.
+   *
+   * The income-path inflow is no longer a scalar × a single step-up: income grows and tapers per
+   * earner while creep-adjusted expenses eat into the residual, so the real inflow's own growth rate
+   * is a curve. The acceleration card / lever bands (`lever-impact.FireBaseline`) take a SCALAR
+   * step-up, so they get the constant real rate that REPRODUCES this kernel's inflow at the horizon
+   * the headline was actually solved at — the exact same technique, and the exact same reason, as
+   * `effectiveTargetDriftRate` above. Handing those surfaces the retired
+   * `householdSavingsStepUpPercent` left the card's baseline ~0.7 years OPTIMISTIC against the
+   * headline printed beside it (measured on the Sharmas + Mehtas seeds, this change).
+   *
+   * Clamped at 0 from below: a shrinking real inflow is representable in the kernel (the taper +
+   * creep case) but `FireBaseline.savingsStepUpPercent` is a non-negative step-up, and a card that
+   * claimed a NEGATIVE step-up would read as advice to save less. 0 is the conservative floor for
+   * that surface; the kernel's own headline keeps the true falling curve.
+   */
+  const inflowAt = (t: number): number =>
+    typeof householdContributionSchedule === "function"
+      ? householdContributionSchedule(t)
+      : householdContributionSchedule;
+  const effectiveInflowRealGrowthPercent = (() => {
+    const T = effectiveDriftHorizon;
+    const c0 = inflowAt(0);
+    if (!(T > 0) || !(c0 > 0)) return 0;
+    // Match the SUM of the inflow over the horizon, not its endpoint. A CAGR fitted to the
+    // endpoint alone (`(c(T)/c(0))^(1/T)`) reproduces the last year's rupees and misses the ones
+    // in between: on the Sharmas seed that left the card's baseline 0.83 years from the headline
+    // beside it, because the income path is CONCAVE (it tapers) while a constant-rate curve is
+    // convex. Fitting the total contributed is the right target — years-to-FIRE is driven by how
+    // many rupees arrive, not by the final month's cheque. Solved by bisection on [0, 15]% because
+    // the sum is monotone in the rate and there is no closed form once the taper is in play.
+    let actualSum = 0;
+    const years = Math.ceil(T);
+    for (let y = 0; y < years; y++) actualSum += inflowAt(y);
+    if (!(actualSum > 0)) return 0;
+    const sumAtRate = (ratePct: number): number => {
+      let total = 0;
+      for (let y = 0; y < years; y++) total += c0 * Math.pow(1 + ratePct / 100, y);
+      return total;
+    };
+    if (sumAtRate(0) >= actualSum) return 0;
+    let lo = 0;
+    let hi = 15;
+    if (sumAtRate(hi) <= actualSum) return hi;
+    for (let i = 0; i < 40; i++) {
+      const mid = (lo + hi) / 2;
+      if (sumAtRate(mid) < actualSum) lo = mid;
+      else hi = mid;
+    }
+    const rate = (lo + hi) / 2;
+    return Number.isFinite(rate) ? Math.max(0, rate) : 0;
+  })();
+
   const yfat = Number.isFinite(yearsToFat) ? yearsToFat : 30;
   const projectionHorizonYears = Math.min(60, Math.max(20, Math.ceil(yfat) + 5));
 
@@ -1075,6 +1289,27 @@ export function derive(
   const householdFireAge = Number.isFinite(yearsToRegular)
     ? anchorAge + Math.ceil(yearsToRegular)
     : null;
+
+  // ADR-0007 / gh #185 — the EXPECTED FIRE age (the second number). Same ceil convention as the
+  // headline so the two never disagree by a rounding step. `expectedFireAgeBasis` is the highest
+  // typed nominal hike% among this household's earners, and is null when nobody typed one that
+  // beats the conservative default — in which case `expectedFireAge` equals the headline and the UI
+  // must show ONE number, not two identical ones.
+  const expectedFireAge = Number.isFinite(expectedYearsToRegular)
+    ? anchorAge + Math.ceil(expectedYearsToRegular)
+    : null;
+  // The basis is non-null ONLY when the expected run is genuinely BETTER than the headline and the
+  // user actually typed a hike. Deciding it from the SOLVED result rather than by comparing rates is
+  // what lets `expectedRealGrowthPercent` stay honest arithmetic (FinTech H2): a user whose hike is
+  // below inflation now gets a truthful `expectedYearsToRegular` that is no better than the
+  // headline, and a null basis tells the UI to show ONE number instead of a second, worse one
+  // labelled as their own expectation.
+  const expectedFireAgeBasis =
+    householdScope.expectedBasisPercent > 0 &&
+    Number.isFinite(expectedYearsToRegular) &&
+    expectedYearsToRegular < corpusOnlyYearsToRegular - 1e-9
+      ? householdScope.expectedBasisPercent
+      : null;
 
   // #81 Phase 2: standalone individual FIRE per ADULT — a clearly-caveated SECONDARY view. The
   // household fireNumber/yearsToRegular above stay the PRIMARY, decision-driving figures and are
@@ -1154,6 +1389,7 @@ export function derive(
     regularTargetComponentsRealAt,
     effectiveTargetDriftRate,
     effectiveTargetGrowthNominal,
+    effectiveInflowRealGrowthPercent,
     // ADR-0006: the NOMINAL corpus inflow the headline was actually solved with (the real
     // schedule above grown at general CPI). Exposed so no consumer rebuilds it.
     nominalContributionSchedule,
@@ -1210,6 +1446,9 @@ export function derive(
     // Canonical household FIRE age (anchor + ceil(years)); null if unreachable. One source for
     // every surface (FireHero, the individual-FIRE card) so the displayed age never diverges.
     householdFireAge,
+    expectedFireAge,
+    expectedFireAgeBasis,
+    expectedYearsToRegular,
   };
 }
 

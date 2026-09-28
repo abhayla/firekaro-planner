@@ -8,9 +8,35 @@
  */
 import type { Assumptions } from "@/types/assumptions";
 import { blendedInflation, getHorizonSWR } from "@/lib/fire-math";
+import { generalInflationWithCreep } from "@/lib/income-path";
 import { RETURN_BUCKET_VOLATILITY } from "@/lib/monte-carlo";
 
-/** Household 4-bucket blended inflation (audit Entry #3 A3.1 + A3.2 weights). */
+/**
+ * The ONE household expense basket every surface must show and the kernel must plan with
+ * (ADR-0006 "one basket" + ADR-0007 (c)/(d)).
+ *
+ * The 4-bucket blend WITH lifestyle creep folded into the `general` bucket. Creep is a permanent
+ * lifestyle ratchet: it grows the expense line AND the FIRE target the corpus has to fund, so it
+ * belongs to the basket itself rather than being a second term some consumers apply and others
+ * forget. The FinTech review of gh #185 caught exactly that asymmetry inside `derive()`; the
+ * REVIEW OF THE REVIEW caught it one layer out — `derive()` folded creep in, the store's
+ * `householdInflation()` did not, so with creep > 0 the expense-trend chart and the /preferences
+ * basket readout quoted a DIFFERENT rate from the one the plan used. That is the gh #180 class:
+ * two numbers on one screen from one store.
+ *
+ * This function is the single formula. `resolveHouseholdInflation` below is the creep-FREE blend,
+ * kept for the two places that genuinely need the price-only basket (the basket-sanity verdict,
+ * which compares priced buckets against all-items CPI, and the internal drift computation in
+ * `derive()` that already supplies its own creep-adjusted `inflation`).
+ */
+export function resolveHouseholdBasket(v: Assumptions): number {
+  return resolveHouseholdInflation({
+    ...v,
+    inflation: generalInflationWithCreep(v.inflation, v.expenseGrowthAboveInflationPercent),
+  });
+}
+
+/** Household 4-bucket blended inflation, creep-FREE (audit Entry #3 A3.1 + A3.2 weights). */
 export function resolveHouseholdInflation(v: Assumptions): number {
   return blendedInflation(
     {

@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import type { UserAssumptions } from "@prisma/client";
-import { assumptionsSchema, type Assumptions } from "@planner/types/assumptions";
+import { assumptionsSchema, DEFAULT_ASSUMPTIONS, type Assumptions } from "@planner/types/assumptions";
+import { persistedAssumptionsSchema } from "./planner-schemas";
 import { buildAssumptionsWriteData, mapAssumptionsRow } from "./planner-read";
 
 /**
@@ -12,10 +13,22 @@ import { buildAssumptionsWriteData, mapAssumptionsRow } from "./planner-read";
  * returned 200 — but that had no `user_assumptions` column, so the upsert silently discarded
  * them and GET always returned the research default. Zod said yes; Postgres never heard about it.
  *
- * The guard is structural, not a list of three names: every key of `assumptionsSchema.shape`
- * must appear in the write payload, and a fully-populated Assumptions object must survive
- * Assumptions → write payload → row → Assumptions with no field lost or altered. A new field
- * added to the Zod schema without a column + both mapping sides fails here, with no DB needed.
+ * The guard is structural, not a list of three names: every key of the schema PUT validates
+ * against (`persistedAssumptionsSchema`) must appear in the write payload, and a fully-populated
+ * Assumptions object must survive Assumptions → write payload → row → Assumptions with no field
+ * lost or altered. A new field added to the ACCEPTED schema without a column + both mapping sides
+ * fails here, with no DB needed.
+ *
+ * ADR-0007 / gh #185 — the three income-path knobs (`salaryGrowthRealPercent`,
+ * `salaryGrowthTaperAge`, `expenseGrowthAboveInflationPercent`) are declared on the CANONICAL
+ * frontend `assumptionsSchema` (the `Assumptions` type and `derive()` need them) and have no
+ * column yet. PUT validates against `persistedAssumptionsSchema`, which omits them — that schema
+ * is a plain Zod object (default STRIP mode, no `.strict()`), so a client sending one of the three
+ * is NOT rejected with a 422; the field is silently STRIPPED at the parse boundary and never
+ * stored (a 422 here would break every `/preferences` save, since the UI sends the full canonical
+ * shape on every PUT). `/preferences` disables those three knobs in server mode so the UI never
+ * implies the edit was saved. The third test below locks the actual strip behaviour, so step 6
+ * (the columns) cannot land the schema half without the column half.
  */
 
 // A FULLY-populated Assumptions — every field non-default, including both optionals, so a
@@ -43,6 +56,13 @@ const FULL: Assumptions = {
   householdSavingsStepUpPercent: 4,
   householdSplitPercent: 40,
   assumptionsMigratedV: 1,
+  // The three #185 income-path knobs are pinned at their RESEARCH DEFAULTS, not at non-default
+  // values like every field above. That is deliberate: they have no column, so `mapAssumptionsRow`
+  // resolves them from `DEFAULT_ASSUMPTIONS`, and the round-trip test below asserts equality with
+  // this object. Step 6 (columns) flips them to non-default values here like the rest.
+  salaryGrowthRealPercent: DEFAULT_ASSUMPTIONS.salaryGrowthRealPercent,
+  salaryGrowthTaperAge: DEFAULT_ASSUMPTIONS.salaryGrowthTaperAge,
+  expenseGrowthAboveInflationPercent: DEFAULT_ASSUMPTIONS.expenseGrowthAboveInflationPercent,
 };
 
 /** The write payload IS the row's column set — wrap it with the DB-managed metadata. */
@@ -57,15 +77,52 @@ function asRow(data: ReturnType<typeof buildAssumptionsWriteData>): UserAssumpti
 }
 
 describe("assumptions persistence mapping (no DB)", () => {
-  it("the write payload covers EVERY field declared on assumptionsSchema", () => {
-    const declared = Object.keys(assumptionsSchema.shape).sort();
+  it("the write payload covers EVERY field the server ACCEPTS (persistedAssumptionsSchema)", () => {
+    const declared = Object.keys(persistedAssumptionsSchema.shape).sort();
     const persisted = Object.keys(buildAssumptionsWriteData(FULL)).sort();
     const missing = declared.filter((k) => !persisted.includes(k));
     expect(
       missing,
-      `assumptionsSchema fields with no column in the upsert payload (they would be accepted by ` +
+      `accepted assumptions fields with no column in the upsert payload (they would be accepted by ` +
         `PUT and then silently dropped): ${missing.join(", ")}`,
     ).toEqual([]);
+  });
+
+  // ADR-0006 invariant, stated as an equality in BOTH directions: the set the server accepts and
+  // the set it can store are the same set. A field added to `persistedAssumptionsSchema` without a
+  // column fails the test above; a column added without widening the accepted schema fails here.
+  it("nothing is stored that the server does not accept (accepted set === column set)", () => {
+    const accepted = Object.keys(persistedAssumptionsSchema.shape).sort();
+    const columns = Object.keys(buildAssumptionsWriteData(FULL)).sort();
+    expect(columns).toEqual(accepted);
+  });
+
+  // The three ADR-0007 income-path knobs: on the canonical frontend schema (derive() reads them),
+  // OFF the accepted schema until #185 step 6 adds the columns. Step 6 deletes this test's
+  // `not.toContain` half and adds all three to both mapping sides in the same change.
+  it("the #185 income-path knobs are declared frontend-side but stripped (not stored) by PUT (step 6 adds columns)", () => {
+    const INCOME_PATH_FIELDS = [
+      "salaryGrowthRealPercent",
+      "salaryGrowthTaperAge",
+      "expenseGrowthAboveInflationPercent",
+    ] as const;
+    const canonical = Object.keys(assumptionsSchema.shape);
+    const accepted = Object.keys(persistedAssumptionsSchema.shape);
+    for (const f of INCOME_PATH_FIELDS) {
+      expect(canonical, `${f} must stay on the canonical frontend schema`).toContain(f);
+      expect(accepted, `${f} has no user_assumptions column — accepting it would silently drop it`).not.toContain(f);
+    }
+    // ...and a PUT body carrying one PARSES (the route uses the schema as-is, no `.strict()` — a
+    // 422 here would break every real save, since the client always sends the full canonical
+    // shape), but the field is STRIPPED from the parsed output and therefore never reaches the
+    // write payload. This is the actual route behaviour — proving it against `.strict()` (a schema
+    // the route never uses) would prove nothing about what really happens.
+    const body = { ...FULL, salaryGrowthRealPercent: 7 };
+    const parsed = persistedAssumptionsSchema.safeParse(body);
+    expect(parsed.success, "the route's safeParse must accept a body carrying an unstorable knob (never 422 a normal save)").toBe(true);
+    for (const f of INCOME_PATH_FIELDS) {
+      expect(parsed.data, `${f} must be stripped from the parsed output, not persisted`).not.toHaveProperty(f);
+    }
   });
 
   it("a fully-populated Assumptions round-trips through write payload → row → Assumptions", () => {
@@ -96,8 +153,11 @@ describe("assumptions persistence mapping (no DB)", () => {
       assumptionsMigratedV: null,
     } as unknown as UserAssumptions;
     const round = mapAssumptionsRow(legacy);
-    expect(round.householdSavingsStepUpPercent).toBe(2);
-    expect(round.householdSplitPercent).toBe(50);
+    // 0, not 2: ADR-0007 / gh #185 moved this default back to 0 when the income path replaced the
+    // step-up as the wage-growth carrier. Read from DEFAULT_ASSUMPTIONS so the next re-basing of a
+    // default cannot leave a stale literal asserting the old product here.
+    expect(round.householdSavingsStepUpPercent).toBe(DEFAULT_ASSUMPTIONS.householdSavingsStepUpPercent);
+    expect(round.householdSplitPercent).toBe(DEFAULT_ASSUMPTIONS.householdSplitPercent);
     // The stamp must stay ABSENT — its absence is the "migration has not run" signal.
     expect(round.assumptionsMigratedV).toBeUndefined();
   });

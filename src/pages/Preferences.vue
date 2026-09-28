@@ -31,6 +31,7 @@ import { useCommsConsent } from "@/composables/useCommsConsent";
 import { useFireDerive } from "@/lib/useFireDerive";
 import { DEFAULT_ASSUMPTIONS } from "@/types/assumptions";
 import { basketSanity, BASKET_SANITY_MAX_EXCESS_BP } from "@/lib/assumption-math";
+import { isServerMode } from "@/lib/runtime-mode";
 
 interface PrefSection {
   id: string;
@@ -142,6 +143,38 @@ const weightedRealVsBasketPct = computed(() => (realVsBasket.value * 100).toFixe
 const realReturnNegative = computed(() => realVsCpi.value < 0);
 const realBelowBasket = computed(() => realVsBasket.value < 0 && realVsCpi.value >= 0);
 
+/**
+ * ADR-0007 / gh #185 — the three income-path knobs are READ-ONLY in server (logged-in) mode.
+ *
+ * `user_assumptions` has no column for `salaryGrowthRealPercent`, `salaryGrowthTaperAge` or
+ * `expenseGrowthAboveInflationPercent` until step 6 of the #185 spec (the Prisma migration, kept
+ * separate because it is the only irreversible step). PUT /api/planner/assumptions therefore does
+ * not ACCEPT them (`persistedAssumptionsSchema`, server/src/lib/planner-schemas.ts). An editable
+ * field whose value cannot be saved is a silent-drop in the UI — the user types 4%, reloads, and
+ * finds 2% with no explanation. So in server mode the fields render disabled with the disclosure
+ * below; the demo/localStorage deployment keeps them editable (the adapter stores them fine).
+ *
+ * Gated on `isServerMode()` per the project non-negotiable — never an inline `import.meta.env`
+ * check (gh #36). Step 6 deletes this computed and its `:disabled` bindings.
+ */
+const incomePathKnobsReadOnly = computed(() => isServerMode());
+const INCOME_PATH_READONLY_NOTE =
+  "Saved per account after the next release; the plan already uses the research default";
+/** The three knobs' hints, declared once so the read-only prefix is applied in ONE place. */
+const INCOME_PATH_HINTS = {
+  salaryGrowth:
+    "Default: 2% a year above inflation, for the FIRE date we headline. Assumes continuous employment; real wage growth for this band was ~0% in FY22-24. Your own hike % on the Income page moves the second number, never the headline.",
+  taperAge:
+    "Default: 50. After this age your income holds flat in real terms (it never drops) while prices keep rising, so your surplus falls. Promotions and job moves slow down late-career.",
+  creep:
+    "Default: OFF (0%) — this is an unsourced assumption, not a research figure, so we do not put it in your headline unasked. Turn it on to see what gradually spending more each year costs you. Applied to your general spending only, never to healthcare, education or housing (those already rise faster than inflation on their own).",
+} as const;
+/** The hint a user reads: prefixed with the persistence disclosure while the knob is read-only. */
+function incomePathHint(key: keyof typeof INCOME_PATH_HINTS): string {
+  const base = INCOME_PATH_HINTS[key];
+  return incomePathKnobsReadOnly.value ? `${INCOME_PATH_READONLY_NOTE}. ${base}` : base;
+}
+
 // Per-section reset handlers.
 function resetSection(id: string) {
   if (id === "core") {
@@ -149,6 +182,14 @@ function resetSection(id: string) {
     assumptions.set(
       "householdSavingsStepUpPercent",
       DEFAULT_ASSUMPTIONS.householdSavingsStepUpPercent,
+    );
+    // ADR-0007 / gh #185 — the income-path knobs live in the same section as the (now retired
+    // from the headline) savings step-up, so a "reset core" restores all four together.
+    assumptions.set("salaryGrowthRealPercent", DEFAULT_ASSUMPTIONS.salaryGrowthRealPercent);
+    assumptions.set("salaryGrowthTaperAge", DEFAULT_ASSUMPTIONS.salaryGrowthTaperAge);
+    assumptions.set(
+      "expenseGrowthAboveInflationPercent",
+      DEFAULT_ASSUMPTIONS.expenseGrowthAboveInflationPercent,
     );
   } else if (id === "inflation") {
     assumptions.set("inflation", DEFAULT_ASSUMPTIONS.inflation);
@@ -322,7 +363,7 @@ const featuresBySection = computed(() => {
                 label="Savings step-up (% real per year)"
                 type="number"
                 :model-value="v.householdSavingsStepUpPercent"
-                hint="Default: 2% a year above inflation, tapering to 0 by age 50. Set 0 if you expect your savings to just keep pace with inflation."
+                hint="No longer used for your FIRE date — we now grow your income instead (see below). Still used by the What-If levers that model 'save more each year'."
                 persistent-hint
                 variant="outlined"
                 density="comfortable"
@@ -330,14 +371,84 @@ const featuresBySection = computed(() => {
                 @update:model-value="(val: string) => assumptions.set('householdSavingsStepUpPercent', Math.min(15, Math.max(0, Number(val) || 0)))"
               />
             </v-col>
+            <!-- ADR-0007 / gh #185 — the income path. These three knobs replace the savings
+                 step-up on the HEADLINE path: we grow each earner's income and let the savings
+                 residual fall out year by year. Deep-link: #pref-section-income-path. -->
+            <v-col cols="12" md="6" id="pref-section-income-path">
+              <v-text-field
+                label="Salary growth (% real per year)"
+                type="number"
+                :model-value="v.salaryGrowthRealPercent"
+                :hint="incomePathHint('salaryGrowth')"
+                persistent-hint
+                variant="outlined"
+                density="comfortable"
+                :disabled="incomePathKnobsReadOnly"
+                data-testid="pref-salary-growth"
+                @update:model-value="(val: string) => assumptions.set('salaryGrowthRealPercent', Math.min(10, Math.max(0, Number(val) || 0)))"
+              />
+            </v-col>
+            <v-col cols="12" md="6">
+              <v-text-field
+                label="Salary growth stops at age"
+                type="number"
+                :model-value="v.salaryGrowthTaperAge"
+                :hint="incomePathHint('taperAge')"
+                persistent-hint
+                variant="outlined"
+                density="comfortable"
+                :disabled="incomePathKnobsReadOnly"
+                data-testid="pref-salary-taper-age"
+                @update:model-value="(val: string) => assumptions.set('salaryGrowthTaperAge', Math.min(65, Math.max(40, Number(val) || 50)))"
+              />
+            </v-col>
+            <v-col cols="12" md="6">
+              <v-text-field
+                label="Lifestyle creep (% above inflation per year)"
+                type="number"
+                :model-value="v.expenseGrowthAboveInflationPercent"
+                :hint="incomePathHint('creep')"
+                persistent-hint
+                variant="outlined"
+                density="comfortable"
+                :disabled="incomePathKnobsReadOnly"
+                data-testid="pref-expense-creep"
+                @update:model-value="(val: string) => assumptions.set('expenseGrowthAboveInflationPercent', Math.min(5, Math.max(0, Number(val) || 0)))"
+              />
+            </v-col>
           </v-row>
+          <v-alert
+            v-if="incomePathKnobsReadOnly"
+            type="info"
+            variant="tonal"
+            density="compact"
+            class="mt-2"
+            data-testid="pref-income-path-readonly-note"
+          >
+            {{ INCOME_PATH_READONLY_NOTE }}.
+          </v-alert>
           <v-alert type="info" variant="tonal" density="compact" class="mt-2">
-            <strong>Why 2%, and why it stops at 50.</strong> The plan used to assume your savings only
-            ever kept pace with inflation — zero real growth for 25 to 40 years — while your expenses
-            grew at your spending basket. For a salaried accumulator that is not caution, it is a
-            mismatch: Indian salary growth has run roughly 3–4% above inflation. We use a deliberately
-            conservative 2% real, and taper it to nothing by age 50, because promotions and job moves
-            slow down late-career and a step-up that ran to retirement would flatter the number.
+            <strong>Why we grow your income, not your savings.</strong> The plan used to grow your
+            <em>savings</em> by 2% a year above inflation. For a household whose surplus is small next
+            to its income that badly understates the future: 2% of a ₹50,000 surplus is ₹1,000 a year,
+            while 2% of a ₹3,00,000 income is ₹6,000 a year — and nearly every rupee of a raise is
+            surplus, because your expenses only track prices. So we now grow each earner's
+            <em>income</em> at a conservative 2% real and let the savings fall out year by year.
+            <br /><br />
+            <strong>Why 2%.</strong> An individual's earnings path rises steeply with experience even
+            when the national average for all salaried workers is flat — 2% sits below every estimate
+            we found for an individual path. It <strong>assumes continuous employment; real wage
+            growth for this band was ~0% in FY22-24</strong>. Your own hike % (Income page) moves a
+            second number beside the headline, never the headline itself — an optimistic FIRE date
+            makes you save too little. Sources and the full reasoning: ADR-0007.
+            <br /><br />
+            <strong>Lifestyle creep is an unsourced assumption, so we ship it OFF.</strong> We found
+            no India-specific study to size it. When we wired it up honestly — it raises both your
+            future spending <em>and</em> the corpus that spending needs — 1% a year moved our sample
+            households 1 to 7 years later. A guess should not be the biggest number in your plan, so
+            the default is 0% and it is yours to turn on. It applies only to general spending:
+            healthcare, education and housing already carry their own faster price rises, so adding
+            creep on top would charge you twice for the same thing.
           </v-alert>
         </section>
 

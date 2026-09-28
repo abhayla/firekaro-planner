@@ -1,6 +1,5 @@
 import { computed } from "vue";
 import { useFireDerive } from "@/lib/useFireDerive";
-import { STEP_UP_TAPER_AGE } from "@/lib/derive";
 import { useHouseholdStore } from "@/stores/household";
 import { useAssumptionsStore } from "@/stores/assumptions";
 import { useUiStore } from "@/stores/ui";
@@ -85,8 +84,22 @@ export function useAcceleration() {
     expectedReturn: fire.blendedReturn.value,
     targetGrowthRate: fire.effectiveTargetGrowthNominal.value,
     savingsInflationRate: a.values.inflation,
-    savingsStepUpPercent: a.values.householdSavingsStepUpPercent ?? 0,
-    savingsStepUpTaperYears: Math.max(0, STEP_UP_TAPER_AGE - fire.anchorAge.value),
+    // ADR-0007 / gh #185: the kernel's inflow is now the INCOME-PATH surplus residual, not a
+    // stepped-up scalar, so the retired `householdSavingsStepUpPercent` no longer describes it.
+    // `effectiveInflowRealGrowthPercent` is the constant real rate that reproduces the kernel's
+    // own inflow over the horizon the headline was solved at (same technique as
+    // `effectiveTargetGrowthNominal` beside it) — so the card keeps reproducing the headline
+    // instead of drifting ~0.7 years optimistic against it. The taper is already INSIDE that
+    // effective rate (the income path tapers per earner), so the baseline carries no separate
+    // taper: the effective rate is measured OVER that horizon, so it applies across the whole of
+    // it. `savingsStepUpTaperYears` must therefore be the solved horizon itself — and it must be
+    // FINITE: `lever-impact.resolveBaselineSchedules` rejects a non-finite taper (`Number.isFinite`)
+    // and silently drops the step-up altogether, which is exactly how an earlier pass at this line
+    // left the card 4 years PESSIMISTIC against the headline beside it.
+    savingsStepUpPercent: fire.effectiveInflowRealGrowthPercent.value,
+    savingsStepUpTaperYears: Number.isFinite(fire.yearsToRegular.value)
+      ? Math.max(0, fire.yearsToRegular.value)
+      : Math.max(0, fire.heroTargetAge.value - fire.anchorAge.value),
   }));
 
   // Canonical per-bucket corpus weights — the SAME basis derive() uses for blendedReturn/volatility

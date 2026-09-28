@@ -64,7 +64,15 @@ const PERSONAS: Array<{
   // 6.24%. This persona has the largest education goals, so decision (b)'s goal cap claws some
   // of it back — the net is +0.4y, not the +2y the reservation leg alone would imply. The #22
   // fireAge ≤ 70 gate still passes with ~1.1y of margin.
-  { name: "mauryas", load: (h, a) => loadMauryasSeed(h, a), savingsRate: [34, 42], maxYearsToFire: 25.0 },
+  // ADR-0007 / gh #185 (the income path): 25.0 → 26.0 (measured 25.58, FIRE age ~69.6 on the
+  // default lens). This is the ONE seed the income path pushes LATER, and the reason matters: the
+  // Mauryas are a SINGLE earner in their mid-40s, so their income growth tapers within ~5 years
+  // while 1%/yr general-bucket lifestyle creep runs the full ~26-year horizon on a large expense
+  // base. Income growth they barely get; creep they pay for throughout. The retired 2% savings
+  // step-up had no matching creep term, so it flattered them. Later is the CONSERVATIVE direction,
+  // and the #22 fireAge ≤ 70 gate still passes (69.58, ~0.4y of margin — the tightest of the four,
+  // and worth watching if the creep default is ever raised).
+  { name: "mauryas", load: (h, a) => loadMauryasSeed(h, a), savingsRate: [34, 42], maxYearsToFire: 26.0 }, // ADR-0007 income path: 25.0 → 25.6 (see below)
 ];
 
 const WHOLE_HOUSEHOLD = { isFamilyView: true, viewingMemberId: null, currentFY: "2025-26" };
