@@ -52,10 +52,16 @@ const PINNED_CURRENT_YEAR = 2026;
 
 const r = (x: number, dp = 4) => (Number.isFinite(x) ? Math.round(x * 10 ** dp) / 10 ** dp : x);
 
-// RE-ANCHORED 2026-09-29 (#176): sharmas + mauryas headlines moved EARLIER (FIRE age 55.42→52.08
-// and 68.92→66.58) — both seeds carry a home-loan EMI (`seed-persona.ts` / `mauryas.ts`) ending
-// before their household's retirement age, now correctly excluded from the retirement expense
-// base instead of being capitalised forever. iyers (loan has no endYear) and mehtas (no loan)
+// RE-ANCHORED 2026-09-29 (#176): sharmas moved in TWO steps, not one, and the net figure a
+// single diff would show (55.42→53.08) hides both terms:
+//   (1) +1.00y, 55.42→56.42 — `anchorAge` shifted 30→31 because the seed's `dobFromAge` is now
+//       pinned to 1 April of FY 2025-26 instead of the wall clock, so the household starts a
+//       year older on this run.
+//   (2) −3.34y, 56.42→53.08 — the ₹42k/mo home-loan EMI (`seed-persona.ts`), which ends in 2037,
+//       is now correctly excluded from the retirement expense base once it's paid off, instead
+//       of being capitalised forever.
+// mauryas' `anchorAge` is unchanged (explicit DOBs, not `dobFromAge`), so only the EMI-exclusion
+// term applies there (FIRE age 68.92→66.58). iyers (loan has no endYear) and mehtas (no loan)
 // snapshots are unchanged — the no-op guarantee for lines that don't end early.
 describe("A7.2 golden-master — per-persona headline (DEFAULT lens)", () => {
   beforeEach(() => setActivePinia(createPinia()));
