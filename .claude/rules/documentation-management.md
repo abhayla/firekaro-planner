@@ -1,4 +1,6 @@
-# Scope: global
+---
+paths: ["docs/**", "**/*.md"]
+---
 
 # Documentation Management — durable homes + document-on-decision + auto-reference
 

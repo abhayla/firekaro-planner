@@ -1,9 +1,7 @@
 ---
 description: Git commit message format and pre-commit workflow
-paths: []
+paths: [".github/**", ".githooks/**"]
 ---
-
-# Scope: global
 
 # Commit Convention
 

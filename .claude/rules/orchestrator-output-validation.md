@@ -1,4 +1,6 @@
-# Scope: global
+---
+paths: [".claude/agents/**", ".claude/skills/**"]
+---
 
 # Orchestrator Output Validation — the supervisor gate
 
