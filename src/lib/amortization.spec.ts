@@ -55,7 +55,7 @@ describe("outstandingPrincipalFromEMI", () => {
 
 describe("derivedEndYear", () => {
   it("returns null for non-amortizing loan", () => {
-    expect(derivedEndYear(10000000, 50000, 12)).toBeNull();
+    expect(derivedEndYear(10000000, 50000, 12, 2026)).toBeNull();
   });
 
   it("returns a year >= startYear for amortizing loan", () => {

@@ -18,7 +18,12 @@ export function derivedEndYear(
   outstandingBalance: number,
   monthlyEMI: number,
   annualRatePercent: number,
-  startYear: number = new Date().getFullYear(),
+  // #176: REQUIRED, never a wall-clock default — the kernel pins `lens.currentFY` and a caller
+  // that silently read `new Date()` would drift from it (a golden master that shifts on 1
+  // January is not a golden master). Every caller passes the year it already has: the kernel's
+  // `financialYearStartYear(lens.currentFY)` for anything feeding derive(), or the store's
+  // `ui.currentFY`-derived year for a live add/edit form.
+  startYear: number,
   startMonth: number = new Date().getMonth() + 1,
 ): number | null {
   const n = monthsRemaining(outstandingBalance, monthlyEMI, annualRatePercent);

@@ -2,7 +2,9 @@
 import { computed, ref, watch } from "vue";
 import { useHouseholdStore } from "@/stores/household";
 import { useFireDerive } from "@/lib/useFireDerive";
+import { useUiStore } from "@/stores/ui";
 import { derivedEndYear } from "@/lib/amortization";
+import { financialYearStartYear } from "@/lib/derive-overrides";
 import { formatINRCompact } from "@/lib/formatters";
 import type { LoanType, Liability } from "@/types/household";
 import EmptyState from "@/components/shared/EmptyState.vue";
@@ -11,6 +13,13 @@ import EntityRow from "@/components/shared/EntityRow.vue";
 
 const household = useHouseholdStore();
 const fire = useFireDerive();
+const ui = useUiStore();
+// #176: derivedEndYear()'s startYear is now REQUIRED — pin to the SAME year the kernel resolves
+// from `lens.currentFY`, never the wall clock, so a loan added here lands on the identical
+// endYear derive() would compute for it.
+const loanStartYear = computed(
+  () => financialYearStartYear(ui.currentFY) ?? new Date().getFullYear(),
+);
 
 // gh #66: the "Your loans" DISPLAY list is member-lensed (selected member + "Joint"); equals
 // household.data.liabilities on the default "Whole household" view and in the onboarding wizard.
@@ -85,6 +94,7 @@ const derivedYear = computed(() => {
     Number(draft.value.outstandingBalance),
     Number(draft.value.monthlyEMI),
     Number(draft.value.interestRate),
+    loanStartYear.value,
   );
 });
 
@@ -153,6 +163,7 @@ const editingDerivedYear = computed(() => {
     Number(editing.value.outstandingBalance),
     Number(editing.value.monthlyEMI),
     Number(editing.value.interestRate),
+    loanStartYear.value,
   );
 });
 function saveEdit() {

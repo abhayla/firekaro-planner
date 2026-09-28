@@ -5,6 +5,8 @@ import type { useAssumptionsStore } from "@/stores/assumptions";
 import { genId } from "@/lib/id";
 import { derivedEndYear } from "@/lib/amortization";
 import { dobFromAge } from "@/lib/age";
+import { getCurrentFinancialYear } from "@/lib/expense-history";
+import { financialYearStartYear } from "@/lib/derive-overrides";
 
 type HStore = ReturnType<typeof useHouseholdStore>;
 type AStore = ReturnType<typeof useAssumptionsStore>;
@@ -279,7 +281,15 @@ export function loadSeedPersona(household: HStore, assumptions: AStore) {
     interestRate: homeLoanRate,
     ownerId: "rohit",
     isSharedWithSpouse: true,
-    derivedEndYear: derivedEndYear(homeLoanBalance, homeLoanEMI, homeLoanRate) ?? undefined,
+    // #176: startYear is now REQUIRED — pin to the current FY's start year, matching the kernel's
+    // own convention, rather than the wall clock derivedEndYear() used to default to internally.
+    derivedEndYear:
+      derivedEndYear(
+        homeLoanBalance,
+        homeLoanEMI,
+        homeLoanRate,
+        financialYearStartYear(getCurrentFinancialYear()) ?? new Date().getFullYear(),
+      ) ?? undefined,
   });
 
   // Insurance

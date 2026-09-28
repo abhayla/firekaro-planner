@@ -12,6 +12,8 @@
 import type { useHouseholdStore } from "@/stores/household";
 import type { useAssumptionsStore } from "@/stores/assumptions";
 import { derivedEndYear } from "@/lib/amortization";
+import { getCurrentFinancialYear } from "@/lib/expense-history";
+import { financialYearStartYear } from "@/lib/derive-overrides";
 
 type HStore = ReturnType<typeof useHouseholdStore>;
 type AStore = ReturnType<typeof useAssumptionsStore>;
@@ -299,6 +301,9 @@ export function loadMauryasSeed(household: HStore, assumptions: AStore) {
   });
 
   // ----- Liabilities -----
+  // #176: startYear is now REQUIRED on derivedEndYear() — pin to the current FY's start year,
+  // matching the kernel's own convention, rather than the wall-clock default it used to have.
+  const loanStartYear = financialYearStartYear(getCurrentFinancialYear()) ?? new Date().getFullYear();
   const homeBalance = 3500000;
   const homeEMI = 45000;
   const homeRate = 8.5;
@@ -310,7 +315,7 @@ export function loadMauryasSeed(household: HStore, assumptions: AStore) {
     interestRate: homeRate,
     ownerId: "abhay",
     isSharedWithSpouse: true,
-    derivedEndYear: derivedEndYear(homeBalance, homeEMI, homeRate) ?? undefined,
+    derivedEndYear: derivedEndYear(homeBalance, homeEMI, homeRate, loanStartYear) ?? undefined,
   });
   const carBalance = 600000;
   const carEMI = 18000;
@@ -323,7 +328,7 @@ export function loadMauryasSeed(household: HStore, assumptions: AStore) {
     interestRate: carRate,
     ownerId: "abhay",
     isSharedWithSpouse: false,
-    derivedEndYear: derivedEndYear(carBalance, carEMI, carRate) ?? undefined,
+    derivedEndYear: derivedEndYear(carBalance, carEMI, carRate, loanStartYear) ?? undefined,
   });
 
   // ----- Insurance -----
