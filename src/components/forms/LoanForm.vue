@@ -2,7 +2,9 @@
 import { computed, ref, watch } from "vue";
 import { useHouseholdStore } from "@/stores/household";
 import { useFireDerive } from "@/lib/useFireDerive";
+import { useUiStore } from "@/stores/ui";
 import { derivedEndYear } from "@/lib/amortization";
+import { financialYearStartYear } from "@/lib/derive-overrides";
 import { formatINRCompact } from "@/lib/formatters";
 import type { LoanType, Liability } from "@/types/household";
 import EmptyState from "@/components/shared/EmptyState.vue";
@@ -11,6 +13,16 @@ import EntityRow from "@/components/shared/EntityRow.vue";
 
 const household = useHouseholdStore();
 const fire = useFireDerive();
+const ui = useUiStore();
+// #176 round 2: BOTH startYear and startMonth are now REQUIRED on derivedEndYear() — pin startYear
+// to the SAME year the kernel resolves from `lens.currentFY` (never the wall clock), and startMonth
+// to April (the FY's own start month). This form has NO field for "which month did you take out
+// this loan" — the FY's April is the same fixed convention the seeds use, so a loan added here is
+// deterministic for the FY it's added in rather than drifting with the day of the month.
+const loanStartYear = computed(
+  () => financialYearStartYear(ui.currentFY) ?? new Date().getFullYear(),
+);
+const loanStartMonth = 4;
 
 // gh #66: the "Your loans" DISPLAY list is member-lensed (selected member + "Joint"); equals
 // household.data.liabilities on the default "Whole household" view and in the onboarding wizard.
@@ -85,6 +97,8 @@ const derivedYear = computed(() => {
     Number(draft.value.outstandingBalance),
     Number(draft.value.monthlyEMI),
     Number(draft.value.interestRate),
+    loanStartYear.value,
+    loanStartMonth,
   );
 });
 
@@ -153,6 +167,8 @@ const editingDerivedYear = computed(() => {
     Number(editing.value.outstandingBalance),
     Number(editing.value.monthlyEMI),
     Number(editing.value.interestRate),
+    loanStartYear.value,
+    loanStartMonth,
   );
 });
 function saveEdit() {

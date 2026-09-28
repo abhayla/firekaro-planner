@@ -11,6 +11,10 @@ import { useHouseholdStore } from "@/stores/household";
 import { useAssumptionsStore } from "@/stores/assumptions";
 import { useUiStore } from "@/stores/ui";
 import { loadSeedPersona } from "@/lib/seed-persona";
+import { loadIyersSeed } from "@/seeds/iyers";
+import { loadMehtasSeed } from "@/seeds/mehtas";
+import { loadMauryasSeed } from "@/seeds/mauryas";
+import { loadEmptySeed } from "@/seeds/empty";
 import { useFireDerive } from "@/lib/useFireDerive";
 import {
   derive as deriveKernel,
@@ -47,6 +51,9 @@ function derive(
 ) {
   return deriveKernel(household, assumptions, lens, { currentYear: PINNED_CURRENT_YEAR, ...overrides });
 }
+
+/** #176 — the default product lens, pinned FY, used by the endYear specs. */
+const LENS_176 = { isFamilyView: false, viewingMemberId: null, currentFY: "2025-26" } as const;
 
 describe("derive() — pure kernel", () => {
   beforeEach(() => setActivePinia(createPinia()));
@@ -694,8 +701,12 @@ describe("derive() — pure kernel", () => {
     // multiplier on top. The bridge leg separately receives GROSS expenses — annuity
     // credited once there via the NPS holding's own income stream — guarded by the
     // contract at derive.ts ~line 605.)
+    // #176 re-anchor: baseFireNumber divides the RETIREMENT expense base (ended recurring
+    // lines excluded), not the accumulation total — reconstruct from the same base the kernel
+    // exposes as `retirementAnnualExpensesToday`, or this lock would false-fail on any seed with
+    // an EMI/lease that ends before retirement (the Sharmas' home loan does).
     const expectedBase = calculateFIRENumber(
-      withNps.annualExpensesToday - withNps.npsAnnuityIncome,
+      withNps.retirementAnnualExpensesToday - withNps.npsAnnuityIncome,
       withNps.effectiveSWR,
       withNps.anchorAge,
     );
@@ -705,7 +716,7 @@ describe("derive() — pure kernel", () => {
     const twoAnnuityDrop =
       withoutNps.baseFireNumber -
       calculateFIRENumber(
-        withNps.annualExpensesToday - 2 * withNps.npsAnnuityIncome,
+        withNps.retirementAnnualExpensesToday - 2 * withNps.npsAnnuityIncome,
         withNps.effectiveSWR,
         withNps.anchorAge,
       );
@@ -967,22 +978,16 @@ describe("seed-anchor regression locks (gh-issue #17 — catch silent adequacy-l
     // relative to the basket path, and the honest FIRE date moves LATER by a year. The Sharmas'
     // dated goals are small, so decision (b)'s goal cap (which pushes earlier) barely registers.
     //
-    // RE-ANCHORED 2026-09-29 (ADR-0007 / gh #185 — the income path): 25.42y → 24.75y, FIRE age
-    // 30 + 24.75 = 54.75. `fireNumber` is AGAIN unchanged at ₹10.60 Cr — this change touches the
-    // INFLOW, never the target. Two effects net out to −0.67y:
-    //   − earlier — each earner's INCOME now grows 2%/yr real (tapering at 50) instead of the
-    //               savings residual stepping up 2%/yr. On the Sharmas the residual is ~48% of
-    //               income, so 2% of income is ~2x the rupees 2% of the residual was.
-    //   + later   — lifestyle creep would eat into the residual every year, a term the retired
-    //               step-up model had no equivalent for — but ADR-0007 revision (g) ships that
-    //               default at 0 (an unsourced term must not be the largest lever in a Tier-0
-    //               headline), so at the DEFAULT it contributes nothing and this delta is the
-    //               income path alone.
-    // `fireNumber` unchanged is itself the proof that only the INFLOW moved: with creep at 0 the
-    // target is byte-identical, so the whole -1.42y is the income path. All four seeds move
-    // earlier (see the PR body's seed-delta table); none breaches the #22 age-70 ceiling.
-    expect(k.yearsToRegular).toBeCloseTo(24.0, 2);
-    expect(Math.round(k.fireNumber)).toBe(105_982_068);
+    // RE-ANCHORED 2026-09-29 (#176 EMI-exclusion fix + ADR-0007/#185 income-path, merged): both
+    // land on this branch. #176 excludes the ended home-loan EMI from the retirement expense base
+    // (see derivedEndYear pin in amortization.spec.ts) -- moving FIRE EARLIER because the corpus no
+    // longer capitalises a payment the household will have finished making. ADR-0007/#185 replaces
+    // the savings-residual step-up proxy with a real per-earner income-growth path (2%/yr real,
+    // tapering at 50; lifestyle creep defaults to 0) -- also moving FIRE earlier, since income is a
+    // larger base than the residual. Values below are the ACTUAL merged-kernel output, MEASURED
+    // (not hand-derived) -- see the evidence table in the merge commit.
+    expect(k.yearsToRegular).toBeCloseTo(21, 2);
+    expect(Math.round(k.fireNumber)).toBe(87_372_837);
   });
 });
 
@@ -1121,6 +1126,186 @@ describe("T-377/QN-2 — the additive `overrides` seam the required-contribution
     // The FIRE NUMBER must be untouched by a contribution change (it is expense-driven).
     expect(doubled.fireNumber).toBe(base.fireNumber);
     expect(doubled.yearsToRegular).toBeLessThanOrEqual(base.yearsToRegular);
+  });
+
+  // #176 — a recurring line that ENDS (a home-loan EMI, a school fee, a lease) must be counted in
+  // the ACCUMULATION leg while it is live (it genuinely eats the savings residual) but EXCLUDED
+  // from the RETIREMENT expense base once it has ended, because the corpus never has to fund it.
+  //
+  // Before the fix `derive()` never read `endYear`, so one undifferentiated recurring total fed
+  // BOTH legs and the EMI inflated `baseFireNumber` by `annualEMI / SWR` forever — on the QN-1
+  // reference persona (Amit, ₹1 L/mo EMI clearing at 45, retiring at 50) roughly ₹3.4 Cr of
+  // target for money he will not be spending. Optimistic in the WRONG direction for the target
+  // persona: it tells a salaried accumulator he needs ~₹3.4 Cr more than he does.
+  describe("#176 — a recurring line that ends before retirement", () => {
+    /** Amit: 35 today, ₹1 L/mo EMI ending the calendar year he turns 45, retiring at 50. */
+    function amit(endYear: number | undefined) {
+      const h = useHouseholdStore();
+      h.data.members = [
+        {
+          id: "amit", name: "Amit", dateOfBirth: `${PINNED_CURRENT_YEAR - 35}-01-01`, role: "ADULT",
+          targetRetirementAge: 50, planToAge: 85, relation: "",
+          city: "Metro", health: "Healthy", riskAppetite: "Moderate", marital: "Married",
+          employmentStatus: "Employed", salary: { annualCTC: 3_600_000, hikePercent: 8 },
+        },
+      ] as typeof h.data.members;
+      h.data.expenses.avgMonthly = 60_000;
+      h.data.expenses.recurring = [
+        {
+          id: "emi-home", label: "EMI — Home loan", amount: 100_000, frequency: "M",
+          source: "auto-loan", sourceRefId: "loan-1", endYear,
+        },
+      ] as typeof h.data.expenses.recurring;
+      return h;
+    }
+
+    it("is EXCLUDED from the retirement expense base — a strictly lower FIRE number than the same line with no endYear", () => {
+      const a = useAssumptionsStore();
+      setActivePinia(createPinia());
+      const forever = derive(amit(undefined).data, a.values, LENS_176);
+      setActivePinia(createPinia());
+      const ends = derive(amit(PINNED_CURRENT_YEAR + 10).data, a.values, LENS_176);
+
+      // The EMI clears at 45, five years before the age-50 retirement the plan funds.
+      expect(ends.fireNumber).toBeLessThan(forever.fireNumber);
+      // Magnitude: the base leg must drop by almost exactly the capitalised annual EMI.
+      const expectedBaseDrop = (100_000 * 12) / ends.effectiveSWR;
+      expect(forever.baseFireNumber - ends.baseFireNumber).toBeCloseTo(expectedBaseDrop, -2);
+    });
+
+    it("is still counted in the ACCUMULATION leg — the savings residual is unchanged by endYear", () => {
+      const a = useAssumptionsStore();
+      setActivePinia(createPinia());
+      const forever = derive(amit(undefined).data, a.values, LENS_176);
+      setActivePinia(createPinia());
+      const ends = derive(amit(PINNED_CURRENT_YEAR + 10).data, a.values, LENS_176);
+
+      // The loan is live today, so today's residual (and the corpus inflow it drives) must not move.
+      expect(ends.annualSavings).toBe(forever.annualSavings);
+      expect(ends.monthlyContribution).toBe(forever.monthlyContribution);
+      // ...and the displayed household expense total is still the real bill being paid today.
+      expect(ends.annualExpensesToday).toBe(forever.annualExpensesToday);
+    });
+
+    it("a line ending AT the first retirement year is RETAINED (conservative boundary)", () => {
+      const a = useAssumptionsStore();
+      // Retires at 50, i.e. 15 years from the pinned year; endYear == that year means the line is
+      // still being paid in the first retirement year, so the corpus must fund it.
+      setActivePinia(createPinia());
+      const atBoundary = derive(amit(PINNED_CURRENT_YEAR + 15).data, a.values, LENS_176);
+      setActivePinia(createPinia());
+      const forever = derive(amit(undefined).data, a.values, LENS_176);
+      expect(atBoundary.baseFireNumber).toBe(forever.baseFireNumber);
+
+      // One year earlier is genuinely over before retirement ⇒ excluded.
+      setActivePinia(createPinia());
+      const justBefore = derive(amit(PINNED_CURRENT_YEAR + 14).data, a.values, LENS_176);
+      expect(justBefore.baseFireNumber).toBeLessThan(forever.baseFireNumber);
+    });
+
+    it("a line with no endYear is untouched by the fix (the no-op guarantee)", () => {
+      const a = useAssumptionsStore();
+      setActivePinia(createPinia());
+      const h = amit(undefined);
+      const k = derive(h.data, a.values, LENS_176);
+      // ₹60k lump + ₹1 L EMI = ₹1.6 L/mo, and with no endYear the retirement base still
+      // capitalises the WHOLE bill — the pre-fix behaviour, preserved exactly for these lines.
+      expect(k.annualExpensesToday).toBe(160_000 * 12);
+      expect(k.baseFireNumber).toBeCloseTo((160_000 * 12) / k.effectiveSWR, -2);
+    });
+  });
+
+  // #176 — cross-seed proof the horizon split is a general property, not something tuned to the
+  // synthetic `amit()` fixture above. For EACH of the 5 personas: the retirement expense base
+  // must equal the accumulation total minus exactly the annual ₹ of recurring lines whose
+  // `endYear` falls strictly before the household's own retirement calendar year (derived from
+  // the SAME `anchorAge`/`targetRetirementAge`/pinned-year the kernel itself resolves) — and must
+  // equal the accumulation total unchanged for a seed with no ending lines.
+  describe("#176 — seed-anchored retirement-base cross-check (all 5 personas)", () => {
+    const LENS = { isFamilyView: false, viewingMemberId: null, currentFY: "2025-26" } as const;
+
+    const seeds: { name: string; load: (h: ReturnType<typeof useHouseholdStore>, a: ReturnType<typeof useAssumptionsStore>) => void }[] = [
+      { name: "Sharmas", load: loadSeedPersona },
+      { name: "Iyers", load: loadIyersSeed },
+      { name: "Mehtas", load: loadMehtasSeed },
+      { name: "Mauryas", load: loadMauryasSeed },
+      { name: "Empty", load: loadEmptySeed },
+    ];
+
+    for (const { name, load } of seeds) {
+      it(`${name}: retirement base = accumulation total − recurring lines ending before retirement`, () => {
+        const h = useHouseholdStore();
+        const a = useAssumptionsStore();
+        load(h, a);
+        const k = derive(h.data, a.values, LENS);
+
+        const retirementCalendarYear =
+          PINNED_CURRENT_YEAR + Math.max(0, k.targetRetirementAge - k.anchorAge);
+        const expectedEnded = h.data.expenses.recurring.reduce((s, r) => {
+          if (typeof r.endYear !== "number" || !Number.isFinite(r.endYear)) return s;
+          if (r.endYear >= retirementCalendarYear) return s;
+          return s + toMonthly({ amount: r.amount, period: r.frequency }) * 12;
+        }, 0);
+
+        expect(k.retirementAnnualExpensesToday).toBeCloseTo(
+          Math.max(0, k.annualExpensesToday - expectedEnded),
+          2,
+        );
+
+        if (expectedEnded > 0) {
+          // A seed WITH an ending line: the retirement base is strictly lower than the
+          // accumulation total (the class this fix targets — Sharmas' + Mauryas' home loans).
+          expect(k.retirementAnnualExpensesToday).toBeLessThan(k.annualExpensesToday);
+        } else {
+          // A seed with NO ending lines (Iyers' loan has no endYear; Mehtas/Empty carry none):
+          // the two bases must be byte-identical — the no-op guarantee, per-seed.
+          expect(k.retirementAnnualExpensesToday).toBe(k.annualExpensesToday);
+        }
+      });
+    }
+  });
+
+  // #176 — no-drift guard: `derivedEndYear`/the horizon split must key off the PINNED kernel
+  // year, never the wall clock. Two `currentYear` overrides a year apart must move
+  // `baseFireNumber` ONLY through the pinned-year effect on the horizon split itself (the
+  // retirement calendar year shifting by exactly one year) — never silently through some other
+  // wall-clock read creeping back in. Using the Sharmas' seed (has an ending EMI, so the split is
+  // live) with a household member's retirement calendar year comfortably far out that shifting
+  // the pinned year by 1 does not cross the loan's own endYear boundary.
+  it("#176 no-drift: baseFireNumber does not silently drift when only the pinned year advances one year (loan boundary unaffected)", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    // #176 round 3: pin the seed's OWN `currentFY` to match `lensNoDrift` below — the seed's
+    // `dobFromAge()` DOB synthesis anchors to `currentFY` too (round 3 fix), so leaving this at
+    // its wall-clock default would make `anchorAge` disagree with the pinned kernel `currentYear`
+    // overrides purely because of the day this test happens to run, reintroducing exactly the
+    // class of drift this test exists to catch.
+    loadSeedPersona(h, a, "2025-26");
+    const lensNoDrift = { isFamilyView: false, viewingMemberId: null, currentFY: "2025-26" } as const;
+
+    const y1 = deriveKernel(h.data, a.values, lensNoDrift, { currentYear: 2026 });
+    const y2 = deriveKernel(h.data, a.values, lensNoDrift, { currentYear: 2027 });
+
+    // Sharmas' EMI ends ~2037; retiring at 47/50 puts the retirement calendar year around 2042
+    // either way — a 1-year pinned-year shift does not cross that boundary, so the
+    // EXCLUDED annual amount is identical in both runs (no drift introduced by #176's own code).
+    const retirementYear1 = 2026 + Math.max(0, y1.targetRetirementAge - y1.anchorAge);
+    const retirementYear2 = 2027 + Math.max(0, y2.targetRetirementAge - y2.anchorAge);
+    const excluded1 = y1.annualExpensesToday - y1.retirementAnnualExpensesToday;
+    const excluded2 = y2.annualExpensesToday - y2.retirementAnnualExpensesToday;
+    // #176 round 3: `anchorAge` is now ALSO pinned to the kernel's `currentYear` (it used to read
+    // the wall clock directly — a second, sibling leak this round found and fixed alongside
+    // `derivedEndYear`). So advancing the pinned year by 1 advances the member's derived age by
+    // 1 too, in lockstep — the person is one calendar year older in the +1 world — which cancels
+    // out in `targetRetirementAge - anchorAge`, leaving the ABSOLUTE retirement calendar year
+    // INVARIANT (not `+1`). That invariance is the real proof of no-drift here: the retirement
+    // year is a property of the person's fixed DOB + fixed target age, not of which year we
+    // happen to be asking from.
+    expect(retirementYear2).toBe(retirementYear1);
+    // Since the loan's endYear (~2037) is comfortably before the (invariant) retirement year, the
+    // EXCLUDED annual amount is identical in both runs — proving the split tracks the person's
+    // real calendar retirement year, not the wall clock or the pinned-year seam itself.
+    expect(excluded2).toBeCloseTo(excluded1, 2);
   });
 
   it("`targetRetirementAge` moves the horizon-dependent layers (SWR / glide / bridge), not just a label", () => {

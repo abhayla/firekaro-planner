@@ -105,6 +105,78 @@ describe("A7.1 kernel invariants — per-persona metamorphic (fast-check)", () =
       );
     });
 
+    // (#176) A RECURRING LINE ENDING BEFORE RETIREMENT ⇒ baseFireNumber NEVER RISES. Adding a
+    // line whose `endYear` falls strictly before the household's own retirement calendar year
+    // can only shrink (or leave unchanged) the retirement expense base — it must never CAPITALISE
+    // spending the corpus will never have to fund. This is the property-level lock for the class
+    // #176 fixed: before the fix, `derive()` ignored `endYear` entirely and every recurring line
+    // inflated `baseFireNumber` forever, regardless of whether it had already ended.
+    it(`${persona.name}: a recurring line ending before retirement never raises baseFireNumber`, () => {
+      const h = useHouseholdStore();
+      const a = useAssumptionsStore();
+      persona.load(h, a);
+      const before = derive(h.data, a.values, LENS);
+      // No `currentYear` override in this file (LENS.currentFY = "2025-26" resolves the kernel's
+      // own currentCalendarYear to 2025) — match that here rather than hardcoding a wrong year.
+      const retirementCalendarYear =
+        2025 + Math.max(0, before.targetRetirementAge - before.anchorAge);
+      fc.assert(
+        fc.property(
+          fc.double({ min: 1000, max: 100_000, noNaN: true }),
+          fc.integer({ min: 1, max: 15 }),
+          (monthlyAmount, yearsBeforeRetirement) => {
+            const h2 = useHouseholdStore();
+            const a2 = useAssumptionsStore();
+            persona.load(h2, a2);
+            h2.data.expenses.recurring.push({
+              id: "prop-176-ending-line",
+              label: "Property-test ending line",
+              amount: monthlyAmount,
+              frequency: "M",
+              source: "manual",
+              endYear: retirementCalendarYear - yearsBeforeRetirement,
+            });
+            const after = derive(h2.data, a2.values, LENS);
+            // Relative epsilon: baseFireNumber is in the crores, so an absolute 1e-9 EPS is
+            // tighter than float64 rounding on this scale of arithmetic (observed spurious
+            // failures at the 8th significant digit with the fixed EPS).
+            const relEps = Math.max(EPS, before.baseFireNumber * 1e-9);
+            expect(after.baseFireNumber).toBeLessThanOrEqual(before.baseFireNumber + relEps);
+          },
+        ),
+        { numRuns: 40 },
+      );
+    });
+
+    // (#176) A RECURRING LINE WITH NO `endYear` ⇒ baseFireNumber NEVER FALLS. A perpetual line
+    // (no endYear, or one at/after retirement) is retirement spending the corpus DOES have to
+    // fund, so adding one can only raise (or leave unchanged) the retirement expense base — the
+    // mirror-image guarantee that #176's fix is additive-only for lines that don't end early.
+    it(`${persona.name}: a recurring line with no endYear never lowers baseFireNumber`, () => {
+      const h = useHouseholdStore();
+      const a = useAssumptionsStore();
+      persona.load(h, a);
+      const before = derive(h.data, a.values, LENS);
+      fc.assert(
+        fc.property(fc.double({ min: 1000, max: 100_000, noNaN: true }), (monthlyAmount) => {
+          const h2 = useHouseholdStore();
+          const a2 = useAssumptionsStore();
+          persona.load(h2, a2);
+          h2.data.expenses.recurring.push({
+            id: "prop-176-perpetual-line",
+            label: "Property-test perpetual line",
+            amount: monthlyAmount,
+            frequency: "M",
+            source: "manual",
+          });
+          const after = derive(h2.data, a2.values, LENS);
+          const relEps = Math.max(EPS, before.baseFireNumber * 1e-9);
+          expect(after.baseFireNumber).toBeGreaterThanOrEqual(before.baseFireNumber - relEps);
+        }),
+        { numRuns: 40 },
+      );
+    });
+
     // (T-376/gh-#165) ADDING A PLANNED-FUTURE GOAL (ANY kind) ⇒ FIRE NO EARLIER. A one-shot
     // today-rupee lump only ever grows the family-layer corpus, so the years-to-FIRE leg must
     // be monotonic non-decreasing in the added goal's `todayAmount` — regardless of `kind`

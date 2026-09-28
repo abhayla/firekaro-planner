@@ -25,20 +25,20 @@ exports[`A7.2 golden-master — per-persona headline (DEFAULT lens) > mauryas: d
 {
   "anchorAge": 44,
   "annualSavings": 1510982,
-  "corpusOnlyYearsToRegular": 23.9167,
+  "corpusOnlyYearsToRegular": 21.6667,
   "effectiveSWR": 0.0325,
-  "fireAge": 67.92,
-  "fireNumber": 113310486,
+  "fireAge": 65.67,
+  "fireNumber": 105335102,
   "fireWithdrawableCorpus": 35520000,
   "lensedEarners": 1,
   "monthlyContribution": 125915,
-  "progressPercent": 31,
+  "progressPercent": 34,
   "savingsRate": 38.1,
   "targetRetirementAge": 50,
   "totalCorpus": 36000000,
   "yearsToFat": 23.3333,
   "yearsToLean": 4,
-  "yearsToRegular": 23.9167,
+  "yearsToRegular": 21.6667,
 }
 `;
 
@@ -65,21 +65,21 @@ exports[`A7.2 golden-master — per-persona headline (DEFAULT lens) > mehtas: de
 
 exports[`A7.2 golden-master — per-persona headline (DEFAULT lens) > sharmas: derive() headline is locked 1`] = `
 {
-  "anchorAge": 30,
+  "anchorAge": 31,
   "annualSavings": 1927164,
-  "corpusOnlyYearsToRegular": 24,
+  "corpusOnlyYearsToRegular": 21,
   "effectiveSWR": 0.0325,
-  "fireAge": 54,
-  "fireNumber": 105982068,
+  "fireAge": 52,
+  "fireNumber": 87372837,
   "fireWithdrawableCorpus": 11000000,
   "lensedEarners": 2,
   "monthlyContribution": 160597,
-  "progressPercent": 10,
+  "progressPercent": 13,
   "savingsRate": 48.1,
   "targetRetirementAge": 47,
   "totalCorpus": 11000000,
   "yearsToFat": 21.4167,
   "yearsToLean": 9.5833,
-  "yearsToRegular": 24,
+  "yearsToRegular": 21,
 }
 `;

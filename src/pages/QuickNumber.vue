@@ -133,7 +133,12 @@ function previewNeed(a: QuickAnswersDraft): number | null {
     const k = derive(
       hh,
       assumptions.values,
-      { isFamilyView: false, viewingMemberId: null, currentFY: ui.currentFY },
+      {
+        isFamilyView: false,
+        viewingMemberId: null,
+        currentFY: ui.currentFY,
+        asOfDate: new Date().toISOString().slice(0, 10),
+      },
       // ADR-0006 Phase 1d — the wall clock enters at the composable boundary, not in the kernel.
       { currentYear: new Date().getFullYear() },
     );

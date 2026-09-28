@@ -11,7 +11,7 @@
  * IMPORTANT: a snapshot update here is a SIGNAL, not a chore — when it fails, confirm the new
  * number is still plausible (rule 31) and intended BEFORE running `vitest -u`.
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { setActivePinia, createPinia } from "pinia";
 import { useHouseholdStore } from "@/stores/household";
 import { useAssumptionsStore } from "@/stores/assumptions";
@@ -25,11 +25,18 @@ const LENS = { isFamilyView: false, viewingMemberId: null, currentFY: "2025-26" 
 
 type H = ReturnType<typeof useHouseholdStore>;
 type A = ReturnType<typeof useAssumptionsStore>;
+// #176 round 3: the two loan-carrying seeds (sharmas, mauryas) take `currentFY` to pin their
+// `derivedEndYear`. Passing NO argument here left them defaulting to `getCurrentFinancialYear()`
+// — the WALL CLOCK — even though `LENS.currentFY` below already pins which FY the kernel itself
+// resolves against. The two must agree: a seed's loan-end-year math and the kernel's own
+// retirement-year math have to be computed against the SAME financial year, or the split between
+// "EMI still live" and "EMI already ended" drifts independently of both the seed data AND the
+// pinned kernel year — exactly the class the time-travel spec below catches.
 const PERSONAS: Array<{ name: string; load: (h: H, a: A) => void }> = [
-  { name: "sharmas", load: (h, a) => loadSeedPersona(h, a) },
+  { name: "sharmas", load: (h, a) => loadSeedPersona(h, a, LENS.currentFY) },
   { name: "mehtas", load: (h, a) => loadMehtasSeed(h, a) },
   { name: "iyers", load: (h, a) => loadIyersSeed(h, a) },
-  { name: "mauryas", load: (h, a) => loadMauryasSeed(h, a) },
+  { name: "mauryas", load: (h, a) => loadMauryasSeed(h, a, LENS.currentFY) },
 ];
 
 /**
@@ -45,6 +52,17 @@ const PINNED_CURRENT_YEAR = 2026;
 
 const r = (x: number, dp = 4) => (Number.isFinite(x) ? Math.round(x * 10 ** dp) / 10 ** dp : x);
 
+// RE-ANCHORED 2026-09-29 (#176): sharmas moved in TWO steps, not one, and the net figure a
+// single diff would show (55.42→53.08) hides both terms:
+//   (1) +1.00y, 55.42→56.42 — `anchorAge` shifted 30→31 because the seed's `dobFromAge` is now
+//       pinned to 1 April of FY 2025-26 instead of the wall clock, so the household starts a
+//       year older on this run.
+//   (2) −3.34y, 56.42→53.08 — the ₹42k/mo home-loan EMI (`seed-persona.ts`), which ends in 2037,
+//       is now correctly excluded from the retirement expense base once it's paid off, instead
+//       of being capitalised forever.
+// mauryas' `anchorAge` is unchanged (explicit DOBs, not `dobFromAge`), so only the EMI-exclusion
+// term applies there (FIRE age 68.92→66.58). iyers (loan has no endYear) and mehtas (no loan)
+// snapshots are unchanged — the no-op guarantee for lines that don't end early.
 describe("A7.2 golden-master — per-persona headline (DEFAULT lens)", () => {
   beforeEach(() => setActivePinia(createPinia()));
 
@@ -75,6 +93,56 @@ describe("A7.2 golden-master — per-persona headline (DEFAULT lens)", () => {
         effectiveSWR: k.effectiveSWR,
       };
       expect(headline).toMatchSnapshot();
+    });
+  }
+});
+
+/**
+ * #176 time-travel lock — the seeds' `currentFY` default (`getCurrentFinancialYear()`, which
+ * reads `new Date()`) must NEVER leak into a seed's `derivedEndYear`. Before this fix a seed
+ * loaded on 2026-09-29 vs 2027-01-15 vs 2027-05-02 computed a DIFFERENT loan end-year for the
+ * exact same fixture data, because `getCurrentFinancialYear()`'s default crossed an FY boundary
+ * (1 April) between calls — silently moving `baseFireNumber` with the calendar, not with any
+ * user action. Only sharmas (`loadSeedPersona`) and mauryas (`loadMauryasSeed`) carry a loan with
+ * an `endYear`, so only they are wall-clock-sensitive; this pins `derive()`'s headline byte-
+ * identical across three real dates straddling both an FY boundary (2026-09-29 → 2027-01-15,
+ * same FY 2026-27) and a full FY crossover (2027-01-15 → 2027-05-02, FY 2026-27 → 2027-28).
+ */
+describe("#176 time-travel — seed headline does not drift with the wall clock", () => {
+  beforeEach(() => setActivePinia(createPinia()));
+
+  const WALL_CLOCK_DATES = ["2026-09-29T10:00:00Z", "2027-01-15T10:00:00Z", "2027-05-02T10:00:00Z"];
+
+  const TIME_SENSITIVE: Array<{ name: string; load: (h: H, a: A) => void }> = [
+    { name: "sharmas", load: (h, a) => loadSeedPersona(h, a, LENS.currentFY) },
+    { name: "mauryas", load: (h, a) => loadMauryasSeed(h, a, LENS.currentFY) },
+  ];
+
+  for (const persona of TIME_SENSITIVE) {
+    it(`${persona.name}: derive() headline is byte-identical across ${WALL_CLOCK_DATES.length} real wall-clock dates`, () => {
+      const headlines = WALL_CLOCK_DATES.map((iso) => {
+        vi.setSystemTime(new Date(iso));
+        try {
+          setActivePinia(createPinia());
+          const h = useHouseholdStore();
+          const a = useAssumptionsStore();
+          persona.load(h, a);
+          const k = derive(h.data, a.values, LENS, { currentYear: PINNED_CURRENT_YEAR });
+          return {
+            fireAge: r(k.anchorAge + k.yearsToRegular, 2),
+            yearsToRegular: r(k.yearsToRegular),
+            fireNumber: Math.round(k.fireNumber),
+            retirementAnnualExpensesToday: Math.round(k.retirementAnnualExpensesToday),
+          };
+        } finally {
+          vi.useRealTimers();
+        }
+      });
+
+      const [first, ...rest] = headlines;
+      for (const later of rest) {
+        expect(later).toEqual(first);
+      }
     });
   }
 });

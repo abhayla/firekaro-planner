@@ -55,13 +55,33 @@ describe("outstandingPrincipalFromEMI", () => {
 
 describe("derivedEndYear", () => {
   it("returns null for non-amortizing loan", () => {
-    expect(derivedEndYear(10000000, 50000, 12)).toBeNull();
+    expect(derivedEndYear(10000000, 50000, 12, 2026, 1)).toBeNull();
   });
 
   it("returns a year >= startYear for amortizing loan", () => {
     const y = derivedEndYear(3800000, 42000, 8.5, 2026, 1);
     expect(y).toBeGreaterThanOrEqual(2026);
     expect(y).toBeLessThan(2050);
+  });
+
+  // #176 round 2 — the exact witness the reviewers proved drifted: a ₹38L / ₹42,000 / 8.5% loan
+  // starting FY 2025-26 (April 2025) amortizes to calendar year 2037.
+  it("startYear=2025, startMonth=4 (April, FY start) pins the exact endYear to 2037", () => {
+    expect(derivedEndYear(3800000, 42000, 8.5, 2025, 4)).toBe(2037);
+  });
+
+  // The defect round 1 missed: startMonth is NOT cosmetic — a loan with the SAME startYear but a
+  // different startMonth can land in a DIFFERENT calendar endYear once (startMonth + n) crosses a
+  // 12-month boundary. For THIS loan (146 months remaining) that boundary sits between month 10
+  // (October) and month 11 (November) — proven by direct computation, not assumed — so January
+  // and November are the two months that actually straddle it. Proves both params are
+  // load-bearing, not just startYear.
+  it("startMonth changes the resulting endYear when it shifts across a 12-month boundary", () => {
+    const yJanuary = derivedEndYear(3800000, 42000, 8.5, 2025, 1);
+    const yNovember = derivedEndYear(3800000, 42000, 8.5, 2025, 11);
+    expect(yJanuary).toBe(2037);
+    expect(yNovember).toBe(2038);
+    expect(yNovember).toBeGreaterThan(yJanuary as number);
   });
 });
 

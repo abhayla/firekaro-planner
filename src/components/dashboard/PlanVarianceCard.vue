@@ -41,7 +41,12 @@ const variance = computed(() => {
     baseline: baseline.value,
     household: h.data,
     currentAssumptions: a.values,
-    lens: { isFamilyView: ui.isFamilyView, viewingMemberId: ui.viewingMemberId, currentFY: ui.currentFY },
+    lens: {
+      isFamilyView: ui.isFamilyView,
+      viewingMemberId: ui.viewingMemberId,
+      currentFY: ui.currentFY,
+      asOfDate: new Date().toISOString().slice(0, 10),
+    },
     nowMs: Date.now(),
     // ADR-0006 Phase 1d — the wall clock enters at the component boundary; the kernel is pure.
     currentYear: new Date().getFullYear(),

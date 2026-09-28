@@ -12,11 +12,18 @@
 import type { useHouseholdStore } from "@/stores/household";
 import type { useAssumptionsStore } from "@/stores/assumptions";
 import { derivedEndYear } from "@/lib/amortization";
+import { getCurrentFinancialYear } from "@/lib/expense-history";
+import { financialYearStartYear } from "@/lib/derive-overrides";
 
 type HStore = ReturnType<typeof useHouseholdStore>;
 type AStore = ReturnType<typeof useAssumptionsStore>;
 
-export function loadMauryasSeed(household: HStore, assumptions: AStore) {
+/** #176 round 2 — see `loadSeedPersona`'s doc comment for why `currentFY` exists and defaults. */
+export function loadMauryasSeed(
+  household: HStore,
+  assumptions: AStore,
+  currentFY: string = getCurrentFinancialYear(),
+) {
   household.resetAll();
   assumptions.reset();
 
@@ -299,6 +306,10 @@ export function loadMauryasSeed(household: HStore, assumptions: AStore) {
   });
 
   // ----- Liabilities -----
+  // #176 round 2: BOTH startYear and startMonth pinned — startMonth to April (the FY's own start
+  // month), never `new Date()` — so this seed's endYears are deterministic for a given FY.
+  const loanStartYear = financialYearStartYear(currentFY) ?? new Date().getFullYear();
+  const loanStartMonth = 4;
   const homeBalance = 3500000;
   const homeEMI = 45000;
   const homeRate = 8.5;
@@ -310,7 +321,8 @@ export function loadMauryasSeed(household: HStore, assumptions: AStore) {
     interestRate: homeRate,
     ownerId: "abhay",
     isSharedWithSpouse: true,
-    derivedEndYear: derivedEndYear(homeBalance, homeEMI, homeRate) ?? undefined,
+    derivedEndYear:
+      derivedEndYear(homeBalance, homeEMI, homeRate, loanStartYear, loanStartMonth) ?? undefined,
   });
   const carBalance = 600000;
   const carEMI = 18000;
@@ -323,7 +335,8 @@ export function loadMauryasSeed(household: HStore, assumptions: AStore) {
     interestRate: carRate,
     ownerId: "abhay",
     isSharedWithSpouse: false,
-    derivedEndYear: derivedEndYear(carBalance, carEMI, carRate) ?? undefined,
+    derivedEndYear:
+      derivedEndYear(carBalance, carEMI, carRate, loanStartYear, loanStartMonth) ?? undefined,
   });
 
   // ----- Insurance -----

@@ -18,8 +18,16 @@ export function derivedEndYear(
   outstandingBalance: number,
   monthlyEMI: number,
   annualRatePercent: number,
-  startYear: number = new Date().getFullYear(),
-  startMonth: number = new Date().getMonth() + 1,
+  // #176 (round 2 — BOTH now required, never a wall-clock default): the kernel pins
+  // `lens.currentFY` and a caller that silently read `new Date()` would drift from it (a golden
+  // master that shifts on 1 January, or even mid-FY as the MONTH ticks over, is not a golden
+  // master — round 1 fixed startYear but left startMonth defaulting to the wall clock, which
+  // alone moved a seed's endYear a year forward between two calls in the same FY). Every caller
+  // passes both: the kernel's `financialYearStartYear(lens.currentFY)` + a FIXED month (seeds use
+  // April, the FY start month, so a seed is deterministic for a given FY regardless of the day it
+  // is loaded), or the store's `ui.currentFY`-derived year + the actual date for a live form.
+  startYear: number,
+  startMonth: number,
 ): number | null {
   const n = monthsRemaining(outstandingBalance, monthlyEMI, annualRatePercent);
   if (!Number.isFinite(n)) return null;

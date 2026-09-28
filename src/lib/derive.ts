@@ -110,6 +110,19 @@ export interface DeriveLens {
   isFamilyView: boolean;
   viewingMemberId: string | null;
   currentFY: string;
+  /**
+   * #176 follow-up (age-reference honesty): the reference date every member's age is computed
+   * against (ISO `YYYY-MM-DD`). Optional so every existing caller (dozens of specs) is
+   * unaffected — omitting it falls back to 1 April of `currentFY`, the pre-existing convention.
+   * The app MUST set this to the real wall-clock date at the composable boundary
+   * (`useFireDerive.ts`, mirroring how `DeriveOverrides.currentYear` already enters there) so a
+   * member's age matches what their own profile page shows TODAY, not a stale FY-start snapshot
+   * that can leave every member up to 12 months younger than they really are — an optimistic
+   * error (`goal-anchored-decisions.md`: makes the salaried accumulator under-save). Tests MUST
+   * set it explicitly (never rely on the fallback) so a snapshot/invariant never drifts with the
+   * real wall clock the way `inflation-frame-invariant.spec.ts`'s iyers case did.
+   */
+  asOfDate?: string;
 }
 
 /**
@@ -230,10 +243,10 @@ export function derive(
   function anchorAgeFor(applyForScope: boolean): number {
     if (applyForScope) {
       const m = members.find((x) => x.id === effectiveLensMemberId);
-      if (m) return ageFromDOB(m.dateOfBirth);
+      if (m) return ageFromDOB(m.dateOfBirth, pinnedAsOf);
     }
     const primary = earners[0];
-    return primary ? ageFromDOB(primary.dateOfBirth) : 30;
+    return primary ? ageFromDOB(primary.dateOfBirth, pinnedAsOf) : 30;
   }
   function targetRetirementAgeFor(applyForScope: boolean): number {
     // T-377: the hero slider's "what if I retired at N" — applied to EVERY scope so the
@@ -260,13 +273,107 @@ export function derive(
     return adultPlanTos.length ? Math.max(...adultPlanTos) : 90;
   }
 
+  // ADR-0006 Phase 1d: injected, never read from the wall clock here — `derive()` is a pure
+  // kernel and a golden master that shifts on 1 January (goals one year nearer ⇒ one year less
+  // inflation ⇒ FIRE optimistically earlier) is not a golden master. See `DeriveOverrides.currentYear`.
+  // Declared HERE (ahead of the expense legs) because #176's horizon split reads it too.
+  const currentCalendarYear =
+    // Last resort (an unparseable FY): year 0, which puts every dated goal beyond the horizon so
+    // it inflates throughout — the conservative reading, never a goal treated as already paid.
+    usableOverride(overrides?.currentYear, 1900) ?? financialYearStartYear(lens.currentFY) ?? 0;
+
+  // #176 round 3: `anchorAgeFor` used to call `ageFromDOB(dob)` with NO reference date, so it
+  // defaulted to the real wall clock — a member's derived age (hence the whole headline) could
+  // shift mid-FY as the CALENDAR DATE ticked over, completely independent of `currentCalendarYear`
+  // above. Round 3 pinned this to 1 April of the FY start year, which made age deterministic
+  // WITHIN an FY — but 1 April is up to 12 months in the PAST for most of the year (today,
+  // 2026-09-29, is FY 2026-27, whose 1 April was 6 months ago), so every member came out up to a
+  // year YOUNGER than they actually are — an OPTIMISTIC error (younger ⇒ more working years ⇒
+  // lower required contribution; caught by `inflation-frame-invariant.spec.ts`'s iyers case
+  // moving 183414 -> 163599, -11%, outside the ±8% honesty allowance).
+  //
+  // #176 follow-up: honour an explicit `lens.asOfDate` (the app sets this to the REAL wall-clock
+  // date at the composable boundary, `useFireDerive.ts`) so a member's age matches what their own
+  // profile shows today. The 1-April fallback is kept ONLY for the dozens of existing callers
+  // that never set `asOfDate` — `derive()` must never throw on a lens that omits it.
+  const pinnedAsOf = lens.asOfDate ? new Date(lens.asOfDate) : new Date(currentCalendarYear, 3, 1);
+
   // Household-level monthly expenses (joint pool) — scope-independent base.
+  //
+  // #176: this is the ACCUMULATION bill — every recurring line the household is paying TODAY,
+  // `endYear` or not. It feeds `annualExpensesToday`, hence the savings residual, hence the corpus
+  // inflow, and it is also the figure the UI shows as "what we spend". A line that ends in 2036 is
+  // genuinely money leaving the household this month, so it MUST stay here.
   const totalMonthlyExpenses =
     household.expenses.avgMonthly +
     household.expenses.recurring.reduce(
       (s, r) => s + toMonthly({ amount: r.amount, period: r.frequency }),
       0,
     );
+
+  /**
+   * #176 — THE HORIZON SPLIT. `RecurringExpenseLine.endYear` is a CALENDAR year and it is
+   * INCLUSIVE: the line is paid THROUGH that year (its two producers derive it from the loan
+   * amortisation end — `amortization.ts` returns `startYear + floor((endMonth - 1) / 12)` — and
+   * from `Liability.derivedEndYear`, the year the last EMI falls in).
+   *
+   * A line that has ENDED by the time the household retires is not retirement spending: the
+   * corpus never has to fund it, so capitalising it at the SWR inflates the FIRE number by
+   * `annualAmount / SWR` for money nobody will spend. Before this split, `derive()` never read
+   * `endYear` at all and one undifferentiated total fed BOTH legs (gh #176).
+   *
+   * CONVENTION (stated, not implied): a line is EXCLUDED from the retirement base only when it
+   * ends STRICTLY BEFORE the first retirement calendar year — `endYear < retirementCalendarYear`.
+   * `endYear === retirementCalendarYear` means the last payment falls INSIDE the first retirement
+   * year, so the line is RETAINED. That is the conservative boundary: retaining a line can only
+   * ever make the target larger, and for the salaried accumulator an over-stated target is the
+   * safe error while an under-stated one is the Tier-0 honesty failure.
+   *
+   * WHICH YEAR (the non-loop): the retirement year is derived from the `targetRetirementAge` the
+   * kernel has ALREADY resolved (member field / hero-slider override / the 50 default), never from
+   * the solved FIRE age. The FIRE age depends on the FIRE number which depends on this base, so
+   * keying off it would be a fixed point — solved by iteration, non-deterministic under a
+   * golden-master gate, and it would make the target move when the user's savings move (an
+   * expense base that reacts to returns is not an expense base). The target age is the horizon the
+   * user is planning TO, and it is the same age every other horizon-dependent layer already reads
+   * (the SWR, the glide path, the bridge window), so the base is now consistent with them.
+   *
+   * A line with NO `endYear` is perpetual and always counted — every pre-#176 household is
+   * therefore byte-identical.
+   */
+  function recurringEndsBeforeRetirement(
+    line: { endYear?: number },
+    anchorAgeForScope: number,
+    targetRetirementAgeForScope: number,
+  ): boolean {
+    const endYear = line.endYear;
+    if (typeof endYear !== "number" || !Number.isFinite(endYear)) return false;
+    const yearsToRetirement = Math.max(0, targetRetirementAgeForScope - anchorAgeForScope);
+    const retirementCalendarYear = currentCalendarYear + yearsToRetirement;
+    return endYear < retirementCalendarYear;
+  }
+
+  /**
+   * #176 — the annual ₹ of recurring lines that have ENDED by retirement, i.e. the amount the
+   * ACCUMULATION bill carries but the RETIREMENT base must not. Computed over the same line set
+   * and with the same `toMonthly` conversion as `totalMonthlyExpenses`, so the two can never drift
+   * apart, and returned as a SUBTRACTION rather than a second total for exactly that reason.
+   */
+  function endedByRetirementAnnual(
+    lines: readonly { endYear?: number; amount: number; frequency: Parameters<typeof toMonthly>[0]["period"] }[],
+    anchorAgeForScope: number,
+    targetRetirementAgeForScope: number,
+  ): number {
+    return (
+      lines.reduce(
+        (s, r) =>
+          recurringEndsBeforeRetirement(r, anchorAgeForScope, targetRetirementAgeForScope)
+            ? s + toMonthly({ amount: r.amount, period: r.frequency })
+            : s,
+        0,
+      ) * 12
+    );
+  }
 
   const cfg = getTaxConfigForFY(lens.currentFY);
 
@@ -329,19 +436,32 @@ export function derive(
 
     // Expenses: household pool is always whole-household (joint) per D6; auto-flow
     // lines tied to lensed insurance/loans only count when those are visible.
-    const annualExpensesToday = (() => {
-      if (!scopeIsLensed) {
-        return totalMonthlyExpenses * 12;
-      }
+    // #176: the recurring lines VISIBLE to this scope, extracted as a list so the accumulation
+    // total and the retirement-base subtraction below are computed over the SAME set (a second
+    // hand-rolled filter is how the two legs would silently diverge again).
+    const scopeRecurring = (() => {
+      if (!scopeIsLensed) return household.expenses.recurring;
       const insuranceIds = new Set(scopeInsurance.map((p) => p.id));
       const loanIds = new Set(scopeLiabilities.map((l) => l.id));
-      const recurringMonthly = household.expenses.recurring.reduce((s, r) => {
-        if (r.source === "auto-insurance" && r.sourceRefId && !insuranceIds.has(r.sourceRefId)) return s;
-        if (r.source === "auto-loan" && r.sourceRefId && !loanIds.has(r.sourceRefId)) return s;
-        return s + toMonthly({ amount: r.amount, period: r.frequency });
-      }, 0);
-      return (household.expenses.avgMonthly + recurringMonthly) * 12;
+      return household.expenses.recurring.filter((r) => {
+        if (r.source === "auto-insurance" && r.sourceRefId && !insuranceIds.has(r.sourceRefId)) return false;
+        if (r.source === "auto-loan" && r.sourceRefId && !loanIds.has(r.sourceRefId)) return false;
+        return true;
+      });
     })();
+    // The ACCUMULATION bill — every visible line, `endYear` or not (#176: this leg must not change).
+    const annualExpensesToday = scopeIsLensed
+      ? (household.expenses.avgMonthly +
+          scopeRecurring.reduce((s, r) => s + toMonthly({ amount: r.amount, period: r.frequency }), 0)) *
+        12
+      : totalMonthlyExpenses * 12;
+    // #176: the slice of that bill which has ENDED by `targetRetirementAge` — subtracted from the
+    // RETIREMENT expense base only. Zero for every household whose lines carry no `endYear`.
+    const endedByRetirementAnnualExpenses = endedByRetirementAnnual(
+      scopeRecurring,
+      anchorAge,
+      targetRetirementAge,
+    );
 
     // Single source of truth for deductions — audit-grounded deriveDeductions()
     // over the SCOPED subset so the recommendation + fyTax match /tax-planning.
@@ -442,7 +562,7 @@ export function derive(
         .filter((m) => (m.salary?.annualCTC ?? 0) > 0)
         .map((m) => ({
           annualAmount: m.salary?.annualCTC ?? 0,
-          ageAtYear0: ageFromDOB(m.dateOfBirth),
+          ageAtYear0: ageFromDOB(m.dateOfBirth, pinnedAsOf),
           realGrowthPercent: growthFor(m),
           taperAge,
         }));
@@ -512,6 +632,8 @@ export function derive(
       planToAge,
       annualIncome,
       annualExpensesToday,
+      // #176 — the ended-by-retirement slice, so the retirement legs can net it off.
+      endedByRetirementAnnualExpenses,
       estimatedDeductionsForOld,
       householdTaxRecommendation,
       fyTax,
@@ -549,6 +671,21 @@ export function derive(
   const targetRetirementAge = householdScope.targetRetirementAge;
   const planToAge = householdScope.planToAge;
   const annualExpensesToday = householdScope.annualExpensesToday;
+  // #176 — the recurring ₹/yr the household pays TODAY but will NOT be paying in retirement.
+  const endedByRetirementAnnualExpenses = householdScope.endedByRetirementAnnualExpenses;
+  /**
+   * #176 — the RETIREMENT expense base: the ongoing annual spend the CORPUS has to fund, in today's
+   * rupees. Identical to `annualExpensesToday` for every household whose recurring lines have no
+   * `endYear` (so the golden masters are untouched); lower by the capitalisable EMI / school fee /
+   * lease that clears before the target retirement age.
+   *
+   * Clamped at 0: a household whose entire bill is terminating lines has no perpetual spend, and a
+   * negative base would drive a negative FIRE number.
+   */
+  const retirementAnnualExpensesToday = Math.max(
+    0,
+    annualExpensesToday - endedByRetirementAnnualExpenses,
+  );
   const householdMarginalRate = householdScope.marginalRate;
   const annualSavings = householdScope.annualSavings;
   const monthlyContribution = householdScope.monthlyContribution;
@@ -603,7 +740,9 @@ export function derive(
   // own per-persona numbers, not as a rider.
   const npsAnnuityIncome = postTaxAnnuityIncome(npsSplit.annuityIncomeAnnual, householdMarginalRate);
   const npsAnnuityCorpus = npsSplit.annuityCorpus;
-  const netAnnualExpenses = Math.max(0, annualExpensesToday - npsAnnuityIncome);
+  // #176: the SWR base is the RETIREMENT bill, not today's — a terminating EMI is accumulation
+  // spending, never something the corpus perpetually funds.
+  const netAnnualExpenses = Math.max(0, retirementAnnualExpensesToday - npsAnnuityIncome);
   // Corpus available for withdrawal excludes the locked annuitised portion.
   const fireWithdrawableCorpus = Math.max(0, totalCorpus - npsAnnuityCorpus);
 
@@ -659,6 +798,8 @@ export function derive(
     healthcareReservationPercent,
   });
 
+  // #176 follow-up (deliberately deferred, see gh good-to-have issue): Lean/Fat FIRE variants
+  // still use the accumulation total. Left on annualExpensesToday to keep #176's fix narrow.
   const variants = calculateFIREVariants(annualExpensesToday, effectiveSWR, {
     lean: assumptions.leanMultiplier,
     fat: assumptions.fatMultiplier,
@@ -977,13 +1118,6 @@ export function derive(
         return generalInflation;
     }
   };
-  // ADR-0006 Phase 1d: injected, never read from the wall clock here — `derive()` is a pure
-  // kernel and a golden master that shifts on 1 January (goals one year nearer ⇒ one year less
-  // inflation ⇒ FIRE optimistically earlier) is not a golden master. See `DeriveOverrides.currentYear`.
-  const currentCalendarYear =
-    // Last resort (an unparseable FY): year 0, which puts every dated goal beyond the horizon so
-    // it inflates throughout — the conservative reading, never a goal treated as already paid.
-    usableOverride(overrides?.currentYear, 1900) ?? financialYearStartYear(lens.currentFY) ?? 0;
   /** One dated lump: its today's-₹ size, its own price index, and when it stops rising. */
   const plannedGoalComponents = familyLayer.allPlannedGoals.map((g) => ({
     todayAmount: Math.max(0, g.todayAmount ?? 0),
@@ -1150,6 +1284,9 @@ export function derive(
       // over-coverage (the bridge looks more covered than it is → retire-too-early, a
       // Tier-0 honesty error). The adequacy leg separately uses netAnnualExpenses for the
       // FIRE number — locked by derive.spec's "annuity-once" magnitude test.
+      //
+      // #176 follow-up (deliberately deferred, see gh good-to-have issue): the bridge runway
+      // still uses the accumulation total, unchanged by #176's fix (kept narrow deliberately).
       annualExpenses: annualExpensesToday,
       // ADR-0006 Phase 1d: …and the SAME expenses re-priced year by year, so the bridge stops
       // being a mixed frame. `corpusScale` above already scales the holdings by the DRIFTED
@@ -1281,7 +1418,9 @@ export function derive(
     // ADR-0006 Phase 1c: and its per-year COMPONENT curve, so the chart's target line kinks
     // where the goal legs stop rising instead of riding one basket rate forever.
     regularTargetSchedule,
-    annualExpensesToday,
+    // #176 follow-up (deliberately deferred, see gh good-to-have issue): the chart's Lean/Fat
+    // target lines still use the accumulation total, unchanged by #176's fix (kept narrow).
+    annualExpensesToday: annualExpensesToday,
     startAge: anchorAge,
     swr: effectiveSWR,
     horizonYears: projectionHorizonYears,
@@ -1333,7 +1472,7 @@ export function derive(
   // "the family can stop". computeIndividualFire owns the attribution (single canonical helper).
   const individualFireByMember = members
     .filter((m) => isAdultRole(m.role))
-    .map((m) => computeIndividualFire(household, assumptions, m.id, lens.currentFY, overrides))
+    .map((m) => computeIndividualFire(household, assumptions, m.id, lens.currentFY, overrides, pinnedAsOf))
     .filter((r): r is NonNullable<ReturnType<typeof computeIndividualFire>> => r != null);
   const sumAdultAttributableExpenses = individualFireByMember.reduce(
     (s, r) => s + r.attributableAnnualExpenses,
@@ -1360,6 +1499,10 @@ export function derive(
     anchorAge,
     targetRetirementAge,
     annualExpensesToday,
+    // #176: the retirement expense base (accumulation total minus recurring lines that end
+    // before `targetRetirementAge`) — exposed so callers/tests can reconstruct `baseFireNumber`
+    // without re-deriving the horizon split themselves.
+    retirementAnnualExpensesToday,
     annualIncome,
     annualTax,
     annualSavings,
