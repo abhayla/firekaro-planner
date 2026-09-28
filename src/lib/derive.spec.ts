@@ -979,13 +979,17 @@ describe("seed-anchor regression locks (gh-issue #17 — catch silent adequacy-l
     // dated goals are small, so decision (b)'s goal cap (which pushes earlier) barely registers.
     //
     // RE-ANCHORED 2026-09-29 (#176): 25.42y/₹105,982,068 → 22.08y/₹87,372,837. The Sharmas seed
-    // carries a ₹42,000/mo home-loan EMI (`seed-persona.ts`) ending ~2045, before the household's
-    // 47/50 retirement ages — so it is now correctly excluded from the RETIREMENT expense base
-    // (baseFireNumber ₹61,116,185 → ₹48,399,877, a drop of ≈ EMI ₹5.04L/yr ÷ SWR 0.0325 ≈ ₹1.55
-    // Cr, matching the #176 fix's own no-drift math). FIRE arrives EARLIER because the corpus no
-    // longer has to fund an EMI that will already be paid off — the correct direction: before
-    // this fix the plan over-stated what the household needs by capitalising a loan payment
-    // nobody will be making in retirement (gh #176).
+    // carries a ₹42,000/mo home-loan EMI (`seed-persona.ts`, ₹38L @ 8.5%) ending ~2037 (see
+    // `derivedEndYear(3_800_000, 42_000, 8.5, 2025, 4) === 2037`, pinned in
+    // `amortization.spec.ts`), well before the household's retirement (anchorAge 31 + ~16y to
+    // target retirement age 47 ⇒ retirement calendar year ~2042 on this FY pin) — so the EMI is
+    // now correctly excluded from the RETIREMENT expense base: measured
+    // `annualExpensesToday - retirementAnnualExpensesToday` = ₹5,04,000/yr (exactly the EMI's
+    // ₹42,000×12), ÷ effectiveSWR 0.0325 ≈ ₹1.55 Cr — the drop in `baseFireNumber` from no longer
+    // capitalising a payment the household will already have finished making. FIRE arrives
+    // EARLIER because the corpus no longer has to fund an EMI that will already be paid off — the
+    // correct direction: before this fix the plan over-stated what the household needs by
+    // capitalising a loan payment nobody will be making in retirement (gh #176).
     expect(k.yearsToRegular).toBeCloseTo(22.08, 2);
     expect(Math.round(k.fireNumber)).toBe(87_372_837);
   });
@@ -1275,23 +1279,36 @@ describe("T-377/QN-2 — the additive `overrides` seam the required-contribution
   it("#176 no-drift: baseFireNumber does not silently drift when only the pinned year advances one year (loan boundary unaffected)", () => {
     const h = useHouseholdStore();
     const a = useAssumptionsStore();
-    loadSeedPersona(h, a);
+    // #176 round 3: pin the seed's OWN `currentFY` to match `lensNoDrift` below — the seed's
+    // `dobFromAge()` DOB synthesis anchors to `currentFY` too (round 3 fix), so leaving this at
+    // its wall-clock default would make `anchorAge` disagree with the pinned kernel `currentYear`
+    // overrides purely because of the day this test happens to run, reintroducing exactly the
+    // class of drift this test exists to catch.
+    loadSeedPersona(h, a, "2025-26");
     const lensNoDrift = { isFamilyView: false, viewingMemberId: null, currentFY: "2025-26" } as const;
 
     const y1 = deriveKernel(h.data, a.values, lensNoDrift, { currentYear: 2026 });
     const y2 = deriveKernel(h.data, a.values, lensNoDrift, { currentYear: 2027 });
 
-    // Sharmas' EMI ends ~2045; retiring at 47/50 puts the retirement calendar year in the
-    // low-2030s either way — a 1-year pinned-year shift does not cross that boundary, so the
+    // Sharmas' EMI ends ~2037; retiring at 47/50 puts the retirement calendar year around 2042
+    // either way — a 1-year pinned-year shift does not cross that boundary, so the
     // EXCLUDED annual amount is identical in both runs (no drift introduced by #176's own code).
     const retirementYear1 = 2026 + Math.max(0, y1.targetRetirementAge - y1.anchorAge);
     const retirementYear2 = 2027 + Math.max(0, y2.targetRetirementAge - y2.anchorAge);
     const excluded1 = y1.annualExpensesToday - y1.retirementAnnualExpensesToday;
     const excluded2 = y2.annualExpensesToday - y2.retirementAnnualExpensesToday;
-    expect(retirementYear2).toBe(retirementYear1 + 1);
-    // Since the loan's endYear (~2045) is far beyond either retirement year, the excluded
-    // amount is unaffected by the 1-year pinned-year shift — proving the split moved with the
-    // PINNED year (both retirement years shifted +1 together), not the wall clock.
+    // #176 round 3: `anchorAge` is now ALSO pinned to the kernel's `currentYear` (it used to read
+    // the wall clock directly — a second, sibling leak this round found and fixed alongside
+    // `derivedEndYear`). So advancing the pinned year by 1 advances the member's derived age by
+    // 1 too, in lockstep — the person is one calendar year older in the +1 world — which cancels
+    // out in `targetRetirementAge - anchorAge`, leaving the ABSOLUTE retirement calendar year
+    // INVARIANT (not `+1`). That invariance is the real proof of no-drift here: the retirement
+    // year is a property of the person's fixed DOB + fixed target age, not of which year we
+    // happen to be asking from.
+    expect(retirementYear2).toBe(retirementYear1);
+    // Since the loan's endYear (~2037) is comfortably before the (invariant) retirement year, the
+    // EXCLUDED annual amount is identical in both runs — proving the split tracks the person's
+    // real calendar retirement year, not the wall clock or the pinned-year seam itself.
     expect(excluded2).toBeCloseTo(excluded1, 2);
   });
 

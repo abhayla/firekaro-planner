@@ -223,10 +223,10 @@ export function derive(
   function anchorAgeFor(applyForScope: boolean): number {
     if (applyForScope) {
       const m = members.find((x) => x.id === effectiveLensMemberId);
-      if (m) return ageFromDOB(m.dateOfBirth);
+      if (m) return ageFromDOB(m.dateOfBirth, pinnedAsOf);
     }
     const primary = earners[0];
-    return primary ? ageFromDOB(primary.dateOfBirth) : 30;
+    return primary ? ageFromDOB(primary.dateOfBirth, pinnedAsOf) : 30;
   }
   function targetRetirementAgeFor(applyForScope: boolean): number {
     // T-377: the hero slider's "what if I retired at N" — applied to EVERY scope so the
@@ -261,6 +261,14 @@ export function derive(
     // Last resort (an unparseable FY): year 0, which puts every dated goal beyond the horizon so
     // it inflates throughout — the conservative reading, never a goal treated as already paid.
     usableOverride(overrides?.currentYear, 1900) ?? financialYearStartYear(lens.currentFY) ?? 0;
+
+  // #176 round 3: `anchorAgeFor` used to call `ageFromDOB(dob)` with NO reference date, so it
+  // defaulted to the real wall clock — a member's derived age (hence the whole headline) could
+  // shift mid-FY as the CALENDAR DATE ticked over, completely independent of `currentCalendarYear`
+  // above. April 1 of the pinned FY start year is the same FY-start convention the seed loan
+  // dates use (`derivedEndYear`'s `startMonth`), so age is deterministic for a given FY rather
+  // than for a given day.
+  const pinnedAsOf = new Date(currentCalendarYear, 3, 1);
 
   // Household-level monthly expenses (joint pool) — scope-independent base.
   //

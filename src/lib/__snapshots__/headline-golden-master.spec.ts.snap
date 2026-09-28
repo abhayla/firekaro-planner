@@ -65,11 +65,11 @@ exports[`A7.2 golden-master — per-persona headline (DEFAULT lens) > mehtas: de
 
 exports[`A7.2 golden-master — per-persona headline (DEFAULT lens) > sharmas: derive() headline is locked 1`] = `
 {
-  "anchorAge": 30,
+  "anchorAge": 31,
   "annualSavings": 1927164,
   "corpusOnlyYearsToRegular": 22.0833,
   "effectiveSWR": 0.0325,
-  "fireAge": 52.08,
+  "fireAge": 53.08,
   "fireNumber": 87372837,
   "fireWithdrawableCorpus": 11000000,
   "lensedEarners": 2,

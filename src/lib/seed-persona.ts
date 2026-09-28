@@ -11,10 +11,32 @@ import { financialYearStartYear } from "@/lib/derive-overrides";
 type HStore = ReturnType<typeof useHouseholdStore>;
 type AStore = ReturnType<typeof useAssumptionsStore>;
 
-export function loadSeedPersona(household: HStore, assumptions: AStore) {
+/**
+ * #176 round 2 — `currentFY` pins WHICH financial year this seed's derived `endYear`s are
+ * computed against. Optional, defaulting to the ACTUAL current FY (`getCurrentFinancialYear()`)
+ * so every existing call site (dozens across specs + the app) is unaffected. The critical part is
+ * not the default — it's that `derivedEndYear()` is now called with a FIXED month (April, the FY
+ * start month) rather than `new Date().getMonth()+1`, so the same seed loaded twice in the SAME FY
+ * always produces the SAME `endYear`, regardless of which day or month within that FY it runs
+ * (round 1 pinned the year but left the month on the wall clock, which alone could move a loan's
+ * endYear a year forward mid-FY — the exact defect this round fixes).
+ */
+export function loadSeedPersona(
+  household: HStore,
+  assumptions: AStore,
+  currentFY: string = getCurrentFinancialYear(),
+) {
   // Reset to clean state then build the persona via store methods so auto-flow runs.
   household.resetAll();
   assumptions.reset();
+
+  // #176 round 3: `dobFromAge(age)` used to default its `asOf` to the WALL CLOCK, so a member's
+  // synthesized DOB (hence, later, `ageFromDOB(dob, <pinned FY>)` inside `derive()`) drifted by
+  // exactly one year whenever the wall-clock day fell on the other side of the pinned FY's
+  // April 1 from where the seed was originally authored. Anchoring `dobFromAge` to the SAME
+  // April-1-of-FY-start convention as the loan dates makes "age N as of this seed's FY" agree
+  // with what the kernel later re-derives, independent of the day this function runs.
+  const seedAsOf = new Date(financialYearStartYear(currentFY) ?? new Date().getFullYear(), 3, 1);
 
   household.setHouseholdName("The Sharma Family");
   household.setSetupMode("Couple+Children");
@@ -22,7 +44,7 @@ export function loadSeedPersona(household: HStore, assumptions: AStore) {
   const rohit = household.addMember({
     id: "rohit",
     name: "Rohit",
-    dateOfBirth: dobFromAge(30),
+    dateOfBirth: dobFromAge(30, seedAsOf),
     role: "ADULT",
     targetRetirementAge: 47,
     salary: { annualCTC: 2500000, hikePercent: 9 },
@@ -36,7 +58,7 @@ export function loadSeedPersona(household: HStore, assumptions: AStore) {
   const priya = household.addMember({
     id: "priya",
     name: "Priya",
-    dateOfBirth: dobFromAge(29),
+    dateOfBirth: dobFromAge(29, seedAsOf),
     role: "ADULT",
     targetRetirementAge: 50,
     salary: { annualCTC: 1800000, hikePercent: 8 },
@@ -49,7 +71,7 @@ export function loadSeedPersona(household: HStore, assumptions: AStore) {
   household.addMember({
     id: "aarav",
     name: "Aarav",
-    dateOfBirth: dobFromAge(4),
+    dateOfBirth: dobFromAge(4, seedAsOf),
     role: "DEPENDENT",
     relation: "Child",
     city: "Metro",
@@ -61,7 +83,7 @@ export function loadSeedPersona(household: HStore, assumptions: AStore) {
   household.addMember({
     id: "meera",
     name: "Meera",
-    dateOfBirth: dobFromAge(2),
+    dateOfBirth: dobFromAge(2, seedAsOf),
     role: "DEPENDENT",
     relation: "Child",
     city: "Metro",
@@ -281,14 +303,16 @@ export function loadSeedPersona(household: HStore, assumptions: AStore) {
     interestRate: homeLoanRate,
     ownerId: "rohit",
     isSharedWithSpouse: true,
-    // #176: startYear is now REQUIRED — pin to the current FY's start year, matching the kernel's
-    // own convention, rather than the wall clock derivedEndYear() used to default to internally.
+    // #176 round 2: BOTH startYear and startMonth are pinned — startMonth to April (the FY's own
+    // start month), never `new Date()` — so this seed's endYear is deterministic for a given FY,
+    // not just a given year (round 1 left the month on the wall clock).
     derivedEndYear:
       derivedEndYear(
         homeLoanBalance,
         homeLoanEMI,
         homeLoanRate,
-        financialYearStartYear(getCurrentFinancialYear()) ?? new Date().getFullYear(),
+        financialYearStartYear(currentFY) ?? new Date().getFullYear(),
+        4,
       ) ?? undefined,
   });
 
