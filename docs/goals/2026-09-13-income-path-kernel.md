@@ -197,3 +197,4 @@ irreversible step, do it on a proven kernel). Steps 1–5 ≈ 400–600k tokens 
 
 - 2026-09-13 — spec written and parked (Abhay: no token budget now).
 - 2026-09-14 — `/first-principles` re-run on the wider question "what would a from-scratch build of FireKaro add?" (D-2026-09-14-01). Abhay's decision: **no build**. Not approved: unparking this spec's kernel steps, client-side CAS import, client-side Form 16 import, value-of-information onboarding, public/Hindi `/quick`, self-hosted funnel counters. #185 stays parked and remains the ONLY next build. **Step 8 executed:** 39 of the 43 `must-have` issues moved to `good-to-have`; kept: #185, #176, #162, #157.
+- 2026-09-28 — correction of the 2026-09-14 line: the build steps were NOT refused; Abhay reviewed them one by one (PROJECT-LOG D-2026-09-28-01). This spec is sequenced AFTER the public Quick Number page + funnel counters (#187, #44); CAS/Form 16 import deferred, not killed.
