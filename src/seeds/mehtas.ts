@@ -8,7 +8,7 @@ import { dobFromAge } from "@/lib/age";
 type HStore = ReturnType<typeof useHouseholdStore>;
 type AStore = ReturnType<typeof useAssumptionsStore>;
 
-export function loadMehtasSeed(household: HStore, assumptions: AStore) {
+export function loadMehtasSeed(household: HStore, assumptions: AStore, asOf: Date = new Date()) {
   household.resetAll();
   assumptions.reset();
 
@@ -18,7 +18,7 @@ export function loadMehtasSeed(household: HStore, assumptions: AStore) {
   const vikram = household.addMember({
     id: "vikram",
     name: "Vikram",
-    dateOfBirth: dobFromAge(45),
+    dateOfBirth: dobFromAge(45, asOf),
     role: "ADULT",
     targetRetirementAge: 47,
     salary: { annualCTC: 4500000, hikePercent: 6 },
@@ -31,7 +31,7 @@ export function loadMehtasSeed(household: HStore, assumptions: AStore) {
   const aanya = household.addMember({
     id: "aanya",
     name: "Aanya",
-    dateOfBirth: dobFromAge(43),
+    dateOfBirth: dobFromAge(43, asOf),
     role: "ADULT",
     targetRetirementAge: 48,
     salary: { annualCTC: 2800000, hikePercent: 5 },

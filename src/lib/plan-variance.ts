@@ -76,7 +76,10 @@ export interface PlanVarianceResult {
   elapsedMonths: number;
 }
 
-type Lens = { isFamilyView: boolean; viewingMemberId: string | null; currentFY: string };
+// #176 follow-up: `asOfDate` mirrors `DeriveLens` (`derive.ts`) — optional, forwarded straight
+// into `derive()` below, so a caller that sets it (the real wall clock) gets age-consistent
+// results between the plan-baseline snapshot and the live headline it's compared against.
+type Lens = { isFamilyView: boolean; viewingMemberId: string | null; currentFY: string; asOfDate?: string };
 
 const MS_PER_YEAR = 365.25 * 24 * 3600 * 1000;
 

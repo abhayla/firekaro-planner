@@ -110,6 +110,19 @@ export interface DeriveLens {
   isFamilyView: boolean;
   viewingMemberId: string | null;
   currentFY: string;
+  /**
+   * #176 follow-up (age-reference honesty): the reference date every member's age is computed
+   * against (ISO `YYYY-MM-DD`). Optional so every existing caller (dozens of specs) is
+   * unaffected — omitting it falls back to 1 April of `currentFY`, the pre-existing convention.
+   * The app MUST set this to the real wall-clock date at the composable boundary
+   * (`useFireDerive.ts`, mirroring how `DeriveOverrides.currentYear` already enters there) so a
+   * member's age matches what their own profile page shows TODAY, not a stale FY-start snapshot
+   * that can leave every member up to 12 months younger than they really are — an optimistic
+   * error (`goal-anchored-decisions.md`: makes the salaried accumulator under-save). Tests MUST
+   * set it explicitly (never rely on the fallback) so a snapshot/invariant never drifts with the
+   * real wall clock the way `inflation-frame-invariant.spec.ts`'s iyers case did.
+   */
+  asOfDate?: string;
 }
 
 /**
@@ -272,10 +285,18 @@ export function derive(
   // #176 round 3: `anchorAgeFor` used to call `ageFromDOB(dob)` with NO reference date, so it
   // defaulted to the real wall clock — a member's derived age (hence the whole headline) could
   // shift mid-FY as the CALENDAR DATE ticked over, completely independent of `currentCalendarYear`
-  // above. April 1 of the pinned FY start year is the same FY-start convention the seed loan
-  // dates use (`derivedEndYear`'s `startMonth`), so age is deterministic for a given FY rather
-  // than for a given day.
-  const pinnedAsOf = new Date(currentCalendarYear, 3, 1);
+  // above. Round 3 pinned this to 1 April of the FY start year, which made age deterministic
+  // WITHIN an FY — but 1 April is up to 12 months in the PAST for most of the year (today,
+  // 2026-09-29, is FY 2026-27, whose 1 April was 6 months ago), so every member came out up to a
+  // year YOUNGER than they actually are — an OPTIMISTIC error (younger ⇒ more working years ⇒
+  // lower required contribution; caught by `inflation-frame-invariant.spec.ts`'s iyers case
+  // moving 183414 -> 163599, -11%, outside the ±8% honesty allowance).
+  //
+  // #176 follow-up: honour an explicit `lens.asOfDate` (the app sets this to the REAL wall-clock
+  // date at the composable boundary, `useFireDerive.ts`) so a member's age matches what their own
+  // profile shows today. The 1-April fallback is kept ONLY for the dozens of existing callers
+  // that never set `asOfDate` — `derive()` must never throw on a lens that omits it.
+  const pinnedAsOf = lens.asOfDate ? new Date(lens.asOfDate) : new Date(currentCalendarYear, 3, 1);
 
   // Household-level monthly expenses (joint pool) — scope-independent base.
   //
@@ -1451,7 +1472,7 @@ export function derive(
   // "the family can stop". computeIndividualFire owns the attribution (single canonical helper).
   const individualFireByMember = members
     .filter((m) => isAdultRole(m.role))
-    .map((m) => computeIndividualFire(household, assumptions, m.id, lens.currentFY, overrides))
+    .map((m) => computeIndividualFire(household, assumptions, m.id, lens.currentFY, overrides, pinnedAsOf))
     .filter((r): r is NonNullable<ReturnType<typeof computeIndividualFire>> => r != null);
   const sumAdultAttributableExpenses = individualFireByMember.reduce(
     (s, r) => s + r.attributableAnnualExpenses,

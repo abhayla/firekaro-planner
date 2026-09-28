@@ -44,7 +44,12 @@ export function usePlanBaseline() {
     const snapshot = captureBaselineFrom(
       h.data,
       a.values,
-      { isFamilyView: ui.isFamilyView, viewingMemberId: ui.viewingMemberId, currentFY: ui.currentFY },
+      {
+        isFamilyView: ui.isFamilyView,
+        viewingMemberId: ui.viewingMemberId,
+        currentFY: ui.currentFY,
+        asOfDate: new Date().toISOString().slice(0, 10),
+      },
       new Date().toISOString(),
       {},
       // ADR-0006 Phase 1d — the wall clock enters at the composable boundary; the kernel is pure.

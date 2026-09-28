@@ -14,7 +14,7 @@ import { dobFromAge } from "@/lib/age";
 type HStore = ReturnType<typeof useHouseholdStore>;
 type AStore = ReturnType<typeof useAssumptionsStore>;
 
-export function loadIyersSeed(household: HStore, assumptions: AStore) {
+export function loadIyersSeed(household: HStore, assumptions: AStore, asOf: Date = new Date()) {
   household.resetAll();
   assumptions.reset();
 
@@ -24,7 +24,7 @@ export function loadIyersSeed(household: HStore, assumptions: AStore) {
   const ashwin = household.addMember({
     id: "ashwin",
     name: "Ashwin",
-    dateOfBirth: dobFromAge(38),
+    dateOfBirth: dobFromAge(38, asOf),
     role: "ADULT",
     targetRetirementAge: 55,
     salary: { annualCTC: 3500000, hikePercent: 10 },
@@ -37,7 +37,7 @@ export function loadIyersSeed(household: HStore, assumptions: AStore) {
   const lakshmi = household.addMember({
     id: "lakshmi",
     name: "Lakshmi",
-    dateOfBirth: dobFromAge(36),
+    dateOfBirth: dobFromAge(36, asOf),
     role: "ADULT",
     targetRetirementAge: 55,
     salary: { annualCTC: 800000, hikePercent: 8 },
@@ -51,7 +51,7 @@ export function loadIyersSeed(household: HStore, assumptions: AStore) {
   household.addMember({
     id: "ananya",
     name: "Ananya",
-    dateOfBirth: dobFromAge(10),
+    dateOfBirth: dobFromAge(10, asOf),
     role: "DEPENDENT",
     relation: "Daughter",
     city: "Metro",
@@ -63,7 +63,7 @@ export function loadIyersSeed(household: HStore, assumptions: AStore) {
   household.addMember({
     id: "rohan",
     name: "Rohan",
-    dateOfBirth: dobFromAge(8),
+    dateOfBirth: dobFromAge(8, asOf),
     role: "DEPENDENT",
     relation: "Son",
     city: "Metro",
@@ -76,7 +76,7 @@ export function loadIyersSeed(household: HStore, assumptions: AStore) {
   household.addMember({
     id: "ramesh",
     name: "Ramesh (father)",
-    dateOfBirth: dobFromAge(68),
+    dateOfBirth: dobFromAge(68, asOf),
     role: "DEPENDENT",
     relation: "Father",
     city: "Metro",
@@ -87,7 +87,7 @@ export function loadIyersSeed(household: HStore, assumptions: AStore) {
   household.addMember({
     id: "sudha",
     name: "Sudha (mother)",
-    dateOfBirth: dobFromAge(65),
+    dateOfBirth: dobFromAge(65, asOf),
     role: "DEPENDENT",
     relation: "Mother",
     city: "Metro",

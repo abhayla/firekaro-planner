@@ -80,12 +80,21 @@ export function computeIndividualFire(
   currentFY: string,
   /** T-377 (QN-2): the same additive solver seam the household path honours — see derive-overrides.ts. */
   overrides?: DeriveOverrides,
+  /**
+   * #176 follow-up: this used to call `ageFromDOB(member.dateOfBirth)` with NO reference date,
+   * so this member's age (hence their whole individual-FIRE solve) silently drifted with the
+   * real wall clock — the exact class #176 fixed in `derive.ts`'s household-scope `anchorAgeFor`,
+   * but never pinned here. Callers MUST pass the same reference date the household scope uses
+   * (`derive.ts`'s `pinnedAsOf`) so a member's individual and household ages agree and neither
+   * moves between two loads of the same data on different days.
+   */
+  asOf: Date = new Date(),
 ): IndividualFireResult | null {
   const member = household.members.find((m) => m.id === memberId);
   if (!member || !isAdultRole(member.role)) return null;
 
   const split = Math.min(100, Math.max(0, assumptions.householdSplitPercent ?? 50)) / 100;
-  const anchorAge = ageFromDOB(member.dateOfBirth);
+  const anchorAge = ageFromDOB(member.dateOfBirth, asOf);
   const targetRetirementAge =
     usableOverride(overrides?.targetRetirementAge, 1) ?? member.targetRetirementAge ?? 50;
   const planToAge = member.planToAge ?? 90;

@@ -114,6 +114,10 @@ export function useFireDerive() {
         isFamilyView: ui.isFamilyView,
         viewingMemberId: ui.viewingMemberId,
         currentFY: ui.currentFY,
+        // #176 follow-up: the wall clock enters HERE too (mirroring `currentYear` below) so a
+        // member's derived age matches their profile TODAY, not a stale FY-start snapshot that
+        // could be up to 12 months in the past — see `derive.ts`'s `pinnedAsOf` comment.
+        asOfDate: new Date().toISOString().slice(0, 10),
       },
       // ADR-0006 Phase 1d: the wall clock enters HERE, at the composable boundary. The kernel is
       // pure and never calls Date, so a dated goal's "years from now" cannot silently change under
@@ -310,6 +314,8 @@ export function useFireDerive() {
     isFamilyView: ui.isFamilyView,
     viewingMemberId: ui.viewingMemberId,
     currentFY: ui.currentFY,
+    // #176 follow-up: same wall-clock age reference as the main `d` lens above.
+    asOfDate: new Date().toISOString().slice(0, 10),
   }));
 
   // ---- QN-5 (T-379): the "how to get there" plan levers ----

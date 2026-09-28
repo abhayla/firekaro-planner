@@ -22,7 +22,7 @@ import { dobFromAge } from "@/lib/age";
 type HStore = ReturnType<typeof useHouseholdStore>;
 type AStore = ReturnType<typeof useAssumptionsStore>;
 
-export function loadRaviSeed(household: HStore, assumptions: AStore) {
+export function loadRaviSeed(household: HStore, assumptions: AStore, asOf: Date = new Date()) {
   household.resetAll();
   assumptions.reset();
 
@@ -32,7 +32,7 @@ export function loadRaviSeed(household: HStore, assumptions: AStore) {
   const ravi = household.addMember({
     id: "ravi",
     name: "Ravi",
-    dateOfBirth: dobFromAge(22),
+    dateOfBirth: dobFromAge(22, asOf),
     role: "ADULT",
     targetRetirementAge: 50,
     salary: { annualCTC: 300000, hikePercent: 12 },

@@ -64,7 +64,12 @@ const nudges = computed(() => {
   const wholeHousehold = derive(
     household.data,
     assumptions.values,
-    { isFamilyView: true, viewingMemberId: null, currentFY: ui.currentFY },
+    {
+      isFamilyView: true,
+      viewingMemberId: null,
+      currentFY: ui.currentFY,
+      asOfDate: new Date().toISOString().slice(0, 10),
+    },
     // ADR-0006 Phase 1d — the wall clock enters at the composable boundary, not in the kernel.
     { currentYear: new Date().getFullYear() },
   );

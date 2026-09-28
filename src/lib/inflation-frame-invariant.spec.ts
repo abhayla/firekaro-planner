@@ -24,16 +24,35 @@ import { derive } from "@/lib/derive";
 import { requiredMonthlyContributionFor } from "@/lib/required-contribution";
 import type { Assumptions } from "@/types/assumptions";
 
+/**
+ * #176 follow-up: `derive()`'s age reference and each seed's `dobFromAge` age-synthesis MUST use
+ * the SAME clock, or a member's synthesized age and the age the kernel re-derives disagree by
+ * however far apart the two clocks are. Before this fix `loadIyersSeed`/`loadMehtasSeed` called
+ * `dobFromAge(age)` with NO `asOf` (defaulting to the REAL wall clock) while `DEFAULT_PRODUCT_LENS`
+ * below carried only `currentFY: "2025-26"` (⇒ `derive()`'s pre-`asOfDate` fallback of 1 April
+ * 2025) — a real, growing mismatch between "today" and "2025-04-01" that silently moved
+ * `requiredMonthlyReal` with the wall clock (caught here: iyers 183414 -> 163599, -11%, the
+ * optimistic direction). Both sides are now pinned to this ONE explicit date, matching the
+ * `currentFY` below exactly, so the test is deterministic and never drifts again.
+ */
+const TEST_AS_OF = new Date(2025, 3, 1);
+const TEST_AS_OF_ISO = "2025-04-01";
+
 /** The EXACT lens the dashboard renders by default (#22 — never verify on a convenient lens). */
-const DEFAULT_PRODUCT_LENS = { isFamilyView: false, viewingMemberId: null, currentFY: "2025-26" } as const;
+const DEFAULT_PRODUCT_LENS = {
+  isFamilyView: false,
+  viewingMemberId: null,
+  currentFY: "2025-26",
+  asOfDate: TEST_AS_OF_ISO,
+} as const;
 
 type Store = ReturnType<typeof useHouseholdStore>;
 type ASt = ReturnType<typeof useAssumptionsStore>;
 const PERSONAS: Array<{ name: string; load: (h: Store, a: ASt) => void }> = [
-  { name: "sharmas", load: (h, a) => loadSeedPersona(h, a) },
-  { name: "mehtas", load: (h, a) => loadMehtasSeed(h, a) },
-  { name: "iyers", load: (h, a) => loadIyersSeed(h, a) },
-  { name: "mauryas", load: (h, a) => loadMauryasSeed(h, a) },
+  { name: "sharmas", load: (h, a) => loadSeedPersona(h, a, DEFAULT_PRODUCT_LENS.currentFY) },
+  { name: "mehtas", load: (h, a) => loadMehtasSeed(h, a, TEST_AS_OF) },
+  { name: "iyers", load: (h, a) => loadIyersSeed(h, a, TEST_AS_OF) },
+  { name: "mauryas", load: (h, a) => loadMauryasSeed(h, a, DEFAULT_PRODUCT_LENS.currentFY) },
 ];
 
 /**
@@ -110,7 +129,7 @@ describe("ADR-0006 — the FIRE target and the corpus must not share one inflati
   it("negative control: raising ONE expense bucket must raise the prescription and never pull FIRE earlier", () => {
     const h = useHouseholdStore();
     const a = useAssumptionsStore();
-    loadSeedPersona(h, a); // Sharmas: anchor 30, stored target 47 ⇒ T = 17 (≥ 10)
+    loadSeedPersona(h, a, DEFAULT_PRODUCT_LENS.currentFY); // Sharmas: anchor 30, stored target 47 ⇒ T = 17 (≥ 10)
 
     const baseline = a.values;
     // ONLY healthcare moves. CPI, weights, returns, step-up all identical.
@@ -158,7 +177,7 @@ describe("ADR-0006 — the FIRE target and the corpus must not share one inflati
   it("positive control: when all four buckets equal general CPI the headline collapses to the single-rate model", () => {
     const h = useHouseholdStore();
     const a = useAssumptionsStore();
-    loadSeedPersona(h, a);
+    loadSeedPersona(h, a, DEFAULT_PRODUCT_LENS.currentFY);
     const cpi = a.values.inflation;
 
     // Four buckets, all at CPI — the drift must vanish EXACTLY.
