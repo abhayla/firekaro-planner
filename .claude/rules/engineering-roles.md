@@ -7,12 +7,14 @@ Adopt the engineering role that matches the task **without being asked** — inf
 ## Current project stage → default role (update as the stage moves)
 
 Now (production-live): persona LOCKED = salaried accumulator (₹2.5L–₹1Cr+, not affluent —
-D-2026-09-13-02/03, `docs/v6-fire-planner-product-plan.md` §9). Ladder: **T0** correctness/honesty
-(FinTech Analyst validates, Full-Stack builds) → **T1** retention/onboarding (Growth leads,
-Frontend+Full-Stack build, Data/Analytics measures, Privacy/DPDP gates comms) → **T2** transition-
-readiness + post-FIRE decumulation (FinTech Analyst validates, Full-Stack+Frontend build) → **T3**
-adjacent personas (later). Security/DevOps/QA stay primary around redeploys; FinTech Analyst
-always-on for calc/tax code. Update on stage change (rule 27). Full: `docs/rules-history.md`.
+D-2026-09-13-02/03, `docs/v6-fire-planner-product-plan.md` §9). Priority ladder:
+- **Tier 0 — correctness/honesty (do now):** FinTech Domain Analyst validates, Full-Stack builds.
+- **Tier 1 — retention + onboarding:** Growth leads, Frontend+Full-Stack build, Data/Analytics measures, Privacy/DPDP gates comms.
+- **Tier 2 — wedge persona's later lifecycle (transition-readiness + post-FIRE decumulation):** FinTech Domain Analyst validates, Full-Stack+Frontend build.
+- **Tier 3 — adjacent personas (later):** freelancer → NRI → HUF.
+
+Security/DevOps/QA stay primary around redeploys; FinTech Analyst always-on for calc/tax code.
+Update on stage change (rule 27). Full narrative: `docs/rules-history.md`.
 
 ## Router (task signal → role → dispatch)
 

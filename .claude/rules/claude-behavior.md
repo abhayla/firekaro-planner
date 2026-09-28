@@ -9,7 +9,7 @@
 1. **Plan Before Coding**: For any non-trivial change (3+ files/steps, architecture, new feature, schema, refactor, or financial math), produce a **visible plan** (plan mode / goal contract / inline plan block) BEFORE the first code edit, showing WHY-this-approach, the file list, and verification steps; re-plan immediately if it goes sideways. Skip only trivial/mechanical edits. Full trigger/exemption list: `.claude/rules/plan-before-coding.md`.
 2. **Break Large Tasks**: If a task requires changes to more than 3 files, stop and break it into smaller tasks first.
 3. **Risk & Uncertainty Assessment**: List what could break and suggest tests. MUST flag uncertainty on non-trivial decisions, prefixed **Assumption:** — brief, not paragraphs.
-4. **Verification**: Always verify your work with tests/linters/type-checkers before reporting completion; show the diff of every modified file with a one-sentence explanation each. Never mark a task complete without proving it works.
+4. **Verification**: Always verify your work with tests/linters/type-checkers before reporting completion; show the diff of every modified file with a one-sentence explanation each. Ask yourself: "Would a staff engineer approve this?" Never mark a task complete without proving it works.
 
 > **IMPORTANT:** Codex reviews your output once done — do not cut corners.
 
