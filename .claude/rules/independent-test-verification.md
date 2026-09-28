@@ -1,4 +1,6 @@
-# Scope: global
+---
+paths: ["e2e/**", "**/*.spec.ts", "verification-evidence/**"]
+---
 
 # Independent Test Verification — the blind second tester
 

@@ -1,4 +1,6 @@
-# Scope: global
+---
+paths: [".claude/hooks/**", ".claude/skills/prompt-auto-enhance/**"]
+---
 
 # Prompt Auto-Enhance
 

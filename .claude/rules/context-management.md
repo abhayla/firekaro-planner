@@ -1,4 +1,6 @@
-# Scope: global
+---
+paths: [".claude/**"]
+---
 
 # Context Management Rules
 

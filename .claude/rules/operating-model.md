@@ -1,4 +1,6 @@
-# Scope: global
+---
+paths: [".claude/agents/**", ".claude/skills/**"]
+---
 
 # Operating Model — CEO orchestration + mandatory hierarchical verification
 
