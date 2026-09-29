@@ -51,6 +51,27 @@ import { toMonthly } from "@/lib/cashflow";
 import type { ContributionSegments } from "@/lib/contribution-schedule";
 
 /** Bisection stops once the bracket is this tight (rupees/month). */
+/**
+ * gh #207 — the ONE growth clause every surface that prints `requiredMonthlyReal` must carry.
+ *
+ * Exported from the module that PRODUCES the number so the copy cannot drift from its source. After
+ * #207 the solved figure is no longer a flat amount held for the whole horizon: it is the STARTING
+ * real contribution of a plan that rises with the household's income
+ * (`contribution(t) = required × income(t)/income(0)`). Copy that still says "invest this every
+ * month" understates what the later years actually ask for — the exact honesty defect the #207
+ * review caught, because the number got fixed and four surfaces kept the old sentence.
+ *
+ * The rate is deliberately written as the conservative default it is drawn from
+ * (`assumptions.salaryGrowthRealPercent`, default 2) rather than interpolated per household: the
+ * clause is a disclosure of the SHAPE of the plan, not a second number to reconcile. The drift-lock
+ * in `lens-coverage-invariant.spec.ts` asserts this clause renders on every such surface.
+ */
+export const PRESCRIPTION_GROWTH_CLAUSE = "rising with your income (~2%/yr real)";
+
+/** The same disclosure as a full sentence, for surfaces with room for one. */
+export const PRESCRIPTION_GROWTH_SENTENCE =
+  "This is what you start with — it rises with your income (~2%/yr real), so later years ask for more.";
+
 export const REQUIRED_CONTRIBUTION_TOLERANCE = 100;
 /** Hard iteration cap — bisection over the bracket converges long before this. */
 export const REQUIRED_CONTRIBUTION_MAX_ITERATIONS = 60;

@@ -70,6 +70,32 @@ export function householdRealIncomeAt(paths: EarnerIncomePath[], yearIndex: numb
 }
 
 /**
+ * gh #207 — the REAL income SCALE at `yearIndex`: income(t) / income(0), taper included.
+ *
+ * THE ONE FORMULA both prescription scopes ride. `derive.ts` (household) and `individual-fire.ts`
+ * (member lens) each scale a fixed real contribution by this factor, so the solver's probe honours
+ * the same income growth the headline already assumes. Before #207 both treated a contribution as a
+ * flat real scalar, so the prescription was solved against a plan in which income never grows -
+ * pessimistic (over-prescribing), and it also left the income-side levers inert on that number.
+ *
+ * Salary-only by construction: the growth path applies to LABOUR income, and non-salary income is
+ * flat in real terms in this model, so it is excluded from BOTH ends of the ratio rather than
+ * diluting the scale with a leg that never grows.
+ *
+ * Returns 1 - a neutral, NaN-free identity - whenever there is no salaried income at all (a
+ * rental-only or pension-only household), when `yearIndex` is not finite, or when the ratio would
+ * not be a positive finite number. A household with no salary must never see its prescription
+ * scaled by 0/0.
+ */
+export function realIncomeScaleAt(paths: EarnerIncomePath[], yearIndex: number): number {
+  if (!Number.isFinite(yearIndex)) return 1;
+  const income0 = householdRealIncomeAt(paths, 0);
+  if (!(income0 > 0)) return 1;
+  const scale = householdRealIncomeAt(paths, Math.max(0, yearIndex)) / income0;
+  return Number.isFinite(scale) && scale > 0 ? scale : 1;
+}
+
+/**
  * The REAL growth rate the EXPECTED band uses for one earner, derived from the user's own typed
  * nominal `salary.hikePercent`.
  *

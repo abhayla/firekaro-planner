@@ -58,6 +58,7 @@ import {
   expectedRealGrowthPercent,
   generalInflationWithCreep,
   householdRealIncomeAt,
+  realIncomeScaleAt,
   type EarnerIncomePath,
 } from "@/lib/income-path";
 
@@ -618,19 +619,14 @@ export function derive(
       return Number.isFinite(monthly) && monthly > 0 ? monthly : 0;
     };
     /**
-     * #207 — the REAL income-path SCALE at `yearIndex`: income(t) / income(0), taper included.
-     * This is what the T-377 solver override rides, so the prescription's probe grows exactly as
-     * the organic residual does instead of being a flat scalar the income path never touches.
-     * Salary-only by construction — the growth path applies to labour income; non-salary income is
-     * flat in real terms in this model, so it is excluded from BOTH ends of the ratio rather than
-     * diluting the scale with a leg that never grows. 1 when there is no salaried income at all.
+     * #207 — the REAL income-path SCALE the T-377 solver override rides, so the prescription's
+     * probe grows exactly as the organic residual does instead of being a flat scalar the income
+     * path never touches. THE formula lives in `income-path.ts` (`realIncomeScaleAt`) because
+     * `individual-fire.ts` scales the member-lens prescription by the same one — one formula, two
+     * scopes, no second growth model to drift.
      */
-    const realIncomeScaleAt = (yearIndex: number, paths: EarnerIncomePath[]): number => {
-      if (!Number.isFinite(yearIndex) || income0 <= 0) return 1;
-      const t = Math.max(0, yearIndex);
-      const scale = householdRealIncomeAt(paths, t) / income0;
-      return Number.isFinite(scale) && scale > 0 ? scale : 1;
-    };
+    const incomeScaleAt = (yearIndex: number, paths: EarnerIncomePath[]): number =>
+      realIncomeScaleAt(paths, yearIndex);
 
     // Primary-residence exclusion (A20.2).
     const fireCorpusInvestments = scopeInvestments.filter(
@@ -659,7 +655,7 @@ export function derive(
       monthlyTakeHome,
       savingsRate,
       realMonthlySurplusAt,
-      realIncomeScaleAt,
+      incomeScaleAt,
       conservativePaths,
       expectedPaths,
       expectedBasisPercent,
@@ -976,9 +972,10 @@ export function derive(
   // replaces the residual's LEVEL, never its GROWTH. Before #207 it replaced both, so the
   // prescription was solved against a kernel run in which the user's income never grew: pessimistic
   // (over-prescribed), worst for the ₹2.5L-₹10L band. Callers needing a genuinely flat override pass
-  // `flatContributionOverride: true`.
+  // The member-lens prescription rides the SAME primitive (`individual-fire.ts`), so the two scopes
+  // cannot drift apart.
   const conservativeSurplusAt = householdScope.realMonthlySurplusAt;
-  const conservativeIncomeScaleAt = householdScope.realIncomeScaleAt;
+  const conservativeIncomeScaleAt = householdScope.incomeScaleAt;
   // `householdSavingsStepUpPercent` is no longer the WAGE-GROWTH proxy — the income path is. Its
   // DEFAULT therefore moves 2 -> 0 (`types/assumptions.ts`): leaving it at 2 would compound wage
   // growth twice, once through each earner's income and once again through the residual. What the
@@ -1008,19 +1005,14 @@ export function derive(
         ? // T-377 as amended by #207: the solver replaces the residual's LEVEL with a fixed real
           // starting amount, and that amount then rides the SAME income path the organic residual
           // does — contribution(t) = override x income(t)/income(0) — so the probe honours the
-          // growth the headline already assumes. `flatContributionOverride` opts out explicitly for
-          // any caller that genuinely needs a flat scalar. The DELIBERATE step-up still applies on
+          // growth the headline already assumes. The DELIBERATE step-up still applies on
           // top (the solver answers "what must I start at, given my plan", and the plan includes
           // stepping up); dropping it made the `step-up-10` lever INERT in
           // `requiredMonthlyContributionFor` (its own no-inert-lever guard caught it).
-          overrides?.flatContributionOverride === true
-          ? deliberateStepUpPct <= 0
-            ? monthlyContribution
-            : (yearIndex: number) => monthlyContribution * stepUpFactor(yearIndex)
-          : (yearIndex: number) =>
-              monthlyContribution *
-              conservativeIncomeScaleAt(yearIndex, householdScope.conservativePaths) *
-              stepUpFactor(yearIndex)
+          (yearIndex: number) =>
+            monthlyContribution *
+            conservativeIncomeScaleAt(yearIndex, householdScope.conservativePaths) *
+            stepUpFactor(yearIndex)
         : (yearIndex: number) =>
             conservativeSurplusAt(yearIndex, householdScope.conservativePaths) * stepUpFactor(yearIndex);
   /**

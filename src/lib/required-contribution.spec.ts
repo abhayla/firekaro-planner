@@ -12,6 +12,7 @@ import { useAssumptionsStore } from "@/stores/assumptions";
 import { loadSeedPersona } from "@/lib/seed-persona";
 import { loadMehtasSeed } from "@/seeds/mehtas";
 import { loadRaviSeed } from "@/seeds/ravi";
+import { realIncomeScaleAt } from "@/lib/income-path";
 import { derive } from "@/lib/derive";
 import {
   requiredMonthlyContributionFor,
@@ -473,5 +474,58 @@ describe("requiredMonthlyContributionFor — solves through the REAL derive() pa
     loadRaviSeed(h, a);
     const k = derive(h.data, a.values, LENS, { monthlyContributionReal: 0, targetRetirementAge: 60 });
     expect(k.householdFireAge == null || !Number.isFinite(k.householdFireAge)).toBe(true);
+  });
+  /**
+   * #207 review (HIGH, cross-screen coherence): `individual-fire.ts` consumed the override as a
+   * FLAT scalar, so after #207 the household prescription fell 12.5% while the member-lens one did
+   * not move at all — the same person, two different answers depending on the selected lens. Both
+   * scopes now ride the ONE `realIncomeScaleAt` formula. For a household that IS one earner and one
+   * member, the two scopes describe the same plan, so the two figures must be identical.
+   */
+  it("#207: single-earner household — member-lens prescription EQUALS the household one", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    loadRaviSeed(h, a);
+    expect(h.data.members.length, "Ravi must stay a single-member household for this proof").toBe(1);
+    const earner = h.data.members[0];
+    expect((earner.salary?.annualCTC ?? 0) > 0).toBe(true);
+    const targetAge = 60;
+    const household = requiredMonthlyContributionFor({
+      snapshot: h.data,
+      assumptions: a.values,
+      lens: LENS,
+      targetAge,
+    }).requiredMonthlyReal;
+    const memberLens = requiredMonthlyContributionFor({
+      snapshot: h.data,
+      assumptions: a.values,
+      lens: { ...LENS, viewingMemberId: earner.id },
+      targetAge,
+    }).requiredMonthlyReal;
+    expect(Number.isFinite(household)).toBe(true);
+    expect(
+      memberLens,
+      `member-lens prescription ${memberLens} must equal the household's ${household} for a ` +
+        "one-earner, one-member household — otherwise the same user is told two different amounts",
+    ).toBe(household);
+  });
+
+  /**
+   * #207 review: the income scale must be NaN-free for a household with NO salaried income at all
+   * (rental-only / pension-only), where `income(0)` is 0 and a naive ratio would be 0/0. The neutral
+   * identity is 1 — such a household's prescription is simply not scaled.
+   */
+  it("#207: zero salaried income — the income scale is a clean 1, never NaN", () => {
+    expect(realIncomeScaleAt([], 0)).toBe(1);
+    expect(realIncomeScaleAt([], 17)).toBe(1);
+    const zeroEarner = [
+      { annualAmount: 0, ageAtYear0: 45, realGrowthPercent: 2, taperAge: 50 },
+    ];
+    expect(realIncomeScaleAt(zeroEarner, 17)).toBe(1);
+    expect(realIncomeScaleAt([{ annualAmount: 1_200_000, ageAtYear0: 40, realGrowthPercent: 2, taperAge: 50 }], Number.NaN)).toBe(1);
+    for (const v of [realIncomeScaleAt([], 5), realIncomeScaleAt(zeroEarner, 5)]) {
+      expect(Number.isFinite(v)).toBe(true);
+      expect(Number.isNaN(v)).toBe(false);
+    }
   });
 });

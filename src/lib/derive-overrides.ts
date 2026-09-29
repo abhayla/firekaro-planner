@@ -13,16 +13,13 @@
 import type { ContributionSegments } from "@/lib/contribution-schedule";
 
 export interface DeriveOverrides {
-  /** Replace the real monthly corpus inflow (₹/month, today's ₹). Must be finite and ≥ 0. */
-  monthlyContributionReal?: number;
   /**
-   * #207 — treat `monthlyContributionReal` as a genuinely FLAT real scalar instead of the default
-   * "starting level that rides the income path". Default (absent/false) is the income-path-scaled
-   * form, because the solver's probe must honour the same growth the headline assumes; a caller
-   * that really means "a constant real amount every year forever" opts in here explicitly rather
-   * than the override silently changing meaning under it.
+   * The STARTING real monthly corpus inflow (₹/month, today's ₹) — it REPLACES the residual's
+   * LEVEL, and the income path then scales it (gh #207): `contribution(t) = this × income(t)/income(0)`,
+   * in BOTH the household (`derive.ts`) and member-lens (`individual-fire.ts`) scopes. Must be finite
+   * and ≥ 0; a 0 still yields the empty-state Infinity sentinel.
    */
-  flatContributionOverride?: boolean;
+  monthlyContributionReal?: number;
   /** Evaluate the plan as if retirement were targeted at this age (the hero slider). */
   targetRetirementAge?: number;
   /**
