@@ -39,7 +39,7 @@ import { epfBucketAfterTaxReturn } from "@/lib/epf-vpf";
 import { ageFromDOB } from "@/lib/age";
 import { todayIsoLocal } from "@/lib/as-of-date";
 import { toMonthly, toAnnual } from "@/lib/cashflow";
-import { returnBucketKey } from "@/lib/investment-traits";
+import { returnBucketKey, expectedReturn } from "@/lib/investment-traits";
 import {
   deriveDeductions,
   computeHousePropertyTax,
@@ -53,7 +53,7 @@ import { computeBridgeCoverage, type BridgeHolding } from "@/lib/bridge";
 import { deriveEpsPensionForMember, EPS_NORMAL_START_AGE } from "@/lib/eps-pension";
 import { deriveGratuityForMember } from "@/lib/gratuity";
 import type { ReturnSchedule, ContributionSchedule } from "@/lib/fire-math";
-import { buildContributionResolver } from "@/lib/contribution-schedule";
+import { buildContributionResolver, scalarToSegments } from "@/lib/contribution-schedule";
 import {
   expectedRealGrowthPercent,
   generalInflationWithCreep,
@@ -1292,6 +1292,28 @@ export function derive(
     const driftedTargetReal = regularTargetComponentsRealAt(adequacyAge - anchorAge).total;
     const corpusScale = totalCorpus > 0 ? driftedTargetReal / totalCorpus : 1;
 
+    // #212 — PER-TRANCHE PROJECTION. `corpusScale` above is retained ONLY as the fallback for a
+    // holding with no instrument rule; the primary path now projects each accessibility family by
+    // its own mechanics, because one portfolio-wide factor grew locked money as if the household's
+    // whole savings residual landed in it (measured: sharmas' ₹6L PPF → ₹53.32L at 8.89×, ~3.4×
+    // what ₹1.5L/yr at 7.1% can reach) while inflating the ABSOLUTE liquid pool against a bill that
+    // rises only at CPI-real. That made the bridge gate structurally lenient — `covered: true` on
+    // every seed — in the one layer whose whole job is to lean pessimistic (Tier-0, optimistic).
+    //
+    // The bridge runs in TODAY's rupees, so the returns handed over are REAL (nominal de-inflated
+    // at general CPI) and the contributions are the REAL ₹/month each holding's own plan carries.
+    // The liquid pool absorbs `driftedTargetReal − Σ(bounded projections)` so the household total
+    // still equals the target the adequacy solve found (the reconciliation identity — see
+    // `computeBridgeCoverage`).
+    const perAssetContributionResolvers = new Map<string, (yearIndex: number) => number>();
+    for (const inv of fireCorpusInvestments) {
+      const segments =
+        inv.contributionSchedule && inv.contributionSchedule.length > 0
+          ? inv.contributionSchedule
+          : scalarToSegments(inv.monthlyContribution);
+      perAssetContributionResolvers.set(inv.id, buildContributionResolver(segments, anchorAge));
+    }
+
     return computeBridgeCoverage({
       holdings,
       retirementAge: adequacyAge,
@@ -1330,6 +1352,13 @@ export function derive(
       exitLumpNet: Math.round(gratuityNet),
       marginalRate: householdMarginalRate,
       corpusScale,
+      projection: {
+        targetReal: driftedTargetReal,
+        realReturnFor: (asset) => toRealReturn(expectedReturn(asset, assumptions)),
+        realMonthlyContributionFor: (asset, yearIndex) =>
+          perAssetContributionResolvers.get(asset.id)?.(yearIndex) ?? 0,
+        yearsToRetirement: adequacyAge - anchorAge,
+      },
     });
   }
 
