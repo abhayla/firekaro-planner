@@ -52,3 +52,19 @@ describe("step2", () => {
     });
   }
 });
+
+import { requiredMonthlyContributionFor } from "@/lib/required-contribution";
+describe("step2-rc", () => {
+  beforeEach(() => setActivePinia(createPinia()));
+  for (const p of PERSONAS) {
+    it(`rc-${p.name}`, () => {
+      const h = useHouseholdStore();
+      const a = useAssumptionsStore();
+      p.load(h, a);
+      const k = derive(h.data, a.values, LENS, { currentYear: PINNED_CURRENT_YEAR });
+      const rc = requiredMonthlyContributionFor({ snapshot: h.data, assumptions: a.values, lens: LENS as any, targetAge: k.targetRetirementAge });
+      console.log(`RC ${p.name}: requiredMonthlyReal=${rc.requiredMonthlyReal} needReal=${rc.needReal} fireAge=${k.fireAge} householdFireAge=${k.householdFireAge}`);
+      expect(true).toBe(true);
+    });
+  }
+});

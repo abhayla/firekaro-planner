@@ -16,6 +16,7 @@ import { loadMehtasSeed } from "@/seeds/mehtas";
 import { loadMauryasSeed } from "@/seeds/mauryas";
 import { loadEmptySeed } from "@/seeds/empty";
 import { useFireDerive } from "@/lib/useFireDerive";
+import { computeTax } from "@/lib/tax";
 import {
   derive as deriveKernel,
   bridgeRentalPostTaxAnnual,
@@ -990,8 +991,87 @@ describe("seed-anchor regression locks (gh-issue #17 — catch silent adequacy-l
     // tapering at 50; lifestyle creep defaults to 0) -- also moving FIRE earlier, since income is a
     // larger base than the residual. Values below are the ACTUAL merged-kernel output, MEASURED
     // (not hand-derived) -- see the evidence table in the merge commit.
-    expect(k.yearsToRegular).toBeCloseTo(21, 2);
+    //
+    // RE-ANCHORED 2026-09-29 (#87 per-assessee household tax): 21.00y -> 19.0833y, FIRE ~1.92y
+    // EARLIER. `fireNumber` is UNCHANGED at Rs 8,73,72,837 -- the target's SIZE never moved, only
+    // how fast this household reaches it, which is exactly the signature of a CASHFLOW change and
+    // not a target change. The one changed term: `derive()` no longer taxes the household as ONE
+    // pooled filer. India taxes each adult separately, so the Sharmas' true bill is Rohit
+    // Rs 5,48,496 + Priya Rs 1,68,064 = Rs 7,16,560, not the pooled Rs 11,65,840 -- Rs 4,49,280/yr
+    // of phantom tax that used to be subtracted from savings before it reached the corpus. The
+    // direction is the honest one: a household that owes less tax reaches FIRE sooner.
+    expect(k.yearsToRegular).toBeCloseTo(19.0833, 2);
     expect(Math.round(k.fireNumber)).toBe(87_372_837);
+  });
+});
+
+/**
+ * #87 -- the household's income tax is the SUM of each earning adult's OWN tax, never one pooled
+ * filer. These are DIRECTION locks, not value pins (the golden master pins the values): they say
+ * what must be true of ANY future kernel, so the pooled single-filer model can never come back.
+ */
+describe("#87 -- per-assessee household tax (direction locks)", () => {
+  beforeEach(() => setActivePinia(createPinia()));
+
+  const LENS87 = { isFamilyView: false, viewingMemberId: null, currentFY: "2025-26" } as const;
+
+  it("kernel annualTax EQUALS the sum of the per-assessee returns, to the rupee", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    loadSeedPersona(h, a, LENS87.currentFY);
+    const k = derive(h.data, a.values, LENS87);
+    const summed = k.perAssesseeTax.perAssessee.reduce((s, x) => s + x.tax, 0);
+    expect(k.annualTax).toBe(summed);
+    // ...and there is one return per EARNING adult, not one for the household.
+    expect(k.perAssesseeTax.perAssessee.length).toBe(k.lensedEarners.length);
+  });
+
+  it("a dual-earner household is taxed BELOW the pooled single-filer model it replaced", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    loadSeedPersona(h, a, LENS87.currentFY);
+    const k = derive(h.data, a.values, LENS87);
+    expect(k.perAssesseeTax.perAssessee.length).toBeGreaterThan(1);
+    // The pooled model this replaced: ONE computeTax over the same taxable gross with the same
+    // household deduction bundle. Pooling can only ever cost MORE (one basic exemption, one
+    // standard deduction, one 87A rebate, and the second earner riding the first's marginal
+    // slabs), so this strict inequality is the defect's own signature.
+    const pooledGross =
+      k.annualIncome.salaryIncome + k.annualIncome.businessShare + k.annualIncome.otherTaxable;
+    const pooled = computeTax({
+      grossIncome: pooledGross,
+      regime: k.householdTaxRecommendation.recommended,
+      fy: LENS87.currentFY,
+      deductions: k.estimatedDeductionsForOld,
+    });
+    expect(k.annualTax).toBeLessThan(pooled.totalTax);
+  });
+
+  it("a SINGLE-earner household is byte-identical to one computeTax over its own income", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    loadMauryasSeed(h, a, LENS87.currentFY);
+    const k = derive(h.data, a.values, LENS87);
+    expect(k.perAssesseeTax.perAssessee.length).toBe(1);
+    expect(k.annualTax).toBe(k.perAssesseeTax.perAssessee[0].tax);
+  });
+
+  it("the #225 cash identity still closes: income - tax === savings + expenses", () => {
+    for (const load of [
+      (h: ReturnType<typeof useHouseholdStore>, a: ReturnType<typeof useAssumptionsStore>) =>
+        loadSeedPersona(h, a, LENS87.currentFY),
+      (h: ReturnType<typeof useHouseholdStore>, a: ReturnType<typeof useAssumptionsStore>) =>
+        loadMauryasSeed(h, a, LENS87.currentFY),
+    ]) {
+      setActivePinia(createPinia());
+      const h = useHouseholdStore();
+      const a = useAssumptionsStore();
+      load(h, a);
+      const k = derive(h.data, a.values, LENS87);
+      expect(
+        Math.abs(k.annualIncome.total - k.annualTax - (k.annualSavings + k.annualExpensesToday)),
+      ).toBeLessThanOrEqual(1);
+    }
   });
 });
 
