@@ -16,15 +16,12 @@
  *     all conservative (a higher target / no early-money credit). The HEALTHCARE reservation IS
  *     now included (#162 part 1, `calculateFireTarget` shared with the household path) — it is
  *     no longer a simplification, see the residual-drift note below.
- *   - RESERVATION-LEG INFLATION DRIFT (disclosed bound, #162 part 2 — NOT fixed tonight): the
- *     household path (`derive.ts`) grows its healthcare reservation leg at `healthcareInflation`
- *     (~9%) while everything else — including this member path's WHOLE target, reservation
- *     included — grows at the household basket (`resolveHouseholdBasket`, ADR-0007(d)). Where
- *     healthcareInflation > the basket (the common case), the household reservation leg rises
- *     FASTER than this member path's reservation share does over time, so a member's target
- *     understates the household-grade reservation more the further out their FIRE date is — a
- *     SMALL, deferred, residual optimism (bounded by the gap between the two rates × the
- *     reservation's ~20% share of base), tracked alongside the per-member bridge gate on #162.
+ *   - (RETIRED — gh #162 part 2 §4.4, this change) the reservation-leg inflation drift is FIXED:
+ *     the member target is now the SAME two legs the household path uses — base at
+ *     `resolveHouseholdBasket` and the healthcare reservation at `healthcareInflation` — so a
+ *     member's reservation share no longer rises slower than the household's the further out
+ *     their FIRE date is. Byte-identical at t = 0; strictly later wherever
+ *     healthcareInflation > basket. See `memberTargetNominalAt` below.
  *   - rental income is taxed at FULL gross in the attributable tax (the household path applies the
  *     §24(a) 30% / §24(b) / §71 house-property collapse; the individual path does NOT). This
  *     OVER-taxes the individual → savings lower → individual FIRE LATER → conservative/safe; it only
@@ -77,6 +74,19 @@ export interface IndividualFireResult {
   yearsToIndividualFire: number;
   /** anchorAge + yearsToIndividualFire (Infinity → anchorAge unchanged sentinel handled by caller). */
   individualFireAge: number;
+  /**
+   * gh #162 part 2 §4.4 — the NOMINAL two-leg target schedule the solver actually chased, at
+   * fractional year `t` from `anchorAge`: base at the household basket + the healthcare reservation
+   * at `healthcareInflation`. Exposed so a test can pin THE KERNEL'S OWN schedule against
+   * `derive.ts`'s `healthcareReservationNominalAt` rather than rebuilding both legs in test-side
+   * arithmetic — a reconstruction cannot see an off-by-one on `t` inside this closure, and a
+   * `tt + 1` mutant provably survived every test that only reconstructed it (#210 review).
+   * Derived, never persisted.
+   */
+  targetNominalAt: (t: number) => number;
+  /** The two legs at t = 0, so a test can separate them without re-deriving the reservation %. */
+  targetBaseToday: number;
+  targetReservationToday: number;
 }
 
 /** "Joint" asset/debt/income sentinel (distinct from the "Household" expense sentinel). */
@@ -298,6 +308,44 @@ export function computeIndividualFire(
       healthcareReservationPercent,
     }),
   );
+  /**
+   * gh #162 part 2 §4.4 — THE TWO LEGS THE TARGET IS MADE OF, kept as components instead of
+   * collapsed into one scalar, so each can ride its OWN price index the way the household path
+   * already does.
+   *
+   * RCA of what this closes: `derive.ts` grows its healthcare-reservation leg at
+   * `assumptions.healthcareInflation` on its own schedule (`healthcareReservationNominalAt`) while
+   * this file grew the member's WHOLE target — reservation included — at
+   * `resolveHouseholdBasket(assumptions)`. `healthcareInflation` does reach the basket by WEIGHT,
+   * but the basket is a blend, so wherever `healthcareInflation > basket` (the normal case, 9% vs
+   * ~6.2% on the default weights) the member's reservation share rose SLOWER than the household's.
+   * The member target therefore understated the household-grade reservation, and understated it
+   * MORE the further out the member's FIRE date is — small, monotone and OPTIMISTIC, which is the
+   * Tier-0 direction for this persona. The file's own docblock disclosed it as a residual bound;
+   * this is the fix.
+   *
+   * At `t = 0` the two legs sum to EXACTLY `individualFireNumber`, so the member's target TODAY is
+   * byte-identical — only the TRAJECTORY the solver chases moves, and it moves the age later.
+   * `familyLayerCorpus: 0` keeps this at exactly two legs (ring-3 exclusion, contract §3); a
+   * member-owned dated goal would make it three, which is why they are summed rather than hard-coded.
+   */
+  const targetReservationToday = individualBaseFireNumber * healthcareReservationPercent;
+  const targetBaseToday = individualFireNumber - targetReservationToday;
+  /** NOMINAL ₹ in the member's target at fractional year `t` — base at the basket, reservation at
+   *  medical inflation. Mirrors `derive.ts`'s `regularTargetSchedule`, on member quantities. */
+  // The rate is snapshotted, NOT read live off `assumptions` inside the closure: the exposed
+  // `targetNominalAt` is the schedule THIS solve used, and a caller mutating the assumptions store
+  // afterwards must not retroactively change an already-returned result (found while pinning the
+  // rupee value — two results computed at 9% and 14% returned the identical schedule because both
+  // closures read the same live object).
+  const memberHealthcareInflation = assumptions.healthcareInflation;
+  const memberTargetNominalAt = (t: number): number => {
+    const tt = Math.max(0, t);
+    return (
+      targetBaseToday * Math.pow(1 + householdBasket, tt) +
+      targetReservationToday * Math.pow(1 + memberHealthcareInflation, tt)
+    );
+  };
 
   // calculateYearsToTarget caps its loop at 1200 months and returns a FINITE value (up to 100.0)
   // for an unreachable target with positive-but-insufficient savings — NOT Infinity (only the
@@ -318,7 +366,9 @@ export function computeIndividualFire(
   const rawYearsToFire = hasTarget
     ? calculateYearsToTarget(
         attributableCorpus,
-        (yearIndex: number) => individualFireNumber * Math.pow(1 + householdBasket, yearIndex),
+        // §4.4: the TWO-LEG schedule, not `individualFireNumber × (1 + basket)^t` — the
+        // reservation leg rides medical inflation, so the target the solver chases is steeper.
+        memberTargetNominalAt,
         nominalContribution,
         blendedReturn,
       )
@@ -344,5 +394,8 @@ export function computeIndividualFire(
     nominalReturn: blendedReturn,
     yearsToIndividualFire,
     individualFireAge,
+    targetNominalAt: memberTargetNominalAt,
+    targetBaseToday,
+    targetReservationToday,
   };
 }
