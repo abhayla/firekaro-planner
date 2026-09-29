@@ -297,3 +297,111 @@ describe("evaluateNudges — P2 newly-wired firing logic", () => {
     ).not.toContain("goal-post-shift");
   });
 });
+
+// ============================================================================================
+// gh #185 step 7 — first-mile nudges (emergency fund, protection cover, first SIP). Fires on the
+// low-band accumulator (Ravi-shaped: young earner, no cover, no SIP, thin emergency fund) and
+// stays silent on a well-set-up household (Sharmas-shaped: covered, funded, investing).
+// ============================================================================================
+describe("evaluateNudges — first-mile nudges (gh #185 step 7)", () => {
+  function earningAdult(o: Partial<Member> = {}): Member {
+    return {
+      id: "ravi",
+      name: "Ravi",
+      dateOfBirth: "2003-01-01",
+      role: "ADULT",
+      relation: "Self",
+      city: "Metro",
+      health: "Healthy",
+      riskAppetite: "Moderate",
+      marital: "Single",
+      employmentStatus: "Employed",
+      salary: { annualCTC: 300_000, hikePercent: 12 },
+      ...o,
+    } as Member;
+  }
+
+  function raviLikeHousehold(): Household {
+    return emptyHousehold({
+      members: [earningAdult()],
+      // EPF only — no deliberate SIP yet.
+      investments: [inv({ id: "epf", type: "EPF_VPF", value: 50_000, monthlyContribution: 1800, ownerId: "ravi" })],
+      insurance: [],
+    });
+  }
+
+  function sharmasLikeHousehold(): Household {
+    return emptyHousehold({
+      members: [earningAdult({ id: "sharma", name: "Sharma" })],
+      investments: [
+        inv({ id: "epf", type: "EPF_VPF", value: 500_000, monthlyContribution: 5_000, ownerId: "sharma" }),
+        inv({ id: "mf", type: "MutualFunds", value: 1_000_000, monthlyContribution: 20_000, ownerId: "sharma" }),
+        // 8 months of expenses sitting in FD — comfortably covers the 6-month emergency-fund bar.
+        inv({ id: "fd", type: "FD", value: 400_000, ownerId: "sharma" }),
+      ],
+      insurance: [
+        { id: "term", type: "Life", provider: "LIC", sumAssured: 10_000_000, annualPremium: 12_000, insuredPersonId: "sharma" },
+        { id: "health", type: "Health", provider: "Star", sumAssured: 1_000_000, annualPremium: 15_000, insuredPersonId: "sharma" },
+      ],
+    });
+  }
+
+  // ---- no-protection-cover ----
+  it("fires no-protection-cover on Ravi (no Life/Health policy on the earning adult)", () => {
+    const out = evaluateNudges(ctx({ household: raviLikeHousehold(), annualExpenses: 250_000 }));
+    expect(kinds(out)).toContain("no-protection-cover");
+    const n = out.find((x) => x.kind === "no-protection-cover")!;
+    expect(n.severity).toBe("alert");
+  });
+
+  it("does NOT fire no-protection-cover on Sharmas (covered)", () => {
+    const out = evaluateNudges(ctx({ household: sharmasLikeHousehold(), annualExpenses: 600_000 }));
+    expect(kinds(out)).not.toContain("no-protection-cover");
+  });
+
+  it("does NOT fire no-protection-cover when there is no earning adult at all", () => {
+    const out = evaluateNudges(ctx({ household: emptyHousehold({ members: [parentMember()] }) }));
+    expect(kinds(out)).not.toContain("no-protection-cover");
+  });
+
+  // ---- first-sip ----
+  it("fires first-sip on Ravi (only EPF, no deliberate SIP)", () => {
+    const out = evaluateNudges(ctx({ household: raviLikeHousehold(), annualExpenses: 250_000 }));
+    expect(kinds(out)).toContain("first-sip");
+  });
+
+  it("does NOT fire first-sip on Sharmas (already has a non-EPF SIP)", () => {
+    const out = evaluateNudges(ctx({ household: sharmasLikeHousehold(), annualExpenses: 600_000 }));
+    expect(kinds(out)).not.toContain("first-sip");
+  });
+
+  it("does NOT fire first-sip for a truly empty household (nothing to nudge about yet)", () => {
+    expect(kinds(evaluateNudges(ctx()))).not.toContain("first-sip");
+  });
+
+  // ---- emergency-fund (existing emergency-fund-shortfall kind covers the < 6 months rule) ----
+  it("fires emergency-fund-shortfall on Ravi (thin/no liquid buffer)", () => {
+    const out = evaluateNudges(ctx({ household: raviLikeHousehold(), annualExpenses: 250_000 }));
+    expect(kinds(out)).toContain("emergency-fund-shortfall");
+  });
+
+  it("does NOT fire emergency-fund-shortfall on Sharmas (8 months covered)", () => {
+    const out = evaluateNudges(ctx({ household: sharmasLikeHousehold(), annualExpenses: 600_000 }));
+    expect(kinds(out)).not.toContain("emergency-fund-shortfall");
+  });
+
+  // ---- the whole first-mile stack, together ----
+  it("all three first-mile nudges fire together on Ravi and none fire on Sharmas", () => {
+    const raviOut = kinds(evaluateNudges(ctx({ household: raviLikeHousehold(), annualExpenses: 250_000 })));
+    expect(raviOut).toEqual(
+      expect.arrayContaining(["no-protection-cover", "first-sip", "emergency-fund-shortfall"]),
+    );
+    const sharmasOut = kinds(evaluateNudges(ctx({ household: sharmasLikeHousehold(), annualExpenses: 600_000 })));
+    expect(sharmasOut).not.toEqual(
+      expect.arrayContaining(["no-protection-cover", "first-sip", "emergency-fund-shortfall"]),
+    );
+    expect(sharmasOut).not.toContain("no-protection-cover");
+    expect(sharmasOut).not.toContain("first-sip");
+    expect(sharmasOut).not.toContain("emergency-fund-shortfall");
+  });
+});

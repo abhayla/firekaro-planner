@@ -17,7 +17,10 @@ import { useScenariosStore, type LeverValues } from "@/stores/scenarios";
 import { useUiStore, SHARED_TARGET_AGE_MIN, SHARED_TARGET_AGE_MAX } from "@/stores/ui";
 import { calculateFIRENumber, calculateYearsToTarget, projectCorpus, type ContributionSchedule } from "@/lib/fire-math";
 import { buildContributionResolver } from "@/lib/contribution-schedule";
-import { requiredMonthlyContributionFor } from "@/lib/required-contribution";
+import {
+  requiredMonthlyContributionFor,
+  PRESCRIPTION_GROWTH_CLAUSE,
+} from "@/lib/required-contribution";
 import { formatINRCompact, formatYearsMonths } from "@/lib/formatters";
 import InfoTip from "@/components/shared/InfoTip.vue";
 import DeltaChip from "@/components/shared/DeltaChip.vue";
@@ -633,7 +636,12 @@ function resetTargetAge() {
               <div class="layer-value text-currency" data-testid="retire-required-sip">
                 {{ formatINRCompact(retireByAge.requiredMonthlySIP ?? 0) }}
               </div>
-              <div class="layer-detail">to hit your FIRE number by {{ targetAge }}</div>
+              <!-- #207: the required SIP is the STARTING real amount of a plan that rises with
+                   income, not a flat one — one exported clause, drift-locked in
+                   `lens-coverage-invariant.spec.ts`. -->
+              <div class="layer-detail">
+                to start, {{ PRESCRIPTION_GROWTH_CLAUSE }} — to hit your FIRE number by {{ targetAge }}
+              </div>
             </div>
             <div class="retire-cell">
               <div class="layer-label">Additional SIP needed</div>
@@ -669,7 +677,8 @@ function resetTargetAge() {
                 Today's {{ formatINRCompact(retireByAge.currentMonthlySIP ?? 0) }}/mo already gets you there.
               </template>
               <template v-else>
-                Step up to {{ formatINRCompact(retireByAge.requiredMonthlySIP ?? 0) }}/mo to retire by {{ targetAge }}.
+                Step up to {{ formatINRCompact(retireByAge.requiredMonthlySIP ?? 0) }}/mo to start,
+                {{ PRESCRIPTION_GROWTH_CLAUSE }}, to retire by {{ targetAge }}.
               </template>
             </span>
           </div>

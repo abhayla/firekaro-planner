@@ -176,4 +176,75 @@ describe("fire-goals member-lens coverage — Goals lenses, the 4 simulation scr
       "Goals copy must not claim the healthcare reserve is skipped (#162 part 1 added it)",
     ).toBe(false);
   });
+  /**
+   * gh #207 drift-lock (copy honesty). After #207 `requiredMonthlyReal` is no longer a FLAT amount
+   * held for the whole horizon: it is the STARTING real contribution of a plan that rises with the
+   * household's income (`contribution(t) = required x income(t)/income(0)`). The number was fixed in
+   * one place (`derive.ts`) while FOUR surfaces kept the old flat sentence — "invest this every
+   * month", "you need Rs X/month", "Step up to Rs X/mo", "your Rs X a month ... for 17 years" — each
+   * of which understates what the later years actually ask for. A fixed number under stale copy is
+   * still a lie to the user, so this lock pins the disclosure to every surface that PRINTS the
+   * figure: add a fifth such surface without the clause and this test fails.
+   *
+   * Comment-stripped on purpose (the precedent above): a clause that survives only inside a `<!-- -->`
+   * or `//` comment is dev-facing history and never reaches a user, so it must not satisfy the lock.
+   */
+  it("#207: every surface printing `requiredMonthlyReal` discloses that it RISES with income", () => {
+    const SRC = join(PAGES, "..");
+    // The exported single source of the wording — the surfaces must use IT, not a hand-typed copy
+    // that can drift word by word.
+    const clauseSrc = readFileSync(join(SRC, "lib", "required-contribution.ts"), "utf8");
+    expect(
+      clauseSrc.includes('export const PRESCRIPTION_GROWTH_CLAUSE'),
+      "`PRESCRIPTION_GROWTH_CLAUSE` must stay exported from the module that PRODUCES the number, " +
+        "so the copy cannot drift from its source",
+    ).toBe(true);
+    for (const token of ["rising with your income", "2%/yr real"]) {
+      expect(
+        clauseSrc.includes(token),
+        `the exported clause must still say "${token}" — it is the whole disclosure`,
+      ).toBe(true);
+    }
+
+    /** Every surface that renders the solved prescription to a user. */
+    const PRESCRIPTION_SURFACES = [
+      "components/dashboard/FireHero.vue",
+      "components/quick/LeverPicker.vue",
+      "pages/fire-goals/WhatIf.vue",
+      "lib/quick-number-copy.ts",
+    ] as const;
+    /** Strip what never reaches a user: HTML comments, block comments, and line comments. */
+    const renderedOnly = (src: string): string =>
+      src
+        .replace(/<!--[\s\S]*?-->/g, "")
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .replace(/^[ \t]*\/\/.*$/gm, "");
+
+    for (const rel of PRESCRIPTION_SURFACES) {
+      const file = join(SRC, ...rel.split("/"));
+      expect(existsSync(file), `${rel} must exist — update this lock if the surface moved`).toBe(true);
+      // The IMPORT line is stripped too: an unused import left behind after someone deletes the
+      // clause from the template would otherwise satisfy this lock (found by mutation-testing this
+      // very assertion — the first version of it passed with the clause removed from LeverPicker).
+      // What must be present is a USE of the constant, not a mention of its name.
+      const rendered = renderedOnly(readFileSync(file, "utf8")).replace(
+        /^[ 	]*import[\s\S]*?from\s*["'][^"']+["'];?[ 	]*$/gm,
+        "",
+      );
+      expect(
+        rendered.includes("PRESCRIPTION_GROWTH_CLAUSE"),
+        `${rel} prints \`requiredMonthlyReal\` but its RENDERED copy does not USE ` +
+          "`PRESCRIPTION_GROWTH_CLAUSE` (an unused import does not count) — after #207 the figure " +
+          "is a STARTING amount that rises with income, so copy implying a flat monthly amount " +
+          "understates the later years",
+      ).toBe(true);
+      // And the old flat phrasings must be gone from rendered copy, in every surface's own words.
+      for (const stale of ["invest this every month", "a month grow at"]) {
+        expect(
+          rendered.includes(stale),
+          `${rel} still renders the pre-#207 flat phrasing "${stale}"`,
+        ).toBe(false);
+      }
+    }
+  });
 });

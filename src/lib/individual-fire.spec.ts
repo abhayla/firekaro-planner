@@ -4,8 +4,12 @@ import { useHouseholdStore } from "@/stores/household";
 import { useAssumptionsStore } from "@/stores/assumptions";
 import { loadSeedPersona } from "@/lib/seed-persona";
 import { loadRaviSeed } from "@/seeds/ravi";
+import { loadMehtasSeed } from "@/seeds/mehtas";
+import { loadIyersSeed } from "@/seeds/iyers";
+import { loadMauryasSeed } from "@/seeds/mauryas";
 import { derive } from "@/lib/derive";
 import { computeIndividualFire } from "@/lib/individual-fire";
+import { resolveHouseholdBasket } from "@/lib/assumption-math";
 
 describe("computeIndividualFire (#81 Phase 2 — standalone per-adult FIRE)", () => {
   beforeEach(() => setActivePinia(createPinia()));
@@ -142,5 +146,214 @@ describe("computeIndividualFire (#81 Phase 2 — standalone per-adult FIRE)", ()
     // And it does NOT touch Priya's attributable expenses.
     const priyaBeforeId = computeIndividualFire(h.data, a.values, "priya", "2025-26")!;
     expect(priyaBeforeId.attributableAnnualExpenses).not.toBeCloseTo(after.attributableAnnualExpenses, 0);
+  });
+  // ---- gh #162 part 2, §4.4 — the reservation-leg inflation asymmetry (T5) ----
+  //
+  // RCA: `derive.ts` grows the healthcare reservation leg at `healthcareInflation` (9%) on its own
+  // schedule (`healthcareReservationNominalAt`) while this file grew the member's WHOLE target —
+  // reservation included — at `resolveHouseholdBasket` (6.24%). Where healthcareInflation > basket
+  // (the normal case) the member's reservation share rose SLOWER than the household's, so the
+  // member target understated the household-grade reservation, and understated it more the further
+  // out the member's FIRE date is. Small, monotone, OPTIMISTIC — the Tier-0 direction.
+  it("gh #162 part 2 T5 — the target is byte-identical at t=0 and STEEPER later (two-leg schedule)", () => {
+    const { h, a } = setup();
+    h.data.healthcareCorpusReservationPercent = 0.2;
+    // Isolate the RESERVATION leg from the basket channel (see T5b): with a general-only weight
+    // vector, `healthcareInflation` reaches the target ONLY through the reservation leg, which is
+    // exactly the asymmetry §4.4 closes.
+    a.values.inflationWeights = { general: 1, healthcare: 0, education: 0, housing: 0 };
+    a.values.healthcareInflation = 0.09;
+
+    // (a) t = 0 byte-identical: the reported `individualFireNumber` is the target TODAY, and the
+    // two-leg split must sum to exactly what the single-rate collapse summed to at t = 0.
+    const withGap = computeIndividualFire(h.data, a.values, "rohit", "2025-26")!;
+    const zeroReservation = (() => {
+      h.data.healthcareCorpusReservationPercent = 0;
+      const r = computeIndividualFire(h.data, a.values, "rohit", "2025-26")!;
+      h.data.healthcareCorpusReservationPercent = 0.2;
+      return r;
+    })();
+    expect(withGap.individualFireNumber).toBeCloseTo(zeroReservation.individualFireNumber * 1.2, -2);
+
+    // (b) STEEPER later: with healthcareInflation ABOVE the basket the reservation leg outruns the
+    // base leg, so the target the solver chases at t > 0 is LARGER than the single-rate schedule's
+    // — which can only push the member's FIRE age LATER (or leave it, on a rounding tie). Compare
+    // against the SAME household with healthcareInflation pinned DOWN to the basket, where the two
+    // schedules provably coincide (one rate for both legs).
+    const basket = resolveHouseholdBasket(a.values);
+    a.values.healthcareInflation = basket;
+    const noGap = computeIndividualFire(h.data, a.values, "rohit", "2025-26")!;
+    // Same target TODAY (the reservation % did not change) …
+    expect(noGap.individualFireNumber).toBeCloseTo(withGap.individualFireNumber, -2);
+    // … but a strictly LONGER solve when the reservation leg runs hotter than the basket.
+    expect(withGap.yearsToIndividualFire).toBeGreaterThan(noGap.yearsToIndividualFire);
+    expect(withGap.individualFireAge).toBeGreaterThanOrEqual(noGap.individualFireAge);
+  });
+
+  it("gh #162 part 2 T5b — a ZERO reservation makes healthcareInflation irrelevant (no leg to grow)", () => {
+    const { h, a } = setup();
+    h.data.healthcareCorpusReservationPercent = 0;
+    // `healthcareInflation` ALSO feeds the household basket by weight (`resolveHouseholdBasket`),
+    // so it must be zeroed out of the basket to isolate the RESERVATION leg — otherwise this test
+    // measures the basket channel, not the leg, and fails on main for the wrong reason.
+    a.values.inflationWeights = { general: 1, healthcare: 0, education: 0, housing: 0 };
+    a.values.healthcareInflation = 0.05;
+    const lo = computeIndividualFire(h.data, a.values, "rohit", "2025-26")!;
+    a.values.healthcareInflation = 0.2;
+    const hi = computeIndividualFire(h.data, a.values, "rohit", "2025-26")!;
+    // With no reservation leg the two-leg schedule collapses to the base leg alone — identical.
+    expect(hi.yearsToIndividualFire).toBe(lo.yearsToIndividualFire);
+    expect(hi.individualFireNumber).toBe(lo.individualFireNumber);
+  });
+
+  it("gh #162 part 2 T5c — raising healthcareInflation never pulls a member's FIRE age EARLIER", () => {
+    const { h, a } = setup();
+    h.data.healthcareCorpusReservationPercent = 0.2;
+    a.values.inflationWeights = { general: 1, healthcare: 0, education: 0, housing: 0 };
+    // Monotone-later, and a high enough medical inflation legitimately outruns the corpus into
+    // "not within horizon" (Infinity) — which is the CONSERVATIVE terminal state, never an earlier
+    // age. Infinity compares correctly under >=, so the ladder covers both regimes in one sweep.
+    let prev = -Infinity;
+    for (const hi of [0.04, 0.06, 0.09, 0.12, 0.15]) {
+      a.values.healthcareInflation = hi;
+      const r = computeIndividualFire(h.data, a.values, "rohit", "2025-26")!;
+      expect(Number.isNaN(r.yearsToIndividualFire)).toBe(false);
+      expect(r.yearsToIndividualFire).toBeGreaterThanOrEqual(prev);
+      prev = r.yearsToIndividualFire;
+    }
+    // …and the top of the ladder really is strictly worse than the bottom (not a flat no-op).
+    a.values.healthcareInflation = 0.04;
+    const lo = computeIndividualFire(h.data, a.values, "rohit", "2025-26")!;
+    a.values.healthcareInflation = 0.12;
+    const hi12 = computeIndividualFire(h.data, a.values, "rohit", "2025-26")!;
+    expect(hi12.yearsToIndividualFire).toBeGreaterThan(lo.yearsToIndividualFire);
+  });
+  // ---- gh #162 part 2, T2 — per-seed member bounds, bands DERIVED from the measured run ----
+  //
+  // Bands come from the step-3 before/after measurement (§4.4 landing), never invented and never
+  // widened to admit a number (D-2026-09-29-03). Each row is the POST-FIX age with a ±1 tolerance
+  // for the solver's integer-age rounding, plus the substance locks (no NaN/Infinity leaking into
+  // a reachable member, target byte-identical at t = 0, expenses/corpus non-negative).
+  it("gh #162 part 2 T2 — per-seed member bounds on the measured post-fix ages", () => {
+    const seeds: Array<[string, (h: never, a: never) => void, Array<[string, number | null]>]> = [
+      ["sharmas", loadSeedPersona as never, [["rohit", 48], ["priya", 47]]],
+      ["mehtas", loadMehtasSeed as never, [["vikram", 45], ["aanya", 63]]],
+      ["iyers", loadIyersSeed as never, [["ashwin", 47], ["lakshmi", 84]]],
+      ["mauryas", loadMauryasSeed as never, [["abhay", 56], ["madhu", null]]],
+      ["ravi", loadRaviSeed as never, [["ravi", 41]]],
+    ];
+    for (const [seed, load, rows] of seeds) {
+      setActivePinia(createPinia());
+      const h = useHouseholdStore();
+      const a = useAssumptionsStore();
+      (load as unknown as (x: unknown, y: unknown) => void)(h, a);
+      for (const [memberId, expectedAge] of rows) {
+        const r = computeIndividualFire(h.data, a.values, memberId, "2025-26")!;
+        expect(r, `${seed}/${memberId}`).not.toBeNull();
+        expect(Number.isNaN(r.individualFireAge), `${seed}/${memberId} age NaN`).toBe(false);
+        expect(Number.isNaN(r.individualFireNumber), `${seed}/${memberId} target NaN`).toBe(false);
+        expect(r.attributableAnnualExpenses, `${seed}/${memberId} exp`).toBeGreaterThanOrEqual(0);
+        expect(r.attributableCorpus, `${seed}/${memberId} corpus`).toBeGreaterThanOrEqual(0);
+        expect(Number.isFinite(r.individualFireNumber), `${seed}/${memberId} finite target`).toBe(true);
+        if (expectedAge === null) {
+          // Measured unreachable (madhu: no salary, target ₹3.0 Cr) — must stay "not within horizon",
+          // never a rendered finite absurd age (rule 31).
+          expect(Number.isFinite(r.individualFireAge), `${seed}/${memberId} unreachable`).toBe(false);
+          continue;
+        }
+        expect(Number.isFinite(r.individualFireAge), `${seed}/${memberId} reachable`).toBe(true);
+        expect(r.individualFireAge, `${seed}/${memberId} lo`).toBeGreaterThanOrEqual(expectedAge - 1);
+        expect(r.individualFireAge, `${seed}/${memberId} hi`).toBeLessThanOrEqual(expectedAge + 1);
+        // Age and years must never disagree (the cross-screen-coherence class).
+        expect(r.individualFireAge, `${seed}/${memberId} coherence`).toBe(
+          Math.round(r.anchorAge + r.yearsToIndividualFire),
+        );
+      }
+    }
+  });
+  // FinTech verdict gap (#210 review): T5/T5b/T5c assert DIRECTION only — a future edit that swaps
+  // the reservation leg's rate for the wrong one, or that grows it at `t + 1` / `t - 1`, would still
+  // be monotone-later and still pass all three. This pins THE KERNEL'S OWN schedule
+  // (`result.targetNominalAt`) against the one-line formula `derive.ts` uses for the household
+  // (`healthcareReservationNominalAt` = `reservation × (1 + healthcareInflation)^t`, derive.ts
+  // l.1151) at t = 10, to within ₹1.
+  //
+  // Why the kernel's own closure and not a test-side reconstruction: the first version of this test
+  // rebuilt both legs in its own arithmetic, and a `tt + 1` mutant on the reservation leg SURVIVED
+  // it (measured, #210 review) — a reconstruction cannot see an off-by-one inside the closure it is
+  // reconstructing. `targetNominalAt` is exposed for exactly this reason.
+  //
+  // Every store mutation below is restored in `finally`: a thrown assertion used to leave
+  // `healthcareInflation`/`healthcareCorpusReservationPercent` elevated on the shared store, which
+  // turned T5 and T5c red in the same file for the wrong reason (#210 review). Same pattern as the
+  // property spec in `kernel-invariants.property.spec.ts`.
+  it("gh #162 part 2 T5d — the KERNEL's schedule matches derive's healthcareReservationNominalAt at t = 10", () => {
+    const { h, a } = setup();
+    const originalWeights = a.values.inflationWeights;
+    const originalHealthcare = a.values.healthcareInflation;
+    const originalEducation = a.values.educationInflation;
+    const originalHousing = a.values.housingInflation;
+    const originalReservation = h.data.healthcareCorpusReservationPercent;
+    try {
+      // Isolate the reservation channel from the basket blend, exactly as T5 does (see T5b).
+      a.values.inflationWeights = { general: 1, healthcare: 0, education: 0, housing: 0 };
+      a.values.healthcareInflation = 0.09;
+      a.values.educationInflation = 0.11; // deliberately DIFFERENT, so a wrong-rate swap is detectable
+      a.values.housingInflation = 0.13;
+      const reservationPercent = 0.2;
+      h.data.healthcareCorpusReservationPercent = reservationPercent;
+
+      const r = computeIndividualFire(h.data, a.values, "rohit", "2025-26")!;
+      const basket = resolveHouseholdBasket(a.values);
+      const T = 10;
+
+      // The two legs the kernel actually built, not a reconstruction.
+      expect(Math.abs(r.targetReservationToday - r.targetBaseToday * reservationPercent)).toBeLessThanOrEqual(1);
+      expect(Math.abs(r.targetBaseToday + r.targetReservationToday - r.individualFireNumber)).toBeLessThanOrEqual(1);
+
+      // derive.ts's household formula, verbatim, on the member's own reservation leg.
+      const healthcareReservationNominalAt10 =
+        r.targetReservationToday * Math.pow(1 + a.values.healthcareInflation, T);
+      const baseLegAt10 = r.targetBaseToday * Math.pow(1 + basket, T);
+
+      // THE ASSERTION: the kernel's own schedule at t = 10 IS base-leg + derive's reservation leg,
+      // to the rupee. A `tt ± 1` or a rate swap inside `memberTargetNominalAt` moves this and fails.
+      // ₹1 absolute, as briefed — `targetBaseToday` is derived off the rounded
+      // `individualFireNumber`, so the two sides differ by paise, never by rupees.
+      expect(Math.abs(r.targetNominalAt(T) - (baseLegAt10 + healthcareReservationNominalAt10)))
+        .toBeLessThanOrEqual(1);
+      // …and the residual after removing the base leg is derive's reservation leg alone.
+      expect(Math.abs(r.targetNominalAt(T) - baseLegAt10 - healthcareReservationNominalAt10))
+        .toBeLessThanOrEqual(1);
+
+      // t = 0 is byte-identical to the reported target (the no-collateral-movement guarantee).
+      expect(Math.abs(r.targetNominalAt(0) - r.individualFireNumber)).toBeLessThanOrEqual(1);
+
+      // NEIGHBOURING RATES and OFF-BY-ONE `t` must each differ by far more than ₹1, so none of them
+      // could pass the pin above on rounding.
+      for (const wrongRate of [basket, a.values.educationInflation, a.values.housingInflation, a.values.inflation]) {
+        const wrongLeg = r.targetReservationToday * Math.pow(1 + wrongRate, T);
+        if (Math.abs(wrongRate - a.values.healthcareInflation) < 1e-9) continue;
+        expect(Math.abs(healthcareReservationNominalAt10 - wrongLeg)).toBeGreaterThan(1);
+      }
+      for (const offBy of [T - 1, T + 1]) {
+        const shifted = r.targetReservationToday * Math.pow(1 + a.values.healthcareInflation, offBy);
+        expect(Math.abs(healthcareReservationNominalAt10 - shifted)).toBeGreaterThan(1);
+      }
+
+      // The schedule is LIVE in the solve, not merely exposed: raising only healthcareInflation
+      // moves the age later while leaving t = 0 untouched.
+      a.values.healthcareInflation = 0.14;
+      const hotter = computeIndividualFire(h.data, a.values, "rohit", "2025-26")!;
+      expect(hotter.yearsToIndividualFire).toBeGreaterThan(r.yearsToIndividualFire);
+      expect(hotter.individualFireNumber).toBe(r.individualFireNumber);
+      expect(hotter.targetNominalAt(T)).toBeGreaterThan(r.targetNominalAt(T));
+    } finally {
+      a.values.inflationWeights = originalWeights;
+      a.values.healthcareInflation = originalHealthcare;
+      a.values.educationInflation = originalEducation;
+      a.values.housingInflation = originalHousing;
+      h.data.healthcareCorpusReservationPercent = originalReservation;
+    }
   });
 });

@@ -33,6 +33,7 @@ import { requiredMonthlyContributionFor } from "@/lib/required-contribution";
 import { isEarningMember } from "@/lib/member-earning";
 import { useFireDerive, deflateProjectionPoints } from "@/lib/useFireDerive";
 import { calculateYearsToTarget } from "@/lib/fire-math";
+import { computeIndividualFire } from "@/lib/individual-fire";
 import { computeRunway } from "@/lib/runway";
 import { toMonthly } from "@/lib/cashflow";
 import { buildContributionResolver } from "@/lib/contribution-schedule";
@@ -880,6 +881,40 @@ describe("T-377/QN-2 — the 'do this' monthly amount is plausible (rule 31 flin
       expect(r.haveAtTargetReal).toBeGreaterThanOrEqual(0);
       expect(r.gapReal).toBe(r.needReal - r.haveAtTargetReal);
       expect(r.needNominal).toBeGreaterThanOrEqual(r.needReal);
+    });
+  }
+});
+
+describe("gh #162 part 2 T7 — the member hero's FIRE age stays persona-sane after §4.4", () => {
+  beforeEach(() => setActivePinia(createPinia()));
+  // The member hero + IndividualFireCard are flagship surfaces (rule 31): §4.4 makes every
+  // member's target trajectory steeper, so the sane-bounds lock has to move with it. A member age
+  // is either "not within horizon" (an HONEST Infinity the card renders as a caveat, never a
+  // number) or a finite age that a salaried accumulator would recognise — never age 115, never
+  // below the member's own current age, and never disagreeing with its own years figure.
+  for (const persona of PERSONAS) {
+    it(`${persona.name}: every adult's member FIRE age is Infinity or inside sane bounds`, () => {
+      const h = useHouseholdStore();
+      const a = useAssumptionsStore();
+      persona.load(h, a);
+      for (const member of h.data.members.filter((m) => m.role === "ADULT")) {
+        const r = computeIndividualFire(h.data, a.values, member.id, "2025-26");
+        if (!r) continue;
+        const label = `${persona.name}/${member.id}`;
+        expect(Number.isNaN(r.individualFireAge), `${label} NaN age`).toBe(false);
+        expect(Number.isNaN(r.individualFireNumber), `${label} NaN target`).toBe(false);
+        expect(r.individualFireNumber, `${label} target > 0`).toBeGreaterThan(0);
+        if (!Number.isFinite(r.individualFireAge)) continue; // honest "not within horizon"
+        expect(r.individualFireAge, `${label} >= anchor`).toBeGreaterThanOrEqual(r.anchorAge);
+        // Upper bound = the member's own plan horizon: the reachability clamp guarantees it, and a
+        // rendered age past it is the exact rule-31 leak the HIGH-1 lock exists for.
+        const planTo = member.planToAge ?? 90;
+        expect(r.individualFireAge, `${label} <= planTo`).toBeLessThanOrEqual(planTo);
+        // Age and years must agree to the rounding step (cross-screen figure coherence).
+        expect(r.individualFireAge, `${label} coherence`).toBe(
+          Math.round(r.anchorAge + r.yearsToIndividualFire),
+        );
+      }
     });
   }
 });

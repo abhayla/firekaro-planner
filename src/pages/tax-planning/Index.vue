@@ -3,6 +3,7 @@ import { computed, ref } from "vue";
 import { useHouseholdStore } from "@/stores/household";
 import { useFireDerive } from "@/lib/useFireDerive";
 import { useUiStore } from "@/stores/ui";
+import { todayIsoLocal } from "@/lib/as-of-date";
 import { computeTax, npsCeilingFor, AVAILABLE_FYS } from "@/lib/tax";
 import { getCurrentFinancialYear } from "@/lib/expense-history";
 import { toAnnual } from "@/lib/cashflow";
@@ -131,7 +132,9 @@ const incomeRows = computed<IncomeRow[]>(() => {
 // gh #86 — deductions over the SAME member scope as the income above (FinTech B'-fallback; deriveDeductions
 // is scope-agnostic, so a member-scoped household yields member-scoped 80C/80CCD/80D/§24/80CCD(2)). This is
 // the load-bearing same-scope fix: lensing income but keeping household deductions would be the #23 leak.
-const derivedDeductions = computed(() => deriveDeductions(scopedHousehold.value));
+const derivedDeductions = computed(() =>
+  deriveDeductions(scopedHousehold.value, { asOfDate: todayIsoLocal() }),
+);
 
 // 80CCD(2) employer-NPS is the one deduction allowed in BOTH regimes — show the CAPPED value
 // at the displayed regime's ceiling (per-member), so the tax-reducing figure is visible (gh-issue #4).
@@ -252,10 +255,28 @@ const monthlyTakeHome = computed(() => {
 // computeEarnerTaxCard (src/lib/tax-deductions.ts) — extracted from this screen so a
 // behaviour spec can call the exact function the screen renders from, and so the SAME sector
 // handling as the LimitMeter above (npsCeilingFor(regime, m.sector)) applies here too.
+//
+// gh-issue #201: derivedDeductions.value.totalDeductions is the WHOLE household's 80C/80D/
+// §24 pool — passing it to EVERY earner's card meant a two-earner household double-claimed the
+// shared deductions (each card claimed 100% of the pool, so an earner with none of a given
+// deduction still showed it, understating their tax). Each earner's card now uses the SAME
+// per-member attribution the headline computeIndividualFire() path uses
+// (src/lib/individual-fire.ts: deriveDeductions scoped to that member's own investments/
+// liabilities/insurance) — one shared attribution, not a second formula.
 const perEarner = computed(() =>
-  household.earners.map((m) =>
-    computeEarnerTaxCard(m, selectedFY.value, derivedDeductions.value.totalDeductions, effectiveRegime.value),
-  ),
+  household.earners.map((m) => {
+    const earnerDeductions = deriveDeductions(
+      {
+        ...scopedHousehold.value,
+        members: [m],
+        investments: scopedHousehold.value.investments.filter((i) => i.ownerId === m.id),
+        liabilities: scopedHousehold.value.liabilities.filter((l) => l.ownerId === m.id),
+        insurance: scopedHousehold.value.insurance.filter((p) => p.insuredPersonId === m.id),
+      },
+      { asOfDate: todayIsoLocal() },
+    );
+    return computeEarnerTaxCard(m, selectedFY.value, earnerDeductions.totalDeductions, effectiveRegime.value);
+  }),
 );
 
 // Per-earner avatar visuals (mirror the Profile per-member colour language).

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { PRESCRIPTION_GROWTH_CLAUSE } from "@/lib/required-contribution";
 /**
  * FireHero — the Option-D verdict hero (design SSOT:
  * docs/design/2026-06-10-fire-dashboard-redesign/option-d-merged.html).
@@ -16,6 +17,7 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, RouterLink } from "vue-router";
 import { useFireDerive } from "@/lib/useFireDerive";
+import { todayIsoLocal } from "@/lib/as-of-date";
 import { useHouseholdStore } from "@/stores/household";
 import { useAssumptionsStore } from "@/stores/assumptions";
 import { useUiStore, SHARED_TARGET_AGE_MIN, SHARED_TARGET_AGE_MAX } from "@/stores/ui";
@@ -139,7 +141,7 @@ const variance = computed(() => {
       isFamilyView: ui.isFamilyView,
       viewingMemberId: ui.viewingMemberId,
       currentFY: ui.currentFY,
-      asOfDate: new Date().toISOString().slice(0, 10),
+      asOfDate: todayIsoLocal(),
     },
     nowMs: Date.now(),
     // ADR-0006 Phase 1d — the wall clock enters at the component boundary; the kernel is pure.
@@ -504,7 +506,7 @@ function yearsLabel(years: number): string {
           <div class="gap-tile__v text-currency" data-testid="hero-required-monthly">
             <template v-if="!requiredFinite">Move the age</template>
             <template v-else-if="!mustInvestMore">You're already there</template>
-            <template v-else>{{ formatINRCompact(req.requiredMonthlyReal) }} / month</template>
+            <template v-else>{{ formatINRCompact(req.requiredMonthlyReal) }} / month to start</template>
           </div>
           <div class="gap-tile__s">
             <template v-if="!requiredFinite">
@@ -514,7 +516,13 @@ function yearsLabel(years: number): string {
               your current {{ formatINRCompact(req.currentMonthlyReal) }}/month is enough for {{ targetAge }}
             </template>
             <template v-else>
-              invest this every month (you do {{ formatINRCompact(req.currentMonthlyReal) }} now) to retire at
+              <!-- #207: the solved figure is the STARTING real amount of a plan that rises with income
+                   (`contribution(t) = required x income(t)/income(0)`), NOT a flat amount held for the
+                   whole horizon. Saying "invest this every month" understates the later years.
+                   `PRESCRIPTION_GROWTH_CLAUSE` is the one exported wording; the drift-lock in
+                   `lens-coverage-invariant.spec.ts` asserts it renders here. -->
+              start here, {{ PRESCRIPTION_GROWTH_CLAUSE }} (you do
+              {{ formatINRCompact(req.currentMonthlyReal) }} now) to retire at
               {{ targetAge }}<template v-if="feasibilityNote"> — {{ feasibilityNote }}</template>
             </template>
             <template v-if="hh.isMember">

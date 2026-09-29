@@ -304,6 +304,61 @@ describe("A7.1 kernel invariants — per-persona metamorphic (fast-check)", () =
   }
 });
 
+describe("gh #162 part 2 §4.4 — the member target's reservation leg is monotone-later in medical inflation", () => {
+  beforeEach(() => setActivePinia(createPinia()));
+  // §4.4 splits the member target into TWO legs (base at the household basket, healthcare
+  // reservation at `healthcareInflation`) instead of growing the whole thing at the basket. The
+  // invariant that makes it honest: raising `healthcareInflation` can only make a member's FIRE
+  // LATER, never earlier — a steeper reservation leg is a bigger target, and a bigger target is
+  // never reached sooner. (Infinity is the conservative terminal state and compares correctly
+  // under >=, so an unreachable tail is admitted, an EARLIER age is not.)
+  //
+  // `healthcareInflation` also feeds the household basket by WEIGHT (`resolveHouseholdBasket`), so
+  // the weights are pinned general-only inside the property: that isolates the RESERVATION channel,
+  // which is the one §4.4 changed, instead of measuring the basket blend.
+  for (const persona of PERSONAS) {
+    it(`${persona.name}: every adult's yearsToIndividualFire is non-decreasing in healthcareInflation`, () => {
+      const h = useHouseholdStore();
+      const a = useAssumptionsStore();
+      persona.load(h, a);
+      const originalWeights = a.values.inflationWeights;
+      const originalHealthcare = a.values.healthcareInflation;
+      const originalReservation = h.data.healthcareCorpusReservationPercent;
+      try {
+        a.values.inflationWeights = { general: 1, healthcare: 0, education: 0, housing: 0 };
+        h.data.healthcareCorpusReservationPercent = 0.2;
+        fc.assert(
+          fc.property(
+            fc.double({ min: 0.03, max: 0.18, noNaN: true }),
+            fc.double({ min: 0.0001, max: 0.06, noNaN: true }),
+            (lowRate, bump) => {
+              const adults = h.data.members.filter((m) => m.role === "ADULT");
+              for (const member of adults) {
+                a.values.healthcareInflation = lowRate;
+                const lo = computeIndividualFire(h.data, a.values, member.id, "2025-26");
+                a.values.healthcareInflation = lowRate + bump;
+                const hi = computeIndividualFire(h.data, a.values, member.id, "2025-26");
+                if (!lo || !hi) continue;
+                expect(Number.isNaN(lo.yearsToIndividualFire)).toBe(false);
+                expect(Number.isNaN(hi.yearsToIndividualFire)).toBe(false);
+                // Monotone-later. A hotter reservation leg can never pull FIRE earlier.
+                expect(hi.yearsToIndividualFire).toBeGreaterThanOrEqual(lo.yearsToIndividualFire);
+                // And the target TODAY is untouched by the rate — only its trajectory moves.
+                expect(hi.individualFireNumber).toBe(lo.individualFireNumber);
+              }
+            },
+          ),
+          { numRuns: 20 },
+        );
+      } finally {
+        a.values.inflationWeights = originalWeights;
+        a.values.healthcareInflation = originalHealthcare;
+        h.data.healthcareCorpusReservationPercent = originalReservation;
+      }
+    });
+  }
+});
+
 describe("gh #162 part 1 — individual FIRE target always carries the healthcare reservation", () => {
   beforeEach(() => setActivePinia(createPinia()));
   // Review finding (#199 item 4): the property body mutated `h.data.healthcareCorpusReservationPercent`

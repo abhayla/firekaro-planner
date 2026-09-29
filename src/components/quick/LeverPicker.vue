@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { PRESCRIPTION_GROWTH_CLAUSE } from "@/lib/required-contribution";
 /**
  * QN-5 (T-379) — "How to get there — pick your moves" (design SSOT:
  * docs/design/2026-08-27-quick-number-gap-hero/option-c-merged.html, the plan card).
@@ -71,7 +72,10 @@ const summary = computed(() => {
   const was = Number.isFinite(baselineToFind.value)
     ? ` (was ${formatINRCompact(baselineToFind.value)})`
     : " (was out of reach)";
-  return `With ${names}: you need ${formatINRCompact(required)}/month to retire at ${targetAge.value}. Of that, ${formatINRCompact(current)} is already flowing; the extra to find is ${formatINRCompact(stackedToFind.value)}/month${was}.`;
+  // #207: `required` is the STARTING real amount of an income-rising plan, not a flat one — the
+  // clause is the single exported wording (`PRESCRIPTION_GROWTH_CLAUSE`), drift-locked in
+  // `lens-coverage-invariant.spec.ts`.
+  return `With ${names}: you need ${formatINRCompact(required)}/month to start, ${PRESCRIPTION_GROWTH_CLAUSE}, to retire at ${targetAge.value}. Of that, ${formatINRCompact(current)} is already flowing; the extra to find is ${formatINRCompact(stackedToFind.value)}/month${was}.`;
 });
 
 const PERSISTABLE: PlanLeverKey[] = ["step-up-10", "delay-3", "direct-plans"];

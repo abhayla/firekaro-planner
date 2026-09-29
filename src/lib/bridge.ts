@@ -44,6 +44,7 @@
  */
 import type { Investment } from "@/types/household";
 import { accessibleAtAge, type AssumptionNote } from "@/lib/accessibility";
+import { accessibilityClass } from "@/lib/investment-traits";
 import { postTaxLiquidation, type LiquidationContext } from "@/lib/liquidation-tax";
 import { postTaxAnnuityIncome } from "@/lib/nps-withdrawal";
 import { LTCG_LISTED_EXEMPTION } from "@/lib/esop-tax";
@@ -85,16 +86,114 @@ export interface BridgeInput {
   /** Marginal slab rate (decimal) — post-taxes the NPS annuity slice. */
   marginalRate: number;
   /**
-   * Multiplier mapping TODAY's holding values to their projected value at the
-   * retirement age (= fireNumber / today's withdrawable corpus). The corpus
-   * grows to the FIRE number via contributions + returns, so a holding worth ₹X
-   * today is worth ≈ ₹X × corpusScale at retirement. Uniform scaling is a
-   * documented MVP simplification — it keeps each instrument's LOCKED PROPORTION
-   * of the retirement corpus roughly right without a per-instrument projection.
-   * Defaults to 1 (no scaling — e.g. an already-FIRE household).
+   * FALLBACK ONLY (#212). Uniform multiplier mapping TODAY's holding values to the retirement
+   * age (= drifted real target / today's corpus). It is used ONLY for a tranche that
+   * `projection` gives no per-instrument rule for, and for the whole portfolio when no
+   * `projection` is supplied at all (every pre-#212 fixture). Defaults to 1 (no scaling).
+   *
+   * WHY IT IS NO LONGER THE PRIMARY PATH (#212, Tier-0 optimistic class). The error was in the
+   * COMPOSITION of the retirement corpus, not its LEVEL. The portfolio TOTAL was pinned to the
+   * adequacy target both before and after this fix (see `projectedPreTaxTotal` — the identity
+   * holds either way), so nothing was "inflated against a CPI-only bill"; what was wrong is that
+   * one portfolio-wide factor grew EVERY holding as if the household's whole future contribution
+   * stream landed in it, which pushed the LOCKED slice past the ceiling its own instrument can
+   * physically reach. A PPF cannot grow that way (₹1.5L/yr statutory cap), an NPS grows only on
+   * its own contributions, and a property grows by appreciation alone. Measured on the sharmas
+   * seed the factor was 8.89×, so a ₹6L PPF was projected to ₹53.32L at age 52 — roughly 3.4×
+   * what ₹1.5L/yr at its own return can reach. Since the total is fixed, an over-stated locked
+   * slice is exactly a MIS-SPLIT: the bridge then reads the wrong liquid-vs-locked division of a
+   * correct total, which is the quantity the coverage check actually consumes.
    */
   corpusScale?: number;
+  /**
+   * #212 — per-instrument projection inputs. When present, each tranche is projected to the
+   * retirement age by ITS OWN rule (see {@link projectHoldingToRetirement}) and the LIQUID pool
+   * absorbs the residual so the household total still reconciles to `targetReal`.
+   */
+  projection?: BridgeProjection;
   asOf?: Date;
+}
+
+/**
+ * #212 — the inputs a per-instrument projection needs, all in the bridge's REAL (today's-rupee)
+ * frame, because the bridge's expense side is in today's rupees.
+ */
+export interface BridgeProjection {
+  /**
+   * The household's DRIFTED REAL corpus target at the retirement age — the same figure the
+   * adequacy leg solved to. The liquid pool absorbs `targetReal − Σ(locked projections)` so the
+   * whole-portfolio total still equals what the adequacy solve found (the reconciliation identity,
+   * asserted in `bridge.spec.ts`).
+   */
+  targetReal: number;
+  /** REAL annual return per instrument family (nominal de-inflated at general CPI). */
+  realReturnFor: (asset: Investment) => number;
+  /**
+   * REAL ₹/month this holding receives, from its own `monthlyContribution` /
+   * `contributionSchedule` (resolved by the caller through `contribution-schedule.ts`). A holding
+   * with no plan of its own contributes nothing and grows on returns alone.
+   */
+  realMonthlyContributionFor: (asset: Investment, yearIndex: number) => number;
+  /** Years from `anchorAge` to the retirement age being projected to. */
+  yearsToRetirement: number;
+}
+
+/**
+ * PPF statutory contribution ceiling, ₹ per financial year per account (PPF Scheme, 2019).
+ *
+ * DELIBERATELY NOT DEDUPED against `LIMIT_80C` (#212 review). The two are ₹1,50,000 today by
+ * coincidence of policy, not by reference: this is a DEPOSIT ceiling under the PPF Scheme (how much
+ * may be paid INTO one account in a financial year), while 80C is a DEDUCTION ceiling under the
+ * Income-tax Act (how much of any 80C-eligible spend reduces taxable income). They are set by
+ * different instruments and either can move without the other. Aliasing them would silently couple
+ * a projection ceiling to a tax cap, so a future Budget that raised only one would corrupt the
+ * other — keep them separate even while the numbers agree.
+ */
+export const PPF_ANNUAL_CONTRIBUTION_CAP = 150_000;
+
+/**
+ * #212 — project ONE holding from today's value to its value at the retirement age, by the rule
+ * its own instrument family actually obeys. All figures REAL (today's ₹).
+ *
+ *  - **PPF** — own contributions, each year's inflow CAPPED at the ₹1.5L statutory ceiling,
+ *    compounded at `ppfReturn`. This is the cap the property invariant in `bridge.spec.ts`
+ *    asserts: a PPF's projected value can never exceed cap-contributions compounded at its own
+ *    return.
+ *  - **EPF / NPS** — own contributions at their own return; no share of the rest of the plan.
+ *  - **Real estate** — appreciation only. A property receives no monthly contribution and is never
+ *    topped up by the savings residual.
+ *  - **Everything else (the liquid pool)** — its own contributions at its own return. The residual
+ *    of the plan's contributions is then allocated across the liquid tranches by the caller (see
+ *    the reconciliation rule in `computeBridgeCoverage`), which is what keeps the household total
+ *    on the adequacy target.
+ *
+ * The year loop compounds a real monthly inflow at a real annual return, mid-year-free (the whole
+ * year's contribution is credited at year end), which is the conservative convention the rest of
+ * the kernel uses.
+ */
+export function projectHoldingToRetirement(
+  asset: Investment,
+  p: BridgeProjection,
+): number {
+  // Whole-year accumulation loop: a fractional horizon is TRUNCATED, never rounded up (12.7 years
+  // accumulates 12). Truncating drops a partial year of contributions + growth, so the projection
+  // errs SMALLER — the conservative direction for a layer whose job is to lean pessimistic, and it
+  // can never manufacture a year of growth the household has not lived through.
+  const years = Math.max(0, Math.floor(p.yearsToRetirement));
+  const r = Number.isFinite(p.realReturnFor(asset)) ? p.realReturnFor(asset) : 0;
+  const cls = accessibilityClass(asset);
+  const isRealEstate = cls === "realEstate";
+  const annualCap = cls === "ppf" ? PPF_ANNUAL_CONTRIBUTION_CAP : Number.POSITIVE_INFINITY;
+
+  let v = Math.max(0, Number.isFinite(asset.value) ? asset.value : 0);
+  for (let t = 0; t < years; t++) {
+    // Real estate: appreciation only — never topped up.
+    const inflow = isRealEstate
+      ? 0
+      : Math.min(annualCap, Math.max(0, p.realMonthlyContributionFor(asset, t) * 12));
+    v = v * (1 + r) + inflow;
+  }
+  return Number.isFinite(v) && v > 0 ? v : 0;
 }
 
 export interface UnlockEvent {
@@ -124,6 +223,20 @@ export interface BridgeCoverage {
   bridgeIncomeAnnual: number;
   /** Transparency notes accumulated from A/B + the bridge (principle 1). */
   assumptions: AssumptionNote[];
+  /**
+   * #212 review — the sum of every holding's PRE-TAX projected value at the tested retirement age.
+   *
+   * WHY IT IS EXPOSED. `reachableCorpus` and `lockedCorpus` are both POST-TAX (a liquidation
+   * haircut sits between the projection and them) and the NPS annuity slice leaves the lump
+   * entirely, so NEITHER can pin the reconciliation identity — the property that the per-tranche
+   * projection still totals exactly the target the adequacy leg solved to. This field is the
+   * pre-tax total, so `|projectedPreTaxTotal − projection.targetReal| < ₹1` is directly assertable
+   * (and is, on all five seeds, in `bridge.spec.ts`).
+   *
+   * `null` when no `projection` was supplied (the pre-#212 uniform-`corpusScale` path), where
+   * there is no target to reconcile to.
+   */
+  projectedPreTaxTotal: number | null;
 }
 
 /** A post-tax pension stream credited from `startAge` onward. */
@@ -154,6 +267,102 @@ export function computeBridgeCoverage(input: BridgeInput): BridgeCoverage {
   const R = input.retirementAge;
   const scale = Number.isFinite(input.corpusScale ?? 1) ? Math.max(0, input.corpusScale ?? 1) : 1;
 
+  /**
+   * #212 — the projected REAL value of every holding at the retirement age, by its own rule.
+   *
+   * THE RECONCILIATION RULE (the one decision this fix turns on). Each non-liquid family is
+   * projected by its own mechanics, which are BOUNDED (a PPF by its ₹1.5L ceiling, an EPF/NPS by
+   * its own contributions, a property by appreciation). Those projections do NOT add up to the
+   * household's drifted real target, because the target was solved from the WHOLE savings
+   * residual, most of which is not earmarked to any one holding. So:
+   *
+   *     Σ(liquid tranches) = max(0, targetReal − Σ(locked/bounded projections))
+   *
+   * distributed across the liquid tranches in proportion to their own standalone projections. The
+   * household total therefore still equals exactly the target the adequacy solve found — the
+   * bridge and the adequacy leg stay in ONE frame (the invariant ADR-0006 Phase 1d established) —
+   * while the locked slice is no longer inflated to a value its instrument cannot reach.
+   *
+   * NO DOUBLE-COUNT — THE ATTRIBUTION, STATED EXPLICITLY (#212 review). The adequacy target is
+   * solved from `annualSavings`, which ALREADY contains every `investments[].monthlyContribution`;
+   * `boundedTotal` then grows the locked tranches by those same earmarked inflows. That is an
+   * attribution, not a duplication, and the subtraction is what makes it one: each earmarked rupee
+   * is counted EXACTLY ONCE, against the locked tranche it is actually paid into, and the liquid
+   * budget is the REMAINDER of the same target — `targetReal − boundedTotal` — so the un-earmarked
+   * part of the savings residual is what lands on the liquid side. Nothing is added to the total;
+   * the total is fixed at `targetReal` and this rule only DIVIDES it. The arbiter is mechanical,
+   * not an argument: `projectedPreTaxTotal` must equal `targetReal` to within ₹1, asserted on all
+   * five seeds through the real `derive()` path in `bridge.spec.ts`. A genuine double-count would
+   * make that sum EXCEED the target, and the test would be red.
+   *
+   * The residual lands on the LIQUID side by construction, which is the honest direction: unearmarked
+   * savings are free cash, and if the bounded projections ever exceed the target the liquid pool
+   * floors at 0 rather than going negative (a household whose locked money alone clears the target
+   * has no liquid runway, and the bridge is exactly the check that should fire).
+   */
+  // Memoised per candidate retirement age: delaying retirement gives every holding more years of
+  // its own contributions + return, so the projection is re-run per candidate in the forward search
+  // (exactly as the accessibility classification already is).
+  const projectionCache = new Map<number, Map<string, number> | null>();
+  /** Σ of the PRE-TAX projected values at the tested age R (see `projectedPreTaxTotal`). */
+  let preTaxTotalAtR: number | null = null;
+  function projectedValuesAt(retAge: number): Map<string, number> | null {
+    const hit = projectionCache.get(retAge);
+    if (hit !== undefined) return hit;
+    const built = buildProjectedValues(retAge);
+    projectionCache.set(retAge, built);
+    return built;
+  }
+
+  function buildProjectedValues(retAge: number): Map<string, number> | null {
+    const base = input.projection;
+    if (!base || !Number.isFinite(base.targetReal) || base.targetReal <= 0) return null;
+    // Extra years past the requested retirement age extend every holding's own accumulation.
+    const p: BridgeProjection = {
+      ...base,
+      yearsToRetirement: base.yearsToRetirement + (retAge - R),
+    };
+
+    const standalone = new Map<string, number>();
+    let boundedTotal = 0;
+    let liquidStandaloneTotal = 0;
+    const liquidIds: string[] = [];
+    for (const { asset } of input.holdings) {
+      const v = projectHoldingToRetirement(asset, p);
+      standalone.set(asset.id, v);
+      if (accessibilityClass(asset) === "liquid") {
+        liquidIds.push(asset.id);
+        liquidStandaloneTotal += v;
+      } else {
+        boundedTotal += v;
+      }
+    }
+
+    const liquidBudget = Math.max(0, p.targetReal - boundedTotal);
+    const out = new Map(standalone);
+    if (liquidIds.length > 0) {
+      if (liquidStandaloneTotal > 0) {
+        // Proportional to each liquid tranche's own standalone projection.
+        for (const id of liquidIds) {
+          out.set(id, liquidBudget * ((standalone.get(id) ?? 0) / liquidStandaloneTotal));
+        }
+      } else {
+        // Degenerate: all liquid tranches project to 0 (a zero-corpus starter household). Split the
+        // budget evenly rather than dropping it, so the identity still holds.
+        for (const id of liquidIds) out.set(id, liquidBudget / liquidIds.length);
+      }
+    }
+    if (retAge === R) preTaxTotalAtR = [...out.values()].reduce((a, b) => a + b, 0);
+    return out;
+  }
+
+  /** Today's value → the projected value at the retirement age (#212 per-tranche, else the scalar). */
+  function projectedValueOf(asset: Investment, retAge: number): number {
+    const perTranche = projectedValuesAt(retAge)?.get(asset.id);
+    if (perTranche != null && Number.isFinite(perTranche)) return Math.max(0, perTranche);
+    return Math.max(0, Number.isFinite(asset.value) ? asset.value : 0) * scale;
+  }
+
   // Classify every holding's accessibility + post-tax net AT a given retirement
   // age (unlock ages, the NPS early/normal split, and PPF maturity all depend on
   // the retirement age, so this is re-run per candidate in the effective-age search).
@@ -167,9 +376,11 @@ export function computeBridgeCoverage(input: BridgeInput): BridgeCoverage {
     let equityExemptionRemaining = LTCG_LISTED_EXEMPTION;
 
     for (const { asset, ownerDob } of input.holdings) {
-      // Project the holding's value to the retirement age (see corpusScale).
+      // #212: project the holding's value to the retirement age by its OWN instrument rule
+      // (falling back to the uniform `corpusScale` only when no projection was supplied).
+      const projectedValue = projectedValueOf(asset, retAge);
       const projected: Investment =
-        scale === 1 ? asset : { ...asset, value: Math.max(0, asset.value) * scale };
+        projectedValue === asset.value ? asset : { ...asset, value: projectedValue };
       const acc = accessibleAtAge(projected, retAge, ownerDob, asOf);
       if (acc.assumption) assumptions.push(acc.assumption);
 
@@ -181,7 +392,15 @@ export function computeBridgeCoverage(input: BridgeInput): BridgeCoverage {
       if (liq.assumption) assumptions.push(liq.assumption);
       equityExemptionRemaining = Math.max(0, equityExemptionRemaining - liq.equityExemptionUsed);
 
-      if (acc.illiquid) {
+      // #211 — a holding that is illiquid AND has no unlock event (primary residence, or any
+      // future family with `unlockAge: Infinity`) is locked forever: it counts in the portfolio
+      // total but NEVER becomes runway. A holding that is illiquid but HAS a finite unlock age is
+      // a dated sale event (an investment property at its `plannedSaleAge`): it is locked until
+      // that age and then credited as a tranche, net of tax + the illiquidity haircut. Before this
+      // fix the second case fell into the first, so a property's rupees propped up the adequacy
+      // total while contributing exactly ₹0 of runway — and the gate read `covered` on money the
+      // household could not spend (Tier-0, optimistic).
+      if (acc.illiquid && !Number.isFinite(acc.unlockAge)) {
         lockedCorpus += Math.max(0, projected.value);
       } else if (acc.unlockAge <= retAge) {
         reachableCorpus += liq.net;
@@ -297,5 +516,6 @@ export function computeBridgeCoverage(input: BridgeInput): BridgeCoverage {
     unlockTimeline: c.tranches,
     bridgeIncomeAnnual: Math.round(bridgeIncomeAnnual),
     assumptions,
+    projectedPreTaxTotal: preTaxTotalAtR,
   };
 }

@@ -17,6 +17,7 @@ import { useAssumptionsStore } from "@/stores/assumptions";
 import { useUiStore } from "@/stores/ui";
 import { useFeaturesStore } from "@/stores/features";
 import { useFireDerive } from "@/lib/useFireDerive";
+import { todayIsoLocal } from "@/lib/as-of-date";
 import { derive } from "@/lib/derive";
 import { evaluateNudges, type NudgeSeverity } from "@/lib/nudge-engine";
 import { derivedFamilyLayer } from "@/lib/derived-records";
@@ -68,7 +69,7 @@ const nudges = computed(() => {
       isFamilyView: true,
       viewingMemberId: null,
       currentFY: ui.currentFY,
-      asOfDate: new Date().toISOString().slice(0, 10),
+      asOfDate: todayIsoLocal(),
     },
     // ADR-0006 Phase 1d — the wall clock enters at the composable boundary, not in the kernel.
     { currentYear: new Date().getFullYear() },

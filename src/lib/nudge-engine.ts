@@ -17,9 +17,10 @@
  * declares where the nudge is allowed to render.
  */
 
-import type { Household, Investment } from "@/types/household";
+import { isAdultRole, type Household, type Investment } from "@/types/household";
 import type { DerivedFamilyLayer } from "./derived-records";
 import { isInMarginalReliefBand, deriveDeductions, LIMIT_80C, LIMIT_80CCD_1B } from "./tax-deductions";
+import { todayIsoLocal } from "./as-of-date";
 import { suggestNpsCap } from "./nps-withdrawal";
 import { epfVpfOpportunityCostYears } from "./epf-vpf";
 import { isEmergencyFundEligible } from "./investment-traits";
@@ -62,7 +63,9 @@ export type NudgeKind =
   | "nps-cap"
   | "epf-vpf-opportunity-cost"
   | "emergency-fund-shortfall"
-  | "over-committed-sips";
+  | "over-committed-sips"
+  | "no-protection-cover"
+  | "first-sip";
 
 export interface NudgeContext {
   household: Household;
@@ -260,6 +263,59 @@ export function evaluateNudges(ctx: NudgeContext): Nudge[] {
     });
   }
 
+  // 9b. First-mile nudges (gh #185 step 7) — the low-band accumulator's setup basics, BEFORE any
+  // acceleration lever is worth discussing. Distinct from the affluent-oriented nudges above (NPS
+  // cap, international allocation, ESOP cliff, estate gaps): these fire on the household having
+  // NONE of a basic safeguard, not on having "too much" of something.
+
+  // 9b-i. No protection cover — no Life (term-equivalent; the schema has no separate "Term" type,
+  // `insuranceTypeSchema` is Vehicle/Health/Life) or Health policy insures any earning adult. Fires
+  // once per household, not once per uncovered earner — the point is "you have a gap", not a count.
+  const earningAdultIds = new Set(
+    ctx.household.members.filter((m) => isAdultRole(m.role) && (m.salary?.annualCTC ?? 0) > 0).map((m) => m.id),
+  );
+  if (earningAdultIds.size > 0) {
+    const coveredIds = new Set(
+      ctx.household.insurance
+        .filter((p) => p.type === "Life" || p.type === "Health")
+        .map((p) => p.insuredPersonId),
+    );
+    const anyEarnerCovered = [...earningAdultIds].some((id) => coveredIds.has(id));
+    if (!anyEarnerCovered) {
+      out.push({
+        id: "no-protection-cover",
+        kind: "no-protection-cover",
+        severity: "alert",
+        title: "No term or health cover yet",
+        body: `Nobody earning in your household has a term life or health insurance policy on record. A single medical or income shock can undo years of saving — this comes before any FIRE-acceleration move.`,
+        routes: ["fire-dashboard", "insurance"],
+        ctaTarget: "/insurance",
+        ctaLabel: "Add a policy",
+      });
+    }
+  }
+
+  // 9b-ii. First SIP — no investment with a real monthly contribution outside EPF/VPF (the
+  // salary-linked auto-flow doesn't count as "you started investing" — it fires whether or not the
+  // household has taken the first deliberate step of a SIP).
+  const hasNonEpfSip = ctx.household.investments.some(
+    (i) => i.type !== "EPF_VPF" && (i.monthlyContribution ?? 0) > 0,
+  );
+  // Gate on the household actually existing (a truly empty household — no members yet, mid-wizard —
+  // has nothing to nudge about investing).
+  if (ctx.household.members.length > 0 && !hasNonEpfSip) {
+    out.push({
+      id: "first-sip",
+      kind: "first-sip",
+      severity: "warning",
+      title: "Start your first SIP",
+      body: `Outside of EPF, you don't have a single recurring investment yet. Even a small SIP started now beats a bigger one started later — compounding rewards the early start more than the amount.`,
+      routes: ["fire-dashboard", "investments-overview"],
+      ctaTarget: "/investments",
+      ctaLabel: "Add a SIP",
+    });
+  }
+
   // 10. Auto-debit gap (audit Entry #28) — fires when any non-automated
   // recurring investment exists.
   const nonAutomated = ctx.household.investments.filter(
@@ -376,7 +432,7 @@ export function evaluateNudges(ctx: NudgeContext): Nudge[] {
   // taxable income above the basic exemption (where deductions actually save
   // tax). Body names the specific unused headroom(s). deriveDeductions is pure.
   if (ctx.taxableIncome > 500_000) {
-    const ded = deriveDeductions(ctx.household);
+    const ded = deriveDeductions(ctx.household, { asOfDate: todayIsoLocal() });
     const headroom80C = Math.max(0, LIMIT_80C - ded.section80C);
     const headroom80CCD1B = Math.max(0, LIMIT_80CCD_1B - ded.section80CCD1B);
     const gaps: string[] = [];

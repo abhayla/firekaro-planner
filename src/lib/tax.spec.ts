@@ -7,6 +7,7 @@ import { useHouseholdStore } from "@/stores/household";
 import { useAssumptionsStore } from "@/stores/assumptions";
 import { loadSeedPersona } from "@/lib/seed-persona";
 import { loadEmptySeed } from "@/seeds/empty";
+import { getCurrentFinancialYear } from "@/lib/expense-history";
 import { computeIndividualFire } from "@/lib/individual-fire";
 import { deriveDeductions, computeEarnerTaxCard } from "@/lib/tax-deductions";
 import {
@@ -618,7 +619,29 @@ describe("EarnerSalaryForm.vue / tax-planning/Index.vue use the sector-aware NPS
 
   it("tax-planning/Index.vue's perEarner call-site body routes through computeEarnerTaxCard, not bare scalars", () => {
     const src = fs.readFileSync(path.join(root, "src/pages/tax-planning/Index.vue"), "utf-8");
-    const body = extractBlock(src, /const perEarner = computed\(/, /\)\s*;/);
+    // gh-issue #201: `perEarner`'s body now contains its own nested `deriveDeductions({...})`
+    // call, so the naive `/\)\s*;/` endPattern (which matches the FIRST `);` after the start,
+    // not the one balancing `computed(`'s own opening paren) would truncate the extraction at
+    // that nested call — paren-balance instead (same technique as the #201 source lock below).
+    const startMatch = /const perEarner = computed\(/.exec(src);
+    if (!startMatch) throw new Error("perEarner computed not found");
+    let depth = 0;
+    let parenStart = -1;
+    let end = -1;
+    for (let i = startMatch.index; i < src.length; i++) {
+      if (src[i] === "(") {
+        if (parenStart === -1) parenStart = i;
+        depth++;
+      } else if (src[i] === ")") {
+        depth--;
+        if (depth === 0 && parenStart !== -1) {
+          end = i + 1;
+          break;
+        }
+      }
+    }
+    if (end === -1) throw new Error("perEarner computed end not found (unbalanced parens)");
+    const body = src.slice(startMatch.index, end);
     expect(body).toMatch(/computeEarnerTaxCard\(/);
     expect(body).not.toMatch(/employerNps:\s*earnerNps/);
     expect(body).not.toMatch(/employerNpsBasic:\s*earnerBasic/);
@@ -739,5 +762,162 @@ describe("government-earner preview === headline behaviour lock (gh-issue #157 �
     expect(formNpsDeducted).toBe(140_000);
     expect(headlineNpsDeducted).toBe(140_000);
     expect(formNpsDeducted).toBe(headlineNpsDeducted);
+  });
+});
+
+describe("per-earner tax-planning card uses the EARNER's attributed deductions, not the household total (gh-issue #201)", () => {
+  // RCA: tax-planning/Index.vue passed derivedDeductions.value.totalDeductions (the WHOLE
+  // household's 80C/80D/§24 sum) into computeEarnerTaxCard for EACH earner, so a two-earner
+  // household double-claims the SHARED deductions (80D/Sec-24, which are pooled once per
+  // household in deriveDeductions) — one earner's card claims deductions they have zero of.
+  // NOTE: 80C is legitimately a PER-INDIVIDUAL ₹1.5L cap under Indian law, and
+  // deriveDeductions already caps it per the SCOPE it's called with — so summing two
+  // per-member 80C figures can legitimately EXCEED the household-wide 80C figure (each earner
+  // has their own ₹1.5L room). This spec therefore locks the discriminating invariant: an
+  // earner with ZERO of a given deduction (e.g. priya has no 80D health cover, no Sec-24 home
+  // loan in her name) must show ZERO of it on HER card — not the other earner's amount.
+  it("an earner with no 80D/Sec-24 deductions of their own does not inherit the other earner's (Sharmas — priya)", () => {
+    setActivePinia(createPinia());
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    loadSeedPersona(h, a); // Sharmas: rohit + priya, both earners, deductions concentrated on rohit
+
+    const rohit = h.data.members.find((m) => m.id === "rohit")!;
+    const priya = h.data.members.find((m) => m.id === "priya")!;
+
+    const rohitDeductions = deriveDeductions({
+      ...h.data,
+      members: [rohit],
+      investments: h.data.investments.filter((i) => i.ownerId === "rohit"),
+      liabilities: h.data.liabilities.filter((l) => l.ownerId === "rohit"),
+      insurance: h.data.insurance.filter((p) => p.insuredPersonId === "rohit"),
+    });
+    const priyaDeductions = deriveDeductions({
+      ...h.data,
+      members: [priya],
+      investments: h.data.investments.filter((i) => i.ownerId === "priya"),
+      liabilities: h.data.liabilities.filter((l) => l.ownerId === "priya"),
+      insurance: h.data.insurance.filter((p) => p.insuredPersonId === "priya"),
+    });
+    const householdDeductions = deriveDeductions(h.data);
+
+    // Ground truth: rohit holds ALL the 80D health cover + the Sec-24 home loan; priya has
+    // neither in the seed. Household 80D/Sec-24 come entirely from rohit's data.
+    expect(rohitDeductions.section80D).toBe(householdDeductions.section80D);
+    expect(rohitDeductions.section24).toBe(householdDeductions.section24);
+    expect(rohitDeductions.section80D).toBeGreaterThan(0);
+    expect(rohitDeductions.section24).toBeGreaterThan(0);
+
+    // THE LOCK: priya's own attributable 80D + Sec-24 are ZERO — she must not inherit rohit's.
+    // Pre-fix, the .vue passed householdDeductions.totalDeductions (which INCLUDES rohit's
+    // ₹22,000 80D + ₹2,00,000 Sec-24) into BOTH earners' cards, so priya's card overstated her
+    // own deductions by that exact amount (an optimistic, understated tax on her card).
+    expect(priyaDeductions.section80D).toBe(0);
+    expect(priyaDeductions.section24).toBe(0);
+    expect(priyaDeductions.totalDeductions).toBeLessThan(householdDeductions.totalDeductions);
+  });
+
+  it("each earner's card tax equals the ACTUAL headline per-member tax (computeIndividualFire) — Sharmas both earners", () => {
+    setActivePinia(createPinia());
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    loadSeedPersona(h, a);
+
+    const fy = getCurrentFinancialYear();
+    const asOf = new Date();
+
+    for (const memberId of ["rohit", "priya"]) {
+      const member = h.data.members.find((m) => m.id === memberId)!;
+      const headline = computeIndividualFire(h.data, a.values, memberId, fy, undefined, asOf)!;
+      expect(headline).not.toBeNull();
+
+      const attributableDeductions = deriveDeductions({
+        ...h.data,
+        members: [member],
+        investments: h.data.investments.filter((i) => i.ownerId === memberId),
+        liabilities: h.data.liabilities.filter((l) => l.ownerId === memberId),
+        insurance: h.data.insurance.filter((p) => p.insuredPersonId === memberId),
+      });
+
+      // The card is rendered at the headline's own recommended regime for this member, so the
+      // two surfaces show the SAME number for the SAME earner (headline uses `taxpayerAge` +
+      // `isSalaried` internally; computeEarnerTaxCard's earnerOld/earnerNew do not take those
+      // args, so this asserts card.tax against the fixed regime headline used — see fix below).
+      const card = computeEarnerTaxCard(member, fy, attributableDeductions.totalDeductions, "OLD");
+      const headlineOld = computeTax({
+        grossIncome: member.salary!.annualCTC,
+        regime: "OLD",
+        fy,
+        deductions: attributableDeductions.totalDeductions,
+        employerNpsByMember: attributableDeductions.employerNpsByMember,
+        taxpayerAge: headline.anchorAge,
+        isSalaried: true,
+      });
+      expect(card.tax).toBe(headlineOld.totalTax);
+    }
+  });
+
+  it("MUTATION LOCK: passing the household total (the pre-fix bug) makes priya's card inherit rohit's 80D/Sec-24", () => {
+    setActivePinia(createPinia());
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    loadSeedPersona(h, a);
+    const priya = h.data.members.find((m) => m.id === "priya")!;
+    const householdDeductions = deriveDeductions(h.data);
+    const priyaOwnDeductions = deriveDeductions({
+      ...h.data,
+      members: [priya],
+      investments: h.data.investments.filter((i) => i.ownerId === "priya"),
+      liabilities: h.data.liabilities.filter((l) => l.ownerId === "priya"),
+      insurance: h.data.insurance.filter((p) => p.insuredPersonId === "priya"),
+    });
+
+    // Simulates the PRE-FIX behaviour: priya's card is built with the household total
+    // (computeEarnerTaxCard's 3rd arg = totalDeductionsForOld), not her own attributable share.
+    const buggyPriyaCard = computeEarnerTaxCard(priya, "2025-26", householdDeductions.totalDeductions, "OLD");
+    const fixedPriyaCard = computeEarnerTaxCard(priya, "2025-26", priyaOwnDeductions.totalDeductions, "OLD");
+
+    // Proves the lock DISCRIMINATES: the buggy card claims MORE deduction (rohit's 80D +
+    // Sec-24, which priya has none of) and therefore shows LOWER (optimistic) tax than the
+    // fixed card — the exact class #201 fixes. If this ever passed with buggy===fixed, the
+    // coherence spec above would not actually be catching the regression (rule 33 mutation-proof).
+    expect(householdDeductions.totalDeductions).toBeGreaterThan(priyaOwnDeductions.totalDeductions);
+    expect(buggyPriyaCard.tax).toBeLessThan(fixedPriyaCard.tax);
+  });
+
+  it("tax-planning/Index.vue's perEarner call-site body passes the EARNER's own deductions, not the household total (source lock, gh-issue #201)", () => {
+    // Mirrors the #157 source-text-lock technique — but extracts by PAREN balance (not the
+    // sibling describe's brace-balance or `);`-endPattern helpers), because `perEarner`'s body
+    // now contains its own nested `deriveDeductions({...})` call whose closing `);` would
+    // otherwise truncate a naive `/\)\s*;/` end-match early (proved during this fix: the naive
+    // pattern matched the nested call's close, not `computed(...)`'s own close).
+    const root = path.resolve(fileURLToPath(import.meta.url), "../../..");
+    const src = fs.readFileSync(path.join(root, "src/pages/tax-planning/Index.vue"), "utf-8");
+    const startMatch = /const perEarner = computed\(/.exec(src);
+    if (!startMatch) throw new Error("perEarner computed not found");
+    let depth = 0;
+    let parenStart = -1;
+    let end = -1;
+    for (let i = startMatch.index; i < src.length; i++) {
+      const ch = src[i];
+      if (ch === "(") {
+        if (parenStart === -1) parenStart = i;
+        depth++;
+      } else if (ch === ")") {
+        depth--;
+        if (depth === 0 && parenStart !== -1) {
+          end = i + 1;
+          break;
+        }
+      }
+    }
+    if (end === -1) throw new Error("perEarner computed end not found (unbalanced parens)");
+    const body = src.slice(startMatch.index, end);
+
+    // THE LOCK: the pre-fix body called computeEarnerTaxCard(m, fy,
+    // derivedDeductions.value.totalDeductions, ...) — the WHOLE household total, identical for
+    // every earner. The fix must build each earner's OWN attributable deductions instead.
+    expect(body).not.toMatch(/computeEarnerTaxCard\([^)]*derivedDeductions\.value\.totalDeductions/);
+    expect(body).toMatch(/computeEarnerTaxCard\(/);
   });
 });

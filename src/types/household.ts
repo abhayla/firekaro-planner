@@ -281,6 +281,21 @@ export const investmentSchema = z.object({
 
   // Phase 1 Stage B — audit Entry #20 A20.1: RealEstate role.
   realEstateRole: z.enum(["PrimaryResidence", "Investment", "Inherited"]).optional(),
+  /**
+   * #211 — the age at which the owner PLANS to sell this (non-primary) property.
+   *
+   * A property is not spendable money until it is sold. Before this field existed, an
+   * investment/inherited flat was classified `unlockAge: Infinity` — it counted toward the FIRE
+   * corpus total but never entered the bridge's unlock timeline, so its rupees silently covered
+   * the bridge by being part of an adequate total while never being available to spend. The honest
+   * model is an explicit SALE EVENT: the property's value becomes spendable only at this age, net
+   * of real-estate LTCG and an illiquidity haircut (see `REAL_ESTATE_ILLIQUIDITY_HAIRCUT`).
+   *
+   * Absent ⇒ the engine assumes the sale happens at the household's target retirement age and
+   * surfaces that as an assumption note (conservative + disclosed, principle 1). Client-side only:
+   * it rides the server's existing `subtypeData` JSONB sweep, so there is NO Prisma change.
+   */
+  plannedSaleAge: z.number().int().min(18).max(120).optional(),
 
   // Phase 1 Stage B — audit Entry #24 A24.1-2: ESOP grant details.
   grantorCountry: z.enum(["India", "US", "Other"]).optional(),
