@@ -26,6 +26,7 @@ import type {
 } from "@/types/household";
 import { ageFromDOB } from "@/lib/age";
 import { toAnnual } from "@/lib/cashflow";
+import { computeTax, singleEarnerNpsArgs } from "@/lib/tax";
 
 // ---------- Statutory limits (audit-grounded, FY 2025-26 onward) ----------
 // These are STATUTORY FACTS per R1.4 — they appear read-only on /preferences
@@ -355,4 +356,51 @@ function estimateAnnualInterest(liability: Liability): number {
   // the loan life. For Sec 24 surfacing this approximation is acceptable
   // — the user can override on /preferences if needed.
   return liability.outstandingBalance * (liability.interestRate / 100);
+}
+
+export interface EarnerTaxCard {
+  name: string;
+  gross: number;
+  tax: number;
+  takeHome: number;
+  effRate: number;
+  rec: "OLD" | "NEW";
+}
+
+/**
+ * gh-issue #157: the tax-planning per-earner card computation, extracted out of
+ * `tax-planning/Index.vue`'s `perEarner` computed so a behaviour spec can call the SAME
+ * function the screen renders from (previously the logic was inline in the .vue with no
+ * importable seam). Sector-aware via `singleEarnerNpsArgs` — a government earner's employer
+ * NPS is capped at 14% of basic on the OLD regime, matching the headline `derive()` /
+ * `computeIndividualFire()` path instead of the private-only scalar fallback.
+ */
+export function computeEarnerTaxCard(
+  member: Member,
+  fy: string,
+  totalDeductionsForOld: number,
+  effectiveRegime: "OLD" | "NEW",
+): EarnerTaxCard {
+  const gross = member.salary?.annualCTC ?? 0;
+  const earnerNps = member.salary?.employerNpsAnnual ?? 0;
+  const earnerBasic = member.salary?.basicAnnual ?? 0;
+  const earnerNpsArgs = singleEarnerNpsArgs(earnerNps, earnerBasic, member.salary?.employerSector ?? "private");
+  const earnerOld = computeTax({
+    grossIncome: gross,
+    regime: "OLD",
+    fy,
+    deductions: totalDeductionsForOld,
+    ...earnerNpsArgs,
+  });
+  const earnerNew = computeTax({ grossIncome: gross, regime: "NEW", fy, ...earnerNpsArgs });
+  const rec: "OLD" | "NEW" = earnerOld.totalTax <= earnerNew.totalTax ? "OLD" : "NEW";
+  const active = effectiveRegime === "OLD" ? earnerOld : earnerNew;
+  return {
+    name: member.name || "Earner",
+    gross,
+    tax: active.totalTax,
+    takeHome: gross - active.totalTax,
+    effRate: gross > 0 ? (active.totalTax / gross) * 100 : 0,
+    rec,
+  };
 }
