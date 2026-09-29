@@ -234,3 +234,36 @@ describe("FireHero binding locks — T-377 QN-2 gap hero", () => {
     expect(script).toMatch(/const req = computed\(\(\) => fire\.requiredContribution\.value\)/);
   });
 });
+
+/**
+ * gh #218 round 2 — the feasibility note must not grow a SECOND basis (FinTech HIGH).
+ *
+ * The defect: the note compared `requiredMonthlyReal` (PF-inclusive, solved against a ceiling that
+ * adds PF back) against `hh.monthlyTakeHome` (CASH, PF removed), so an affordable amount read as
+ * "more than you take home" across the whole PF-wide band. The logic now lives in
+ * `fire-milestone-copy.ts` (`feasibilityNoteCopy`, unit-tested there) and this source scan stops a
+ * future edit from re-inlining a cash-only comparison in the component.
+ */
+describe("FireHero #218 — the feasibility note delegates, and tests on the solver ceiling", () => {
+  it("delegates the note to the shared copy helper — no inline affordability arithmetic", () => {
+    expect(src, "the helper must be imported").toMatch(/feasibilityNoteCopy/);
+    expect(src, "feasibilityNote must be a delegation, not a computed comparison").toMatch(
+      /const feasibilityNote = computed<string \| null>\(\(\) =>[\s\S]{0,600}feasibilityNoteCopy\(/,
+    );
+  });
+
+  it("passes the SOLVER's ceiling, so the prescription and the verdict share one basis", () => {
+    expect(src).toMatch(/feasibleMonthlyCeilingReal:\s*req\.value\.feasibleMonthlyCeilingReal/);
+  });
+
+  it("does NOT re-inline a cash-only over-the-line test in the component", () => {
+    const sliced = src.slice(src.indexOf("const feasibilityNote"), src.indexOf("const needYear"));
+    expect(
+      sliced,
+      "no `takeHome - required` subtraction may live in the component any more",
+    ).not.toMatch(/monthlyTakeHome\s*-\s*req/);
+    expect(sliced, "and no literal over-take-home string outside the helper").not.toMatch(
+      /more than you take home/,
+    );
+  });
+});

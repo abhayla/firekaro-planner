@@ -36,6 +36,7 @@ import {
 import { derivedFamilyLayer, plannedGoalInflationBucket } from "@/lib/derived-records";
 import { computeTax, recommendRegime, marginalSlabRate, getTaxConfigForFY } from "@/lib/tax";
 import { epfBucketAfterTaxReturn } from "@/lib/epf-vpf";
+import { netCashSalary, pfFromRows, PROFESSIONAL_TAX_ANNUAL_PER_EARNER } from "@/lib/salary-cash";
 import { ageFromDOB } from "@/lib/age";
 import { todayIsoLocal } from "@/lib/as-of-date";
 import { toMonthly, toAnnual } from "@/lib/cashflow";
@@ -528,8 +529,39 @@ export function derive(
     // T-377: the solver replaces ONLY the corpus inflow — `annualSavings`/`savingsRate` keep
     // describing the household's real cashflow, so no display figure is silently rewritten.
     const monthlyContribution = contributionOverride ?? Math.round(annualSavings / 12);
-    const monthlyTakeHome = Math.round((annualIncome.total - annualTax) / 12);
-    const savingsRate = calculateSavingsRate(monthlyTakeHome, Math.round(annualSavings / 12));
+    // gh #218 — `monthlyTakeHome` is the CASH figure a user can recognise on a payslip: gross
+    // minus the PF that leaves it, income tax and professional tax. It used to be `gross - tax`,
+    // which for the salaried-accumulator persona overstated the bank credit by the whole PF
+    // block (~12% of CTC). ONE helper owns the formula (`salary-cash.ts`).
+    //
+    // WHERE THE PF NUMBER COMES FROM: the EPF_VPF rows ALREADY IN SCOPE (`scopeInvestments`) —
+    // the exact rupees this same scope's corpus receives. Money leaving the payslip and money
+    // entering the corpus are therefore one number read from one place, so no SECOND basic base
+    // is introduced and nothing downstream of this figure moves. (Unifying the app's two basic
+    // bases is correct but MOVES headlines, so it is PR B: `chore/218b-basic-50pct-unification`.)
+    //
+    // PF is deliberately NOT removed from `annualSavings`/`monthlyContribution` above: it is
+    // funded out of that residual and already reaches the corpus through that same EPF row
+    // (gh #11 LOCK). Subtracting it twice would move every EPF household's FIRE date years
+    // later for no real change in their finances.
+    const scopePf = pfFromRows(scopeInvestments);
+    // Professional tax is levied on EMPLOYMENT, so it is counted per SALARIED earner — gated on
+    // `salary.annualCTC` exactly as the earner card, the member lens and the salary form do. A
+    // business-only earner has no payslip and was previously charged a spurious ₹208/mo.
+    const scopeProfessionalTax =
+      scopeEarners.filter((m) => (m.salary?.annualCTC ?? 0) > 0).length *
+      PROFESSIONAL_TAX_ANNUAL_PER_EARNER;
+    const monthlyTakeHome = netCashSalary({
+      annualCTC: annualIncome.total,
+      annualPf: scopePf,
+      annualTax,
+      professionalTax: scopeProfessionalTax,
+    }).monthly;
+    // `savingsRate` keeps its ORIGINAL post-tax-gross base - the savings residual is measured
+    // against the same gross it was carved out of, so re-basing it on the smaller cash figure
+    // would inflate the percentage without any behaviour changing (gh #218).
+    const monthlyGrossPostTax = Math.round((annualIncome.total - annualTax) / 12);
+    const savingsRate = calculateSavingsRate(monthlyGrossPostTax, Math.round(annualSavings / 12));
 
     // ===== ADR-0007 / gh #185 — the per-earner INCOME path (replaces the savings step-up proxy) ==
     //

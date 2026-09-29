@@ -14,6 +14,7 @@ import { loadMehtasSeed } from "@/seeds/mehtas";
 import { loadRaviSeed } from "@/seeds/ravi";
 import { realIncomeScaleAt } from "@/lib/income-path";
 import { derive } from "@/lib/derive";
+import { pfFromInvestmentRows } from "@/lib/salary-cash";
 import {
   requiredMonthlyContributionFor,
   REQUIRED_CONTRIBUTION_TOLERANCE,
@@ -333,7 +334,13 @@ describe("requiredMonthlyContributionFor — solves through the REAL derive() pa
     loadSeedPersona(h, a);
     const k = derive(h.data, a.values, LENS);
     const monthlyExpenses = k.annualExpensesToday / 12;
-    const feasibleCeiling = k.monthlyTakeHome - MIN_LIVING_RETENTION * monthlyExpenses;
+    // gh #218 — `monthlyTakeHome` is now CASH (net of both PF legs and professional tax), but PF
+    // is money the household is already CONTRIBUTING, so the investable ceiling adds it back:
+    // `cash + PF/12 − livingFloor`, matching `required-contribution.ts`'s own `hi`. Net of the
+    // pre-#218 figure this is lower by professional tax alone (~₹208/earner/month).
+    const ceilingPf = pfFromInvestmentRows(h.data, null);
+    const feasibleCeiling =
+      k.monthlyTakeHome + Math.round(ceilingPf / 12) - MIN_LIVING_RETENTION * monthlyExpenses;
     for (const age of [40, 45, 47, 50, 55, 60]) {
       const r = requiredMonthlyContributionFor({ snapshot: h.data, assumptions: a.values, lens: LENS, targetAge: age });
       if (Number.isFinite(r.requiredMonthlyReal)) {

@@ -291,15 +291,33 @@ describe("applyQuickAnswers — the unaccounted rupee is spent, not deleted", ()
     expect(household.expenses.recurring.some((r) => /Unaccounted/.test(r.label))).toBe(false);
   });
 
-  it("with nothing invested, the surplus is spending — not a silently assumed contribution", () => {
-    const { household } = apply({ ...AMIT, sip: 0 });
+  it("with nothing invested, the surplus is the STATUTORY PF only — never an assumed market SIP", () => {
+    const { household, salaryAnnualCTC } = apply({ ...AMIT, sip: 0 });
     const k = derive(household, DEFAULT_ASSUMPTIONS, {
       isFamilyView: false,
       viewingMemberId: null,
       currentFY: "2026-27",
     });
-    // The old fallback assumed every unspent rupee reached the market (~2.2 L/month here).
-    expect(k.monthlyContribution).toBeLessThan(10_000);
+    // The old fallback assumed every unspent rupee reached the market — ₹2.2 L/month here. That
+    // failure mode is still dead: the residual below is a third of it.
+    expect(k.monthlyContribution).toBeLessThan(0.5 * 220_000);
+    // gh #218 — the residual is no longer ~zero, and the reason is EXACT, not approximate. Card 3
+    // asks for "Household take-home per month", and take-home is now the CASH figure (net of the
+    // PF the EPF row already carries, plus professional tax). So the solver has to land on a CTC
+    // ABOVE the stated ₹5 L/month, and the gap it opens is precisely the PF — real, mandatory
+    // saving that is already sitting in the quick EPF row. Pinning the residual TO that row is
+    // what keeps the old invisible-contribution bug dead: a rupee more would mean the solver had
+    // started assuming market investing again.
+    //
+    // Measured on this fixture: CTC ₹98.0 L ⇒ PF ₹78,400/mo, residual ₹78,572/mo.
+    const pfMonthly = Math.round(
+      household.investments
+        .filter((i) => i.type === "EPF_VPF")
+        .reduce((sum, i) => sum + (i.monthlyContribution ?? 0) * 12, 0) / 12,
+    );
+    expect(salaryAnnualCTC).toBeGreaterThan(5 * L * 12); // above the stated take-home, by the PF
+    expect(pfMonthly).toBeGreaterThan(0);
+    expect(k.monthlyContribution).toBeLessThanOrEqual(pfMonthly + 1_000);
   });
 });
 

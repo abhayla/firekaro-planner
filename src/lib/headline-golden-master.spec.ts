@@ -63,6 +63,11 @@ const r = (x: number, dp = 4) => (Number.isFinite(x) ? Math.round(x * 10 ** dp) 
 // mauryas' `anchorAge` is unchanged (explicit DOBs, not `dobFromAge`), so only the EMI-exclusion
 // term applies there (FIRE age 68.92→66.58). iyers (loan has no endYear) and mehtas (no loan)
 // snapshots are unchanged — the no-op guarantee for lines that don't end early.
+// gh #218 — `monthlyTakeHome` is ADDED to the snapshot below; NO existing field moves. The cash
+// figure is computed by subtracting the PF the household's EPF_VPF rows already carry (the same
+// rupees the corpus receives) plus professional tax, so it introduces no second basic base and
+// nothing downstream of it changes. Unifying the two basic bases DOES move two personas by one
+// month — that is split out to PR B (`chore/218b-basic-50pct-unification`) for an owner call.
 describe("A7.2 golden-master — per-persona headline (DEFAULT lens)", () => {
   beforeEach(() => setActivePinia(createPinia()));
 
@@ -84,6 +89,10 @@ describe("A7.2 golden-master — per-persona headline (DEFAULT lens)", () => {
         yearsToLean: r(k.yearsToLean),
         yearsToFat: r(k.yearsToFat),
         savingsRate: k.savingsRate,
+        // gh #218 — the CASH figure joins the golden master. It is the number a user reads on
+        // the hero stat block, and it was silently `gross − tax` (optimistic by the whole PF
+        // block) for five releases with every gate green. Locked here so it cannot drift back.
+        monthlyTakeHome: k.monthlyTakeHome,
         progressPercent: k.progressPercent,
         fireNumber: Math.round(k.fireNumber),
         totalCorpus: Math.round(k.totalCorpus),

@@ -59,8 +59,8 @@ export const TERM_GLOSSARY = {
   "savings-rate": {
     label: "Savings Rate",
     explanation:
-      "The share of your take-home income that you save and invest each year. Mr. Money Mustache's well-known table maps savings rate directly to years to FIRE.",
-    formula: "Savings Rate = (Annual income - Annual spending) ÷ Annual income",
+      "The share of your income AFTER INCOME TAX that you save and invest each year. Note the base is post-tax gross pay, NOT the cash that lands in your bank — your PF contributions and professional tax come out of this same figure, and PF is itself part of what you save. Mr. Money Mustache's well-known table maps savings rate directly to years to FIRE.",
+    formula: "Savings Rate = (Annual income - Annual tax - Annual spending) ÷ (Annual income - Annual tax)",
   },
   "net-worth": {
     label: "Net Worth",

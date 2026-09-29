@@ -30,7 +30,11 @@ import { describeFireConfidenceBand } from "@/lib/fire-confidence-band";
 import { MAX_PROJECTION_YEARS } from "@/lib/monte-carlo";
 import { formatINRCompact } from "@/lib/formatters";
 import { DEFAULT_ASSUMPTIONS } from "@/types/assumptions";
-import { expectedHeadlineCopy, EXPECTED_HEADLINE_CAVEAT } from "@/lib/fire-milestone-copy";
+import {
+  expectedHeadlineCopy,
+  feasibilityNoteCopy,
+  EXPECTED_HEADLINE_CAVEAT,
+} from "@/lib/fire-milestone-copy";
 import InfoTip from "@/components/shared/InfoTip.vue";
 import QuickExplainer from "@/components/quick/QuickExplainer.vue";
 
@@ -324,18 +328,19 @@ const gapTone = computed(() => resolveGapTone(req.value.gapReal));
  * re-solve (it holds today's expenses fixed). So such an amount is CONSERVATIVE, never
  * optimistic, and the user is told where it would have to come from (FinTech review HIGH-4).
  */
-const feasibilityNote = computed<string | null>(() => {
-  if (!requiredFinite.value || !mustInvestMore.value) return null;
-  const takeHome = hh.value.monthlyTakeHome;
-  if (!Number.isFinite(takeHome) || takeHome <= 0) return null;
-  const left = takeHome - req.value.requiredMonthlyReal;
-  // A negative remainder is the LOUDEST case, not a reason to go quiet — the earlier version
-  // returned null here, switching the caveat off exactly when it mattered most.
-  if (left < 0) {
-    return "That is more than you take home each month — see the moves below, or retire a little later.";
-  }
-  return `That would leave ${formatINRCompact(left)}/month to live on — spending less also lowers the number above, which this figure does not yet credit you for.`;
-});
+const feasibilityNote = computed<string | null>(() =>
+  // gh #218 round 2 — the copy AND the basis of the comparison live in `fire-milestone-copy.ts`.
+  // The over-the-line test uses the solver's own ceiling (`feasibleMonthlyCeilingReal`), not the
+  // cash take-home: the prescription is PF-inclusive, cash is not, and mixing the two made an
+  // affordable amount read as unaffordable across the whole PF-wide band.
+  feasibilityNoteCopy({
+    requiredMonthlyReal: req.value.requiredMonthlyReal,
+    feasibleMonthlyCeilingReal: req.value.feasibleMonthlyCeilingReal,
+    monthlyTakeHome: hh.value.monthlyTakeHome,
+    mustInvestMore: mustInvestMore.value,
+    formatCurrency: formatINRCompact,
+  }),
+);
 // The label MUST come from the same horizon the amount was inflated over — re-deriving it here
 // from the household anchor made the year disagree with the rupees under a member lens
 // (FinTech re-review E1; contract §10 "no parallel math" applies to labels too).

@@ -13,6 +13,7 @@ import { useUiStore } from "@/stores/ui";
 import { loadSeedPersona } from "@/lib/seed-persona";
 import { useFireDerive } from "@/lib/useFireDerive";
 import { derive } from "@/lib/derive";
+import { pfFromInvestmentRows, PROFESSIONAL_TAX_ANNUAL_PER_EARNER } from "@/lib/salary-cash";
 
 describe("memberFinancials — same-scope FH resolver", () => {
   beforeEach(() => setActivePinia(createPinia()));
@@ -53,7 +54,7 @@ describe("memberFinancials — same-scope FH resolver", () => {
   });
 
   it("member lens = that adult's OWN slice on BOTH sides of every ratio (no member÷household)", () => {
-    const { ui, fire } = setup();
+    const { h, ui, fire } = setup();
     const household = fire.memberFinancials.value; // whole-household baseline
     ui.setViewingMemberId("rohit");
     const rohit = fire.memberFinancials.value;
@@ -72,8 +73,19 @@ describe("memberFinancials — same-scope FH resolver", () => {
     expect(rohit.savingsRatePercent).toBeLessThanOrEqual(100);
     expect(rohit.fireProgressPercent).toBeGreaterThanOrEqual(0);
     expect(rohit.fireProgressPercent).toBeLessThanOrEqual(100);
-    // monthlyTakeHome is the member's own (income − tax)/12, the SAME scope the DTI/savings ratios divide by.
-    expect(rohit.monthlyTakeHome).toBeCloseTo((rohit.annualIncome - rohit.annualTax) / 12, 0);
+    // gh #218 — monthlyTakeHome is the member's own CASH: their income minus their tax minus
+    // THEIR OWN PF legs and professional tax. Still the member scope on both sides (never
+    // member-numerator ÷ household-denominator, which is what this file exists to lock), just a
+    // smaller, honest numerator. `savingsRatePercent` above deliberately keeps the post-tax-gross
+    // base, because PF is funded out of that same residual (gh #11).
+    const rohitPf = pfFromInvestmentRows(h.data, "rohit");
+    expect(rohitPf, "rohit has an EPF row to deduct").toBeGreaterThan(0);
+    expect(rohit.monthlyTakeHome).toBeCloseTo(
+      (rohit.annualIncome - rohit.annualTax - rohitPf - PROFESSIONAL_TAX_ANNUAL_PER_EARNER) / 12,
+      0,
+    );
+    // …and therefore strictly BELOW the post-tax-gross figure it replaced (the #218 defect).
+    expect(rohit.monthlyTakeHome).toBeLessThan((rohit.annualIncome - rohit.annualTax) / 12);
   });
 
   it("the household FIRE figures stay INVARIANT to the FH member lens", () => {

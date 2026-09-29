@@ -12,6 +12,11 @@ import {
   employerNpsAnnualFromPercents,
   salaryEditPercents,
 } from "@/lib/salary-percent";
+import {
+  netCashSalary,
+  pfFromInvestmentRows,
+  PROFESSIONAL_TAX_ANNUAL_PER_EARNER,
+} from "@/lib/salary-cash";
 import type { Member } from "@/types/household";
 
 const props = defineProps<{ earner: Member }>();
@@ -24,6 +29,7 @@ function deriveTakeHomeFor(
   employerNps: number,
   employerNpsBasic: number,
   employerSector: "private" | "government" = "private",
+  annualPf = 0,
 ) {
   if (!ctc) return null;
   const oldDed = 175000;
@@ -39,7 +45,15 @@ function deriveTakeHomeFor(
     deductions: rec.recommended === "OLD" ? oldDed : 0,
     ...npsArgs,
   });
-  const annual = ctc - result.totalTax;
+  // gh #218 — the preview shows CASH: CTC minus the PF this earner's own EPF row already
+  // carries, income tax and professional tax, via the ONE shared helper (`salary-cash.ts`) the
+  // dashboard headline uses. (The hardcoded `oldDed = 175000` above is a separate defect — #222.)
+  const { annual } = netCashSalary({
+    annualCTC: ctc,
+    annualPf,
+    annualTax: result.totalTax,
+    professionalTax: PROFESSIONAL_TAX_ANNUAL_PER_EARNER,
+  });
   return {
     annual,
     monthly: Math.round(annual / 12),
@@ -59,7 +73,13 @@ const employerNps = computed(() => props.earner.salary?.employerNpsAnnual ?? 0);
 const basicAnnual = computed(() => props.earner.salary?.basicAnnual ?? 0);
 const employerSector = computed(() => props.earner.salary?.employerSector ?? "private");
 const takeHome = computed(() =>
-  deriveTakeHomeFor(ctc.value, employerNps.value, basicAnnual.value, employerSector.value),
+  deriveTakeHomeFor(
+    ctc.value,
+    employerNps.value,
+    basicAnnual.value,
+    employerSector.value,
+    pfFromInvestmentRows(household.data, props.earner.id),
+  ),
 );
 
 // Q4 (v3) + ISSUES-v2 #1: salary fields are no longer inline-editable. Pencil opens
@@ -196,7 +216,7 @@ function saveEdit() {
     >
       <v-icon icon="mdi-cash-check" size="small" color="success" />
       <span class="text-caption">
-        Estimated take-home (after tax,
+        Estimated take-home (after tax, PF and professional tax,
         {{ takeHome.regime === "OLD" ? "Old" : "New" }} regime):
         <strong>{{ formatINRCompact(takeHome.monthly) }}/mo</strong>
         (~{{ formatINRCompact(takeHome.annual) }}/yr,

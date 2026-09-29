@@ -48,6 +48,11 @@ import type { Assumptions } from "@/types/assumptions";
 import { derive, type DeriveLens } from "@/lib/derive";
 import { projectCorpus } from "@/lib/fire-math";
 import { toMonthly } from "@/lib/cashflow";
+import {
+  netCashSalary,
+  pfFromInvestmentRows,
+  PROFESSIONAL_TAX_ANNUAL_PER_EARNER,
+} from "@/lib/salary-cash";
 import type { ContributionSegments } from "@/lib/contribution-schedule";
 
 /** Bisection stops once the bracket is this tight (rupees/month). */
@@ -142,6 +147,21 @@ export interface RequiredContributionResult {
    * (blind verification finding 3).
    */
   netAnnualExpensesReal: number;
+  /**
+   * gh #218 round 2 — the INVESTABLE CEILING the solver itself used, ₹/month in today's money:
+   * `cash take-home + PF/12 − livingFloor`. Exported because every "can they actually afford
+   * this?" comparison MUST use the same basis the prescription was solved against.
+   *
+   * Why a consumer cannot just use `monthlyTakeHome`: take-home is now CASH (PF removed), while
+   * `requiredMonthlyReal` is solved against a ceiling that adds PF back (PF is investment, not
+   * spending) and is compared with `currentMonthlyReal`, which is PF-INCLUSIVE. Comparing a
+   * PF-inclusive prescription against a PF-exclusive take-home makes an affordable amount read as
+   * "more than you take home" for anything in the PF-wide band between them — up to ~₹35k/month
+   * on the Sharmas (FinTech review HIGH, round 2). One module owns the basis; consumers read it.
+   *
+   * It is 0 when there is no feasible headroom (and `requiredMonthlyReal` is then Infinity).
+   */
+  feasibleMonthlyCeilingReal: number;
 }
 
 /**
@@ -193,6 +213,7 @@ export function requiredMonthlyContributionFor(
       needPlannedGoalsReal: 0,
       needHealthcareReservationReal: 0,
       netAnnualExpensesReal: 0,
+      feasibleMonthlyCeilingReal: 0,
     };
   }
   const targetAge = Math.round(input.targetAge);
@@ -332,8 +353,22 @@ export function requiredMonthlyContributionFor(
   // Scope matters: under a member lens this must be THAT adult's take-home and THAT adult's
   // expenses, never the couple's — the household figure would let the card quote one spouse
   // more than twice their own income (FinTech re-review §D).
+  // gh #218 — `base.monthlyTakeHome` is now NET of both PF legs and professional tax, but PF is
+  // still money the household is CONTRIBUTING (it lands in the corpus via the auto-flowed EPF
+  // row), so a ceiling on "how much can you invest" must add it back. The net effect on the
+  // ceiling is exactly minus professional tax (≈₹208/earner/month) versus the old figure — the
+  // one term that is a genuine outflow and was previously counted as investable.
+  const scopeMember = atTargetAdult
+    ? snapshot.members.find((m) => m.id === atTargetAdult.memberId) ?? null
+    : null;
+  const ceilingPf = pfFromInvestmentRows(snapshot, atTargetAdult ? atTargetAdult.memberId : null);
   const monthlyTakeHome = atTargetAdult
-    ? Math.max(0, Math.round((atTargetAdult.attributableAnnualIncome - atTargetAdult.attributableAnnualTax) / 12))
+    ? netCashSalary({
+        annualCTC: atTargetAdult.attributableAnnualIncome,
+        annualPf: ceilingPf,
+        annualTax: atTargetAdult.attributableAnnualTax,
+        professionalTax: scopeMember?.salary?.annualCTC ? PROFESSIONAL_TAX_ANNUAL_PER_EARNER : 0,
+      }).monthly
     : safe(base.monthlyTakeHome);
   const monthlyExpenses = atTargetAdult
     ? Math.max(0, atTargetAdult.attributableAnnualExpenses / 12)
@@ -346,7 +381,9 @@ export function requiredMonthlyContributionFor(
     .filter((r) => r.source === "auto-loan" || r.source === "auto-insurance")
     .reduce((sum, r) => sum + toMonthly({ amount: r.amount, period: r.frequency }) * scopeSplit, 0);
   const livingFloor = Math.max(committedMonthly, MIN_LIVING_RETENTION * monthlyExpenses);
-  const hi = Math.max(0, monthlyTakeHome - livingFloor);
+  // The PF already committed is investable headroom by definition (it IS an investment), so it
+  // is added back on top of the cash figure before the living floor is taken off.
+  const hi = Math.max(0, monthlyTakeHome + Math.round(ceilingPf / 12) - livingFloor);
 
   let requiredMonthlyReal: number;
   const solve = input.solve !== false;
@@ -419,5 +456,8 @@ export function requiredMonthlyContributionFor(
       0,
       Math.round(safe(atTargetComponents.base * safe(atTarget.effectiveSWR, 0.035))),
     ),
+    // gh #218 round 2 — the very `hi` the bisection used, so a consumer's affordability check and
+    // the prescription share one basis (see the interface doc).
+    feasibleMonthlyCeilingReal: Math.max(0, Math.round(safe(hi))),
   };
 }

@@ -30,6 +30,7 @@ import type { OtherIncomeLine } from "@/types/household";
 import { calculateNpsWithdrawal, postTaxAnnuityIncome } from "@/lib/nps-withdrawal";
 import { calculateYearsToTarget, calculateFIRENumber } from "@/lib/fire-math";
 import { toMonthly } from "@/lib/cashflow";
+import { pfFromInvestmentRows, PROFESSIONAL_TAX_ANNUAL_PER_EARNER } from "@/lib/salary-cash";
 
 /**
  * ADR-0006 Phase 1d — the calendar year every `derive()` call in this file is evaluated in.
@@ -1323,4 +1324,88 @@ describe("T-377/QN-2 — the additive `overrides` seam the required-contribution
     expect(later.effectiveSWR).toBeGreaterThanOrEqual(base.effectiveSWR);
     expect(later.fireNumber).toBeLessThanOrEqual(base.fireNumber);
   });
+});
+
+/**
+ * gh #218 — the CASH-vs-SAVINGS identity locks.
+ *
+ * `monthlyTakeHome` became a real cash figure (net of both PF legs, any VPF and professional
+ * tax). The thing that MUST NOT move with it is the savings/corpus side: PF is funded OUT of
+ * the savings residual and already reaches the corpus through the auto-flowed EPF investment
+ * row (gh #11 LOCK), so subtracting it from `annualSavings` too would count the same rupees
+ * twice and push every EPF household's FIRE date years later.
+ *
+ * These three identities are what a future "just net PF off savings as well" edit trips on.
+ */
+describe("gh #218 — take-home is cash; savings is the residual (identity locks)", () => {
+  beforeEach(() => setActivePinia(createPinia()));
+
+  const SEEDS: Array<{ name: string; load: (h: ReturnType<typeof useHouseholdStore>, a: ReturnType<typeof useAssumptionsStore>) => void }> = [
+    { name: "sharmas", load: (h, a) => loadSeedPersona(h, a, LENS_176.currentFY) },
+    { name: "iyers", load: (h, a) => loadIyersSeed(h, a) },
+    { name: "mehtas", load: (h, a) => loadMehtasSeed(h, a) },
+    { name: "mauryas", load: (h, a) => loadMauryasSeed(h, a, LENS_176.currentFY) },
+  ];
+
+  for (const seed of SEEDS) {
+    it(`${seed.name}: savings is still income − tax − expenses (PF NOT netted off)`, () => {
+      const h = useHouseholdStore();
+      const a = useAssumptionsStore();
+      seed.load(h, a);
+      const k = derive(h.data, a.values, LENS_176);
+      expect(
+        k.annualIncome.total - k.annualTax,
+        `${seed.name}: annualSavings + expenses must reconstruct post-tax income`,
+      ).toBeCloseTo(k.annualSavings + k.annualExpensesToday, 0);
+    });
+
+    it(`${seed.name}: take-home is post-tax gross MINUS every PF leg and professional tax`, () => {
+      const h = useHouseholdStore();
+      const a = useAssumptionsStore();
+      seed.load(h, a);
+      const k = derive(h.data, a.values, LENS_176);
+      const pf = pfFromInvestmentRows(h.data, null);
+      const expected =
+        k.annualIncome.total -
+        k.annualTax -
+        pf -
+        k.lensedEarners.length * PROFESSIONAL_TAX_ANNUAL_PER_EARNER;
+      expect(k.monthlyTakeHome, `${seed.name}: cash figure`).toBe(Math.round(expected / 12));
+      // …and therefore strictly BELOW the old `gross − tax` figure it replaced.
+      expect(k.monthlyTakeHome).toBeLessThan(Math.round((k.annualIncome.total - k.annualTax) / 12));
+    });
+
+    it(`${seed.name}: annualSavings is large enough to FUND the PF it is charged with`, () => {
+      const h = useHouseholdStore();
+      const a = useAssumptionsStore();
+      seed.load(h, a);
+      const k = derive(h.data, a.values, LENS_176);
+      expect(k.annualSavings).toBeGreaterThanOrEqual(
+        pfFromInvestmentRows(h.data, null) +
+          k.lensedEarners.length * PROFESSIONAL_TAX_ANNUAL_PER_EARNER,
+      );
+    });
+
+    it(`${seed.name}: the PF deducted from cash IS the PF the corpus receives (same rows)`, () => {
+      const h = useHouseholdStore();
+      const a = useAssumptionsStore();
+      seed.load(h, a);
+      const k = derive(h.data, a.values, LENS_176);
+      // The rupees leaving the payslip and the rupees entering the corpus are read from the SAME
+      // EPF_VPF rows — this is what makes the take-home fix introduce no second basic base and
+      // therefore move nothing downstream.
+      const fromRows = h.data.investments
+        .filter((i) => i.type === "EPF_VPF")
+        .reduce((sum, i) => sum + (i.monthlyContribution ?? 0) * 12, 0);
+      expect(pfFromInvestmentRows(h.data, null)).toBe(fromRows);
+      expect(fromRows, `${seed.name} has a real EPF outflow`).toBeGreaterThan(0);
+      expect(k.monthlyTakeHome * 12).toBeCloseTo(
+        k.annualIncome.total -
+          k.annualTax -
+          fromRows -
+          k.lensedEarners.length * PROFESSIONAL_TAX_ANNUAL_PER_EARNER,
+        -1,
+      );
+    });
+  }
 });
