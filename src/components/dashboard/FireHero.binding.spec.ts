@@ -153,6 +153,24 @@ describe("FireHero binding locks — T-377 QN-2 gap hero", () => {
     expect(src, "a never-reached pace makes no age claim").toMatch(/would <b>not<\/b> reach this number/);
   });
 
+  it("ADR-0007 / gh #185 step 5: the SECOND ('expected') headline number reads the kernel, never re-derives", () => {
+    expect(template).toContain('data-testid="fire-hero-expected"');
+    expect(
+      src,
+      "expectedPaceCopy must be decided by the pure copy-helper from kernel fields, never inline arithmetic",
+    ).toMatch(/expectedHeadlineCopy\(req\.value\.paceFireAge, fire\.expectedFireAge\.value, fire\.expectedFireAgeBasis\.value\)/);
+    expect(src, "the second number is household-only — a member lens is a different scope").toMatch(
+      /hh\.value\.isMember\s*\n\s*\? null\s*\n\s*: expectedHeadlineCopy/,
+    );
+  });
+
+  it("NON-REMOVABLE: the second number carries the honesty caveat behind an info tooltip", () => {
+    expect(template).toContain('data-testid="fire-hero-expected-caveat"');
+    expect(src, "the caveat text is imported from the copy-helper, never hand-typed inline").toMatch(
+      /EXPECTED_HEADLINE_CAVEAT/,
+    );
+  });
+
   it("NON-REMOVABLE: household stays primary — the member lens keeps its caveat + household figure", () => {
     expect(template).toContain('data-testid="fire-hero-member-caveat"');
     expect(template).toMatch(/Switch to <b>Whole household<\/b> above for your full plan/);

@@ -30,6 +30,7 @@ import { describeFireConfidenceBand } from "@/lib/fire-confidence-band";
 import { MAX_PROJECTION_YEARS } from "@/lib/monte-carlo";
 import { formatINRCompact } from "@/lib/formatters";
 import { DEFAULT_ASSUMPTIONS } from "@/types/assumptions";
+import { expectedHeadlineCopy, EXPECTED_HEADLINE_CAVEAT } from "@/lib/fire-milestone-copy";
 import InfoTip from "@/components/shared/InfoTip.vue";
 import QuickExplainer from "@/components/quick/QuickExplainer.vue";
 
@@ -379,6 +380,20 @@ const paceLine = computed(() => {
   return `At today's pace you'd get there at <b>${pace}</b> — <b>${late} year${late === 1 ? "" : "s"} later</b> than you'd like. The "do this" amount closes that gap.`;
 });
 
+/**
+ * ADR-0007 / gh #185 step 5 — the SECOND ("expected") headline number: "· 42 if your 12% hikes
+ * continue". Household-only (the kernel's expected run is a household projection, same scope as
+ * `paceFireAge`/`req.value.paceFireAge` — the conservative age this second number extends, never
+ * replaces). Null (renders nothing) unless `expectedFireAgeBasis` says some earner's own hike beats
+ * the conservative default — the kernel (`derive.ts`) is the only place that decision is made.
+ */
+const expectedPaceCopy = computed(() =>
+  hh.value.isMember
+    ? null
+    : expectedHeadlineCopy(req.value.paceFireAge, fire.expectedFireAge.value, fire.expectedFireAgeBasis.value),
+);
+const expectedHeadlineCaveat = EXPECTED_HEADLINE_CAVEAT;
+
 /** Persist the dragged age as the real plan (the only write the slider can make). */
 function setAsMyTarget() {
   const age = targetAge.value;
@@ -563,6 +578,25 @@ function yearsLabel(years: number): string {
            NON-REMOVABLE #18 confidence band + the "since you were away" delta. -->
       <p v-if="req.hasTarget" class="fire-hero__pace" data-testid="fire-hero-pace">
         <span v-html="paceLine"></span>
+        <template v-if="expectedPaceCopy">
+          <span class="fire-hero__sep">·</span>
+          <span data-testid="fire-hero-expected">
+            {{ expectedPaceCopy }}
+            <v-tooltip location="bottom" max-width="380" aria-label="How the second number is modelled">
+              <template #activator="{ props: tipProps }">
+                <button
+                  type="button"
+                  v-bind="tipProps"
+                  class="fire-hero__band-info"
+                  aria-label="How the second number is modelled"
+                >
+                  <v-icon icon="mdi-information-outline" size="14" aria-hidden="true" />
+                </button>
+              </template>
+              <div class="text-body-2" data-testid="fire-hero-expected-caveat">{{ expectedHeadlineCaveat }}</div>
+            </v-tooltip>
+          </span>
+        </template>
         <template v-if="band">
           <span class="fire-hero__sep">·</span>
           <span data-testid="fire-hero-confidence-subline">
