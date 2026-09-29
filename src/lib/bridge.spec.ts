@@ -410,6 +410,125 @@ describe("#212 reconciliation identity — the household total still equals the 
   });
 });
 
+// ---------------------------------------------------------------------------
+// #212 RESIDUAL (a) — THE PROPORTIONAL LIQUID SPLIT, PINNED PER-HOLDING.
+//
+// `computeBridgeCoverage`'s documented rule (see `buildProjectedValues` in bridge.ts): the liquid
+// budget `targetReal − boundedTotal` is distributed across liquid tranches IN PROPORTION TO EACH
+// TRANCHE'S OWN STANDALONE PROJECTION (`projectHoldingToRetirement` run on that holding alone) —
+// never an equal split, and never proportional to TODAY's value. Only the sum identity was
+// guarded before this test; a mutant that swaps the rule for an equal split reads the exact same
+// `projectedPreTaxTotal` (still equals `targetReal`) and would ship green.
+//
+// Both holdings are FD (`liquidationTaxTreatment` = "pass-through" — net == gross, NO tax haircut
+// and no LTCG-exemption threading), so `reachableCorpus` reads the PRE-TAX split exactly — the
+// cleanest possible surface to pin the DIVISION rule on, not just the sum.
+//
+// THE FIXTURE, BY HAND (node-verified this session, not freehand arithmetic):
+// two liquid FD holdings, no locked tranche (boundedTotal = 0, so liquidBudget = targetReal = 1 Cr):
+//   Holding A: value 10L,  monthly 0,      r=5%, 10y  -> standalone = value*(1.05)^10 = 16,28,894.63
+//   Holding B: value 20L,  monthly 20,000, r=5%, 10y  -> standalone = 62,76,483.46 (compounding the
+//     ANNUAL contribution of monthly*12 = 2,40,000/yr at 5%, 10 years, atop the 20L opening value)
+//   Standalone total = 79,05,378.09
+// Three splits of the SAME 1 Cr liquid budget, all different:
+//   EQUAL split:              A = B = 50,00,000.00
+//   VALUE-proportional (today's ₹ 10L:20L = 1:2): A = 33,33,333.33, B = 66,66,666.67
+//   CORRECT (standalone-projection-proportional):  A = 20,60,489.21, B = 79,39,510.79
+// ---------------------------------------------------------------------------
+describe("#212 residual (a) — the liquid residual splits PROPORTIONAL TO EACH HOLDING'S OWN STANDALONE PROJECTION, never equally and never by today's value", () => {
+  // A is FD ("pass-through" tax: net == gross, no haircut). B is Stocks ("equity-ltcg": taxed).
+  // Mixing tax treatments is DELIBERATE and load-bearing: when both tranches share ONE tax
+  // treatment, `reachableCorpus` (the sum) is IDENTICAL under every split rule (equal,
+  // value-proportional, or correct) — verified by hand (see /tmp/calc2.js this session) — because
+  // tax-free addition doesn't care how a fixed total is divided. Only a MIXED-tax pair makes the
+  // DIVISION itself observable through the post-tax total, which is the only number
+  // `computeBridgeCoverage`'s public API exposes.
+  const holdingA = holding("FD", 1_000_000); // liquid, pass-through (0% tax), no contribution
+  const holdingB = holding("Stocks", 2_000_000, { monthlyContribution: 20_000 }); // liquid, equity-ltcg, contributing
+
+  const STANDALONE_A = 1_628_894.63;
+  const STANDALONE_B = 6_276_483.46;
+  const CORRECT_A = 2_060_489.21;
+  const CORRECT_B = 7_939_510.79;
+  const EQUAL_SPLIT = 5_000_000;
+  const VALUE_PROPORTIONAL_A = 10_000_000 * (1_000_000 / 3_000_000); // 33,33,333.33
+  const VALUE_PROPORTIONAL_B = 10_000_000 * (2_000_000 / 3_000_000); // 66,66,666.67
+
+  // Equity-LTCG post-tax net, mirroring liquidation-tax.ts exactly (ASSUMED_GAIN_FRACTION 0.7,
+  // LTCG_LISTED_EXEMPTION ₹1.25L, LTCG_LISTED_RATE 12.5%, 4% cess, Math.round on the tax only).
+  function postTaxEquityNet(gross: number): number {
+    const gain = gross * 0.7;
+    const exemptUsed = Math.min(gain, 125_000);
+    const taxable = Math.max(0, gain - exemptUsed);
+    const tax = Math.round(taxable * 0.125 * 1.04);
+    return gross - tax;
+  }
+  // Holding A is FD (pass-through, 0% tax) — its net always equals its gross share.
+  const NET_TOTAL_CORRECT = CORRECT_A + postTaxEquityNet(CORRECT_B);
+  const NET_TOTAL_EQUAL = EQUAL_SPLIT + postTaxEquityNet(EQUAL_SPLIT);
+
+  function runWith(holdings: BridgeHolding[]) {
+    return computeBridgeCoverage(
+      baseInput({
+        retirementAge: 50,
+        anchorAge: 40,
+        annualExpenses: 0, // isolate the split from any bridge-year drawdown noise
+        holdings,
+        projection: {
+          targetReal: 10_000_000, // no locked holdings => the WHOLE budget is liquid
+          realReturnFor: () => 0.05,
+          realMonthlyContributionFor: (asset) => (asset.id === holdingB.asset.id ? 20_000 : 0),
+          yearsToRetirement: 10,
+        },
+      }),
+    );
+  }
+
+  it("the three candidate splits give materially different numbers — the fixture actually discriminates (sanity check on the hand derivation)", () => {
+    expect(CORRECT_A).not.toBeCloseTo(EQUAL_SPLIT, -4);
+    expect(CORRECT_A).not.toBeCloseTo(VALUE_PROPORTIONAL_A, -4);
+    expect(CORRECT_B).not.toBeCloseTo(EQUAL_SPLIT, -4);
+    expect(CORRECT_B).not.toBeCloseTo(VALUE_PROPORTIONAL_B, -4);
+    // The mixed-tax post-tax TOTALS also differ materially (₹92.94L correct vs ₹95.61L equal) —
+    // this is the gap `reachableCorpus` below is read against.
+    expect(NET_TOTAL_EQUAL - NET_TOTAL_CORRECT).toBeGreaterThan(200_000);
+  });
+
+  it("real code: projectedPreTaxTotal pins the SUM (already guarded) at exactly the target, pre-tax and per-holding standalone projections match hand derivation to ₹1", () => {
+    const r = runWith([holdingA, holdingB]);
+    expect(r.projectedPreTaxTotal).not.toBeNull();
+    expect(r.projectedPreTaxTotal!).toBeCloseTo(10_000_000, 0);
+    const pA = projectHoldingToRetirement(holdingA.asset, {
+      targetReal: 10_000_000,
+      realReturnFor: () => 0.05,
+      realMonthlyContributionFor: () => 0,
+      yearsToRetirement: 10,
+    });
+    const pB = projectHoldingToRetirement(holdingB.asset, {
+      targetReal: 10_000_000,
+      realReturnFor: () => 0.05,
+      realMonthlyContributionFor: () => 20_000,
+      yearsToRetirement: 10,
+    });
+    expect(pA).toBeCloseTo(STANDALONE_A, 1);
+    expect(pB).toBeCloseTo(STANDALONE_B, 1);
+  });
+
+  it("MUTANT PROOF: reachableCorpus (post-tax total) matches the CORRECT standalone-proportional split (₹92,93,754.52), NOT the equal-split total (₹95,61,250) — apply an equal-split mutant to buildProjectedValues, run this file, observe RED, then `git checkout -- src/lib/bridge.ts`", () => {
+    // With A (FD, 0% tax) and B (Stocks, equity-LTCG taxed) mixed, the split rule determines HOW
+    // MUCH of the ₹1 Cr liquid budget lands on the taxed side — a bigger share to B under the
+    // correct rule (79.4% vs the equal rule's 50%) means MORE tax is paid, so reachableCorpus is
+    // LOWER under the correct rule than an equal-split mutant would produce. This is the one
+    // number the public API exposes that the split rule actually moves.
+    const r = runWith([holdingA, holdingB]);
+    // The correct-rule net total, pinned to the nearest rupee (rounding happens inside the tax calc).
+    expect(r.reachableCorpus).toBeCloseTo(Math.round(NET_TOTAL_CORRECT), -1);
+    // An equal-split mutant would instead produce ~₹95,61,250 — strictly and measurably HIGHER
+    // (less tax paid because less of the budget sits on the taxed side) than what real code gives.
+    expect(r.reachableCorpus).toBeLessThan(Math.round(NET_TOTAL_EQUAL) - 100_000);
+  });
+});
+
 describe("#212 no-op guarantees — nothing changes where no rule applies", () => {
   it("NO `projection` supplied => the pre-#212 corpusScale path, unchanged", () => {
     const holdings = [
@@ -560,6 +679,181 @@ describe("#212 the gate fires — a locked-heavy early retiree is NOT covered", 
     expect(r.effectiveFireAge).toBeGreaterThan(r.corpusOnlyFireAge);
     // ...and it reports a surfaced reason, not a silent move.
     expect(r.assumptions.some((x) => x.id === "bridge-shortfall")).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// #212 RESIDUAL (b) — A PERSONA-PLAUSIBLE LOCKED-HEAVY FIXTURE THROUGH THE REAL
+// `derive()` PATH (not a hand-built BridgeInput like the fixture above).
+//
+// REJECTED FIRST ATTEMPT (2026-09-29, this session): a ₹3.2 Cr PPF is not persona-plausible — the
+// statutory cap is ₹1.5L/yr (₹1L before FY2014-15, ₹70k before FY2011-12); even 30 years at the
+// CURRENT cap compounding at ~7.5-8% tops out around ₹1.5-1.7 Cr. That fixture was the forced case
+// the brief forbids. Caps used below, derived by hand:
+//   PPF ≤ ₹1.6 Cr  — years contributing × cap × growth: 30y × ₹1.5L/yr compounded @7.5% ≈ ₹1.55 Cr
+//     (node-verified this session: ppfCompound(30, 150_000, 0.075) = 1,55,09,910).
+//   NPS ≤ ₹60 L    — a ₹28L-CTC earner's own 50k/yr + ~10% employer share since 2009 (17y by 2026):
+//     17y × ₹1.7L/yr compounded @8-9% ≈ ₹57-63L (node-verified: npsCompound(17, 170_000, 0.08..0.09)).
+// This fixture uses PPF ₹1.5 Cr (15,000,000) and NPS ₹55L (5,500,000) — both inside the derived
+// caps (PPF ≤ ₹1.6 Cr, NPS ≤ ₹60L).
+//
+// THE HONEST FINDING (searched ≤20 tool calls, 18 candidates tried — see the report's per-fixture
+// table): `accessibility.ts` classifies EPF as unlocking AT the retirement age (job-exit rule) and
+// NPS also unlocks AT the retirement age (only the annuity SLICE becomes non-lump income, credited
+// from that same age) — so neither can create a bridge gap for a household retiring after its own
+// FIRE-adequate age. The ONLY instrument that locks PAST a plausible early-retirement age is an
+// UNDATED PPF (locks to 60, `ASSUMED_PENSION_UNLOCK_AGE`). Every candidate that pushed the
+// corpus-ADEQUATE age (`corpusOnlyFireAge`, which `derive()` computes independently of
+// `targetRetirementAge` — it is NOT an input the household can pin directly) early enough to leave
+// a meaningful PPF-locked gap ALSO left enough liquid runway + bridge income (NPS annuity + partial
+// income streams) to cover the resulting 1-2 year window. Every candidate that starved liquidity
+// enough to matter pushed `corpusOnlyFireAge` to 59-63 — by which point the undated PPF's 60-age
+// unlock leaves at most a 1-year gap, which even a thin liquid slice + bridge income covers.
+//
+// THIS IS THE STRONGEST PLAUSIBLE FIXTURE FOUND (candidate C12/C13 in the search table): a
+// 55-year-old retiring once corpus-adequate (age 59, per derive()'s own solve), with a PPF at the
+// derived cap (locked to 60 — only a 1-year bridge), a NPS at its derived cap, and a THIN liquid MF
+// slice (₹1L). It is COVERED, and the margin (`reachableCorpus` minus the single bridge year's net
+// draw) is recorded rather than forced — the honest finding #212 asks for.
+// ---------------------------------------------------------------------------
+describe("#212 residual (b) — limit recorded: no persona-plausible locked-heavy household binds the gate", () => {
+  beforeEach(() => setActivePinia(createPinia()));
+
+  it("strongest plausible fixture found (PPF at cap, NPS at cap, thin liquid MF) → covered:true, margin recorded", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    h.data.members = [
+      {
+        id: "you",
+        name: "You",
+        dateOfBirth: "1971-01-01", // age 55 as of this file's pinned currentYear (2026)
+        role: "ADULT",
+        targetRetirementAge: 55,
+        planToAge: 90,
+        relation: "",
+        city: "Metro",
+        health: "Healthy",
+        riskAppetite: "Conservative",
+        marital: "Married",
+        employmentStatus: "Employed",
+        salary: { annualCTC: 2_800_000, hikePercent: 4 }, // ₹28L CTC — inside the ₹2.5L–₹1Cr band
+      },
+    ] as typeof h.data.members;
+    h.data.expenses.avgMonthly = 66_667; // ₹8L/yr today — inside the ₹8-10L/yr band the issue names
+    h.data.investments = [];
+    // PPF at the derived cap: 30y at the ₹1.5L statutory cap compounding at ~7.5% ≈ ₹1.5 Cr. NO
+    // openingYear set — the household never recorded it, which is the DEFAULT path every real user
+    // hits (per the #211 "no plannedSaleAge" precedent above) — so it locks to age 60
+    // (`ASSUMED_PENSION_UNLOCK_AGE`), not a dated maturity.
+    h.addInvestment({ type: "PPF", label: "PPF (near cap)", value: 15_000_000, monthlyContribution: 12_500, ownerId: "you" });
+    // NPS at the derived cap: ~17y since 2009 of ~10% employer + ₹50k/yr own contribution, ≈₹55-60L.
+    h.addInvestment({ type: "NPS", label: "NPS Tier I", value: 5_500_000, monthlyContribution: 4_000, ownerId: "you" });
+    // A thin liquid MF pot — plausible for a household whose savings mostly went into PPF/NPS.
+    h.addInvestment({ type: "MutualFunds", label: "Liquid MF", value: 100_000, monthlyContribution: 500, ownerId: "you" });
+
+    const lens = { isFamilyView: false, viewingMemberId: null, currentFY: "2025-26" };
+    const k = derive(h.data, a.values, lens, { currentYear: 2026 });
+    expect(k.bridgeCoverage).not.toBeNull();
+    const b = k.bridgeCoverage!;
+
+    // Exact locks, measured from this real derive() run (2026-09-29, this session).
+    // `corpusOnlyFireAge` is derive()'s OWN solve for when the corpus becomes adequate — not the
+    // household's stated targetRetirementAge (55) — and it lands at 59 for this contribution mix.
+    expect(b.corpusOnlyFireAge).toBe(59);
+    expect(b.unlockTimeline).toEqual([{ age: 60, netAmount: 16_241_805.200630352, label: "PPF (near cap)" }]);
+    expect(b.reachableCorpus).toBe(6_320_373);
+    expect(b.lockedCorpus).toBeCloseTo(16_241_805.2, 0);
+    expect(b.bridgeIncomeAnnual).toBe(282_341);
+
+    // THE HONEST RESULT: covered, not false. Recording the margin rather than forcing a fail.
+    expect(b.covered).toBe(true);
+    expect(b.effectiveFireAge).toBe(59); // unchanged — no bridge shortfall to push it later
+    expect(b.shortfallYears).toBe(0);
+
+    // THE MARGIN — reachableCorpus minus the single bridge year's (age 59, the only underwater
+    // candidate before the PPF unlocks at 60) net draw. `k.baseFireNumber`/`regularTargetComponentsRealAt`
+    // is the SAME expense-repricing seam the bridge itself reads (never a re-derived formula, per
+    // the frame-lock test below) — t = corpusOnlyFireAge - k.anchorAge years from anchor.
+    const t = b.corpusOnlyFireAge - k.anchorAge;
+    const expenseRatio = k.regularTargetComponentsRealAt(t).base / k.baseFireNumber;
+    const grossExpenseAtBridgeAge = k.annualExpensesToday * expenseRatio;
+    const netDrawAtBridgeAge = grossExpenseAtBridgeAge - b.bridgeIncomeAnnual;
+    const margin = b.reachableCorpus - netDrawAtBridgeAge;
+    // The margin is POSITIVE (covered) and recorded exactly — this is the honest finding: even the
+    // strongest plausible locked-heavy household found in an 18-candidate search still clears its
+    // one-year bridge gap comfortably, because a plausible PPF/NPS cap can never lock enough, for
+    // long enough past a plausible early-retirement age, to outrun even a thin liquid slice.
+    expect(margin).toBeGreaterThan(0);
+    expect(margin).toBeCloseTo(5_795_440.04, 0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// FRAME LOCK — the bridge's expense repricer, `annualExpensesAt`, must reprice at EXACTLY
+// ((1+basket)/(1+CPI))^t, never a nominal curve fed into the real-frame bridge.
+//
+// Why this exists: a scratch prototype run last night (2026-09-29, see the #162 comment + D-2026-
+// 09-29-09) fed a NOMINAL expense curve into this real-frame seam and fabricated a spurious 7-year
+// gate print. `derive.ts` builds `annualExpensesAt(t)` as:
+//     annualExpensesToday * (regularTargetComponentsRealAt(t).base / baseFireNumber)
+// and `regularTargetComponentsRealAt(t).base = baseFireNumber * basketFactor(t) / deflator(t)`,
+// where `basketFactor(t) = (1+householdInflation)^t` and `deflator(t) = (1+generalInflation)^t` —
+// so the ratio collapses to exactly `((1+householdInflation)/(1+generalInflation))^t`, independent
+// of `baseFireNumber`. This test locks that identity on the residual (b) household at t=1,10,25,
+// reading it through the SAME `regularTargetComponentsRealAt` the bridge itself is fed (never a
+// re-derived formula), within 1e-9 relative tolerance.
+// ---------------------------------------------------------------------------
+describe("frame lock — the bridge's annualExpensesAt reprices at exactly ((1+basket)/(1+CPI))^t, never a nominal curve", () => {
+  beforeEach(() => setActivePinia(createPinia()));
+
+  it("t in {1, 10, 25}: regularTargetComponentsRealAt(t).base / baseFireNumber matches the basket/CPI frame ratio to 1e-9", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    h.data.members = [
+      {
+        id: "you",
+        name: "You",
+        dateOfBirth: "1974-01-01",
+        role: "ADULT",
+        targetRetirementAge: 54,
+        planToAge: 90,
+        relation: "",
+        city: "Metro",
+        health: "Healthy",
+        riskAppetite: "Conservative",
+        marital: "Married",
+        employmentStatus: "Employed",
+        salary: { annualCTC: 2_800_000, hikePercent: 5 },
+      },
+    ] as typeof h.data.members;
+    h.data.expenses.avgMonthly = 75_000;
+    h.data.investments = [];
+    h.addInvestment({ type: "PPF", label: "PPF (re-extended)", value: 32_000_000, monthlyContribution: 12_000, ownerId: "you" });
+    h.addInvestment({ type: "NPS", label: "NPS Tier I", value: 9_000_000, monthlyContribution: 8_000, ownerId: "you" });
+    h.addInvestment({ type: "MutualFunds", label: "Liquid MF", value: 4_000_000, monthlyContribution: 15_000, ownerId: "you" });
+
+    const lens = { isFamilyView: false, viewingMemberId: null, currentFY: "2025-26" };
+    const k = derive(h.data, a.values, lens, { currentYear: 2026 });
+
+    // The independently-known frame ratio: (1+householdBasket)/(1+generalCPI))^t. `realTargetDriftRate`
+    // is EXPOSED by derive() as exactly `(1+householdInflation)/(1+generalInflation) - 1` (ADR-0006,
+    // derive.ts:939/1595) — reading it, rather than re-deriving householdInflation/CPI ourselves,
+    // pins the identity against the kernel's OWN stated frame invariant, not a parallel guess.
+    const frameRatio = 1 + k.realTargetDriftRate;
+
+    for (const t of [1, 10, 25]) {
+      const components = k.regularTargetComponentsRealAt(t);
+      const actualRatio = components.base / k.baseFireNumber;
+      const expectedRatio = Math.pow(frameRatio, t);
+      expect(Math.abs(actualRatio - expectedRatio) / expectedRatio).toBeLessThan(1e-9);
+    }
+
+    // Sanity: the ratio must actually MOVE across t (i.e. basket != CPI for this assumption set) —
+    // otherwise the identity would be trivially true even for a broken (nominal) repricer that
+    // happens to also be flat, and this lock would prove nothing.
+    const ratioAt1 = k.regularTargetComponentsRealAt(1).base / k.baseFireNumber;
+    const ratioAt25 = k.regularTargetComponentsRealAt(25).base / k.baseFireNumber;
+    expect(Math.abs(ratioAt25 - ratioAt1)).toBeGreaterThan(1e-6);
   });
 });
 
