@@ -31,6 +31,8 @@ Abhay went to sleep ~00:30 IST with the direction "implement whatever is clear a
 > ```sql
 > UPDATE _prisma_migrations SET checksum = '3444d436d3517a61cb26da84803cf00279ff545a83ee32b9b041912406bde403' WHERE migration_name = '20260827120000_adr0006_assumptions_columns' AND checksum = 'manual-harness-repair';
 > UPDATE _prisma_migrations SET checksum = '213ffadd10e1f0094806eb715141b7ed7dfe513cacce05965abc49dda3b381b8' WHERE migration_name = '20260928000000_activation_event' AND checksum = 'manual-harness-repair';
+>
+> Then `prisma migrate deploy` applies the ONE genuinely new migration authored tonight and never run anywhere: `20260929190000_member_salary_has_epf` (`ALTER TABLE "members" ADD COLUMN "salaryHasEpf" BOOLEAN;` — nullable, additive, PR #227 for #223). So the bundle carries three migrations: two already on prod needing only their checksum rows fixed, one to apply.
 > ```
 > (checksums computed with `sha256sum` on the committed files at `213ca54`; verify with `npx prisma migrate status` after.) Also note `prisma migrate resolve --applied` was called twice and timed out — check for duplicate rows for those two names before running the UPDATEs.
 
