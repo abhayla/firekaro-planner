@@ -539,12 +539,16 @@ export const useHouseholdStore = defineStore("household", () => {
       const existing = data.value.investments.find(
         (i) => i.type === "EPF_VPF" && i.ownerId === m.id,
       );
-      // #223 round 2 — "no EPF" is household state on the member's salary, honoured HERE, the one
-      // place every surface (quick, Profile, the salary form) funnels through. Remove only the row
-      // THIS auto-flow created (autoFlowSource) — a row the user added by hand in InvestmentForm.vue
-      // is never touched, matching the store's existing auto-flow-vs-manual convention.
+      // #223 round 3 — "no EPF" is household state on the member's salary, honoured HERE, the one
+      // place every surface (quick, Profile, the salary form) funnels through. `existing` is the
+      // FIRST EPF_VPF row for this member — the exact row the dedupe branch below would otherwise
+      // overwrite, so this auto-flow already treats it as its own regardless of who created it
+      // (a household whose row predates the `autoFlowSource` marker never had that marker set, and
+      // must not keep an invented deduction forever). Remove exactly that row; a SECOND row for the
+      // same member (a hand-added extra, e.g. a previous employer's balance) is never touched — it
+      // was never the row this dedupe would have refreshed.
       if (m.salary.hasEpf === false) {
-        if (existing?.autoFlowSource) {
+        if (existing) {
           data.value.investments = data.value.investments.filter((i) => i !== existing);
         }
         continue;
