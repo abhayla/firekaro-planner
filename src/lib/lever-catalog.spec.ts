@@ -568,3 +568,129 @@ describe("QN-5 plan levers — Amit (the /quick persona) at 50: out-of-reach bas
     expect(all.requiredMonthlyReal / all.currentMonthlyReal).toBeLessThan(2);
   });
 });
+
+// ============================================================================================
+// gh #185 step 7 — income-side plan levers ("raise income X%", "add side income from age Z").
+// Proof fixture: Ravi (the lower-band accumulator, `src/seeds/ravi.ts`) — the household the
+// income-path kernel (ADR-0007) exists to serve — and Mehtas (an affluent household with no
+// need for a side income) for the NaN-safety / no-crash half of the proof.
+// ============================================================================================
+import { loadRaviSeed } from "@/seeds/ravi";
+import { loadMehtasSeed } from "@/seeds/mehtas";
+
+describe("QN-5 income-side plan levers — Ravi (#185 step 7, real kernel)", () => {
+  const LENS: DeriveLens = { isFamilyView: false, viewingMemberId: null, currentFY: "2025-26" };
+
+  function ravi() {
+    setActivePinia(createPinia());
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    loadRaviSeed(h, a);
+    return { snapshot: h.data, assumptions: a.values };
+  }
+
+  function conservativeFireAge(snapshot: Household, assumptions: Assumptions): number {
+    const k = derive(snapshot, assumptions, LENS);
+    return k.anchorAge + k.yearsToRegular;
+  }
+
+  it("raise-income and side-income are both AVAILABLE on Ravi", () => {
+    const { snapshot, assumptions } = ravi();
+    const anchorAge = derive(snapshot, assumptions, LENS).anchorAge;
+    const levers = buildPlanLevers(snapshot, assumptions, {
+      anchorAge,
+      directPlans: null,
+      memberLens: false,
+      currentYear: new Date().getFullYear(),
+    });
+    const raiseIncome = levers.find((l) => l.key === "raise-income")!;
+    const sideIncome = levers.find((l) => l.key === "side-income")!;
+    expect(raiseIncome.available).toBe(true);
+    expect(sideIncome.available).toBe(true);
+    expect(raiseIncome.unavailableReason).toBeUndefined();
+    expect(sideIncome.unavailableReason).toBeUndefined();
+  });
+
+  it("raise-income 2pp/yr moves Ravi's CONSERVATIVE FIRE age materially earlier through derive()", () => {
+    const { snapshot, assumptions } = ravi();
+    const anchorAge = derive(snapshot, assumptions, LENS).anchorAge;
+    const levers = buildPlanLevers(snapshot, assumptions, {
+      anchorAge,
+      directPlans: null,
+      memberLens: false,
+      currentYear: new Date().getFullYear(),
+    });
+    const raiseIncome = levers.find((l) => l.key === "raise-income")!;
+    const baseFireAge = conservativeFireAge(snapshot, assumptions);
+    const { assumptions: raisedAssumptions } = raiseIncome.apply({
+      snapshot,
+      assumptions,
+      targetAge: 65,
+      extraSegments: [],
+    });
+    const raisedFireAge = conservativeFireAge(snapshot, raisedAssumptions);
+    const delta = baseFireAge - raisedFireAge;
+    // Listed delta (evidence table): Ravi's own real conservative growth default is 2%/yr
+    // (`salaryGrowthRealPercent` default). Doubling it to 4%/yr on a household whose income is
+    // nearly ALL surplus (spec §1 RCA) must move the age earlier by MORE than a rounding blip.
+    expect(delta, `raise-income delta=${delta.toFixed(2)}yr (base ${baseFireAge.toFixed(2)} -> raised ${raisedFireAge.toFixed(2)})`).toBeGreaterThan(0.5);
+  });
+
+  it("side-income ₹5,000/mo from age 25 moves Ravi's CONSERVATIVE FIRE age materially earlier", () => {
+    const { snapshot, assumptions } = ravi();
+    const anchorAge = derive(snapshot, assumptions, LENS).anchorAge;
+    const levers = buildPlanLevers(snapshot, assumptions, {
+      anchorAge,
+      directPlans: null,
+      memberLens: false,
+      currentYear: new Date().getFullYear(),
+    });
+    const sideIncome = levers.find((l) => l.key === "side-income")!;
+    expect(sideIncome.label).toContain("age 25");
+
+    const targetAge = 65;
+    const base: PlanInputs = { snapshot, assumptions, targetAge, extraSegments: [] };
+    const baseline = derive(snapshot, assumptions, LENS);
+    const withSideIncome = sideIncome.apply(base);
+    const boosted = derive(withSideIncome.snapshot, withSideIncome.assumptions, LENS, {
+      extraContributionSegments: withSideIncome.extraSegments,
+    });
+    const baseFireAge = baseline.anchorAge + baseline.yearsToRegular;
+    const boostedFireAge = boosted.anchorAge + boosted.yearsToRegular;
+    const delta = baseFireAge - boostedFireAge;
+    expect(delta, `side-income delta=${delta.toFixed(2)}yr (base ${baseFireAge.toFixed(2)} -> boosted ${boostedFireAge.toFixed(2)})`).toBeGreaterThan(0.5);
+  });
+});
+
+describe("QN-5 income-side plan levers — Mehtas (NaN-safe on an affluent household, #185 step 7)", () => {
+  const LENS: DeriveLens = { isFamilyView: false, viewingMemberId: null, currentFY: "2025-26" };
+
+  it("evaluatePlanLevers runs clean (no NaN/Infinity leak) with raise-income + side-income in the catalog", () => {
+    setActivePinia(createPinia());
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    loadMehtasSeed(h, a);
+    const snapshot = h.data;
+    const assumptions = a.values;
+    const anchorAge = derive(snapshot, assumptions, LENS).anchorAge;
+    const levers = buildPlanLevers(snapshot, assumptions, {
+      anchorAge,
+      directPlans: null,
+      memberLens: false,
+      currentYear: new Date().getFullYear(),
+    });
+    expect(levers.map((l) => l.key)).toContain("raise-income");
+    expect(levers.map((l) => l.key)).toContain("side-income");
+
+    const targetAge = 55;
+    const base: PlanInputs = { snapshot, assumptions, targetAge, extraSegments: [] };
+    const { baseline, effects } = evaluatePlanLevers(base, LENS, levers);
+    expect(Number.isFinite(baseline.gapReal)).toBe(true);
+    for (const e of effects) {
+      expect(Number.isNaN(e.lessToFind), `${e.key} lessToFind must not be NaN`).toBe(false);
+      expect(Number.isNaN(e.gapClosed), `${e.key} gapClosed must not be NaN`).toBe(false);
+      expect(e.lessToFind).toBeGreaterThanOrEqual(0);
+      expect(e.gapClosed).toBeGreaterThanOrEqual(0);
+    }
+  });
+});
