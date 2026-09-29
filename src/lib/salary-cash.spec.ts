@@ -11,6 +11,7 @@ import {
   PROFESSIONAL_TAX_ANNUAL_PER_EARNER,
   netCashSalary,
   pfFromInvestmentRows,
+  pfFromRows,
   resolveBasicAnnual,
 } from "./salary-cash";
 import { DEFAULT_BASIC_PERCENT_OF_CTC } from "./salary-percent";
@@ -34,6 +35,16 @@ describe("pfFromInvestmentRows — PF is the rupees the corpus already receives"
     expect(pfFromInvestmentRows(h, "b")).toBe(172_800);
   });
 
+  // KNOWN LIMIT (recorded as a finding, not fixed): two EPF rows for ONE earner are SUMMED. A
+  // dormant previous-employer row carrying a stale `monthlyContribution` would over-deduct
+  // take-home — conservative (cash reads low, never high), and consistent with the corpus, which
+  // grows from the same rows. See the `salary-cash.ts` header.
+  it("sums MULTIPLE EPF rows owned by the same earner (documented limit)", () => {
+    expect(
+      pfFromInvestmentRows(hh([inv({ monthlyContribution: 20_000 }), inv({ id: "i2", monthlyContribution: 5_000 })]), "a"),
+    ).toBe(300_000);
+  });
+
   it("ignores every non-EPF row (a SIP is not a payslip deduction)", () => {
     expect(
       pfFromInvestmentRows(hh([inv({ type: "MutualFunds", monthlyContribution: 80_000 }), inv({ monthlyContribution: 5_000 })]), null),
@@ -51,6 +62,19 @@ describe("pfFromInvestmentRows — PF is the rupees the corpus already receives"
     expect(
       Number.isFinite(pfFromInvestmentRows(hh([inv({ monthlyContribution: Number.NaN })]), null)),
     ).toBe(true);
+  });
+});
+
+describe("pfFromRows — the same body over a pre-scoped array (derive.ts's entry point)", () => {
+  it("agrees with pfFromInvestmentRows on the same rows", () => {
+    const rows = [inv({ monthlyContribution: 20_000 }), inv({ monthlyContribution: 14_400, ownerId: "b" })];
+    expect(pfFromRows(rows)).toBe(pfFromInvestmentRows(hh(rows), null));
+    expect(pfFromRows(rows, "b")).toBe(pfFromInvestmentRows(hh(rows), "b"));
+  });
+
+  it("is zero for an absent array", () => {
+    expect(pfFromRows(undefined)).toBe(0);
+    expect(pfFromRows(null)).toBe(0);
   });
 });
 

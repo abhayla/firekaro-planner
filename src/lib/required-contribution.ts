@@ -147,6 +147,21 @@ export interface RequiredContributionResult {
    * (blind verification finding 3).
    */
   netAnnualExpensesReal: number;
+  /**
+   * gh #218 round 2 — the INVESTABLE CEILING the solver itself used, ₹/month in today's money:
+   * `cash take-home + PF/12 − livingFloor`. Exported because every "can they actually afford
+   * this?" comparison MUST use the same basis the prescription was solved against.
+   *
+   * Why a consumer cannot just use `monthlyTakeHome`: take-home is now CASH (PF removed), while
+   * `requiredMonthlyReal` is solved against a ceiling that adds PF back (PF is investment, not
+   * spending) and is compared with `currentMonthlyReal`, which is PF-INCLUSIVE. Comparing a
+   * PF-inclusive prescription against a PF-exclusive take-home makes an affordable amount read as
+   * "more than you take home" for anything in the PF-wide band between them — up to ~₹35k/month
+   * on the Sharmas (FinTech review HIGH, round 2). One module owns the basis; consumers read it.
+   *
+   * It is 0 when there is no feasible headroom (and `requiredMonthlyReal` is then Infinity).
+   */
+  feasibleMonthlyCeilingReal: number;
 }
 
 /**
@@ -198,6 +213,7 @@ export function requiredMonthlyContributionFor(
       needPlannedGoalsReal: 0,
       needHealthcareReservationReal: 0,
       netAnnualExpensesReal: 0,
+      feasibleMonthlyCeilingReal: 0,
     };
   }
   const targetAge = Math.round(input.targetAge);
@@ -440,5 +456,8 @@ export function requiredMonthlyContributionFor(
       0,
       Math.round(safe(atTargetComponents.base * safe(atTarget.effectiveSWR, 0.035))),
     ),
+    // gh #218 round 2 — the very `hi` the bisection used, so a consumer's affordability check and
+    // the prescription share one basis (see the interface doc).
+    feasibleMonthlyCeilingReal: Math.max(0, Math.round(safe(hi))),
   };
 }

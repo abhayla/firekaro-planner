@@ -241,10 +241,6 @@ const pageRecommended = computed<"OLD" | "NEW">(() =>
 
 const monthlyTakeHome = computed(() => {
   // gh #86 — savings contribution is the member's own (lensed) investments when a lens is active.
-  const annualSavingsContrib = scopedHousehold.value.investments.reduce(
-    (s, i) => s + (i.monthlyContribution ?? 0) * 12,
-    0,
-  );
   // gh #218 — EPF/VPF rows are excluded HERE because PF is already subtracted inside the cash
   // figure below. Netting the auto-flowed EPF row off again would take the same rupees twice and
   // show a discretionary figure several thousand ₹/month too low.
@@ -269,7 +265,6 @@ const monthlyTakeHome = computed(() => {
     annualGross: totalTaxable.value,
     annualTax: activeResult.value.totalTax,
     annualGrossPostTax,
-    annualSavingsContrib,
     annualNonPfInvesting,
     annualTake,
     monthlyTake: Math.round(annualTake / 12),

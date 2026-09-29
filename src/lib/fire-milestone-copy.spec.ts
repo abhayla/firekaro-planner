@@ -1,10 +1,17 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { setActivePinia, createPinia } from "pinia";
-import { coastFireBlurb, baristaFireBlurb, expectedHeadlineCopy } from "./fire-milestone-copy";
+import {
+  coastFireBlurb,
+  baristaFireBlurb,
+  expectedHeadlineCopy,
+  feasibilityNoteCopy,
+} from "./fire-milestone-copy";
 import { useHouseholdStore } from "@/stores/household";
 import { useAssumptionsStore } from "@/stores/assumptions";
 import { loadSeedPersona } from "@/lib/seed-persona";
 import { derive } from "@/lib/derive";
+import { requiredMonthlyContributionFor } from "@/lib/required-contribution";
+import { pfFromInvestmentRows } from "@/lib/salary-cash";
 
 // gh #39 (new-user path): the Coast/Barista descriptive copy must NOT assert the
 // "you've effectively coasted / no contributions needed" framing when there is no FIRE
@@ -123,5 +130,120 @@ describe("expectedHeadlineCopy — real kernel output (Core proof, gh #185 step 
     // Belt-and-braces case per the helper's own doc comment — even if a future kernel change ever
     // set a non-null basis without a strictly-earlier expected age, the UI must not show "51 · 51".
     expect(expectedHeadlineCopy(51, 51, 12)).toBeNull();
+  });
+});
+
+/**
+ * gh #218 round 2 — the feasibility note's BASIS (FinTech HIGH).
+ *
+ * The regression this file exists to stop: after #218, `monthlyTakeHome` is CASH (PF removed),
+ * while `requiredMonthlyReal` is solved against a ceiling that adds PF back and is compared with a
+ * PF-INCLUSIVE `currentMonthlyReal`. A note that tested affordability against cash alone told the
+ * user "that is more than you take home" for any prescription in the PF-wide band between the two
+ * — up to ~₹35,000/month on the Sharmas. The over-the-line test must use the solver's own ceiling.
+ */
+describe("gh #218 — feasibilityNoteCopy tests affordability on the SOLVER ceiling, not cash", () => {
+  beforeEach(() => setActivePinia(createPinia()));
+  const DEFAULT_LENS = { isFamilyView: false, viewingMemberId: null, currentFY: "2025-26" } as const;
+  const fmt = (n: number) => `₹${Math.round(n)}`;
+
+  it("does NOT say 'more than you take home' in the PF band between cash and the ceiling", () => {
+    // The exact shape of the defect: required sits ABOVE cash but BELOW the real ceiling, because
+    // PF is investable. Measured band on the Sharmas is ~₹35k wide (cash ₹2.99L, PF ₹34,400/mo).
+    const note = feasibilityNoteCopy({
+      requiredMonthlyReal: 320_000,
+      feasibleMonthlyCeilingReal: 333_263,
+      monthlyTakeHome: 298_863,
+      mustInvestMore: true,
+      formatCurrency: fmt,
+    });
+    expect(note, "an affordable amount must not be called unaffordable").not.toMatch(
+      /more than you take home/,
+    );
+    expect(note, "it should name the squeeze honestly instead").toMatch(/within reach/);
+    expect(note).toMatch(/already going to PF/);
+  });
+
+  it("DOES say 'more than you take home' once the amount clears the solver ceiling", () => {
+    expect(
+      feasibilityNoteCopy({
+        requiredMonthlyReal: 400_000,
+        feasibleMonthlyCeilingReal: 333_263,
+        monthlyTakeHome: 298_863,
+        mustInvestMore: true,
+        formatCurrency: fmt,
+      }),
+    ).toMatch(/more than you take home/);
+  });
+
+  it("an UNREACHABLE prescription is the loudest case, never silence", () => {
+    expect(
+      feasibilityNoteCopy({
+        requiredMonthlyReal: Number.POSITIVE_INFINITY,
+        feasibleMonthlyCeilingReal: 0,
+        monthlyTakeHome: 298_863,
+        mustInvestMore: true,
+        formatCurrency: fmt,
+      }),
+    ).toMatch(/more than you take home/);
+  });
+
+  it("quotes what is LEFT TO LIVE ON off cash, because that is what a user spends", () => {
+    const note = feasibilityNoteCopy({
+      requiredMonthlyReal: 100_000,
+      feasibleMonthlyCeilingReal: 333_263,
+      monthlyTakeHome: 298_863,
+      mustInvestMore: true,
+      formatCurrency: fmt,
+    });
+    expect(note).toMatch(/₹198863\/month to live on/);
+  });
+
+  it("makes NO claim when the user is already investing enough, or has no income", () => {
+    expect(
+      feasibilityNoteCopy({
+        requiredMonthlyReal: 100_000,
+        feasibleMonthlyCeilingReal: 333_263,
+        monthlyTakeHome: 298_863,
+        mustInvestMore: false,
+        formatCurrency: fmt,
+      }),
+    ).toBeNull();
+    expect(
+      feasibilityNoteCopy({
+        requiredMonthlyReal: 100_000,
+        feasibleMonthlyCeilingReal: 0,
+        monthlyTakeHome: 0,
+        mustInvestMore: true,
+        formatCurrency: fmt,
+      }),
+    ).toBeNull();
+  });
+
+  it("REAL SEED: the Sharmas' own prescription is never called unaffordable at its own ceiling", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    loadSeedPersona(h, a);
+    const k = derive(h.data, a.values, DEFAULT_LENS);
+    const req = requiredMonthlyContributionFor({
+      snapshot: h.data,
+      assumptions: a.values,
+      lens: DEFAULT_LENS,
+      targetAge: Math.ceil(k.anchorAge + k.yearsToRegular),
+    });
+    // The ceiling the solver used must exceed cash by roughly the PF — that gap IS the defect band.
+    const pf = pfFromInvestmentRows(h.data, null);
+    expect(req.feasibleMonthlyCeilingReal, "ceiling is exported and positive").toBeGreaterThan(0);
+    expect(pf, "the Sharmas have a real PF outflow").toBeGreaterThan(0);
+    // A prescription AT the ceiling must never be labelled over take-home.
+    expect(
+      feasibilityNoteCopy({
+        requiredMonthlyReal: req.feasibleMonthlyCeilingReal,
+        feasibleMonthlyCeilingReal: req.feasibleMonthlyCeilingReal,
+        monthlyTakeHome: k.monthlyTakeHome,
+        mustInvestMore: true,
+        formatCurrency: fmt,
+      }),
+    ).not.toMatch(/more than you take home/);
   });
 });

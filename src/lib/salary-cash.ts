@@ -41,6 +41,16 @@
  *   - No EPF row ⇒ PF is zero for that earner. Nothing is being auto-flowed, so nothing is
  *     leaving their payslip, and the figure honestly collapses to `gross − tax`.
  *
+ * KNOWN LIMIT — MULTIPLE EPF ROWS PER EARNER (recorded as a finding, not fixed here). An earner
+ * can own more than one `EPF_VPF` row: `InvestmentForm.vue` lets a user add one by hand, and the
+ * store's `autoFlowSalaryToEPF` dedupes only against the row IT created. Every such row is summed
+ * here. That is right for a genuine live second contribution, but a DORMANT row — a previous
+ * employer's EPF balance carried over with a stale non-zero `monthlyContribution` — would
+ * over-deduct take-home. The error is CONSERVATIVE (cash reads lower than reality, never higher),
+ * and the same rows are what the corpus grows from, so the payslip and the corpus stay consistent
+ * with each other. Distinguishing live from dormant needs a per-row "still contributing" flag on
+ * the investment model; that is a separate change.
+ *
  * PROFESSIONAL TAX: a flat ₹2,500 per earner per year. It is a STATE levy, so the exact
  * slab varies (Maharashtra ₹2,500/yr, Karnataka ₹2,400/yr, and a few states levy none),
  * but Article 276(2) of the Constitution CAPS it at ₹2,500 per person per year in every
@@ -50,7 +60,7 @@
  * that is not already inside an existing row, and therefore the only one that can move a
  * downstream figure at all (the solver ceiling, by ≤ ₹208/earner/month).
  */
-import type { Household } from "@/types/household";
+import type { Household, Investment } from "@/types/household";
 import { DEFAULT_BASIC_PERCENT_OF_CTC, basicAnnualFromPercent } from "./salary-percent";
 
 /** Statutory EPF rate on Basic+DA, both the employee and the employer leg (EPF Act, Sch. IV). */
@@ -105,7 +115,18 @@ export function pfFromInvestmentRows(
   household: Pick<Household, "investments"> | undefined | null,
   memberId: string | null,
 ): number {
-  const rows = household?.investments;
+  return pfFromRows(household?.investments, memberId);
+}
+
+/**
+ * The same read, over a row array the caller has ALREADY scoped (`derive.ts` works from
+ * `scopeInvestments`, which the member lens has filtered). One body serves both entry points so
+ * the EPF filter is never re-implemented at a call site.
+ */
+export function pfFromRows(
+  rows: readonly Investment[] | undefined | null,
+  memberId: string | null = null,
+): number {
   if (!rows) return 0;
   return rows
     .filter((i) => i.type === "EPF_VPF" && (memberId == null || i.ownerId === memberId))

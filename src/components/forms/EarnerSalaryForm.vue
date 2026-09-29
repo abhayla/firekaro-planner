@@ -216,7 +216,7 @@ function saveEdit() {
     >
       <v-icon icon="mdi-cash-check" size="small" color="success" />
       <span class="text-caption">
-        Estimated take-home (after tax,
+        Estimated take-home (after tax, PF and professional tax,
         {{ takeHome.regime === "OLD" ? "Old" : "New" }} regime):
         <strong>{{ formatINRCompact(takeHome.monthly) }}/mo</strong>
         (~{{ formatINRCompact(takeHome.annual) }}/yr,

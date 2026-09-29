@@ -36,7 +36,7 @@ import {
 import { derivedFamilyLayer, plannedGoalInflationBucket } from "@/lib/derived-records";
 import { computeTax, recommendRegime, marginalSlabRate, getTaxConfigForFY } from "@/lib/tax";
 import { epfBucketAfterTaxReturn } from "@/lib/epf-vpf";
-import { netCashSalary, PROFESSIONAL_TAX_ANNUAL_PER_EARNER } from "@/lib/salary-cash";
+import { netCashSalary, pfFromRows, PROFESSIONAL_TAX_ANNUAL_PER_EARNER } from "@/lib/salary-cash";
 import { ageFromDOB } from "@/lib/age";
 import { todayIsoLocal } from "@/lib/as-of-date";
 import { toMonthly, toAnnual } from "@/lib/cashflow";
@@ -544,10 +544,13 @@ export function derive(
     // funded out of that residual and already reaches the corpus through that same EPF row
     // (gh #11 LOCK). Subtracting it twice would move every EPF household's FIRE date years
     // later for no real change in their finances.
-    const scopePf = scopeInvestments
-      .filter((i) => i.type === "EPF_VPF")
-      .reduce((sum, i) => sum + (i.monthlyContribution ?? 0) * 12, 0);
-    const scopeProfessionalTax = scopeEarners.length * PROFESSIONAL_TAX_ANNUAL_PER_EARNER;
+    const scopePf = pfFromRows(scopeInvestments);
+    // Professional tax is levied on EMPLOYMENT, so it is counted per SALARIED earner — gated on
+    // `salary.annualCTC` exactly as the earner card, the member lens and the salary form do. A
+    // business-only earner has no payslip and was previously charged a spurious ₹208/mo.
+    const scopeProfessionalTax =
+      scopeEarners.filter((m) => (m.salary?.annualCTC ?? 0) > 0).length *
+      PROFESSIONAL_TAX_ANNUAL_PER_EARNER;
     const monthlyTakeHome = netCashSalary({
       annualCTC: annualIncome.total,
       annualPf: scopePf,
