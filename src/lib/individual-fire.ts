@@ -61,6 +61,8 @@ export interface IndividualFireResult {
   attributableAnnualExpenses: number;
   /** M-owned + split × Joint investments (primary residence excluded). ₹ today. */
   attributableCorpus: number;
+  /** #160: M-owned + split × shared-with-spouse liabilities. ₹ outstanding today. */
+  attributableLiabilitiesValue: number;
   attributableAnnualIncome: number;
   attributableAnnualTax: number;
   attributableAnnualSavings: number;
@@ -176,6 +178,23 @@ export function computeIndividualFire(
     }
   }
   attributableCorpus = Math.round(attributableCorpus);
+
+  // ---- attributable liabilities: own (100%) + shared-with-spouse (× split) ----
+  // #160: the dashboard's Liabilities tile showed the HOUSEHOLD balance beside a member-lensed
+  // loan count (same class as the Investments tile). Liabilities carry no "Joint" ownerId
+  // sentinel (unlike investments) — `isSharedWithSpouse` is the equivalent signal — so the
+  // weight mirrors `corpusWeightOf` above with that flag standing in for `ownerId === JOINT`.
+  let attributableLiabilitiesValue = 0;
+  for (const l of household.liabilities) {
+    const w =
+      l.ownerId === memberId
+        ? l.outstandingBalance
+        : l.isSharedWithSpouse
+          ? split * l.outstandingBalance
+          : 0;
+    attributableLiabilitiesValue += w;
+  }
+  attributableLiabilitiesValue = Math.round(attributableLiabilitiesValue);
 
   // ---- attributable income: own (100%) + Joint (× split) ----
   const salary = isEarningMember(member, household.businesses)
@@ -390,6 +409,7 @@ export function computeIndividualFire(
     anchorAge,
     attributableAnnualExpenses,
     attributableCorpus,
+    attributableLiabilitiesValue,
     attributableAnnualIncome,
     attributableAnnualTax,
     attributableAnnualSavings,

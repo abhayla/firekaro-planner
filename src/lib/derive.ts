@@ -1672,8 +1672,23 @@ export function derive(
     // already-lensed instrument/loan COUNT (the bug: household value + lensed count = frozen value
     // under "Viewing as <member>"). On the default (no-lens) view lensedScope spans the whole
     // household, so these are byte-identical to the household totals.
-    lensedTotalCorpus: lensedScope.totalCorpus,
-    lensedTotalLiabilitiesValue: lensedScope.totalLiabilitiesValue,
+    //
+    // #160: under an EXPLICIT member lens, `lensedScope.totalCorpus`/`totalLiabilitiesValue` counted
+    // the member's own holdings/loans + 100% of every "Joint"/shared one — while the tile's SUBLINE
+    // count (lensedInvestments.length / lensedLiabilities.length) is the same "which rows are
+    // visible" set, so value and count agreed on WHICH ROWS but not on HOW MUCH of a shared row is
+    // this member's. That is still a scope mismatch: the value read 100% of Joint, the count implied
+    // "this member's slice". Route through the SAME attribution `individual-fire.ts` already uses
+    // for this member's own FIRE math (own 100% + Joint/shared × householdSplitPercent) so the tile
+    // value is the member's ATTRIBUTABLE slice, never a second attribution rule. On the default
+    // (no-lens) view `effectiveLensMemberId` is null → falls through to `lensedScope`, byte-identical
+    // to today.
+    lensedTotalCorpus:
+      individualFireByMember.find((r) => r.memberId === effectiveLensMemberId)?.attributableCorpus ??
+      lensedScope.totalCorpus,
+    lensedTotalLiabilitiesValue:
+      individualFireByMember.find((r) => r.memberId === effectiveLensMemberId)
+        ?.attributableLiabilitiesValue ?? lensedScope.totalLiabilitiesValue,
     npsAnnuityIncome,
     fireWithdrawableCorpus,
     // Whole-household income/tax — the coherent denominator for the cashflow / financial-health
