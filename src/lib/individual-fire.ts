@@ -74,6 +74,19 @@ export interface IndividualFireResult {
   yearsToIndividualFire: number;
   /** anchorAge + yearsToIndividualFire (Infinity → anchorAge unchanged sentinel handled by caller). */
   individualFireAge: number;
+  /**
+   * gh #162 part 2 §4.4 — the NOMINAL two-leg target schedule the solver actually chased, at
+   * fractional year `t` from `anchorAge`: base at the household basket + the healthcare reservation
+   * at `healthcareInflation`. Exposed so a test can pin THE KERNEL'S OWN schedule against
+   * `derive.ts`'s `healthcareReservationNominalAt` rather than rebuilding both legs in test-side
+   * arithmetic — a reconstruction cannot see an off-by-one on `t` inside this closure, and a
+   * `tt + 1` mutant provably survived every test that only reconstructed it (#210 review).
+   * Derived, never persisted.
+   */
+  targetNominalAt: (t: number) => number;
+  /** The two legs at t = 0, so a test can separate them without re-deriving the reservation %. */
+  targetBaseToday: number;
+  targetReservationToday: number;
 }
 
 /** "Joint" asset/debt/income sentinel (distinct from the "Household" expense sentinel). */
@@ -320,11 +333,17 @@ export function computeIndividualFire(
   const targetBaseToday = individualFireNumber - targetReservationToday;
   /** NOMINAL ₹ in the member's target at fractional year `t` — base at the basket, reservation at
    *  medical inflation. Mirrors `derive.ts`'s `regularTargetSchedule`, on member quantities. */
+  // The rate is snapshotted, NOT read live off `assumptions` inside the closure: the exposed
+  // `targetNominalAt` is the schedule THIS solve used, and a caller mutating the assumptions store
+  // afterwards must not retroactively change an already-returned result (found while pinning the
+  // rupee value — two results computed at 9% and 14% returned the identical schedule because both
+  // closures read the same live object).
+  const memberHealthcareInflation = assumptions.healthcareInflation;
   const memberTargetNominalAt = (t: number): number => {
     const tt = Math.max(0, t);
     return (
       targetBaseToday * Math.pow(1 + householdBasket, tt) +
-      targetReservationToday * Math.pow(1 + assumptions.healthcareInflation, tt)
+      targetReservationToday * Math.pow(1 + memberHealthcareInflation, tt)
     );
   };
 
@@ -375,5 +394,8 @@ export function computeIndividualFire(
     nominalReturn: blendedReturn,
     yearsToIndividualFire,
     individualFireAge,
+    targetNominalAt: memberTargetNominalAt,
+    targetBaseToday,
+    targetReservationToday,
   };
 }

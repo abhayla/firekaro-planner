@@ -271,4 +271,89 @@ describe("computeIndividualFire (#81 Phase 2 — standalone per-adult FIRE)", ()
       }
     }
   });
+  // FinTech verdict gap (#210 review): T5/T5b/T5c assert DIRECTION only — a future edit that swaps
+  // the reservation leg's rate for the wrong one, or that grows it at `t + 1` / `t - 1`, would still
+  // be monotone-later and still pass all three. This pins THE KERNEL'S OWN schedule
+  // (`result.targetNominalAt`) against the one-line formula `derive.ts` uses for the household
+  // (`healthcareReservationNominalAt` = `reservation × (1 + healthcareInflation)^t`, derive.ts
+  // l.1151) at t = 10, to within ₹1.
+  //
+  // Why the kernel's own closure and not a test-side reconstruction: the first version of this test
+  // rebuilt both legs in its own arithmetic, and a `tt + 1` mutant on the reservation leg SURVIVED
+  // it (measured, #210 review) — a reconstruction cannot see an off-by-one inside the closure it is
+  // reconstructing. `targetNominalAt` is exposed for exactly this reason.
+  //
+  // Every store mutation below is restored in `finally`: a thrown assertion used to leave
+  // `healthcareInflation`/`healthcareCorpusReservationPercent` elevated on the shared store, which
+  // turned T5 and T5c red in the same file for the wrong reason (#210 review). Same pattern as the
+  // property spec in `kernel-invariants.property.spec.ts`.
+  it("gh #162 part 2 T5d — the KERNEL's schedule matches derive's healthcareReservationNominalAt at t = 10", () => {
+    const { h, a } = setup();
+    const originalWeights = a.values.inflationWeights;
+    const originalHealthcare = a.values.healthcareInflation;
+    const originalEducation = a.values.educationInflation;
+    const originalHousing = a.values.housingInflation;
+    const originalReservation = h.data.healthcareCorpusReservationPercent;
+    try {
+      // Isolate the reservation channel from the basket blend, exactly as T5 does (see T5b).
+      a.values.inflationWeights = { general: 1, healthcare: 0, education: 0, housing: 0 };
+      a.values.healthcareInflation = 0.09;
+      a.values.educationInflation = 0.11; // deliberately DIFFERENT, so a wrong-rate swap is detectable
+      a.values.housingInflation = 0.13;
+      const reservationPercent = 0.2;
+      h.data.healthcareCorpusReservationPercent = reservationPercent;
+
+      const r = computeIndividualFire(h.data, a.values, "rohit", "2025-26")!;
+      const basket = resolveHouseholdBasket(a.values);
+      const T = 10;
+
+      // The two legs the kernel actually built, not a reconstruction.
+      expect(Math.abs(r.targetReservationToday - r.targetBaseToday * reservationPercent)).toBeLessThanOrEqual(1);
+      expect(Math.abs(r.targetBaseToday + r.targetReservationToday - r.individualFireNumber)).toBeLessThanOrEqual(1);
+
+      // derive.ts's household formula, verbatim, on the member's own reservation leg.
+      const healthcareReservationNominalAt10 =
+        r.targetReservationToday * Math.pow(1 + a.values.healthcareInflation, T);
+      const baseLegAt10 = r.targetBaseToday * Math.pow(1 + basket, T);
+
+      // THE ASSERTION: the kernel's own schedule at t = 10 IS base-leg + derive's reservation leg,
+      // to the rupee. A `tt ± 1` or a rate swap inside `memberTargetNominalAt` moves this and fails.
+      // ₹1 absolute, as briefed — `targetBaseToday` is derived off the rounded
+      // `individualFireNumber`, so the two sides differ by paise, never by rupees.
+      expect(Math.abs(r.targetNominalAt(T) - (baseLegAt10 + healthcareReservationNominalAt10)))
+        .toBeLessThanOrEqual(1);
+      // …and the residual after removing the base leg is derive's reservation leg alone.
+      expect(Math.abs(r.targetNominalAt(T) - baseLegAt10 - healthcareReservationNominalAt10))
+        .toBeLessThanOrEqual(1);
+
+      // t = 0 is byte-identical to the reported target (the no-collateral-movement guarantee).
+      expect(Math.abs(r.targetNominalAt(0) - r.individualFireNumber)).toBeLessThanOrEqual(1);
+
+      // NEIGHBOURING RATES and OFF-BY-ONE `t` must each differ by far more than ₹1, so none of them
+      // could pass the pin above on rounding.
+      for (const wrongRate of [basket, a.values.educationInflation, a.values.housingInflation, a.values.inflation]) {
+        const wrongLeg = r.targetReservationToday * Math.pow(1 + wrongRate, T);
+        if (Math.abs(wrongRate - a.values.healthcareInflation) < 1e-9) continue;
+        expect(Math.abs(healthcareReservationNominalAt10 - wrongLeg)).toBeGreaterThan(1);
+      }
+      for (const offBy of [T - 1, T + 1]) {
+        const shifted = r.targetReservationToday * Math.pow(1 + a.values.healthcareInflation, offBy);
+        expect(Math.abs(healthcareReservationNominalAt10 - shifted)).toBeGreaterThan(1);
+      }
+
+      // The schedule is LIVE in the solve, not merely exposed: raising only healthcareInflation
+      // moves the age later while leaving t = 0 untouched.
+      a.values.healthcareInflation = 0.14;
+      const hotter = computeIndividualFire(h.data, a.values, "rohit", "2025-26")!;
+      expect(hotter.yearsToIndividualFire).toBeGreaterThan(r.yearsToIndividualFire);
+      expect(hotter.individualFireNumber).toBe(r.individualFireNumber);
+      expect(hotter.targetNominalAt(T)).toBeGreaterThan(r.targetNominalAt(T));
+    } finally {
+      a.values.inflationWeights = originalWeights;
+      a.values.healthcareInflation = originalHealthcare;
+      a.values.educationInflation = originalEducation;
+      a.values.housingInflation = originalHousing;
+      h.data.healthcareCorpusReservationPercent = originalReservation;
+    }
+  });
 });
