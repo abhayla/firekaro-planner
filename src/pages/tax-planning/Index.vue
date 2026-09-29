@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { useHouseholdStore } from "@/stores/household";
 import { useFireDerive } from "@/lib/useFireDerive";
 import { useUiStore } from "@/stores/ui";
 import { todayIsoLocal } from "@/lib/as-of-date";
-import { computeTax, npsCeilingFor, AVAILABLE_FYS } from "@/lib/tax";
+import { computeTax, npsCeilingFor, AVAILABLE_FYS, getTaxConfigForFY } from "@/lib/tax";
 import { getCurrentFinancialYear } from "@/lib/expense-history";
 import { toAnnual } from "@/lib/cashflow";
 import { formatINRCompact, formatPercent, formatINR } from "@/lib/formatters";
@@ -392,6 +392,47 @@ const takeHomeSegments = computed<ProportionSegment[]>(() => {
     { key: "tax", label: "Tax", value: mt.annualTax, color: "error" },
   ].filter((s) => s.value > 0);
 });
+
+// gh #185 step 7 — zero-tax collapse (income-path kernel spec §7, "tax section collapses to
+// 'you pay zero tax' below ₹12L"). The LOCKED persona spans ₹2.5L-₹1Cr; a ₹3-10L earner under the
+// new-regime ₹12L rebate (u/s 87A, FY config `rebateLimit`) owes ZERO tax, so the whole
+// deduction-optimisation machinery below (80C/80D/§24 meters, the old/new regime picker, the tax
+// cliff chart, per-earner table) is noise that cannot move a number that is already zero — it reads
+// as "this app is not for me" for exactly the persona this app exists to serve (goal-anchored
+// rule 30). Honesty guard: this NEVER collapses a non-zero figure — it gates on the CURRENTLY
+// DISPLAYED regime's own computed tax being zero (`activeResult`, which already respects an
+// explicit OLD/NEW pick via `mode`), never a hardcoded income threshold. A household that has
+// actively chosen a regime with real tax due always sees the full section; a genuine ₹0-₹0 tie
+// (both regimes zero, e.g. Ravi at ₹3L) collapses regardless of which side the tie-break in
+// `pageRecommended` (`<=`) happens to land on, because the number shown either way is honestly
+// zero. The rebate threshold shown in the card copy is read from the FY config
+// (`getTaxConfigForFY`), never hardcoded, so a future Budget change flows through automatically.
+//
+// Independent-review CRITICAL fix (per-earner class, gh #185 step 7 round 2): tax is per
+// ASSESSEE, not per household. The household-pooled `activeResult.totalTax` can be ₹0 while one
+// earner's OWN bill is non-zero (e.g. a two-earner household where one earner's large §24/80C
+// claims zero out the pool while the other earner, taxed on their own income+deductions via
+// `computeEarnerTaxCard`, still owes real tax) — collapsing on the pooled figure alone would hide
+// that earner's real bill (the exact per-earner table this collapse would otherwise remove). The
+// gate now ALSO requires every row in `perEarner` (already per-member-correct, l.266) to be zero.
+const newRegimeRebateLimit = computed(
+  () => getTaxConfigForFY(selectedFY.value).newRegime.rebateLimit,
+);
+const isZeroTaxRecommended = computed(
+  () => activeResult.value.totalTax === 0 && perEarner.value.every((row) => row.tax === 0),
+);
+// Round-2 LOW fix: the "deduction planning can't move a zero" sentence was duplicated verbatim
+// across the New/Old regime copy branches — one string, read by both.
+const zeroTaxDeductionPlanningNote =
+  "Deduction planning (80C, 80D, home-loan interest, and the Old-vs-New comparison) cannot lower a tax bill that is already ₹0, so we've hidden it below.";
+// Power-user escape hatch (SCREEN-STANDARD §9 three-state render — collapsed is a THIRD state,
+// not a dead end): defaults closed each time the collapse condition re-triggers (e.g. FY switch),
+// so stale "expanded" state never silently survives onto a different zero-tax household/year.
+const showFullSectionAnyway = ref(false);
+watch(isZeroTaxRecommended, (isZero) => {
+  if (!isZero) showFullSectionAnyway.value = false;
+});
+const zeroTaxSectionVisible = computed(() => !isZeroTaxRecommended.value || showFullSectionAnyway.value);
 </script>
 
 <template>
@@ -429,8 +470,69 @@ const takeHomeSegments = computed<ProportionSegment[]>(() => {
       </ul>
     </v-alert>
 
+    <!-- gh #185 step 7 — zero-tax collapse: a single honest card replaces the whole
+         deduction-optimisation section for a household whose CURRENTLY DISPLAYED regime already
+         computes to ₹0 tax. Never fires on a real, non-zero figure (activeResult respects an
+         explicit OLD/NEW pick via `mode`, so a household that has chosen a regime with tax due
+         always sees the full section). -->
+    <PanelCard
+      v-if="isZeroTaxRecommended && !showFullSectionAnyway"
+      data-testid="tax-zero-collapse"
+      icon="mdi-emoticon-happy-outline"
+      icon-color="success"
+      class="mb-5 zero-tax-card"
+    >
+      <div class="zero-tax-card__headline">You pay ₹0 income tax</div>
+      <p class="zero-tax-card__scope text-caption text-medium-emphasis mb-3">
+        On salary, business and other slab income — capital gains, if any, are taxed separately and
+        not shown here; TDS already deducted is recovered on filing.
+      </p>
+      <p v-if="effectiveRegime === 'NEW'" class="zero-tax-card__reason text-body-2 mb-4">
+        Your taxable income of {{ formatINRCompact(newResult.taxableIncome) }} is within the New
+        regime's ₹{{ Math.round(newRegimeRebateLimit / 100000) }}L rebate (Section 87A) for FY
+        {{ selectedFY }} — the New regime is your {{ pageRecommended === "NEW" ? "recommended" : "selected" }} regime, and its rebate brings your tax
+        to zero. {{ zeroTaxDeductionPlanningNote }}
+      </p>
+      <p v-else class="zero-tax-card__reason text-body-2 mb-4">
+        Your taxable income of {{ formatINRCompact(oldResult.taxableIncome) }} falls within the Old
+        regime's basic exemption and Section 87A rebate for FY {{ selectedFY }} — the Old regime is
+        your {{ pageRecommended === "OLD" ? "recommended" : "selected" }} regime here, and it already brings your tax to zero<template v-if="newResult.totalTax === 0"> (the New regime also computes to ₹0 at this income)</template>.
+        The New regime is the statutory default; choosing Old is an opt-in at filing. {{ zeroTaxDeductionPlanningNote }}
+      </p>
+      <div class="row-line mb-1">
+        <span class="text-medium-emphasis">Effective rate</span>
+        <span class="text-currency font-weight-bold">{{ formatPercent(activeResult.effectiveRate, 1) }}</span>
+      </div>
+      <div class="row-line">
+        <span class="text-medium-emphasis">Income after tax (before PF)</span>
+        <span class="text-currency font-weight-bold">{{ formatINRCompact(monthlyTakeHome.annualTake) }}</span>
+      </div>
+      <v-btn
+        variant="text"
+        color="primary"
+        size="small"
+        class="mt-4"
+        data-testid="tax-zero-collapse-toggle"
+        @click="showFullSectionAnyway = true"
+      >
+        Show the full section anyway
+      </v-btn>
+    </PanelCard>
+    <div v-if="isZeroTaxRecommended && showFullSectionAnyway" class="mb-4">
+      <v-btn
+        variant="tonal"
+        color="secondary"
+        size="small"
+        data-testid="tax-zero-collapse-toggle"
+        @click="showFullSectionAnyway = false"
+      >
+        Your tax is ₹0 — collapse back to the summary
+      </v-btn>
+    </div>
+
     <!-- Hero: effective rate / tax / take-home + income split donut + regime comparison -->
     <StatDashboard
+      v-if="zeroTaxSectionVisible"
       :kpis="kpis"
       :donut-segments="donutSegments"
       donut-eyebrow="Income split"
@@ -454,6 +556,10 @@ const takeHomeSegments = computed<ProportionSegment[]>(() => {
       </template>
     </StatDashboard>
 
+    <!-- gh #185 step 7 — the deduction-optimisation machinery (income/deduction meters, tax
+         breakdown, tax cliff, per-earner table, filing disclaimer) is exactly what cannot move an
+         already-zero tax bill; hidden while collapsed, restored verbatim via the toggle above. -->
+    <template v-if="zeroTaxSectionVisible">
     <!-- ───── Income & deductions ───── -->
     <div class="section-eyebrow">Income &amp; deductions</div>
     <v-row dense>
@@ -607,6 +713,7 @@ const takeHomeSegments = computed<ProportionSegment[]>(() => {
       This is an estimate — for filing, use your CA / Cleartax. Standard deduction, 80C (EPF + PPF + ELSS + life premium),
       80D (health premium), and Section 24 (home-loan interest) are auto-applied.
     </v-alert>
+    </template>
 
     <DiscoveryFooter
       :also-show-keys="[
@@ -668,5 +775,14 @@ const takeHomeSegments = computed<ProportionSegment[]>(() => {
   gap: 4px;
   font-weight: 600;
   font-size: 0.85rem;
+}
+.zero-tax-card__headline {
+  font-size: var(--type-3xl, 1.75rem);
+  font-weight: 700;
+  color: rgb(var(--v-theme-success));
+  margin-bottom: 12px;
+}
+.zero-tax-card__reason {
+  max-width: 62ch;
 }
 </style>
