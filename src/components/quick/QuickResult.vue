@@ -20,7 +20,7 @@ import { useFireDerive } from "@/lib/useFireDerive";
 import { useHouseholdStore } from "@/stores/household";
 import { useUiStore } from "@/stores/ui";
 import { requiredMonthlyContributionFor } from "@/lib/required-contribution";
-import { FULL_PLANNER_ADDS, QUICK_PORTFOLIO_CAVEAT, overCommitmentWarning } from "@/lib/quick-number-copy";
+import { FULL_PLANNER_ADDS, quickPortfolioCaveat, overCommitmentWarning } from "@/lib/quick-number-copy";
 import { formatINRCompact } from "@/lib/formatters";
 import type { QuickAnswers } from "@/types/quick-number";
 import {
@@ -39,6 +39,7 @@ const h = useHouseholdStore();
 const ui = useUiStore();
 
 const req = computed(() => fire.requiredContribution.value);
+const portfolioCaveat = computed(() => quickPortfolioCaveat(props.answers.debtSharePercent ?? 0));
 
 // T-378C F3 — the over-commitment guard was architecturally dead in the forward flow (it only
 // rendered on card 3, before the SIP and EMI were known). By the result screen all three answers
@@ -120,6 +121,7 @@ const answerRows = computed(() => {
     ["Spend / month (excl. EMI)", money(q.spend)],
     ["Take-home / month", money(q.income)],
     ["All investments", money(q.corpus)],
+    ["— of which PF / PPF / NPS / FDs", q.debtSharePercent ? `${q.debtSharePercent}%` : "—"],
     ["Spouse investments", q.includeSpouse ? money(q.spouseCorpus) : "—"],
     ["Investing / month", money(q.sip)],
     ["Kids", q.kids ? `${q.kids} · age ${q.kidsAge ?? 0}` : "—"],
@@ -234,7 +236,7 @@ watch(fireAge, applyOgTags);
         class="mb-4"
         data-testid="quick-portfolio-caveat"
       >
-        {{ QUICK_PORTFOLIO_CAVEAT }}
+        {{ portfolioCaveat }}
       </v-alert>
 
       <QuickExplainer />

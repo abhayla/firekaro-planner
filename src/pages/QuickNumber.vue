@@ -337,6 +337,24 @@ function editAnswers() {
             <!-- 4 · all investments -->
             <div v-else-if="card.key === 'corpus'">
               <LakhInput v-model="answers.corpus" label="Total investments" testid="quick-corpus" />
+              <div class="text-body-2 mt-4 mb-1">
+                Roughly how much of that is in EPF, PPF, NPS or FDs?
+              </div>
+              <div class="text-caption text-medium-emphasis mb-2">
+                They grow slower (~7%) than the rest (~12%) — leave at 0% if none of it applies.
+              </div>
+              <v-text-field
+                v-model.number="answers.debtSharePercent"
+                type="number"
+                min="0"
+                max="100"
+                step="5"
+                suffix="%"
+                variant="outlined"
+                density="comfortable"
+                hide-details
+                data-testid="quick-debt-share"
+              />
               <div class="text-body-2 mt-4 mb-2">Are your mutual funds direct plans?</div>
               <div class="d-flex flex-wrap ga-2">
                 <v-chip
