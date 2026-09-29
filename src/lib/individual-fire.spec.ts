@@ -4,8 +4,12 @@ import { useHouseholdStore } from "@/stores/household";
 import { useAssumptionsStore } from "@/stores/assumptions";
 import { loadSeedPersona } from "@/lib/seed-persona";
 import { loadRaviSeed } from "@/seeds/ravi";
+import { loadMehtasSeed } from "@/seeds/mehtas";
+import { loadIyersSeed } from "@/seeds/iyers";
+import { loadMauryasSeed } from "@/seeds/mauryas";
 import { derive } from "@/lib/derive";
 import { computeIndividualFire } from "@/lib/individual-fire";
+import { resolveHouseholdBasket } from "@/lib/assumption-math";
 
 describe("computeIndividualFire (#81 Phase 2 — standalone per-adult FIRE)", () => {
   beforeEach(() => setActivePinia(createPinia()));
@@ -142,5 +146,129 @@ describe("computeIndividualFire (#81 Phase 2 — standalone per-adult FIRE)", ()
     // And it does NOT touch Priya's attributable expenses.
     const priyaBeforeId = computeIndividualFire(h.data, a.values, "priya", "2025-26")!;
     expect(priyaBeforeId.attributableAnnualExpenses).not.toBeCloseTo(after.attributableAnnualExpenses, 0);
+  });
+  // ---- gh #162 part 2, §4.4 — the reservation-leg inflation asymmetry (T5) ----
+  //
+  // RCA: `derive.ts` grows the healthcare reservation leg at `healthcareInflation` (9%) on its own
+  // schedule (`healthcareReservationNominalAt`) while this file grew the member's WHOLE target —
+  // reservation included — at `resolveHouseholdBasket` (6.24%). Where healthcareInflation > basket
+  // (the normal case) the member's reservation share rose SLOWER than the household's, so the
+  // member target understated the household-grade reservation, and understated it more the further
+  // out the member's FIRE date is. Small, monotone, OPTIMISTIC — the Tier-0 direction.
+  it("gh #162 part 2 T5 — the target is byte-identical at t=0 and STEEPER later (two-leg schedule)", () => {
+    const { h, a } = setup();
+    h.data.healthcareCorpusReservationPercent = 0.2;
+    // Isolate the RESERVATION leg from the basket channel (see T5b): with a general-only weight
+    // vector, `healthcareInflation` reaches the target ONLY through the reservation leg, which is
+    // exactly the asymmetry §4.4 closes.
+    a.values.inflationWeights = { general: 1, healthcare: 0, education: 0, housing: 0 };
+    a.values.healthcareInflation = 0.09;
+
+    // (a) t = 0 byte-identical: the reported `individualFireNumber` is the target TODAY, and the
+    // two-leg split must sum to exactly what the single-rate collapse summed to at t = 0.
+    const withGap = computeIndividualFire(h.data, a.values, "rohit", "2025-26")!;
+    const zeroReservation = (() => {
+      h.data.healthcareCorpusReservationPercent = 0;
+      const r = computeIndividualFire(h.data, a.values, "rohit", "2025-26")!;
+      h.data.healthcareCorpusReservationPercent = 0.2;
+      return r;
+    })();
+    expect(withGap.individualFireNumber).toBeCloseTo(zeroReservation.individualFireNumber * 1.2, -2);
+
+    // (b) STEEPER later: with healthcareInflation ABOVE the basket the reservation leg outruns the
+    // base leg, so the target the solver chases at t > 0 is LARGER than the single-rate schedule's
+    // — which can only push the member's FIRE age LATER (or leave it, on a rounding tie). Compare
+    // against the SAME household with healthcareInflation pinned DOWN to the basket, where the two
+    // schedules provably coincide (one rate for both legs).
+    const basket = resolveHouseholdBasket(a.values);
+    a.values.healthcareInflation = basket;
+    const noGap = computeIndividualFire(h.data, a.values, "rohit", "2025-26")!;
+    // Same target TODAY (the reservation % did not change) …
+    expect(noGap.individualFireNumber).toBeCloseTo(withGap.individualFireNumber, -2);
+    // … but a strictly LONGER solve when the reservation leg runs hotter than the basket.
+    expect(withGap.yearsToIndividualFire).toBeGreaterThan(noGap.yearsToIndividualFire);
+    expect(withGap.individualFireAge).toBeGreaterThanOrEqual(noGap.individualFireAge);
+  });
+
+  it("gh #162 part 2 T5b — a ZERO reservation makes healthcareInflation irrelevant (no leg to grow)", () => {
+    const { h, a } = setup();
+    h.data.healthcareCorpusReservationPercent = 0;
+    // `healthcareInflation` ALSO feeds the household basket by weight (`resolveHouseholdBasket`),
+    // so it must be zeroed out of the basket to isolate the RESERVATION leg — otherwise this test
+    // measures the basket channel, not the leg, and fails on main for the wrong reason.
+    a.values.inflationWeights = { general: 1, healthcare: 0, education: 0, housing: 0 };
+    a.values.healthcareInflation = 0.05;
+    const lo = computeIndividualFire(h.data, a.values, "rohit", "2025-26")!;
+    a.values.healthcareInflation = 0.2;
+    const hi = computeIndividualFire(h.data, a.values, "rohit", "2025-26")!;
+    // With no reservation leg the two-leg schedule collapses to the base leg alone — identical.
+    expect(hi.yearsToIndividualFire).toBe(lo.yearsToIndividualFire);
+    expect(hi.individualFireNumber).toBe(lo.individualFireNumber);
+  });
+
+  it("gh #162 part 2 T5c — raising healthcareInflation never pulls a member's FIRE age EARLIER", () => {
+    const { h, a } = setup();
+    h.data.healthcareCorpusReservationPercent = 0.2;
+    a.values.inflationWeights = { general: 1, healthcare: 0, education: 0, housing: 0 };
+    // Monotone-later, and a high enough medical inflation legitimately outruns the corpus into
+    // "not within horizon" (Infinity) — which is the CONSERVATIVE terminal state, never an earlier
+    // age. Infinity compares correctly under >=, so the ladder covers both regimes in one sweep.
+    let prev = -Infinity;
+    for (const hi of [0.04, 0.06, 0.09, 0.12, 0.15]) {
+      a.values.healthcareInflation = hi;
+      const r = computeIndividualFire(h.data, a.values, "rohit", "2025-26")!;
+      expect(Number.isNaN(r.yearsToIndividualFire)).toBe(false);
+      expect(r.yearsToIndividualFire).toBeGreaterThanOrEqual(prev);
+      prev = r.yearsToIndividualFire;
+    }
+    // …and the top of the ladder really is strictly worse than the bottom (not a flat no-op).
+    a.values.healthcareInflation = 0.04;
+    const lo = computeIndividualFire(h.data, a.values, "rohit", "2025-26")!;
+    a.values.healthcareInflation = 0.12;
+    const hi12 = computeIndividualFire(h.data, a.values, "rohit", "2025-26")!;
+    expect(hi12.yearsToIndividualFire).toBeGreaterThan(lo.yearsToIndividualFire);
+  });
+  // ---- gh #162 part 2, T2 — per-seed member bounds, bands DERIVED from the measured run ----
+  //
+  // Bands come from the step-3 before/after measurement (§4.4 landing), never invented and never
+  // widened to admit a number (D-2026-09-29-03). Each row is the POST-FIX age with a ±1 tolerance
+  // for the solver's integer-age rounding, plus the substance locks (no NaN/Infinity leaking into
+  // a reachable member, target byte-identical at t = 0, expenses/corpus non-negative).
+  it("gh #162 part 2 T2 — per-seed member bounds on the measured post-fix ages", () => {
+    const seeds: Array<[string, (h: never, a: never) => void, Array<[string, number | null]>]> = [
+      ["sharmas", loadSeedPersona as never, [["rohit", 48], ["priya", 47]]],
+      ["mehtas", loadMehtasSeed as never, [["vikram", 45], ["aanya", 63]]],
+      ["iyers", loadIyersSeed as never, [["ashwin", 47], ["lakshmi", 84]]],
+      ["mauryas", loadMauryasSeed as never, [["abhay", 56], ["madhu", null]]],
+      ["ravi", loadRaviSeed as never, [["ravi", 41]]],
+    ];
+    for (const [seed, load, rows] of seeds) {
+      setActivePinia(createPinia());
+      const h = useHouseholdStore();
+      const a = useAssumptionsStore();
+      (load as unknown as (x: unknown, y: unknown) => void)(h, a);
+      for (const [memberId, expectedAge] of rows) {
+        const r = computeIndividualFire(h.data, a.values, memberId, "2025-26")!;
+        expect(r, `${seed}/${memberId}`).not.toBeNull();
+        expect(Number.isNaN(r.individualFireAge), `${seed}/${memberId} age NaN`).toBe(false);
+        expect(Number.isNaN(r.individualFireNumber), `${seed}/${memberId} target NaN`).toBe(false);
+        expect(r.attributableAnnualExpenses, `${seed}/${memberId} exp`).toBeGreaterThanOrEqual(0);
+        expect(r.attributableCorpus, `${seed}/${memberId} corpus`).toBeGreaterThanOrEqual(0);
+        expect(Number.isFinite(r.individualFireNumber), `${seed}/${memberId} finite target`).toBe(true);
+        if (expectedAge === null) {
+          // Measured unreachable (madhu: no salary, target ₹3.0 Cr) — must stay "not within horizon",
+          // never a rendered finite absurd age (rule 31).
+          expect(Number.isFinite(r.individualFireAge), `${seed}/${memberId} unreachable`).toBe(false);
+          continue;
+        }
+        expect(Number.isFinite(r.individualFireAge), `${seed}/${memberId} reachable`).toBe(true);
+        expect(r.individualFireAge, `${seed}/${memberId} lo`).toBeGreaterThanOrEqual(expectedAge - 1);
+        expect(r.individualFireAge, `${seed}/${memberId} hi`).toBeLessThanOrEqual(expectedAge + 1);
+        // Age and years must never disagree (the cross-screen-coherence class).
+        expect(r.individualFireAge, `${seed}/${memberId} coherence`).toBe(
+          Math.round(r.anchorAge + r.yearsToIndividualFire),
+        );
+      }
+    }
   });
 });
