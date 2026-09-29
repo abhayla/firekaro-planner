@@ -6,7 +6,16 @@
  * Pins the two DoD cases: a fully-liquid household is covered (no headline move),
  * a locked-heavy early-retiree fails the bridge (effective FIRE age moves later).
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
+import { setActivePinia, createPinia } from "pinia";
+import { useHouseholdStore } from "@/stores/household";
+import { useAssumptionsStore } from "@/stores/assumptions";
+import { loadSeedPersona } from "@/lib/seed-persona";
+import { loadMehtasSeed } from "@/seeds/mehtas";
+import { loadIyersSeed } from "@/seeds/iyers";
+import { loadMauryasSeed } from "@/seeds/mauryas";
+import { loadRaviSeed } from "@/seeds/ravi";
+import { derive } from "@/lib/derive";
 import fc from "fast-check";
 import {
   computeBridgeCoverage,
@@ -435,5 +444,112 @@ describe("#212 no-op guarantees — nothing changes where no rule applies", () =
     // the gain) and never above it — the identity, read through the tax layer that follows it.
     expect(r.reachableCorpus).toBeLessThan(40_000_000);
     expect(r.reachableCorpus).toBeGreaterThan(40_000_000 * 0.9);
+  });
+});
+
+const IDENTITY_LENS = { isFamilyView: false, viewingMemberId: null, currentFY: "2025-26" } as const;
+type IH = ReturnType<typeof useHouseholdStore>;
+type IA = ReturnType<typeof useAssumptionsStore>;
+const IDENTITY_PERSONAS: Array<{ name: string; load: (h: IH, a: IA) => void }> = [
+  { name: "sharmas", load: (h, a) => loadSeedPersona(h, a, IDENTITY_LENS.currentFY) },
+  { name: "mehtas", load: (h, a) => loadMehtasSeed(h, a) },
+  { name: "iyers", load: (h, a) => loadIyersSeed(h, a) },
+  { name: "mauryas", load: (h, a) => loadMauryasSeed(h, a, IDENTITY_LENS.currentFY) },
+  { name: "ravi", load: (h, a) => loadRaviSeed(h, a) },
+];
+
+// ---------------------------------------------------------------------------
+// #212 REVIEW — THE RECONCILIATION IDENTITY, ASSERTED PRE-TAX ON EVERY SEED.
+//
+// Why this exists: the first round pinned the per-tranche RULES but never the
+// identity itself, because `reachableCorpus`/`lockedCorpus` are both POST-TAX
+// (a liquidation haircut sits between the projection and them) and the NPS
+// annuity slice leaves the lump entirely — so neither can express
+// "Σ projections === targetReal". `projectedPreTaxTotal` is exposed for exactly
+// this, and this block asserts it through the REAL `derive()` path (not a hand
+// fixture) on all five populated seeds.
+//
+// It is also the ARBITER of the double-count question raised in review: the
+// adequacy target is solved from `annualSavings`, which already contains every
+// `investments[].monthlyContribution`, and `boundedTotal` then grows the locked
+// tranches by those same earmarked inflows. If that were a duplication the sum
+// would EXCEED the target and this test would be red. It is an attribution
+// instead — each earmarked rupee counted once against its own locked tranche,
+// with the liquid budget taking the remainder of the SAME target.
+// ---------------------------------------------------------------------------
+describe("#212 reconciliation identity — Σ pre-tax projections === the adequacy target (real derive)", () => {
+  beforeEach(() => setActivePinia(createPinia()));
+
+  for (const persona of IDENTITY_PERSONAS) {
+    it(`${persona.name}: |projectedPreTaxTotal − targetReal| < ₹1`, () => {
+      const h = useHouseholdStore();
+      const a = useAssumptionsStore();
+      persona.load(h, a);
+      const k = derive(h.data, a.values, IDENTITY_LENS, { currentYear: 2026 });
+      const b = k.bridgeCoverage;
+      expect(b).not.toBeNull();
+      // The bridge ran with a per-tranche projection, so the total is exposed.
+      expect(b!.projectedPreTaxTotal).not.toBeNull();
+      // The target the adequacy leg solved to, at the age the bridge was tested at — read from the
+      // same component schedule `derive()` hands the bridge, so this is the identity's other half
+      // and not a re-derivation of it.
+      const targetReal = k.regularTargetComponentsRealAt(
+        b!.corpusOnlyFireAge - k.anchorAge,
+      ).total;
+      expect(Math.abs(b!.projectedPreTaxTotal! - targetReal)).toBeLessThan(1);
+    });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// #212 REVIEW — PROVE THE GATE ACTUALLY FIRES.
+//
+// The first round corrected the locked/liquid SPLIT but no seed's verdict moved,
+// so nothing demonstrated the coverage check can still fail under the new
+// projection. This is that proof, on a realistic locked-heavy household: a
+// ₹1.2 Cr EPF + ₹40 L PPF + ₹2 Cr let-out property + ₹15 L MF retiring at 48,
+// where the property never liquidates, the PPF is held to 60, and the liquid
+// remainder cannot carry the bridge bill.
+// ---------------------------------------------------------------------------
+describe("#212 the gate fires — a locked-heavy early retiree is NOT covered", () => {
+  it("retire at 48 with ₹2 Cr illiquid + ₹40 L PPF locked to 60 → covered:false, FIRE age moves later", () => {
+    const r = computeBridgeCoverage(
+      baseInput({
+        retirementAge: 48,
+        anchorAge: 40,
+        planToAge: 90,
+        // The bridge bill: ₹30 L/yr for the 12 years to the PPF unlock at 60. Against a ₹3.75 Cr
+        // adequate corpus that is an 8% draw — high, which is exactly why a household this
+        // locked-heavy cannot fund the early years out of the liquid slice alone.
+        annualExpenses: 3_000_000,
+        exitLumpNet: 1_500_000,
+        income: { rentalAnnualPostTax: 300_000, epsAnnualPostTax: 0, epsStartAge: 58 },
+        holdings: [
+          holding("EPF_VPF", 12_000_000),
+          holding("PPF", 4_000_000),
+          holding("RealEstate", 20_000_000, { realEstateRole: "Investment" }),
+          holding("MutualFunds", 1_500_000),
+        ],
+        projection: {
+          // The household is corpus-adequate at ₹3.75 Cr — but most of it cannot be spent at 48.
+          targetReal: 37_500_000,
+          realReturnFor: (asset) =>
+            asset.type === "PPF" ? 0.01 : asset.type === "EPF_VPF" ? 0.02 : asset.type === "RealEstate" ? 0 : 0.06,
+          realMonthlyContributionFor: (asset) =>
+            asset.type === "PPF" ? 12_500 : asset.type === "EPF_VPF" ? 25_000 : 0,
+          yearsToRetirement: 8,
+        },
+      }),
+    );
+    // The property is illiquid and the PPF is held past 48 → the liquid runway is thin.
+    expect(r.lockedCorpus).toBeGreaterThan(20_000_000);
+    expect(r.unlockTimeline.length).toBeGreaterThan(0);
+    // THE GATE: the liquid money does not carry the bridge, so the headline moves LATER.
+    expect(r.covered).toBe(false);
+    expect(r.shortfallYears).toBeGreaterThan(0);
+    expect(r.shortfallAmount).toBeGreaterThan(0);
+    expect(r.effectiveFireAge).toBeGreaterThan(r.corpusOnlyFireAge);
+    // ...and it reports a surfaced reason, not a silent move.
+    expect(r.assumptions.some((x) => x.id === "bridge-shortfall")).toBe(true);
   });
 });

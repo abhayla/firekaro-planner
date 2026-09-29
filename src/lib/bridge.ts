@@ -91,13 +91,18 @@ export interface BridgeInput {
    * `projection` gives no per-instrument rule for, and for the whole portfolio when no
    * `projection` is supplied at all (every pre-#212 fixture). Defaults to 1 (no scaling).
    *
-   * WHY IT IS NO LONGER THE PRIMARY PATH (#212, Tier-0 optimistic class): one portfolio-wide
-   * factor grows EVERY holding as if the household's whole future contribution stream landed in
-   * it. A PPF cannot (₹1.5L/yr statutory cap), an NPS grows only on its own contributions, and a
-   * property grows by appreciation alone. Measured on the sharmas seed the factor was 8.89×, so a
-   * ₹6L PPF was projected to ₹53.32L at age 52 — about 3.4× what ₹1.5L/yr at 7.1% can reach — and
-   * the ABSOLUTE liquid pool was inflated against a bill that rises only at CPI-real. Every seed
-   * reported `covered: true`, which was leniency, not coverage.
+   * WHY IT IS NO LONGER THE PRIMARY PATH (#212, Tier-0 optimistic class). The error was in the
+   * COMPOSITION of the retirement corpus, not its LEVEL. The portfolio TOTAL was pinned to the
+   * adequacy target both before and after this fix (see `projectedPreTaxTotal` — the identity
+   * holds either way), so nothing was "inflated against a CPI-only bill"; what was wrong is that
+   * one portfolio-wide factor grew EVERY holding as if the household's whole future contribution
+   * stream landed in it, which pushed the LOCKED slice past the ceiling its own instrument can
+   * physically reach. A PPF cannot grow that way (₹1.5L/yr statutory cap), an NPS grows only on
+   * its own contributions, and a property grows by appreciation alone. Measured on the sharmas
+   * seed the factor was 8.89×, so a ₹6L PPF was projected to ₹53.32L at age 52 — roughly 3.4×
+   * what ₹1.5L/yr at its own return can reach. Since the total is fixed, an over-stated locked
+   * slice is exactly a MIS-SPLIT: the bridge then reads the wrong liquid-vs-locked division of a
+   * correct total, which is the quantity the coverage check actually consumes.
    */
   corpusScale?: number;
   /**
@@ -133,7 +138,17 @@ export interface BridgeProjection {
   yearsToRetirement: number;
 }
 
-/** PPF statutory contribution ceiling, ₹ per financial year per account (Sec 80C / PPF Scheme). */
+/**
+ * PPF statutory contribution ceiling, ₹ per financial year per account (PPF Scheme, 2019).
+ *
+ * DELIBERATELY NOT DEDUPED against `LIMIT_80C` (#212 review). The two are ₹1,50,000 today by
+ * coincidence of policy, not by reference: this is a DEPOSIT ceiling under the PPF Scheme (how much
+ * may be paid INTO one account in a financial year), while 80C is a DEDUCTION ceiling under the
+ * Income-tax Act (how much of any 80C-eligible spend reduces taxable income). They are set by
+ * different instruments and either can move without the other. Aliasing them would silently couple
+ * a projection ceiling to a tax cap, so a future Budget that raised only one would corrupt the
+ * other — keep them separate even while the numbers agree.
+ */
 export const PPF_ANNUAL_CONTRIBUTION_CAP = 150_000;
 
 /**
@@ -160,6 +175,10 @@ export function projectHoldingToRetirement(
   asset: Investment,
   p: BridgeProjection,
 ): number {
+  // Whole-year accumulation loop: a fractional horizon is TRUNCATED, never rounded up (12.7 years
+  // accumulates 12). Truncating drops a partial year of contributions + growth, so the projection
+  // errs SMALLER — the conservative direction for a layer whose job is to lean pessimistic, and it
+  // can never manufacture a year of growth the household has not lived through.
   const years = Math.max(0, Math.floor(p.yearsToRetirement));
   const r = Number.isFinite(p.realReturnFor(asset)) ? p.realReturnFor(asset) : 0;
   const cls = accessibilityClass(asset);
@@ -204,6 +223,20 @@ export interface BridgeCoverage {
   bridgeIncomeAnnual: number;
   /** Transparency notes accumulated from A/B + the bridge (principle 1). */
   assumptions: AssumptionNote[];
+  /**
+   * #212 review — the sum of every holding's PRE-TAX projected value at the tested retirement age.
+   *
+   * WHY IT IS EXPOSED. `reachableCorpus` and `lockedCorpus` are both POST-TAX (a liquidation
+   * haircut sits between the projection and them) and the NPS annuity slice leaves the lump
+   * entirely, so NEITHER can pin the reconciliation identity — the property that the per-tranche
+   * projection still totals exactly the target the adequacy leg solved to. This field is the
+   * pre-tax total, so `|projectedPreTaxTotal − projection.targetReal| < ₹1` is directly assertable
+   * (and is, on all five seeds, in `bridge.spec.ts`).
+   *
+   * `null` when no `projection` was supplied (the pre-#212 uniform-`corpusScale` path), where
+   * there is no target to reconcile to.
+   */
+  projectedPreTaxTotal: number | null;
 }
 
 /** A post-tax pension stream credited from `startAge` onward. */
@@ -250,6 +283,18 @@ export function computeBridgeCoverage(input: BridgeInput): BridgeCoverage {
    * bridge and the adequacy leg stay in ONE frame (the invariant ADR-0006 Phase 1d established) —
    * while the locked slice is no longer inflated to a value its instrument cannot reach.
    *
+   * NO DOUBLE-COUNT — THE ATTRIBUTION, STATED EXPLICITLY (#212 review). The adequacy target is
+   * solved from `annualSavings`, which ALREADY contains every `investments[].monthlyContribution`;
+   * `boundedTotal` then grows the locked tranches by those same earmarked inflows. That is an
+   * attribution, not a duplication, and the subtraction is what makes it one: each earmarked rupee
+   * is counted EXACTLY ONCE, against the locked tranche it is actually paid into, and the liquid
+   * budget is the REMAINDER of the same target — `targetReal − boundedTotal` — so the un-earmarked
+   * part of the savings residual is what lands on the liquid side. Nothing is added to the total;
+   * the total is fixed at `targetReal` and this rule only DIVIDES it. The arbiter is mechanical,
+   * not an argument: `projectedPreTaxTotal` must equal `targetReal` to within ₹1, asserted on all
+   * five seeds through the real `derive()` path in `bridge.spec.ts`. A genuine double-count would
+   * make that sum EXCEED the target, and the test would be red.
+   *
    * The residual lands on the LIQUID side by construction, which is the honest direction: unearmarked
    * savings are free cash, and if the bounded projections ever exceed the target the liquid pool
    * floors at 0 rather than going negative (a household whose locked money alone clears the target
@@ -259,6 +304,8 @@ export function computeBridgeCoverage(input: BridgeInput): BridgeCoverage {
   // its own contributions + return, so the projection is re-run per candidate in the forward search
   // (exactly as the accessibility classification already is).
   const projectionCache = new Map<number, Map<string, number> | null>();
+  /** Σ of the PRE-TAX projected values at the tested age R (see `projectedPreTaxTotal`). */
+  let preTaxTotalAtR: number | null = null;
   function projectedValuesAt(retAge: number): Map<string, number> | null {
     const hit = projectionCache.get(retAge);
     if (hit !== undefined) return hit;
@@ -305,6 +352,7 @@ export function computeBridgeCoverage(input: BridgeInput): BridgeCoverage {
         for (const id of liquidIds) out.set(id, liquidBudget / liquidIds.length);
       }
     }
+    if (retAge === R) preTaxTotalAtR = [...out.values()].reduce((a, b) => a + b, 0);
     return out;
   }
 
@@ -460,5 +508,6 @@ export function computeBridgeCoverage(input: BridgeInput): BridgeCoverage {
     unlockTimeline: c.tranches,
     bridgeIncomeAnnual: Math.round(bridgeIncomeAnnual),
     assumptions,
+    projectedPreTaxTotal: preTaxTotalAtR,
   };
 }

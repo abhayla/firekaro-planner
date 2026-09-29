@@ -34,6 +34,7 @@ function bc(over: Partial<BridgeCoverage>): BridgeCoverage {
     unlockTimeline: [],
     bridgeIncomeAnnual: 0,
     assumptions: [],
+    projectedPreTaxTotal: null,
     ...over,
   };
 }

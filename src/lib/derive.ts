@@ -1294,11 +1294,18 @@ export function derive(
 
     // #212 — PER-TRANCHE PROJECTION. `corpusScale` above is retained ONLY as the fallback for a
     // holding with no instrument rule; the primary path now projects each accessibility family by
-    // its own mechanics, because one portfolio-wide factor grew locked money as if the household's
-    // whole savings residual landed in it (measured: sharmas' ₹6L PPF → ₹53.32L at 8.89×, ~3.4×
-    // what ₹1.5L/yr at 7.1% can reach) while inflating the ABSOLUTE liquid pool against a bill that
-    // rises only at CPI-real. That made the bridge gate structurally lenient — `covered: true` on
-    // every seed — in the one layer whose whole job is to lean pessimistic (Tier-0, optimistic).
+    // its own mechanics.
+    //
+    // WHAT WAS ACTUALLY WRONG (corrected after the #212 FinTech review): the COMPOSITION of the
+    // retirement corpus, not its LEVEL. The portfolio TOTAL was pinned to the drifted adequacy
+    // target both before and after this change — `bridgeCoverage.projectedPreTaxTotal` equals that
+    // target to within ₹1 on every seed, asserted in `bridge.spec.ts` — so nothing was "inflated
+    // against a CPI-only bill". The defect is that one portfolio-wide factor grew locked money as
+    // if the household's whole savings residual landed in it (measured: sharmas' ₹6L PPF → ₹53.32L
+    // at 8.89×, ~3.4× what ₹1.5L/yr at its own return can reach), pushing the LOCKED slice past
+    // its instrument's ceiling. With the total fixed, an over-stated locked slice is exactly a
+    // MIS-SPLIT of a correct total — and the liquid-vs-locked split is the one quantity the
+    // coverage check consumes, so the gate read the wrong division (Tier-0, optimistic).
     //
     // The bridge runs in TODAY's rupees, so the returns handed over are REAL (nominal de-inflated
     // at general CPI) and the contributions are the REAL ₹/month each holding's own plan carries.
