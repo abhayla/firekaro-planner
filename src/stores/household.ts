@@ -536,15 +536,25 @@ export const useHouseholdStore = defineStore("household", () => {
     for (const m of data.value.members) {
       // gh #67: EPF auto-flow is salary-driven — an adult with actual CTC. Earning is derived.
       if (m.role !== "ADULT" || !m.salary?.annualCTC) continue;
+      const existing = data.value.investments.find(
+        (i) => i.type === "EPF_VPF" && i.ownerId === m.id,
+      );
+      // #223 round 2 — "no EPF" is household state on the member's salary, honoured HERE, the one
+      // place every surface (quick, Profile, the salary form) funnels through. Remove only the row
+      // THIS auto-flow created (autoFlowSource) — a row the user added by hand in InvestmentForm.vue
+      // is never touched, matching the store's existing auto-flow-vs-manual convention.
+      if (m.salary.hasEpf === false) {
+        if (existing?.autoFlowSource) {
+          data.value.investments = data.value.investments.filter((i) => i !== existing);
+        }
+        continue;
+      }
       const basic = m.salary.annualCTC * 0.4;
       const topUp = (m.salary.vpfTopUpPercent ?? 0) / 100;
       const annualEmpEmployee = basic * 0.12 * (1 + topUp);
       const annualEmployer = basic * 0.12;
       const monthly = Math.round((annualEmpEmployee + annualEmployer) / 12);
 
-      const existing = data.value.investments.find(
-        (i) => i.type === "EPF_VPF" && i.ownerId === m.id,
-      );
       if (existing) {
         existing.monthlyContribution = monthly;
       } else {
@@ -555,6 +565,7 @@ export const useHouseholdStore = defineStore("household", () => {
           value: 0,
           monthlyContribution: monthly,
           ownerId: m.id,
+          autoFlowSource: true,
         });
       }
     }

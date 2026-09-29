@@ -199,11 +199,10 @@ function finish() {
   // The store owns these two effects; re-running them over rows we already wrote is a no-op
   // (same ids), and it keeps the express path on exactly one auto-flow implementation.
   household.autoFlowEMIToRecurring();
-  // #223 — the store's own salary→EPF auto-flow has no concept of "no EPF": it rebuilds an EPF
-  // row for ANY member with `salary.annualCTC` set, which would silently undo the toggle the
-  // instant this runs. `/quick` only ever gives a salary to `self`, so skipping this single call
-  // when the user said "no EPF" is exact, not a household-wide behaviour change.
-  if (answers.value.hasEpf !== false) household.autoFlowSalaryToEPF();
+  // #223 round 2 — the store's salary→EPF auto-flow now itself honours `salary.hasEpf` (removes
+  // its own row when false, never touches a user-added one), so this call is safe unconditionally
+  // and Profile/Salary-form saves later respect the same flag without any `/quick`-local gating.
+  household.autoFlowSalaryToEPF();
   household.markProfileComplete();
   household.markWizardComplete();
   features.markWizardCompleted();

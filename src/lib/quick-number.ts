@@ -153,6 +153,10 @@ function autoEpfInvestment(member: Member, hasEpf = true): Investment | null {
     value: 0,
     monthlyContribution: monthly,
     ownerId: member.id,
+    // #223 round 2 — marks this as an auto-created row using the SAME convention the store's
+    // `autoFlowSalaryToEPF` uses, so a later Profile/Salary-form save (which reads `salary.hasEpf`
+    // off this same member) can find and remove it if the answer is later flipped to "no".
+    autoFlowSource: true,
   };
 }
 
@@ -174,7 +178,12 @@ function solveSalary(
     const hh = clone(base);
     const member = hh.members.find((m) => m.id === memberId);
     if (member) {
-      member.salary = { ...(member.salary ?? { hikePercent: 0 }), annualCTC: ctc, hikePercent: 0 };
+      member.salary = {
+        ...(member.salary ?? { hikePercent: 0 }),
+        annualCTC: ctc,
+        hikePercent: 0,
+        hasEpf,
+      };
       const epf = autoEpfInvestment(member, hasEpf);
       hh.investments = hh.investments.filter((i) => i.id !== `${QUICK_ID_PREFIX}epf-${memberId}`);
       if (epf) hh.investments.push(epf);
@@ -489,7 +498,7 @@ export function applyQuickAnswers(
     solvedContributionMonthly = 0;
   }
   if (salaryAnnualCTC > 0) {
-    self.salary = { annualCTC: salaryAnnualCTC, hikePercent: 0 };
+    self.salary = { annualCTC: salaryAnnualCTC, hikePercent: 0, hasEpf };
     const epf = autoEpfInvestment(self, hasEpf);
     if (epf) {
       hh.investments = hh.investments.filter((i) => i.id !== epf.id);
@@ -570,10 +579,11 @@ export function quickAnswersFromHousehold(
     spend,
     // The take-home is the identity the mapping enforces, so it reconstructs exactly.
     income: spend + emi + sip + n(unaccounted?.amount),
-    // #223 — infer the toggle from whether the salary solve actually produced an EPF row. When
-    // there is no salary at all (nothing to solve against), default to true (most members are
-    // EPF-covered) rather than falsely reconstructing "no EPF" from an absence that says nothing.
-    hasEpf: self.salary?.annualCTC ? Boolean(epf) : true,
+    // #223 round 2 — `salary.hasEpf` is now household state (round-1 fix only lived in `/quick`
+    // answers, so a Profile/Salary save could silently rebuild the row and this read would then
+    // wrongly say "yes"). Prefer the persisted flag; fall back to row presence for a household
+    // saved before this field existed.
+    hasEpf: self.salary?.hasEpf ?? Boolean(epf),
     corpus: n(selfInv?.value),
     sip,
     includeSpouse: Boolean(spouse),
