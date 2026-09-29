@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { isAdultRole, type MemberDraft, type MemberRole } from "@/types/household";
-import { ageFromDOB, dobFromAge } from "@/lib/age";
+import { dobFromAge } from "@/lib/age";
+import { ageAsOf, todayIsoLocal } from "@/lib/as-of-date";
 import { validateMemberHorizon, type HorizonIssue } from "@/lib/member-horizon";
 import EmptyState from "@/components/shared/EmptyState.vue";
 
@@ -219,7 +220,7 @@ const employmentItems = [
             <div class="person-card__role">{{ m.isEarning ? "Earning adult" : "Non-earning adult" }}</div>
           </div>
           <v-chip size="small" variant="tonal" :color="memberColor(m.id)" class="person-card__age">
-            Age {{ ageFromDOB(m.dateOfBirth) }}
+            Age {{ ageAsOf(m.dateOfBirth, todayIsoLocal()) }}
           </v-chip>
           <v-btn
             icon
@@ -352,7 +353,7 @@ const employmentItems = [
             <div class="person-card__role">{{ m.relation || "Dependent" }}</div>
           </div>
           <v-chip size="small" variant="tonal" :color="memberColor(m.id)" class="person-card__age">
-            Age {{ ageFromDOB(m.dateOfBirth) }}
+            Age {{ ageAsOf(m.dateOfBirth, todayIsoLocal()) }}
           </v-chip>
           <v-btn
             icon

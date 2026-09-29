@@ -42,6 +42,7 @@ import type { Assumptions } from "@/types/assumptions";
 import { isEarningMember } from "@/lib/member-earning";
 import { toMonthly, toAnnual } from "@/lib/cashflow";
 import { ageFromDOB } from "@/lib/age";
+import { todayIsoLocal } from "@/lib/as-of-date";
 import { calculateFIRENumber, calculateFireTarget, calculateYearsToTarget } from "@/lib/fire-math";
 import { computeTax, recommendRegime, marginalSlabRate, getTaxConfigForFY } from "@/lib/tax";
 import { deriveDeductions } from "@/lib/tax-deductions";
@@ -185,13 +186,16 @@ export function computeIndividualFire(
   const ownInvestments = fireInvestments.filter((i) => i.ownerId === memberId);
   const ownLiabilities = household.liabilities.filter((l) => l.ownerId === memberId);
   const ownInsurance = household.insurance.filter((p) => p.insuredPersonId === memberId);
-  const deductions = deriveDeductions({
-    ...household,
-    members: [member],
-    investments: ownInvestments,
-    liabilities: ownLiabilities,
-    insurance: ownInsurance,
-  });
+  const deductions = deriveDeductions(
+    {
+      ...household,
+      members: [member],
+      investments: ownInvestments,
+      liabilities: ownLiabilities,
+      insurance: ownInsurance,
+    },
+    { asOfDate: todayIsoLocal(asOf) },
+  );
   // The ₹50k salaried standard deduction applies ONLY against salary income — a non-earning
   // adult with only split capital income must NOT receive it (else their tax is understated →
   // an optimistically EARLY individual FIRE). isSalaried = this adult actually draws a salary.

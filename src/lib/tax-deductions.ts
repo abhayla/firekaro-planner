@@ -24,7 +24,7 @@ import type {
   Member,
   OtherIncomeLine,
 } from "@/types/household";
-import { ageFromDOB } from "@/lib/age";
+import { ageAsOf, todayIsoLocal } from "@/lib/as-of-date";
 import { toAnnual } from "@/lib/cashflow";
 import { computeTax, singleEarnerNpsArgs } from "@/lib/tax";
 
@@ -137,6 +137,13 @@ interface DeriveDeductionsOptions {
   isSelfSenior?: boolean;
   /** When true, applies senior-citizen limits to 80D parents. */
   hasSeniorParents?: boolean;
+  /**
+   * #198: the reference date the auto-detected senior-citizen (≥60) 80D check resolves member
+   * ages against. Defaults to `todayIsoLocal()` (today, local calendar date) for the callers that
+   * don't carry an explicit kernel lens date; `derive.ts` and `individual-fire.ts` pass their own
+   * pinned `asOfDate`/`asOf` so this agrees with the SAME age the kernel uses elsewhere.
+   */
+  asOfDate?: string;
 }
 
 /**
@@ -198,9 +205,10 @@ export function deriveDeductions(
   // Senior status: honour an explicit option, else auto-detect from member age — a parent ≥ 60
   // qualifies for the ₹50k senior 80D cap (gh-issue #6; callers don't pass the flag today, so
   // seniors were silently under-claiming the ₹25k cap). `?? ` keeps an explicit `false` honoured.
+  const asOfDate = options.asOfDate ?? todayIsoLocal();
   const hasSeniorParents =
     options.hasSeniorParents ??
-    household.members.filter(isParentMember).some((m) => memberIsSenior(m));
+    household.members.filter(isParentMember).some((m) => memberIsSenior(m, asOfDate));
   const cap80Dself = options.isSelfSenior ? LIMIT_80D_SENIOR_SELF : LIMIT_80D_SELF;
   const cap80Dparents = hasSeniorParents ? LIMIT_80D_SENIOR_PARENTS : LIMIT_80D_PARENTS;
   const section80D =
@@ -330,8 +338,8 @@ function isParentMember(m: Member): boolean {
 }
 
 /** ≥ 60 by DOB → senior-citizen 80D limits. Missing DOB → not senior (safe default). */
-function memberIsSenior(m: Member): boolean {
-  return m.dateOfBirth ? ageFromDOB(m.dateOfBirth) >= 60 : false;
+function memberIsSenior(m: Member, asOfDate: string): boolean {
+  return m.dateOfBirth ? ageAsOf(m.dateOfBirth, asOfDate) >= 60 : false;
 }
 
 function sumHealthPremium(

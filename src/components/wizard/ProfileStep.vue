@@ -2,7 +2,8 @@
 import { computed, ref, watch } from "vue";
 import { useHouseholdStore } from "@/stores/household";
 import type { MemberDraft, SetupMode, MemberRole } from "@/types/household";
-import { ageFromDOB, dobFromAge } from "@/lib/age";
+import { dobFromAge } from "@/lib/age";
+import { ageAsOf, todayIsoLocal } from "@/lib/as-of-date";
 import { finalizeMemberDraft } from "@/lib/member-draft";
 import { isEarningMember } from "@/lib/member-earning";
 import { validateMemberHorizon, hasBlockingHorizonIssue } from "@/lib/member-horizon";
@@ -106,7 +107,7 @@ const adultCount = computed(() => draftMembers.value.filter((m) => m.role === "A
 const canSave = computed(() => {
   if (adultCount.value === 0) return false;
   return draftMembers.value.every((m) => {
-    const validDOB = /^\d{4}-\d{2}-\d{2}$/.test(m.dateOfBirth) && ageFromDOB(m.dateOfBirth) <= 120;
+    const validDOB = /^\d{4}-\d{2}-\d{2}$/.test(m.dateOfBirth) && ageAsOf(m.dateOfBirth, todayIsoLocal()) <= 120;
     if (!validDOB) return false;
     // Retire-from-job age only applies to an EARNING adult; a non-earning adult has none yet.
     if (m.role === "ADULT" && m.isEarning) {

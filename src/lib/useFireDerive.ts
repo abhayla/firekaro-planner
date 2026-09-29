@@ -3,6 +3,7 @@ import { useHouseholdStore } from "@/stores/household";
 import { useAssumptionsStore } from "@/stores/assumptions";
 import { useUiStore } from "@/stores/ui";
 import { derive } from "@/lib/derive";
+import { todayIsoLocal } from "@/lib/as-of-date";
 import {
   buildPlanLevers,
   applyPlanLevers,
@@ -117,7 +118,7 @@ export function useFireDerive() {
         // #176 follow-up: the wall clock enters HERE too (mirroring `currentYear` below) so a
         // member's derived age matches their profile TODAY, not a stale FY-start snapshot that
         // could be up to 12 months in the past — see `derive.ts`'s `pinnedAsOf` comment.
-        asOfDate: new Date().toISOString().slice(0, 10),
+        asOfDate: todayIsoLocal(),
       },
       // ADR-0006 Phase 1d: the wall clock enters HERE, at the composable boundary. The kernel is
       // pure and never calls Date, so a dated goal's "years from now" cannot silently change under
@@ -315,7 +316,7 @@ export function useFireDerive() {
     viewingMemberId: ui.viewingMemberId,
     currentFY: ui.currentFY,
     // #176 follow-up: same wall-clock age reference as the main `d` lens above.
-    asOfDate: new Date().toISOString().slice(0, 10),
+    asOfDate: todayIsoLocal(),
   }));
 
   // ---- QN-5 (T-379): the "how to get there" plan levers ----

@@ -24,6 +24,7 @@ import {
   SO_FAR_PLACEHOLDER,
 } from "@/lib/quick-number-copy";
 import { applyQuickAnswers, quickAnswersFromHousehold } from "@/lib/quick-number";
+import { todayIsoLocal } from "@/lib/as-of-date";
 import { emptyQuickAnswers, type QuickAnswersDraft } from "@/types/quick-number";
 import { useHouseholdStore } from "@/stores/household";
 import { useAssumptionsStore } from "@/stores/assumptions";
@@ -137,7 +138,7 @@ function previewNeed(a: QuickAnswersDraft): number | null {
         isFamilyView: false,
         viewingMemberId: null,
         currentFY: ui.currentFY,
-        asOfDate: new Date().toISOString().slice(0, 10),
+        asOfDate: todayIsoLocal(),
       },
       // ADR-0006 Phase 1d — the wall clock enters at the composable boundary, not in the kernel.
       { currentYear: new Date().getFullYear() },

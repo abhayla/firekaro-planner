@@ -16,6 +16,7 @@ import { useAssumptionsStore } from "@/stores/assumptions";
 import { useUiStore } from "@/stores/ui";
 import { usePlanBaseline } from "@/composables/usePlanBaseline";
 import { computePlanVariance, isBaselineFrameCurrent } from "@/lib/plan-variance";
+import { todayIsoLocal } from "@/lib/as-of-date";
 import { formatINRCompact } from "@/lib/formatters";
 import PlanVarianceWaterfall from "@/components/dashboard/viz/PlanVarianceWaterfall.vue";
 
@@ -45,7 +46,7 @@ const variance = computed(() => {
       isFamilyView: ui.isFamilyView,
       viewingMemberId: ui.viewingMemberId,
       currentFY: ui.currentFY,
-      asOfDate: new Date().toISOString().slice(0, 10),
+      asOfDate: todayIsoLocal(),
     },
     nowMs: Date.now(),
     // ADR-0006 Phase 1d — the wall clock enters at the component boundary; the kernel is pure.
