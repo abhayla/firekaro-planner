@@ -521,7 +521,7 @@ function yearsLabel(years: number): string {
                    whole horizon. Saying "invest this every month" understates the later years.
                    `PRESCRIPTION_GROWTH_CLAUSE` is the one exported wording; the drift-lock in
                    `lens-coverage-invariant.spec.ts` asserts it renders here. -->
-              start here, {{ PRESCRIPTION_GROWTH_CLAUSE }} (you do
+              {{ PRESCRIPTION_GROWTH_CLAUSE }} (you do
               {{ formatINRCompact(req.currentMonthlyReal) }} now) to retire at
               {{ targetAge }}<template v-if="feasibilityNote"> — {{ feasibilityNote }}</template>
             </template>
