@@ -7,7 +7,7 @@ import {
   assumptionsLine,
   FULL_PLANNER_ADDS,
   PLAN_HONESTY_LINE,
-  QUICK_PORTFOLIO_CAVEAT,
+  quickPortfolioCaveat,
   sanityLine,
   overCommitmentWarning,
   epfNote,
@@ -205,9 +205,17 @@ describe("quick-number copy — QN-4 explainers", () => {
     expect(howWeGotThis(withNps)[0]).not.toContain(formatINRCompact(BASE_CORPUS));
   });
 
-  it("names the single-equity-line simplification rather than hiding it", () => {
-    expect(QUICK_PORTFOLIO_CAVEAT).toContain("EPF");
-    expect(QUICK_PORTFOLIO_CAVEAT.toLowerCase()).toContain("optimistic");
+  it("at 0% debt share, names the single-equity-line simplification rather than hiding it", () => {
+    const caveat = quickPortfolioCaveat(0);
+    expect(caveat).toContain("EPF");
+    expect(caveat).toContain("whole corpus as one equity");
+  });
+
+  it("gh #169 — at a stated debt share, states what was actually booked, not the old blanket claim", () => {
+    const caveat = quickPortfolioCaveat(30);
+    expect(caveat).toContain("30%");
+    expect(caveat).toContain("EPF");
+    expect(caveat).not.toContain("whole corpus as one equity");
   });
 
   it("the sanity line counts the EMI and names the unaccounted rupee", () => {

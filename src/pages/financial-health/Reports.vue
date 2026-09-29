@@ -6,6 +6,7 @@ import { useFireDerive } from "@/lib/useFireDerive";
 import { formatINRCompact, formatPercent } from "@/lib/formatters";
 import PanelCard from "@/components/shared/PanelCard.vue";
 import MemberLensBadge from "@/components/shared/MemberLensBadge.vue";
+import WholeHouseholdBadge from "@/components/shared/WholeHouseholdBadge.vue";
 
 const household = useHouseholdStore();
 const ui = useUiStore();
@@ -66,6 +67,7 @@ function printReport() {
     </PanelCard>
 
     <PanelCard title="FIRE picture" icon="mdi-fire" icon-color="warning" class="mb-4">
+      <WholeHouseholdBadge class="mb-2" />
       <div class="report-row"><span>FIRE number</span><span class="text-currency">{{ formatINRCompact(fire.fireNumber.value) }}</span></div>
       <div class="report-row"><span>Current corpus</span><span class="text-currency">{{ formatINRCompact(fire.totalCorpus.value) }}</span></div>
       <div class="report-row"><span>Progress</span><span class="font-mono">{{ fire.progressPercent.value }}%</span></div>
@@ -80,9 +82,9 @@ function printReport() {
     </PanelCard>
 
     <PanelCard title="Investments &amp; Liabilities" icon="mdi-scale-balance" icon-color="info" class="mb-4">
-      <div class="report-row"><span>Total corpus</span><span class="text-currency">{{ formatINRCompact(fire.totalCorpus.value) }}</span></div>
-      <div class="report-row"><span>Total liabilities</span><span class="text-currency">{{ formatINRCompact(fire.totalLiabilitiesValue.value) }}</span></div>
-      <div class="report-row"><span>Net worth</span><span class="text-currency text-primary font-weight-bold">{{ formatINRCompact(fire.totalCorpus.value - fire.totalLiabilitiesValue.value) }}</span></div>
+      <div class="report-row"><span>Total corpus</span><span class="text-currency">{{ formatINRCompact(fire.lensedTotalCorpus.value) }}</span></div>
+      <div class="report-row"><span>Total liabilities</span><span class="text-currency">{{ formatINRCompact(fire.lensedTotalLiabilitiesValue.value) }}</span></div>
+      <div class="report-row"><span>Net worth</span><span class="text-currency text-primary font-weight-bold">{{ formatINRCompact(fire.lensedTotalCorpus.value - fire.lensedTotalLiabilitiesValue.value) }}</span></div>
     </PanelCard>
 
     <v-alert type="info" variant="tonal" density="compact" class="mt-4 no-print">

@@ -345,12 +345,15 @@ describe("derive() — pure kernel", () => {
     // (c) the FIRE-math household corpus is UNCHANGED under the lens — guardrail preserved.
     expect(rohit.totalCorpus).toBe(whole.totalCorpus);
 
-    // (d) Joint assets are INTENTIONALLY visible at full value in EVERY member's own view (the
-    // established lens semantic — a co-owned asset is fully accessible to each owner; FinTech-noted).
-    // So Σ(members) OVER-counts the household by exactly the Joint overlap — locking this documents the
-    // overlap is deliberate and guards against a future "silently split Joint per owner" regression.
+    // (d) #160: the twin is now the member's ATTRIBUTABLE slice — own 100% + Joint × the household
+    // split % (the SAME corpusWeightOf convention individual-fire.ts already uses for this member's
+    // own FIRE math), not "own + 100% of every Joint asset". So Σ(members) no longer double-counts
+    // the Joint overlap — it reconstructs the household total exactly (split% sums to 100% for the
+    // locked 2-adult persona). This replaces the old "deliberately over-counts" lock: over-counting
+    // was the very incoherence #160 fixes (a value tile disagreeing with what "this member's slice"
+    // means), not a semantic worth preserving.
     const priya = derive(h.data, a.values, { isFamilyView: false, viewingMemberId: "priya", currentFY: "2025-26" });
-    expect(rohit.lensedTotalCorpus + priya.lensedTotalCorpus).toBeGreaterThan(whole.lensedTotalCorpus);
+    expect(rohit.lensedTotalCorpus + priya.lensedTotalCorpus).toBeCloseTo(whole.lensedTotalCorpus, -1);
   });
 
   // #81 Phase 1: member-attributable itemised expenses. The lensed expense DISPLAY mirrors

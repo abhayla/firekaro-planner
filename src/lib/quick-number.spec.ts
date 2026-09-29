@@ -4,6 +4,7 @@ import {
   applyQuickAnswers,
   quickAnswersFromHousehold,
   QUICK_INVESTMENT_LABEL,
+  QUICK_DEBT_INVESTMENT_LABEL,
 } from "./quick-number";
 import { emptyQuickAnswers, type QuickAnswers } from "@/types/quick-number";
 import { DEFAULT_ASSUMPTIONS } from "@/types/assumptions";
@@ -130,6 +131,120 @@ describe("applyQuickAnswers — money", () => {
     const { household } = apply({ ...AMIT, hasLoan: false });
     expect(household.liabilities.length).toBe(0);
     expect(household.expenses.recurring.filter((r) => r.source === "auto-loan").length).toBe(0);
+  });
+});
+
+describe("applyQuickAnswers — gh #169: the stated PF/PPF/NPS/FD share books as a debt line", () => {
+  it("at 0% debt share (the default), books the whole corpus as one equity line — byte-identical to before this fix", () => {
+    const withZero = apply({ ...AMIT, debtSharePercent: 0 });
+    const withUndefined = apply({ ...AMIT, debtSharePercent: undefined });
+    const baseline = apply(AMIT); // AMIT never sets debtSharePercent
+    for (const { household } of [withZero, withUndefined, baseline]) {
+      const quickLines = household.investments.filter((i) => i.quickSource === true);
+      expect(quickLines.length).toBe(2); // one equity line per adult, no debt line
+      expect(quickLines.every((i) => i.type === "MutualFunds")).toBe(true);
+    }
+    expect(withZero.household).toEqual(baseline.household);
+  });
+
+  it("splits the stated corpus into an equity line and a PPF-classed debt line, by the stated %", () => {
+    const { household } = apply({ ...AMIT, debtSharePercent: 30, includeSpouse: false });
+    const equity = household.investments.find((i) => i.id === "quick-inv-quick-self");
+    const debt = household.investments.find((i) => i.id === "quick-debt-quick-self");
+    expect(equity?.type).toBe("MutualFunds");
+    expect(equity?.value).toBe(80 * L - Math.round(80 * L * 0.3));
+    expect(debt?.type).toBe("PPF");
+    expect(debt?.value).toBe(Math.round(80 * L * 0.3));
+    expect(debt?.label).toBe(QUICK_DEBT_INVESTMENT_LABEL);
+    // The two lines still sum to the exact stated corpus — nothing is invented or dropped.
+    expect((equity?.value ?? 0) + (debt?.value ?? 0)).toBe(80 * L);
+    // The SIP goes entirely to the equity line — card 5 never asked which slice it lands in.
+    expect(debt?.monthlyContribution).toBe(0);
+  });
+
+  it("applies the SAME stated % to the spouse's corpus", () => {
+    const { household } = apply({ ...AMIT, debtSharePercent: 30 });
+    const spouseEquity = household.investments.find((i) => i.id === "quick-inv-quick-spouse");
+    const spouseDebt = household.investments.find((i) => i.id === "quick-debt-quick-spouse");
+    expect(spouseDebt?.value).toBe(Math.round(70 * L * 0.3));
+    expect(spouseEquity?.value).toBe(70 * L - Math.round(70 * L * 0.3));
+  });
+
+  it("worked example from gh #169: ₹1.5 Cr corpus, 30% PF/PPF/FD, ₹1.5 L/month, 15 years — the " +
+    "blended return drops from 12.0% (all-equity) to ~10.8%, and the projected corpus at year 15 " +
+    "falls by roughly the issue's ~11%", () => {
+      const solo: QuickAnswers = {
+        ...emptyQuickAnswers(35),
+        age: 35,
+        targetAge: 50, // 15 years to target
+        spend: 1 * L,
+        income: 3 * L,
+        corpus: 1.5 * CR,
+        sip: 1.5 * L,
+        includeSpouse: false,
+      };
+      const allEquity = apply({ ...solo, debtSharePercent: 0 }, undefined);
+      const withDebtShare = apply({ ...solo, debtSharePercent: 30 }, undefined);
+
+      const deriveFor = (hh: Household) =>
+        derive(hh, DEFAULT_ASSUMPTIONS, {
+          isFamilyView: false,
+          viewingMemberId: null,
+          currentFY: "2026-27",
+        });
+
+      const k100 = deriveFor(allEquity.household);
+      const k70 = deriveFor(withDebtShare.household);
+
+      // 100% equity ⇒ exactly the equity return; 70/30 ⇒ a blend strictly below it and above the
+      // debt (PPF) return — this is the mechanism the issue names, proven on the real kernel.
+      expect(k100.blendedReturn).toBeCloseTo(DEFAULT_ASSUMPTIONS.equityReturn, 4);
+      expect(k70.blendedReturn).toBeLessThan(k100.blendedReturn);
+      expect(k70.blendedReturn).toBeGreaterThan(DEFAULT_ASSUMPTIONS.ppfReturn);
+      // Within the issue's own ballpark (~10.8% for a 70/30 split at 12.0%/7.1%).
+      expect(k70.blendedReturn).toBeGreaterThan(0.1);
+      expect(k70.blendedReturn).toBeLessThan(0.115);
+
+      // Year-15 corpus delta, same FV-of-(lump + monthly SIP) methodology the issue uses.
+      // Measured: blended 12.00% -> 10.53%; corpus ~₹16.56 Cr -> ~₹13.81 Cr, a ~16.6% drop —
+      // same direction and same order of magnitude as the issue's own worked example.
+      const fvCorpus = (rate: number) => {
+        const monthlyRate = rate / 12;
+        const months = 15 * 12;
+        const fvLump = 1.5 * CR * Math.pow(1 + monthlyRate, months);
+        const fvSip =
+          1.5 * L * ((Math.pow(1 + monthlyRate, months) - 1) / monthlyRate) * (1 + monthlyRate);
+        return fvLump + fvSip;
+      };
+      const corpus100 = fvCorpus(k100.blendedReturn);
+      const corpus70 = fvCorpus(k70.blendedReturn);
+      expect(corpus70).toBeLessThan(corpus100);
+      const pctDrop = ((corpus100 - corpus70) / corpus100) * 100;
+      expect(pctDrop).toBeGreaterThan(5);
+      expect(pctDrop).toBeLessThan(25);
+    });
+
+  it("the debt/locked line is classified as debt-return AND locked (PPF), never liquid equity", () => {
+    const { household } = apply({ ...AMIT, debtSharePercent: 30, includeSpouse: false });
+    const debt = household.investments.find((i) => i.id === "quick-debt-quick-self");
+    expect(debt?.type).toBe("PPF"); // conservative: debt-return (7.1%) AND locked, not FD (liquid)
+  });
+
+  it("quickAnswersFromHousehold reconstructs the total corpus and the debt share on reload", () => {
+    const first = apply({ ...AMIT, debtSharePercent: 30 });
+    const rebuilt = quickAnswersFromHousehold(first.household, undefined, NOW);
+    expect(rebuilt?.corpus).toBe(80 * L);
+    expect(rebuilt?.debtSharePercent).toBe(30);
+    expect(rebuilt?.spouseCorpus).toBe(70 * L);
+  });
+
+  it("re-running applyQuickAnswers with the reconstructed answers reproduces the same split (round-trip)", () => {
+    const first = apply({ ...AMIT, debtSharePercent: 30 });
+    const rebuilt = quickAnswersFromHousehold(first.household, undefined, NOW);
+    const second = apply(rebuilt as QuickAnswers, first.createdIds);
+    const debt1 = first.household.investments.find((i) => i.id === "quick-debt-quick-self");
+    const debt2 = second.household.investments.find((i) => i.id === "quick-debt-quick-self");
+    expect(debt2?.value).toBe(debt1?.value);
   });
 });
 
