@@ -14,6 +14,7 @@
  * (contract section 5: numbers in the copy come from derive()/QN-2 outputs).
  */
 import { formatINRCompact } from "@/lib/formatters";
+import { PRESCRIPTION_GROWTH_CLAUSE } from "@/lib/required-contribution";
 
 export type QuickCardKey =
   | "guess"
@@ -250,9 +251,12 @@ export function howWeGotThis(input: ExplainerInput): string[] {
     `Plus ${formatINRCompact(
       input.healthcareReservation,
     )} reserved purely for medical shocks — 20% of the base, because health is the one cost that reliably outruns everything else.`,
+    // #207: the monthly figure is a STARTING amount that rises with income, not a flat one held
+    // for `yearsToTarget` years. "X a month ... for 17 years" read as flat; the one exported clause
+    // (`PRESCRIPTION_GROWTH_CLAUSE`) fixes that, drift-locked in `lens-coverage-invariant.spec.ts`.
     `Your ${formatINRCompact(input.currentCorpus)} plus ${formatINRCompact(
       input.monthlyContributionReal,
-    )} a month grow at ${pct(input.expectedReturn)} for ${input.yearsToTarget} years — while the ` +
+    )} a month to start — ${PRESCRIPTION_GROWTH_CLAUSE} — grow at ${pct(input.expectedReturn)} for ${input.yearsToTarget} years, while the ` +
       `number you're chasing keeps rising at ${pct(
         input.householdInflation,
         1,

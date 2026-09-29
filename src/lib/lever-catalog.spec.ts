@@ -314,14 +314,17 @@ describe("QN-5 plan levers — buildPlanLevers / evaluatePlanLevers (Sharmas, re
 
   // gh #185 step 7 review: a lever's expected CHANNEL of effect is not the same for every lever.
   // `step-up-10`/`delay-3`/`trim-expenses`/`direct-plans`/`no-prepay-roll-emi` all perturb inputs
-  // the BISECTION itself re-solves against, so they must move `requiredMonthlyReal`. `raise-income`
-  // and `side-income` patch the income-path residual/segments that the T-377 solver contract
-  // (`required-contribution.ts` / `derive.ts` "the override REPLACES the residual") deliberately
-  // does NOT re-grow during bisection — only a DELIBERATE step-up
-  // (`householdSavingsStepUpPercent`) survives that override. Their honest effect shows up in
-  // `gapReal` instead (`atTarget`'s own income-path-driven schedule is never overridden) — exactly
-  // why `PlanLeverEffect.gapClosed` exists. A three-way OR let a genuinely broken lever hide behind
-  // whichever channel happened to move; this map pins EACH lever to the channel it must move, by
+  // the BISECTION itself re-solves against, so they must move `requiredMonthlyReal`.
+  //
+  // FLIPPED BACK at gh #207 (2026-09-29): `raise-income` and `side-income` were pinned to `gapReal`
+  // because the T-377 override was a FLAT scalar the income path never touched, so the bisection
+  // could not see an income-growth change at all. #207 makes the override the STARTING level of an
+  // income-path-SCALED schedule, so `salaryGrowthRealPercent` (raise-income) now enters the probe
+  // directly and `extraContributionSegments` (side-income) are summed onto it — both must move
+  // `requiredMonthlyReal`, the channel the user actually reads on the prescription.
+  //
+  // A three-way OR would let a genuinely broken lever hide behind whichever channel happened to
+  // move; this map pins EACH lever to the channel it must move, by
   // AT LEAST the solver's own tolerance (`REQUIRED_CONTRIBUTION_TOLERANCE`), so a rounding-noise
   // "move" can never pass as evidence.
   const LEVER_EFFECT_CHANNEL: Record<PlanLeverKey, "requiredMonthlyReal" | "gapReal"> = {
@@ -330,8 +333,8 @@ describe("QN-5 plan levers — buildPlanLevers / evaluatePlanLevers (Sharmas, re
     "trim-expenses": "requiredMonthlyReal",
     "direct-plans": "requiredMonthlyReal",
     "no-prepay-roll-emi": "requiredMonthlyReal",
-    "raise-income": "gapReal",
-    "side-income": "gapReal",
+    "raise-income": "requiredMonthlyReal",
+    "side-income": "requiredMonthlyReal",
   };
 
   it("NO-INERT-LEVER GUARD: every available lever moves its EXPECTED channel on Sharmas, by more than solver noise", () => {

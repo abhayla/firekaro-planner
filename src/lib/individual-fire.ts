@@ -42,6 +42,7 @@ import type { Assumptions } from "@/types/assumptions";
 import { isEarningMember } from "@/lib/member-earning";
 import { toMonthly, toAnnual } from "@/lib/cashflow";
 import { ageFromDOB } from "@/lib/age";
+import { realIncomeScaleAt, type EarnerIncomePath } from "@/lib/income-path";
 import { todayIsoLocal } from "@/lib/as-of-date";
 import { calculateFIRENumber, calculateFireTarget, calculateYearsToTarget } from "@/lib/fire-math";
 import { computeTax, recommendRegime, marginalSlabRate, getTaxConfigForFY } from "@/lib/tax";
@@ -226,6 +227,31 @@ export function computeIndividualFire(
   );
   const monthlyContribution =
     usableOverride(overrides?.monthlyContributionReal, 0) ?? Math.round(attributableAnnualSavings / 12);
+  /**
+   * gh #207 — THIS member's own REAL income path, and the scale factor the contribution rides.
+   *
+   * The household path (`derive.ts`) scales its inflow by `income(t)/income(0)`; before this fix the
+   * member-lens path did not, so the SAME single-earner household could be told two different
+   * prescriptions depending on which lens was selected (the household one fell 12.5% at #207 while
+   * the member one did not move at all — the cross-screen incoherence class
+   * `feedback_cross_screen_figure_coherence` names). Both scopes now ride the ONE
+   * `realIncomeScaleAt` formula in `income-path.ts`, on this member's own salary rather than the
+   * couple's, because this card funds only this member's lifestyle.
+   *
+   * A member with no salary (rental/pension only) scales by 1 — `realIncomeScaleAt` returns the
+   * neutral identity rather than dividing by a zero base.
+   */
+  const memberIncomePaths: EarnerIncomePath[] =
+    (member.salary?.annualCTC ?? 0) > 0
+      ? [
+          {
+            annualAmount: member.salary?.annualCTC ?? 0,
+            ageAtYear0: anchorAge,
+            realGrowthPercent: assumptions.salaryGrowthRealPercent ?? 2,
+            taperAge: assumptions.salaryGrowthTaperAge ?? 50,
+          },
+        ]
+      : [];
 
   const cfg = getTaxConfigForFY(currentFY);
   const slabs = recommended.recommended === "NEW" ? cfg.newRegime.slabs : cfg.oldRegime.slabs;
@@ -285,7 +311,10 @@ export function computeIndividualFire(
   const nominalContribution =
     monthlyContribution <= 0
       ? monthlyContribution
-      : (yearIndex: number) => monthlyContribution * Math.pow(1 + generalInflation, yearIndex);
+      : (yearIndex: number) =>
+          monthlyContribution *
+          realIncomeScaleAt(memberIncomePaths, yearIndex) *
+          Math.pow(1 + generalInflation, yearIndex);
   const rawYearsToFire = hasTarget
     ? calculateYearsToTarget(
         attributableCorpus,

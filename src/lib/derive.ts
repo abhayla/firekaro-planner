@@ -58,6 +58,7 @@ import {
   expectedRealGrowthPercent,
   generalInflationWithCreep,
   householdRealIncomeAt,
+  realIncomeScaleAt,
   type EarnerIncomePath,
 } from "@/lib/income-path";
 
@@ -617,6 +618,15 @@ export function derive(
       const monthly = surplus / 12;
       return Number.isFinite(monthly) && monthly > 0 ? monthly : 0;
     };
+    /**
+     * #207 — the REAL income-path SCALE the T-377 solver override rides, so the prescription's
+     * probe grows exactly as the organic residual does instead of being a flat scalar the income
+     * path never touches. THE formula lives in `income-path.ts` (`realIncomeScaleAt`) because
+     * `individual-fire.ts` scales the member-lens prescription by the same one — one formula, two
+     * scopes, no second growth model to drift.
+     */
+    const incomeScaleAt = (yearIndex: number, paths: EarnerIncomePath[]): number =>
+      realIncomeScaleAt(paths, yearIndex);
 
     // Primary-residence exclusion (A20.2).
     const fireCorpusInvestments = scopeInvestments.filter(
@@ -645,6 +655,7 @@ export function derive(
       monthlyTakeHome,
       savingsRate,
       realMonthlySurplusAt,
+      incomeScaleAt,
       conservativePaths,
       expectedPaths,
       expectedBasisPercent,
@@ -956,9 +967,15 @@ export function derive(
   // conservative/expected split live in `computeScope` above (`realMonthlySurplusAt`); the flattening
   // of the per-year values into a resolver stays out of the inline path (single-kernel rule).
   //
-  // T-377 contract preserved: when the solver passes a `contributionOverride`, the inflow is that
-  // fixed scalar — the override REPLACES the residual, so it must not be re-grown by the income path.
+  // T-377 contract, AS AMENDED BY #207: when the solver passes a `contributionOverride`, the inflow
+  // is that amount as the STARTING real contribution, SCALED along the income path — the override
+  // replaces the residual's LEVEL, never its GROWTH. Before #207 it replaced both, so the
+  // prescription was solved against a kernel run in which the user's income never grew: pessimistic
+  // (over-prescribed), worst for the ₹2.5L-₹10L band. Callers needing a genuinely flat override pass
+  // The member-lens prescription rides the SAME primitive (`individual-fire.ts`), so the two scopes
+  // cannot drift apart.
   const conservativeSurplusAt = householdScope.realMonthlySurplusAt;
+  const conservativeIncomeScaleAt = householdScope.incomeScaleAt;
   // `householdSavingsStepUpPercent` is no longer the WAGE-GROWTH proxy — the income path is. Its
   // DEFAULT therefore moves 2 -> 0 (`types/assumptions.ts`): leaving it at 2 would compound wage
   // growth twice, once through each earner's income and once again through the residual. What the
@@ -977,23 +994,25 @@ export function derive(
   };
   /**
    * The HEADLINE inflow: the conservative income-path surplus residual, times any DELIBERATE
-   * step-up the user (or a lever) set. T-377 contract preserved — when the solver passes a
-   * `contributionOverride` the inflow is that fixed scalar, because the override REPLACES the
-   * residual and must not be re-grown by the income path. A non-positive scalar passes through so
-   * `calculateYearsToTarget`'s `monthlySavings <= 0 -> Infinity` empty-state sentinel still fires.
+   * step-up the user (or a lever) set. A non-positive scalar passes through so
+   * `calculateYearsToTarget`'s `monthlySavings <= 0 -> Infinity` empty-state sentinel still fires —
+   * including for an override of 0 (the T-377 empty-state guarantee, unchanged by #207).
    */
   const baseContributionSchedule: ContributionSchedule =
     monthlyContribution <= 0
       ? monthlyContribution
       : contributionOverride != null
-        ? // T-377: the solver REPLACES the residual with a fixed real amount, so the income path
-          // must not re-grow it — but the DELIBERATE step-up still applies, because the solver is
-          // answering "what flat amount must I start at, given my plan", and the plan includes
-          // stepping that amount up. Dropping the step-up here made the `step-up-10` plan lever
-          // INERT in `requiredMonthlyContributionFor` (its own no-inert-lever guard caught it).
-          deliberateStepUpPct <= 0
-          ? monthlyContribution
-          : (yearIndex: number) => monthlyContribution * stepUpFactor(yearIndex)
+        ? // T-377 as amended by #207: the solver replaces the residual's LEVEL with a fixed real
+          // starting amount, and that amount then rides the SAME income path the organic residual
+          // does — contribution(t) = override x income(t)/income(0) — so the probe honours the
+          // growth the headline already assumes. The DELIBERATE step-up still applies on
+          // top (the solver answers "what must I start at, given my plan", and the plan includes
+          // stepping up); dropping it made the `step-up-10` lever INERT in
+          // `requiredMonthlyContributionFor` (its own no-inert-lever guard caught it).
+          (yearIndex: number) =>
+            monthlyContribution *
+            conservativeIncomeScaleAt(yearIndex, householdScope.conservativePaths) *
+            stepUpFactor(yearIndex)
         : (yearIndex: number) =>
             conservativeSurplusAt(yearIndex, householdScope.conservativePaths) * stepUpFactor(yearIndex);
   /**
