@@ -416,30 +416,75 @@ describe("deductionsForMember — #204 Joint-owned 80C/80D/§24 attribution", ()
     expect(b.section80C).toBe(LIMIT_80C);
   });
 
-  it("a Joint (isSharedWithSpouse) home loan doubles §24 to ₹4L when both co-borrowers are tracked, each earner claiming their own share", () => {
+  // Round 2 (#204 review finding): a shared home loan is a PAYMENT split, not an ownership split.
+  // Each co-borrower claims ONLY their own share of the interest, each capped at the per-assessee
+  // ₹2L — the shares must sum to the interest actually paid, never more (the round-1 fixture was
+  // an OVER-claim: owner ₹4L + spouse ₹2L = ₹6L on ₹4L of interest paid).
+  function sharedHomeLoan(interestRate: number): Household["liabilities"][number] {
+    return {
+      id: "l1",
+      name: "Joint Home Loan",
+      type: "HomeLoan",
+      outstandingBalance: 5_000_000,
+      monthlyEMI: 50_000,
+      interestRate, // interest = outstandingBalance × interestRate / 100
+      ownerId: "a",
+      isSharedWithSpouse: true,
+      coBorrowers: ["a", "b"],
+    };
+  }
+
+  it("shared ₹4L interest: each co-borrower's own share is already ≥ ₹2L → both cap at ₹2L, summing to ₹4L (never ₹6L)", () => {
+    const hh = twoEarnerHH();
+    hh.liabilities = [sharedHomeLoan(8.0)]; // 50L × 8% = 4L interest; 50/50 share = 2L each
+    const a = deductionsForMember(hh, "a", 50);
+    const b = deductionsForMember(hh, "b", 50);
+    expect(a.section24).toBe(200_000);
+    expect(b.section24).toBe(200_000);
+    expect(a.section24 + b.section24).toBe(400_000); // sums to interest paid, never doubled to 6L
+    expect(a.section24 + b.section24).toBeLessThanOrEqual(Math.min(400_000, 2 * LIMIT_SECTION_24));
+  });
+
+  it("shared ₹3L interest: each co-borrower's share (₹1.5L) is under the ₹2L cap → claims their real share", () => {
+    const hh = twoEarnerHH();
+    hh.liabilities = [sharedHomeLoan(6.0)]; // 50L × 6% = 3L interest; 50/50 share = 1.5L each
+    const a = deductionsForMember(hh, "a", 50);
+    const b = deductionsForMember(hh, "b", 50);
+    expect(a.section24).toBe(150_000);
+    expect(b.section24).toBe(150_000);
+    expect(a.section24 + b.section24).toBe(300_000);
+    expect(a.section24 + b.section24).toBeLessThanOrEqual(Math.min(300_000, 2 * LIMIT_SECTION_24));
+  });
+
+  it("shared ₹5L interest: each co-borrower's share (₹2.5L) exceeds ₹2L → both cap at ₹2L, summing to ₹4L, never ₹5L", () => {
+    const hh = twoEarnerHH();
+    hh.liabilities = [sharedHomeLoan(10.0)]; // 50L × 10% = 5L interest; 50/50 share = 2.5L each
+    const a = deductionsForMember(hh, "a", 50);
+    const b = deductionsForMember(hh, "b", 50);
+    expect(a.section24).toBe(200_000);
+    expect(b.section24).toBe(200_000);
+    expect(a.section24 + b.section24).toBe(400_000); // capped sum < actual 5L interest paid
+    expect(a.section24 + b.section24).toBeLessThanOrEqual(Math.min(500_000, 2 * LIMIT_SECTION_24));
+  });
+
+  it("a NON-shared home loan is 100% the owner's, 0% the spouse's, capped at ₹2L", () => {
     const hh = twoEarnerHH();
     hh.liabilities = [
       {
-        id: "l1",
-        name: "Joint Home Loan",
+        id: "l2",
+        name: "Solo Home Loan",
         type: "HomeLoan",
         outstandingBalance: 5_000_000,
         monthlyEMI: 50_000,
-        interestRate: 8.0, // interest = 4L
+        interestRate: 8.0, // 4L interest
         ownerId: "a",
-        isSharedWithSpouse: true,
-        coBorrowers: ["a", "b"],
+        isSharedWithSpouse: false,
       },
     ];
     const a = deductionsForMember(hh, "a", 50);
     const b = deductionsForMember(hh, "b", 50);
-    // a owns it (100% weight) → full 4L interest, capped at the doubled 4L cap (2 tracked co-borrowers).
-    expect(a.section24).toBe(400_000);
-    // b's share is isSharedWithSpouse × split = 50% of 4L interest = 2L, under its own 2L cap slice
-    // of the doubled ceiling — the co-borrower check still sees the FULL household roster (#204),
-    // not just b alone, so the multiplier is 2 (4L cap) here too, but b's actual interest share
-    // (2L) is what is claimed.
-    expect(b.section24).toBe(200_000);
+    expect(a.section24).toBe(LIMIT_SECTION_24);
+    expect(b.section24).toBe(0);
   });
 
   it("own-owned sources are UNCHANGED — a member's own PPF/health/loan still yields exactly its own value", () => {

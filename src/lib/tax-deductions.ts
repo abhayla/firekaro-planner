@@ -185,9 +185,15 @@ export const JOINT_DEDUCTION_OWNER = "Joint";
  * family-floater CLASS to split here today. If a Joint-insurance concept is ever added, it plugs into
  * this same `weightOf` convention.
  *
- * Sec 24 is the one deduction where the co-borrower ₹2L→₹4L doubling depends on the FULL household's
- * tracked-member roster, independent of which single earner's deductions are being computed — see
- * `coBorrowerTrackedMemberIds` on `DeriveDeductionsOptions`.
+ * Sec 24 round 2 (#204 review finding): a shared home loan is a PAYMENT split, not an OWNERSHIP
+ * split — the corpus-style "owner 100% + Joint × split" convention (right for who OWNS an asset)
+ * double-counted a shared loan's interest across both earners (owner ₹4L + spouse ₹2L = ₹6L
+ * claimed on ₹4L actually paid). Tax law: each co-borrower claims ONLY their own share of the
+ * interest, each capped at the per-assessee ₹2L, and the two shares always sum to the interest
+ * paid (never more). So §24 is computed HERE directly, per member, and passed straight into
+ * `totalDeductions` — it is NEVER routed through `deriveDeductions`'s own household-aggregate §24
+ * block (that block's co-borrower ₹2L→₹4L doubling is a HOUSEHOLD-total rule — exactly the SUM of
+ * two ₹2L caps — and would double-count again if applied a second time to an already-split share).
  */
 export function deductionsForMember(
   household: Household,
@@ -208,32 +214,42 @@ export function deductionsForMember(
       monthlyContribution: (inv.monthlyContribution ?? 0) * w,
     }));
 
-  const liabilities = household.liabilities
-    .map((l) => ({ liab: l, w: l.ownerId === memberId ? 1 : l.isSharedWithSpouse ? split : 0 }))
-    .filter(({ w }) => w > 0)
-    .map(({ liab, w }) => ({
-      ...liab,
-      outstandingBalance: liab.outstandingBalance * w,
-    }));
-
   // No "Joint" sentinel for insurance (see doc comment above) — own-owned only, unchanged.
   const insurance = household.insurance.filter((p) => p.insuredPersonId === memberId);
 
-  return deriveDeductions(
+  // ---- Sec 24 — PAYMENT share, not ownership share (round-2 fix) ----
+  // Owner's share = (1 − split); spouse's (non-owner) share = split — the two always sum to 1, so
+  // the two earners' §24 claims on one shared loan always sum to the interest actually paid, never
+  // more. A non-shared loan is 100% the owner's, 0% everyone else's. Each earner's share is capped
+  // independently at the per-assessee ₹2L (LIMIT_SECTION_24) — never at a doubled ₹4L; the ₹4L
+  // "household" figure is only ever the sum of two ₹2L per-assessee caps.
+  let section24 = 0;
+  for (const l of household.liabilities) {
+    if (l.type !== "HomeLoan") continue;
+    const annualInterest = estimateAnnualInterest(l);
+    const isOwner = l.ownerId === memberId;
+    const isSpouseShare = !isOwner && l.isSharedWithSpouse;
+    if (!isOwner && !isSpouseShare) continue;
+    const paymentShare = !l.isSharedWithSpouse ? (isOwner ? 1 : 0) : isOwner ? 1 - split : split;
+    section24 += Math.min(LIMIT_SECTION_24, annualInterest * paymentShare);
+  }
+
+  const rest = deriveDeductions(
     {
       ...household,
       members: member ? [member] : [],
       investments,
-      liabilities,
+      liabilities: [], // §24 computed above, independently — see doc comment
       insurance,
     },
-    {
-      ...options,
-      // #204: the co-borrower tracked-member check reads the WHOLE household roster, never the
-      // single-earner slice above — see the doc comment on `coBorrowerTrackedMemberIds`.
-      coBorrowerTrackedMemberIds: household.members.map((m) => m.id),
-    },
+    options,
   );
+
+  return {
+    ...rest,
+    section24,
+    totalDeductions: rest.section80C + rest.section80CCD1B + rest.section80D + section24,
+  };
 }
 
 /**
