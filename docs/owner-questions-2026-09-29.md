@@ -34,6 +34,7 @@ Abhay went to sleep ~00:30 IST with the direction "implement whatever is clear a
 > (checksums computed with `sha256sum` on the committed files at `213ca54`; verify with `npx prisma migrate status` after.) Also note `prisma migrate resolve --applied` was called twice and timed out — check for duplicate rows for those two names before running the UPDATEs.
 
 ## Overnight queue (authorised) — status
+- [ ] #185 step 5 (second 'expected' headline number, Income hike helper, Preferences anchor, SCREEN-STANDARD) — Sonnet builder dispatched ~07:20 IST as a DRAFT PR; **UI verification will be pending** (no browser tool tonight) — it needs a screenshot pass before merge.
 - [ ] #201 per-earner card credits the whole household's deductions — dispatched ~07:10 IST.
 - [x] #157 scalar tax path hardcodes private-sector NPS ceiling — MERGED `b6b3f5d` (PR #200, ~07:05 IST) after FinTech PASS + code review + round-2 with real RED/GREEN mutations. Government OLD-regime earners now see 14% on the salary preview and the tax-planning card, matching the headline. Pre-existing leak found on the way → #201 (must-have).
 - [x] #162 part 1 — MERGED `6259454` (PR #199, ~06:15 IST) after FinTech + code review + round-2 re-check; math untouched on the household path; caveat drift-lock re-pinned; magnitude band re-based [26, 41].
