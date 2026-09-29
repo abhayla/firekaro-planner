@@ -26,6 +26,13 @@ Abhay went to sleep ~00:30 IST with the direction "implement whatever is clear a
 
 6. **Rate limit hit at ~04:00 IST** (session limit, reset 04:20): two fix rounds (#197 wall-clock, #196 member-lens blend) died mid-work; their state was committed, and both were re-dispatched at 04:23. If this file's status lines below still say "running" when you read it, the second run also hit a limit — the branches hold everything, nothing is lost.
 
+> **Deploy prep (prepared, NOT run):** the two hand-inserted `_prisma_migrations` rows carry checksum `manual-harness-repair`; `prisma migrate deploy` will report a checksum mismatch until they are corrected. Prisma stores the SHA-256 of `migration.sql`. Run in the deploy window, on the prod DB, BEFORE `migrate deploy`:
+> ```sql
+> UPDATE _prisma_migrations SET checksum = '3444d436d3517a61cb26da84803cf00279ff545a83ee32b9b041912406bde403' WHERE migration_name = '20260827120000_adr0006_assumptions_columns' AND checksum = 'manual-harness-repair';
+> UPDATE _prisma_migrations SET checksum = '213ffadd10e1f0094806eb715141b7ed7dfe513cacce05965abc49dda3b381b8' WHERE migration_name = '20260928000000_activation_event' AND checksum = 'manual-harness-repair';
+> ```
+> (checksums computed with `sha256sum` on the committed files at `213ca54`; verify with `npx prisma migrate status` after.) Also note `prisma migrate resolve --applied` was called twice and timed out — check for duplicate rows for those two names before running the UPDATEs.
+
 ## Overnight queue (authorised) — status
 - [ ] #201 per-earner card credits the whole household's deductions — dispatched ~07:10 IST.
 - [x] #157 scalar tax path hardcodes private-sector NPS ceiling — MERGED `b6b3f5d` (PR #200, ~07:05 IST) after FinTech PASS + code review + round-2 with real RED/GREEN mutations. Government OLD-regime earners now see 14% on the salary preview and the tax-planning card, matching the headline. Pre-existing leak found on the way → #201 (must-have).
