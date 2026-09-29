@@ -270,8 +270,9 @@ export function evaluateNudges(ctx: NudgeContext): Nudge[] {
   // NONE of a basic safeguard, not on having "too much" of something.
 
   // 9b-i/ii. No term cover / no health cover — split (#208) because a Life-only OR Health-only
-  // policy used to silence a single "no-protection-cover" nudge, hiding the larger risk for the
-  // locked persona (salaried accumulator): an income shock with zero term cover. The schema has
+  // policy used to silence the single combined protection nudge this pair replaces, hiding the
+  // larger risk for the locked persona (salaried accumulator): an income shock with zero term
+  // cover. The schema has
   // no separate "Term" type (`insuranceTypeSchema` is Vehicle/Health/Life) — "Life" IS the
   // term-equivalent here. Each condition is independent and fires once per household (not once
   // per uncovered earner/member) — the point is "you have this specific gap", not a count. A
