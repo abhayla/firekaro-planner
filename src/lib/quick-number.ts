@@ -40,6 +40,15 @@ import { outstandingPrincipalFromEMI } from "@/lib/amortization";
 /** Every row the quick path owns carries this id prefix — that is what makes a re-run idempotent. */
 export const QUICK_ID_PREFIX = "quick-";
 export const QUICK_INVESTMENT_LABEL = "All investments (quick estimate)";
+/**
+ * gh #169 — the debt/locked slice the user carved out of card 4's corpus (EPF/PPF/NPS/FD money).
+ * Booked as `PPF` — the most CONSERVATIVE of the four instruments the question names: `PPF`
+ * classifies as debt-return (7.1%, the lowest of debt/EPF/PPF in the research defaults) AND as
+ * locked (`accessibilityClass: "ppf"`) for the accessible-money bridge, unlike `FD` (liquid) or
+ * `EPF_VPF`/`NPS` (return closer to 8.25%). Without an `openingYear` the accessibility layer falls
+ * back to "locked until 60" — also the conservative direction (never assumed spendable early).
+ */
+export const QUICK_DEBT_INVESTMENT_LABEL = "PF / PPF / NPS / FDs (quick estimate)";
 /** Ages the goal timings come from (transcript: education at 18, weddings "at the age of 30"). */
 export const EDUCATION_AT_AGE = 18;
 export const POSTGRAD_AT_AGE = 22;
@@ -313,7 +322,7 @@ export function applyQuickAnswers(
       : "Couple"
     : "Solo";
 
-  // ---- 3. investments — ONE line per adult, holding everything they told us about ----
+  // ---- 3. investments — ONE equity line (+ one debt/locked line, gh #169) per adult ----
   const quickInvestment = (owner: Member, value: number, monthly: number): Investment => ({
     id: `${QUICK_ID_PREFIX}inv-${owner.id}`,
     // MutualFunds is the equity-classified catch-all (investment-traits.ts); the full planner is
@@ -325,17 +334,42 @@ export function applyQuickAnswers(
     ownerId: owner.id,
     quickSource: true,
   });
+  // gh #169 — the stated PF/PPF/NPS/FD share of the SAME corpus, booked as its own PPF-classed
+  // line so `blendPortfolioReturn` and the accessible-money bridge see the real mix instead of
+  // 100% equity at 12%. The SIP goes entirely to the equity line (monthlyContribution: 0 here) —
+  // card 5 never asked which slice the monthly investing lands in, so splitting it would invent a
+  // number we were not told; the copy says so (`QUICK_PORTFOLIO_CAVEAT`).
+  const quickDebtInvestment = (owner: Member, value: number): Investment => ({
+    id: `${QUICK_ID_PREFIX}debt-${owner.id}`,
+    type: "PPF",
+    label: QUICK_DEBT_INVESTMENT_LABEL,
+    value,
+    monthlyContribution: 0,
+    ownerId: owner.id,
+    quickSource: true,
+  });
   // Display-only split of the stated monthly investing across the adults who hold money.
-  const selfCorpus = n(answers.corpus);
-  const spouseCorpus = answers.includeSpouse ? n(answers.spouseCorpus) : 0;
+  const debtShare = Math.min(100, Math.max(0, n(answers.debtSharePercent))) / 100;
+  const selfCorpusTotal = n(answers.corpus);
+  const spouseCorpusTotal = answers.includeSpouse ? n(answers.spouseCorpus) : 0;
+  const selfDebtCorpus = Math.round(selfCorpusTotal * debtShare);
+  const selfEquityCorpus = selfCorpusTotal - selfDebtCorpus;
+  const spouseDebtCorpus = Math.round(spouseCorpusTotal * debtShare);
+  const spouseEquityCorpus = spouseCorpusTotal - spouseDebtCorpus;
   const sip = n(answers.sip);
-  const totalCorpus = selfCorpus + spouseCorpus;
-  const selfShare = totalCorpus > 0 ? selfCorpus / totalCorpus : 1;
-  hh.investments.push(track(quickInvestment(self, selfCorpus, Math.round(sip * selfShare))));
+  const totalCorpus = selfCorpusTotal + spouseCorpusTotal;
+  const selfShare = totalCorpus > 0 ? selfCorpusTotal / totalCorpus : 1;
+  hh.investments.push(track(quickInvestment(self, selfEquityCorpus, Math.round(sip * selfShare))));
+  if (selfDebtCorpus > 0) {
+    hh.investments.push(track(quickDebtInvestment(self, selfDebtCorpus)));
+  }
   if (spouse) {
     hh.investments.push(
-      track(quickInvestment(spouse, spouseCorpus, Math.round(sip * (1 - selfShare)))),
+      track(quickInvestment(spouse, spouseEquityCorpus, Math.round(sip * (1 - selfShare)))),
     );
+    if (spouseDebtCorpus > 0) {
+      hh.investments.push(track(quickDebtInvestment(spouse, spouseDebtCorpus)));
+    }
   }
 
   // ---- 4. spending + the loan (the ONLY place the EMI enters spending) ----
@@ -556,6 +590,8 @@ export function quickAnswersFromHousehold(
   const kids = household.members.filter((m) => m.id.startsWith(`${QUICK_ID_PREFIX}kid-`));
   const quickInv = (ownerId: string) =>
     household.investments.find((i) => i.id === `${QUICK_ID_PREFIX}inv-${ownerId}`);
+  const quickDebtInv = (ownerId: string) =>
+    household.investments.find((i) => i.id === `${QUICK_ID_PREFIX}debt-${ownerId}`);
   const goal = (suffix: string) =>
     household.expenses.plannedFuture.find((p) => p.id === `${QUICK_ID_PREFIX}goal-${suffix}`);
   const loan = household.liabilities.find((l) => l.id === `${QUICK_ID_PREFIX}home-loan`);
@@ -564,6 +600,8 @@ export function quickAnswersFromHousehold(
   );
   const selfInv = quickInv(self.id);
   const spouseInv = spouse ? quickInv(spouse.id) : undefined;
+  const selfDebtInv = quickDebtInv(self.id);
+  const spouseDebtInv = spouse ? quickDebtInv(spouse.id) : undefined;
   const epf = household.investments.find((i) => i.id === `${QUICK_ID_PREFIX}epf-${self.id}`);
   const sip =
     n(selfInv?.monthlyContribution) + n(spouseInv?.monthlyContribution) + n(epf?.monthlyContribution);
@@ -584,10 +622,18 @@ export function quickAnswersFromHousehold(
     // wrongly say "yes"). Prefer the persisted flag; fall back to row presence for a household
     // saved before this field existed.
     hasEpf: self.salary?.hasEpf ?? Boolean(epf),
-    corpus: n(selfInv?.value),
+    // gh #169 — the total the user typed on card 4 is the equity line plus its own debt line back
+    // out; the share is read from self's split (both adults are asked the SAME question, so the
+    // ratio the store already applied to self is definitional for the card, not re-derived per
+    // owner — the spouse's own ratio can differ only if a hand-edit changed one line since).
+    corpus: n(selfInv?.value) + n(selfDebtInv?.value),
+    debtSharePercent:
+      n(selfInv?.value) + n(selfDebtInv?.value) > 0
+        ? Math.round((n(selfDebtInv?.value) / (n(selfInv?.value) + n(selfDebtInv?.value))) * 100)
+        : 0,
     sip,
     includeSpouse: Boolean(spouse),
-    spouseCorpus: n(spouseInv?.value),
+    spouseCorpus: n(spouseInv?.value) + n(spouseDebtInv?.value),
     kids: kids.length,
     kidsAge: kids.length > 0 ? ageOf(kids[0]) : 0,
     education: n(goal("education")?.todayAmount),

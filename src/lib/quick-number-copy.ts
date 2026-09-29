@@ -301,14 +301,25 @@ export const PLAN_HONESTY_LINE =
   "Returns may be 10% one decade and 14% the next; the moves you pick are what you control.";
 
 /**
- * The one simplification the express path cannot hide: card 4 asks for EVERY holding, and we book
- * the total as a single equity line. A real salaried portfolio has EPF/PPF/FD money compounding at
- * 7–8%, not 12% — so a corpus that is part debt grows slower than this screen shows.
+ * gh #169 — the caveat now reflects what card 4 ACTUALLY booked: the equity share you typed as
+ * equity, and the PF/PPF/NPS/FD share you told us about as a locked, debt-return holding. When the
+ * debt share is 0% (unanswered, or genuinely none) the wording still needs to be honest about that
+ * — the corpus really is one equity line then, not a hidden simplification.
  */
-export const QUICK_PORTFOLIO_CAVEAT =
-  "One simplification you should know about: we booked your whole corpus as one equity holding at " +
-  "12%. If a chunk of it sits in EPF, PPF, NPS or FDs — which grow at 7–8% — your real blend is " +
-  "lower and this projection is optimistic. Split it in the full planner and the number gets honest.";
+export function quickPortfolioCaveat(debtSharePercentValue: number): string {
+  if (debtSharePercentValue > 0) {
+    return (
+      `You told us ${debtSharePercentValue}% of your corpus sits in EPF, PPF, NPS or FDs, so we ` +
+      "booked that share separately at a locked, debt-like return (~7%) and the rest as equity at " +
+      "12%. The full planner lets you split it holding-by-holding for an exact blend."
+    );
+  }
+  return (
+    "One simplification you should know about: we booked your whole corpus as one equity holding at " +
+    "12% because you told us none of it sits in EPF, PPF, NPS or FDs. If that's not quite right, " +
+    "the full planner lets you split it holding-by-holding for an exact blend."
+  );
+}
 
 /** D1/D3–D6 — what the express path deliberately leaves to the full planner. */
 export const FULL_PLANNER_ADDS: readonly string[] = [
