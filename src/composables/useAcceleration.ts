@@ -20,6 +20,7 @@ import {
 } from "@/lib/lever-impact";
 import { computeLeverBand, volatilityAfterEquityNotch, type LeverBand } from "@/lib/lever-bands";
 import { deriveDeductions } from "@/lib/tax-deductions";
+import { todayIsoLocal } from "@/lib/as-of-date";
 import { getTaxConfigForFY } from "@/lib/tax";
 
 /**
@@ -146,7 +147,7 @@ export function useAcceleration() {
       currentEquityPct: currentEquityPct.value,
       maxEquityPct: DEFAULT_MAX_EQUITY_PCT,
       nominalReturnPerEquityPoint,
-      currentNps80ccd1bUsed: deriveDeductions(h.data).section80CCD1B,
+      currentNps80ccd1bUsed: deriveDeductions(h.data, { asOfDate: todayIsoLocal() }).section80CCD1B,
       marginalTaxRate,
       regime: fire.householdTaxRecommendation.value?.recommended ?? "NEW",
     };

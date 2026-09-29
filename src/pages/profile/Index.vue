@@ -2,7 +2,7 @@
 import { computed, ref, watch } from "vue";
 import { useHouseholdStore } from "@/stores/household";
 import type { MemberDraft, SetupMode } from "@/types/household";
-import { ageFromDOB } from "@/lib/age";
+import { ageAsOf, todayIsoLocal } from "@/lib/as-of-date";
 import { finalizeMemberDraft } from "@/lib/member-draft";
 import { isEarningMember } from "@/lib/member-earning";
 import { formatINRCompact } from "@/lib/formatters";
@@ -141,7 +141,7 @@ const combinedCTC = computed(() => household.totalAnnualIncome.salaryIncome);
           <span class="hh-tile__trunc">{{ primaryEarner?.name || "—" }}</span>
         </div>
         <div class="hh-tile__meta">
-          {{ primaryEarner ? `age ${ageFromDOB(primaryEarner.dateOfBirth)}` : "no earners yet" }}
+          {{ primaryEarner ? `age ${ageAsOf(primaryEarner.dateOfBirth, todayIsoLocal())}` : "no earners yet" }}
         </div>
       </div>
       <div class="hh-tile">

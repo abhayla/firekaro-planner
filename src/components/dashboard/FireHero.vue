@@ -16,6 +16,7 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, RouterLink } from "vue-router";
 import { useFireDerive } from "@/lib/useFireDerive";
+import { todayIsoLocal } from "@/lib/as-of-date";
 import { useHouseholdStore } from "@/stores/household";
 import { useAssumptionsStore } from "@/stores/assumptions";
 import { useUiStore, SHARED_TARGET_AGE_MIN, SHARED_TARGET_AGE_MAX } from "@/stores/ui";
@@ -138,7 +139,7 @@ const variance = computed(() => {
       isFamilyView: ui.isFamilyView,
       viewingMemberId: ui.viewingMemberId,
       currentFY: ui.currentFY,
-      asOfDate: new Date().toISOString().slice(0, 10),
+      asOfDate: todayIsoLocal(),
     },
     nowMs: Date.now(),
     // ADR-0006 Phase 1d — the wall clock enters at the component boundary; the kernel is pure.

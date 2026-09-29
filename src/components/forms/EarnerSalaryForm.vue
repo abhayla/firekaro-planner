@@ -4,7 +4,7 @@ import { useHouseholdStore } from "@/stores/household";
 import { useUiStore } from "@/stores/ui";
 import { formatINRCompact, formatPercent } from "@/lib/formatters";
 import { computeTax, recommendRegime, singleEarnerNpsArgs } from "@/lib/tax";
-import { ageFromDOB } from "@/lib/age";
+import { ageAsOf, todayIsoLocal } from "@/lib/as-of-date";
 import InfoTip from "@/components/shared/InfoTip.vue";
 import {
   basicAnnualFromPercent,
@@ -164,7 +164,7 @@ function saveEdit() {
     <v-row dense align="center">
       <v-col cols="12" md="3">
         <div class="text-subtitle-2">{{ earner.name }}</div>
-        <div class="text-caption text-medium-emphasis">Age {{ ageFromDOB(earner.dateOfBirth) }}</div>
+        <div class="text-caption text-medium-emphasis">Age {{ ageAsOf(earner.dateOfBirth, todayIsoLocal()) }}</div>
       </v-col>
       <v-col cols="6" md="3">
         <div class="text-caption text-medium-emphasis">

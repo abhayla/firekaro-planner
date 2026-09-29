@@ -18,6 +18,7 @@ import { useHouseholdStore } from "@/stores/household";
 import { useAssumptionsStore } from "@/stores/assumptions";
 import { useUiStore } from "@/stores/ui";
 import { captureBaselineFrom, type PlanBaseline } from "@/lib/plan-variance";
+import { todayIsoLocal } from "@/lib/as-of-date";
 
 export const PLAN_BASELINE_KEY = "plan-baseline";
 
@@ -48,7 +49,7 @@ export function usePlanBaseline() {
         isFamilyView: ui.isFamilyView,
         viewingMemberId: ui.viewingMemberId,
         currentFY: ui.currentFY,
-        asOfDate: new Date().toISOString().slice(0, 10),
+        asOfDate: todayIsoLocal(),
       },
       new Date().toISOString(),
       {},

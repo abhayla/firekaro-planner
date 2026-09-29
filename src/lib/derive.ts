@@ -37,6 +37,7 @@ import { derivedFamilyLayer, plannedGoalInflationBucket } from "@/lib/derived-re
 import { computeTax, recommendRegime, marginalSlabRate, getTaxConfigForFY } from "@/lib/tax";
 import { epfBucketAfterTaxReturn } from "@/lib/epf-vpf";
 import { ageFromDOB } from "@/lib/age";
+import { todayIsoLocal } from "@/lib/as-of-date";
 import { toMonthly, toAnnual } from "@/lib/cashflow";
 import { returnBucketKey } from "@/lib/investment-traits";
 import {
@@ -475,7 +476,7 @@ export function derive(
       investments: scopeInvestments,
       liabilities: scopeLiabilities,
       insurance: scopeInsurance,
-    });
+    }, { asOfDate: todayIsoLocal(pinnedAsOf) });
     const estimatedDeductionsForOld = scopeDeductions.totalDeductions;
     // 80CCD(2) employer NPS — applies in both regimes, passed separately (gh-issue #2);
     // employerNpsByMember lets computeTax cap each member at their own basic's ceiling
