@@ -338,7 +338,7 @@ export function applyQuickAnswers(
   // line so `blendPortfolioReturn` and the accessible-money bridge see the real mix instead of
   // 100% equity at 12%. The SIP goes entirely to the equity line (monthlyContribution: 0 here) —
   // card 5 never asked which slice the monthly investing lands in, so splitting it would invent a
-  // number we were not told; the copy says so (`QUICK_PORTFOLIO_CAVEAT`).
+  // number we were not told; the copy says so (`quickPortfolioCaveat()`).
   const quickDebtInvestment = (owner: Member, value: number): Investment => ({
     id: `${QUICK_ID_PREFIX}debt-${owner.id}`,
     type: "PPF",
