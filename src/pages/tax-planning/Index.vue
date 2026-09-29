@@ -407,10 +407,24 @@ const takeHomeSegments = computed<ProportionSegment[]>(() => {
 // `pageRecommended` (`<=`) happens to land on, because the number shown either way is honestly
 // zero. The rebate threshold shown in the card copy is read from the FY config
 // (`getTaxConfigForFY`), never hardcoded, so a future Budget change flows through automatically.
+//
+// Independent-review CRITICAL fix (per-earner class, gh #185 step 7 round 2): tax is per
+// ASSESSEE, not per household. The household-pooled `activeResult.totalTax` can be ₹0 while one
+// earner's OWN bill is non-zero (e.g. a two-earner household where one earner's large §24/80C
+// claims zero out the pool while the other earner, taxed on their own income+deductions via
+// `computeEarnerTaxCard`, still owes real tax) — collapsing on the pooled figure alone would hide
+// that earner's real bill (the exact per-earner table this collapse would otherwise remove). The
+// gate now ALSO requires every row in `perEarner` (already per-member-correct, l.266) to be zero.
 const newRegimeRebateLimit = computed(
   () => getTaxConfigForFY(selectedFY.value).newRegime.rebateLimit,
 );
-const isZeroTaxRecommended = computed(() => activeResult.value.totalTax === 0);
+const isZeroTaxRecommended = computed(
+  () => activeResult.value.totalTax === 0 && perEarner.value.every((row) => row.tax === 0),
+);
+// Round-2 LOW fix: the "deduction planning can't move a zero" sentence was duplicated verbatim
+// across the New/Old regime copy branches — one string, read by both.
+const zeroTaxDeductionPlanningNote =
+  "Deduction planning (80C, 80D, home-loan interest, and the Old-vs-New comparison) cannot lower a tax bill that is already ₹0, so we've hidden it below.";
 // Power-user escape hatch (SCREEN-STANDARD §9 three-state render — collapsed is a THIRD state,
 // not a dead end): defaults closed each time the collapse condition re-triggers (e.g. FY switch),
 // so stale "expanded" state never silently survives onto a different zero-tax household/year.
@@ -469,27 +483,28 @@ const zeroTaxSectionVisible = computed(() => !isZeroTaxRecommended.value || show
       class="mb-5 zero-tax-card"
     >
       <div class="zero-tax-card__headline">You pay ₹0 income tax</div>
+      <p class="zero-tax-card__scope text-caption text-medium-emphasis mb-3">
+        On salary, business and other slab income — capital gains, if any, are taxed separately and
+        not shown here; TDS already deducted is recovered on filing.
+      </p>
       <p v-if="effectiveRegime === 'NEW'" class="zero-tax-card__reason text-body-2 mb-4">
         Your taxable income of {{ formatINRCompact(newResult.taxableIncome) }} is within the New
         regime's ₹{{ Math.round(newRegimeRebateLimit / 100000) }}L rebate (Section 87A) for FY
         {{ selectedFY }} — the New regime is your {{ pageRecommended === "NEW" ? "recommended" : "selected" }} regime, and its rebate brings your tax
-        to zero. Deduction planning (80C, 80D, home-loan interest, and the Old-vs-New comparison)
-        cannot lower a tax bill that is already ₹0, so we've hidden it below.
+        to zero. {{ zeroTaxDeductionPlanningNote }}
       </p>
       <p v-else class="zero-tax-card__reason text-body-2 mb-4">
         Your taxable income of {{ formatINRCompact(oldResult.taxableIncome) }} falls within the Old
         regime's basic exemption and Section 87A rebate for FY {{ selectedFY }} — the Old regime is
-        your {{ pageRecommended === "OLD" ? "recommended" : "selected" }} regime here, and it already brings your tax to zero
-        (the New regime also computes to ₹0 at this income). Deduction planning (80C, 80D,
-        home-loan interest, and the Old-vs-New comparison) cannot lower a tax bill that is already
-        ₹0, so we've hidden it below.
+        your {{ pageRecommended === "OLD" ? "recommended" : "selected" }} regime here, and it already brings your tax to zero<template v-if="newResult.totalTax === 0"> (the New regime also computes to ₹0 at this income)</template>.
+        The New regime is the statutory default; choosing Old is an opt-in at filing. {{ zeroTaxDeductionPlanningNote }}
       </p>
       <div class="row-line mb-1">
         <span class="text-medium-emphasis">Effective rate</span>
         <span class="text-currency font-weight-bold">{{ formatPercent(activeResult.effectiveRate, 1) }}</span>
       </div>
       <div class="row-line">
-        <span class="text-medium-emphasis">Take-home · per year</span>
+        <span class="text-medium-emphasis">Income after tax (before PF)</span>
         <span class="text-currency font-weight-bold">{{ formatINRCompact(monthlyTakeHome.annualTake) }}</span>
       </div>
       <v-btn
