@@ -33,6 +33,12 @@ export const quickAnswersSchema = z.object({
   corpus: z.number().min(0).optional(),
   /** Card 4 — true ONLY when the user says their mutual funds are direct plans (gates the QN-5 TER lever). */
   directPlans: z.boolean().nullable().optional(),
+  /**
+   * Card 4 — gh #169. Roughly what share (0-100) of `corpus` sits in EPF/PPF/NPS/FDs rather than
+   * market-linked equity. Default 0 (absent ⇒ 0) so an unanswered card behaves exactly as before —
+   * the whole corpus booked as one equity line at the equity return.
+   */
+  debtSharePercent: z.number().min(0).max(100).optional(),
 
   /** Card 5 — everything invested every month, PF included (₹/month). */
   sip: z.number().min(0).optional(),
@@ -83,6 +89,7 @@ export type QuickAnswersDraft = QuickAnswers &
       | "income"
       | "hasEpf"
       | "corpus"
+      | "debtSharePercent"
       | "sip"
       | "includeSpouse"
       | "spouseCorpus"
@@ -111,6 +118,7 @@ export function emptyQuickAnswers(currentAge = 35): QuickAnswersDraft {
     hasEpf: true,
     corpus: 0,
     directPlans: null,
+    debtSharePercent: 0,
     sip: 0,
     includeSpouse: false,
     spouseCorpus: 0,
