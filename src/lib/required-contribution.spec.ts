@@ -529,3 +529,164 @@ describe("requiredMonthlyContributionFor — solves through the REAL derive() pa
     }
   });
 });
+
+/**
+ * Mutant-kill specs for the living-floor / scopeSplit arithmetic (l.334-372) and the binary-search
+ * loop bounds (l.370-381). Written against the Stryker survivor list of 2026-09-29
+ * (`src/lib/required-contribution.ts` — 78 survivors + 1 no-coverage).
+ */
+describe("required-contribution — living floor, scopeSplit, and binary-search bounds (mutant kills)", () => {
+  beforeEach(() => setActivePinia(createPinia()));
+
+  it("committedMonthly filters to ONLY auto-loan/auto-insurance — an equally-large MANUAL recurring line does NOT tighten the living floor the same way (kills the `.filter(() => true)` / `.filter(() => false)` / `&&` ArrowFunction+LogicalOperator mutants at l.346)", () => {
+    // Both a manual and an auto-loan line of the SAME amount raise overall household expenses
+    // identically (they're both real outgoings) — the discriminator is specifically the
+    // COMMITTED-outflow living floor, which only auto-loan/auto-insurance feed. At ₹2L/month this
+    // manual line still leaves a reachable target-60 prescription, while the SAME amount tagged
+    // auto-loan pushes `committedMonthly` above the feasible ceiling `hi` and the household can no
+    // longer be prescribed a number at all (verified against the real kernel, not asserted from
+    // memory). A `.filter(() => true)` mutant would apply this to manual too (no divergence); a
+    // `.filter(() => false)` mutant would make the auto-loan row invisible too (no divergence
+    // either) — only the correct filter produces exactly this asymmetry.
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    loadSeedPersona(h, a);
+
+    h.data.expenses.recurring = [
+      { id: "r1", label: "Discretionary spend", amount: 200_000, frequency: "M", source: "manual" },
+    ];
+    const withManual = requiredMonthlyContributionFor({ snapshot: h.data, assumptions: a.values, lens: LENS, targetAge: 60 });
+    expect(Number.isFinite(withManual.requiredMonthlyReal), "manual line must still leave a solvable prescription").toBe(true);
+
+    h.data.expenses.recurring = [
+      { id: "r2", label: "Home loan EMI", amount: 200_000, frequency: "M", source: "auto-loan" },
+    ];
+    const withAutoLoan = requiredMonthlyContributionFor({ snapshot: h.data, assumptions: a.values, lens: LENS, targetAge: 60 });
+    expect(
+      withAutoLoan.requiredMonthlyReal,
+      "the SAME amount tagged auto-loan must tighten the committed-outflow floor past feasibility",
+    ).toBe(Number.POSITIVE_INFINITY);
+  });
+
+  it("committedMonthly is scaled by scopeSplit under a member lens — a 100% split absorbs the FULL EMI and can push a 50%-split-reachable target out of reach (kills the `+`/`-` ArithmeticOperator mutants at l.347 and the `* 100`/`min↔max` mutants at l.343)", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    loadMehtasSeed(h, a);
+    const adult = h.data.members.find((m) => m.salary != null);
+    expect(adult).toBeTruthy();
+    const memberLens = { ...LENS, viewingMemberId: adult!.id };
+    h.data.expenses.recurring = [
+      { id: "r1", label: "Home loan EMI", amount: 200_000, frequency: "M", source: "auto-loan" },
+    ];
+
+    a.values.householdSplitPercent = 50;
+    const split50 = requiredMonthlyContributionFor({
+      snapshot: h.data,
+      assumptions: a.values,
+      lens: memberLens,
+      targetAge: 60,
+    });
+    expect(Number.isFinite(split50.requiredMonthlyReal), "at a 50% split the target must be reachable").toBe(true);
+
+    // At a 100% split the SAME adult absorbs the FULL committed EMI (scopeSplit=1 instead of 0.5),
+    // doubling their committedMonthly and tightening their individual feasible ceiling past what
+    // reached the target a moment ago — proving scopeSplit is a real multiplier on committedMonthly,
+    // not a mutated arithmetic op that leaves it unchanged or halves it the wrong way.
+    a.values.householdSplitPercent = 100;
+    const split100 = requiredMonthlyContributionFor({
+      snapshot: h.data,
+      assumptions: a.values,
+      lens: memberLens,
+      targetAge: 60,
+    });
+    expect(
+      split100.requiredMonthlyReal,
+      "doubling this adult's share of the EMI (50%→100% split) must push the same target out of reach",
+    ).toBe(Number.POSITIVE_INFINITY);
+  });
+
+  it("hi <= 0 (no feasible headroom) -> Infinity, and reaches(0) -> 0 are DISTINCT branches (kills the `if (false)` ConditionalExpression mutants at l.353/l.359)", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    loadSeedPersona(h, a);
+    // Strip all income -> monthlyTakeHome = 0 -> hi = max(0, 0 - livingFloor) = 0 -> Infinity.
+    for (const m of h.data.members) m.salary = undefined;
+    h.data.businesses = [];
+    h.data.otherIncome = [];
+    const noIncome = requiredMonthlyContributionFor({ snapshot: h.data, assumptions: a.values, lens: LENS, targetAge: 60 });
+    expect(noIncome.requiredMonthlyReal).toBe(Number.POSITIVE_INFINITY);
+  });
+
+  it("!reaches(hi) -> Infinity (unreachable even at the feasible ceiling) is a genuinely different case from reaches(hi) (kills the `if (false)` mutant at l.359-continuation and proves the branch is load-bearing)", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    loadSeedPersona(h, a);
+    // A very early target age the household cannot reach even investing 100% of feasible headroom.
+    const tooEarly = requiredMonthlyContributionFor({ snapshot: h.data, assumptions: a.values, lens: LENS, targetAge: 32 });
+    // A generously late target age the household easily reaches — different branch outcome.
+    const reachable = requiredMonthlyContributionFor({ snapshot: h.data, assumptions: a.values, lens: LENS, targetAge: 65 });
+    expect(reachable.requiredMonthlyReal).not.toBe(tooEarly.requiredMonthlyReal);
+    if (tooEarly.requiredMonthlyReal === Number.POSITIVE_INFINITY) {
+      expect(Number.isFinite(reachable.requiredMonthlyReal)).toBe(true);
+    }
+  });
+
+  it("solve: false always yields the not-solved Infinity sentinel regardless of feasibility (kills the `solve = true` ConditionalExpression mutant at l.352)", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    loadSeedPersona(h, a);
+    const r = requiredMonthlyContributionFor({
+      snapshot: h.data,
+      assumptions: a.values,
+      lens: LENS,
+      targetAge: 65, // easily reachable — proves the Infinity comes from `solve`, not infeasibility
+      solve: false,
+    });
+    expect(r.requiredMonthlyReal).toBe(Number.POSITIVE_INFINITY);
+    expect(r.solved).toBe(false);
+  });
+
+  it("the binary-search loop actually converges: a solved finite prescription re-fed into derive() reaches the target (kills the `i < MAX && …` -> `true && …` / `i <= MAX` / `up - lo >= TOL` / `up + lo` mutants at l.370)", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    loadSeedPersona(h, a);
+    const targetAge = 55;
+    const r = requiredMonthlyContributionFor({ snapshot: h.data, assumptions: a.values, lens: LENS, targetAge });
+    expect(Number.isFinite(r.requiredMonthlyReal)).toBe(true);
+    // A genuinely converged bisection must be TIGHT: the bracket width at exit is bounded by
+    // REQUIRED_CONTRIBUTION_TOLERANCE, so re-feeding one tolerance-step less must fail to reach —
+    // a `true && …` mutant (never checks the tolerance) or a corrupted `up + lo` comparison would
+    // either loop needlessly (harmless but slow) or converge on a WRONG (non-tight) bracket whose
+    // "one step less" would still reach, breaking this proof.
+    const check = derive(h.data, a.values, LENS, {
+      monthlyContributionReal: r.requiredMonthlyReal,
+      targetRetirementAge: targetAge,
+    });
+    expect(check.householdFireAge).not.toBeNull();
+    expect(check.householdFireAge!).toBeLessThanOrEqual(targetAge);
+  });
+
+  it("already-FIRE-ready at pace 0 -> requiredMonthlyReal is exactly 0 (kills the `reaches(0) -> false` ConditionalExpression mutant at l.359 and the `up <= TOL` boundary mutant at l.381)", () => {
+    // Construct a household that is ALREADY FIRE-ready today with zero extra contribution — a
+    // massively over-funded investment book — so `reaches(0)` is genuinely true and the solver
+    // must take the "already there" branch (l.359-361) rather than ever entering the bisection.
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    loadSeedPersona(h, a);
+    for (const inv of h.data.investments ?? []) {
+      inv.value = (inv.value ?? 0) * 100 + 50_000_000;
+    }
+    const k = derive(h.data, a.values, LENS, { monthlyContributionReal: 0 });
+    expect(k.householdFireAge, "the fixture must actually be FIRE-ready at pace 0 for this proof to exercise reaches(0)").not.toBeNull();
+    const r = requiredMonthlyContributionFor({
+      snapshot: h.data,
+      assumptions: a.values,
+      lens: LENS,
+      targetAge: 70,
+    });
+    // A `reaches(0) -> false` mutant would skip this branch and fall through to the bisection
+    // (or the `!reaches(hi)` branch), which — for an already-adequate corpus — converges to a
+    // near-zero but NON-EXACT positive bracket value, never the clean `0` the direct branch emits.
+    expect(r.requiredMonthlyReal).toBe(0);
+  });
+});
