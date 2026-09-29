@@ -603,17 +603,34 @@ describe("EarnerSalaryForm.vue / tax-planning/Index.vue use the sector-aware NPS
     throw new Error(`extractBlock: unbalanced braces after ${startPattern}`);
   }
 
-  it("EarnerSalaryForm.vue's deriveTakeHomeFor call-site body routes through the sector-aware helper, not bare scalars", () => {
+  it("EarnerSalaryForm.vue's deriveTakeHomeFor call-site body routes through previewEarnerTakeHome, not bare scalars", () => {
+    // gh-issue #222: the form no longer calls computeTax/recommendRegime/singleEarnerNpsArgs
+    // directly — it hardcoded a flat ₹1.75L old-regime deduction (oldDed = 175000) instead of
+    // the earner's REAL deductions, disagreeing with the tax-planning page's per-earner card.
+    // The fix routes it through previewEarnerTakeHome (tax-deductions.ts), the SAME derivation
+    // (computeEarnerTaxCard) the tax-planning page's perEarner table uses — one derivation, not
+    // two. The gh-157 INTENT (never bare employerNps/employerNpsBasic scalar arithmetic in the
+    // form) is preserved by this assertion plus the companion assertion below, which locks that
+    // computeEarnerTaxCard itself — and therefore previewEarnerTakeHome's call path — stays
+    // sector-aware via singleEarnerNpsArgs.
     const src = fs.readFileSync(path.join(root, "src/components/forms/EarnerSalaryForm.vue"), "utf-8");
     const body = extractBlock(src, /function deriveTakeHomeFor\(/);
+    expect(body).toMatch(/previewEarnerTakeHome\(/);
+    // No bare scalar NPS arithmetic in the form itself — that logic must live ONLY inside the
+    // shared derivation (computeEarnerTaxCard / singleEarnerNpsArgs), never re-inlined here.
+    expect(body).not.toMatch(/singleEarnerNpsArgs\(/);
+    expect(body).not.toMatch(/\bemployerNps,\s*employerNpsBasic\s*,?\s*\}/);
+  });
+
+  it("computeEarnerTaxCard (previewEarnerTakeHome's derivation) stays sector-aware via singleEarnerNpsArgs", () => {
+    // gh-issue #157 intent, relocated: previously this lock read EarnerSalaryForm.vue's OWN
+    // call-site body. Now that the form delegates to previewEarnerTakeHome -> computeEarnerTaxCard
+    // (gh-issue #222), the sector-aware-NPS guarantee must be asserted on THAT shared derivation
+    // instead — so the lock still fails if someone re-inlines bare employerNps/employerNpsBasic
+    // scalars into computeEarnerTaxCard or previewEarnerTakeHome.
+    const src = fs.readFileSync(path.join(root, "src/lib/tax-deductions.ts"), "utf-8");
+    const body = extractBlock(src, /export function computeEarnerTaxCard\(/);
     expect(body).toMatch(/singleEarnerNpsArgs\(|\.\.\.npsArgs/);
-    // The buggy (pre-fix) shape passed employerNps/employerNpsBasic as trailing SHORTHAND
-    // object-literal properties directly to computeTax/recommendRegime, immediately followed by
-    // the object's closing `}` — e.g. `{ ..., employerNps, employerNpsBasic }` /
-    // `{ ..., employerNps, employerNpsBasic,\n  });`. The (correct) call
-    // `singleEarnerNpsArgs(employerNps, employerNpsBasic, employerSector)` never has
-    // `employerNpsBasic` immediately followed by `}` — a third argument (`employerSector`)
-    // always comes next — so this pattern cannot match the fixed helper call.
     expect(body).not.toMatch(/\bemployerNps,\s*employerNpsBasic\s*,?\s*\}/);
   });
 
