@@ -13,11 +13,7 @@ import { useUiStore } from "@/stores/ui";
 import { loadSeedPersona } from "@/lib/seed-persona";
 import { useFireDerive } from "@/lib/useFireDerive";
 import { derive } from "@/lib/derive";
-import {
-  statutoryPfFor,
-  totalPf,
-  PROFESSIONAL_TAX_ANNUAL_PER_EARNER,
-} from "@/lib/salary-cash";
+import { pfFromInvestmentRows, PROFESSIONAL_TAX_ANNUAL_PER_EARNER } from "@/lib/salary-cash";
 
 describe("memberFinancials — same-scope FH resolver", () => {
   beforeEach(() => setActivePinia(createPinia()));
@@ -82,10 +78,10 @@ describe("memberFinancials — same-scope FH resolver", () => {
     // member-numerator ÷ household-denominator, which is what this file exists to lock), just a
     // smaller, honest numerator. `savingsRatePercent` above deliberately keeps the post-tax-gross
     // base, because PF is funded out of that same residual (gh #11).
-    const rohitMember = h.data.members.find((m) => m.id === "rohit");
-    const rohitPf = statutoryPfFor(rohitMember?.salary);
+    const rohitPf = pfFromInvestmentRows(h.data, "rohit");
+    expect(rohitPf, "rohit has an EPF row to deduct").toBeGreaterThan(0);
     expect(rohit.monthlyTakeHome).toBeCloseTo(
-      (rohit.annualIncome - rohit.annualTax - totalPf(rohitPf) - PROFESSIONAL_TAX_ANNUAL_PER_EARNER) / 12,
+      (rohit.annualIncome - rohit.annualTax - rohitPf - PROFESSIONAL_TAX_ANNUAL_PER_EARNER) / 12,
       0,
     );
     // …and therefore strictly BELOW the post-tax-gross figure it replaced (the #218 defect).

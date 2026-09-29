@@ -6,7 +6,7 @@ import { derive } from "@/lib/derive";
 import { todayIsoLocal } from "@/lib/as-of-date";
 import {
   netCashSalary,
-  statutoryPfFor,
+  pfFromInvestmentRows,
   PROFESSIONAL_TAX_ANNUAL_PER_EARNER,
 } from "@/lib/salary-cash";
 import {
@@ -208,7 +208,8 @@ export function useFireDerive() {
       monthlyTakeHome: adult
         ? netCashSalary({
             annualCTC: annualIncome,
-            pf: statutoryPfFor(adultMember?.salary),
+            // That member's OWN EPF rows — EPF is never "Joint", so no split applies.
+            annualPf: pfFromInvestmentRows(h.data, adult.memberId),
             annualTax,
             professionalTax: adultMember?.salary?.annualCTC
               ? PROFESSIONAL_TAX_ANNUAL_PER_EARNER

@@ -63,17 +63,11 @@ const r = (x: number, dp = 4) => (Number.isFinite(x) ? Math.round(x * 10 ** dp) 
 // mauryas' `anchorAge` is unchanged (explicit DOBs, not `dobFromAge`), so only the EMI-exclusion
 // term applies there (FIRE age 68.92→66.58). iyers (loan has no endYear) and mehtas (no loan)
 // snapshots are unchanged — the no-op guarantee for lines that don't end early.
-// RE-ANCHORED 2026-09-29 (gh #218) — sharmas + mehtas moved by ONE MONTH (+0.0833y), and ONLY on
-// the years/age fields. `fireNumber`, `totalCorpus`, `fireWithdrawableCorpus`, `annualSavings`,
-// `monthlyContribution`, `savingsRate` and `effectiveSWR` are byte-identical, and iyers + mauryas
-// are unchanged outright. The cause is NOT the take-home fix: measured with the basic base held at
-// the old 40%, every seed's FIRE age reproduces the pre-change baseline exactly. It is the single
-// basic base — the EPF auto-flow used a local `0.4 × CTC` while the salary form defaulted basic to
-// 50% of CTC, and `resolveBasicAnnual` (salary-cash.ts) now serves both, so slightly MORE of the
-// (unchanged) savings residual is routed into the 8.25% EPF bucket instead of the blended
-// portfolio. mauryas is unmoved because its seed sets `basicAnnual` explicitly (40% of CTC), which
-// the resolver honours; iyers' shift lands inside the rounding step. `monthlyTakeHome` is a NEW
-// field in the snapshot below — that part is an addition, not a drift.
+// gh #218 — `monthlyTakeHome` is ADDED to the snapshot below; NO existing field moves. The cash
+// figure is computed by subtracting the PF the household's EPF_VPF rows already carry (the same
+// rupees the corpus receives) plus professional tax, so it introduces no second basic base and
+// nothing downstream of it changes. Unifying the two basic bases DOES move two personas by one
+// month — that is split out to PR B (`chore/218b-basic-50pct-unification`) for an owner call.
 describe("A7.2 golden-master — per-persona headline (DEFAULT lens)", () => {
   beforeEach(() => setActivePinia(createPinia()));
 

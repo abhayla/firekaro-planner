@@ -14,7 +14,7 @@ import {
 } from "@/lib/salary-percent";
 import {
   netCashSalary,
-  statutoryPfFor,
+  pfFromInvestmentRows,
   PROFESSIONAL_TAX_ANNUAL_PER_EARNER,
 } from "@/lib/salary-cash";
 import type { Member } from "@/types/household";
@@ -29,7 +29,7 @@ function deriveTakeHomeFor(
   employerNps: number,
   employerNpsBasic: number,
   employerSector: "private" | "government" = "private",
-  vpfTopUpPercent?: number,
+  annualPf = 0,
 ) {
   if (!ctc) return null;
   const oldDed = 175000;
@@ -45,14 +45,12 @@ function deriveTakeHomeFor(
     deductions: rec.recommended === "OLD" ? oldDed : 0,
     ...npsArgs,
   });
-  // gh #218 — the preview shows CASH: CTC minus BOTH PF legs (+ any VPF top-up), income tax and
-  // professional tax, via the ONE shared helper (`salary-cash.ts`) the dashboard headline uses.
-  // `employerNpsBasic` here IS the stored `basicAnnual`, so the resolver falls back to the 50%
-  // default only when the user has not entered one. (The hardcoded `oldDed = 175000` above is a
-  // separate defect — gh #222.)
+  // gh #218 — the preview shows CASH: CTC minus the PF this earner's own EPF row already
+  // carries, income tax and professional tax, via the ONE shared helper (`salary-cash.ts`) the
+  // dashboard headline uses. (The hardcoded `oldDed = 175000` above is a separate defect — #222.)
   const { annual } = netCashSalary({
     annualCTC: ctc,
-    pf: statutoryPfFor({ annualCTC: ctc, basicAnnual: employerNpsBasic, vpfTopUpPercent }),
+    annualPf,
     annualTax: result.totalTax,
     professionalTax: PROFESSIONAL_TAX_ANNUAL_PER_EARNER,
   });
@@ -80,7 +78,7 @@ const takeHome = computed(() =>
     employerNps.value,
     basicAnnual.value,
     employerSector.value,
-    props.earner.salary?.vpfTopUpPercent,
+    pfFromInvestmentRows(household.data, props.earner.id),
   ),
 );
 

@@ -25,11 +25,7 @@ import type {
   OtherIncomeLine,
 } from "@/types/household";
 import { ageAsOf, todayIsoLocal } from "@/lib/as-of-date";
-import {
-  netCashSalary,
-  statutoryPfFor,
-  PROFESSIONAL_TAX_ANNUAL_PER_EARNER,
-} from "@/lib/salary-cash";
+import { netCashSalary, PROFESSIONAL_TAX_ANNUAL_PER_EARNER } from "@/lib/salary-cash";
 import { toAnnual } from "@/lib/cashflow";
 import { computeTax, singleEarnerNpsArgs } from "@/lib/tax";
 
@@ -393,6 +389,13 @@ export function computeEarnerTaxCard(
   fy: string,
   totalDeductionsForOld: number,
   effectiveRegime: "OLD" | "NEW",
+  /**
+   * gh #218 — the earner's annual PF outflow, read from their EPF_VPF rows by the caller
+   * (`pfFromInvestmentRows(household, member.id)`). Optional so the many existing callers that
+   * only want the tax half keep compiling; absent ⇒ no PF is deducted, which is the honest
+   * answer for an earner with no EPF row.
+   */
+  annualPf = 0,
 ): EarnerTaxCard {
   const gross = member.salary?.annualCTC ?? 0;
   const earnerNps = member.salary?.employerNpsAnnual ?? 0;
@@ -412,12 +415,13 @@ export function computeEarnerTaxCard(
     name: member.name || "Earner",
     gross,
     tax: active.totalTax,
-    // gh #218 — the card's cash figure is net of BOTH PF legs (+ any VPF) and professional
-    // tax, from the ONE helper the dashboard headline uses (`salary-cash.ts`). `gross - tax`
-    // overstated a salaried earner's bank credit by the whole 24%-of-basic PF block.
+    // gh #218 — the card's cash figure is net of the PF this earner's own EPF_VPF row already
+    // carries (passed in by the caller) plus professional tax, from the ONE helper the dashboard
+    // headline uses (`salary-cash.ts`). `gross - tax` overstated a salaried earner's bank credit
+    // by the whole PF block.
     takeHome: netCashSalary({
       annualCTC: gross,
-      pf: statutoryPfFor(member.salary),
+      annualPf,
       annualTax: active.totalTax,
       professionalTax: gross > 0 ? PROFESSIONAL_TAX_ANNUAL_PER_EARNER : 0,
     }).annual,

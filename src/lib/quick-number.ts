@@ -36,7 +36,6 @@ import type { QuickAnswers, QuickAnswersDraft } from "@/types/quick-number";
 import { emptyQuickAnswers } from "@/types/quick-number";
 import { derive } from "@/lib/derive";
 import { outstandingPrincipalFromEMI } from "@/lib/amortization";
-import { statutoryPfFor, totalPf } from "@/lib/salary-cash";
 
 /** Every row the quick path owns carries this id prefix — that is what makes a re-run idempotent. */
 export const QUICK_ID_PREFIX = "quick-";
@@ -133,12 +132,13 @@ function autoLoanRecurringLine(loan: Liability): RecurringExpenseLine {
 function autoEpfInvestment(member: Member): Investment | null {
   const ctc = n(member.salary?.annualCTC);
   if (!ctc) return null;
-  // gh #218 — the SAME resolver + PF helper the store's auto-flow and the take-home figure use.
-  // This was a THIRD local `0.4 × CTC` basic base (the store had one, the salary form defaulted to
-  // 50%); after `replaceAll()` the store re-runs `autoFlowSalaryToEPF` over this very row, so a
-  // different base here meant the quick path's own EPF row was overwritten by a different number.
-  const { employeePF, vpf, employerPF } = statutoryPfFor(member.salary);
-  const monthly = Math.round((employeePF + vpf + employerPF) / 12);
+  // NOTE (gh #218 PR B): this `0.4 × CTC` is a SECOND basic base — the salary form defaults basic
+  // to 50% of CTC (`resolveBasicAnnual`), and the store's `autoFlowSalaryToEPF` has a third copy
+  // of this same 0.4. Unifying them moves two personas' headline FIRE age, so it is split out to
+  // PR B (`chore/218b-basic-50pct-unification`) for an owner call. PR A deliberately leaves it.
+  const basic = ctc * 0.4;
+  const topUp = (member.salary?.vpfTopUpPercent ?? 0) / 100;
+  const monthly = Math.round((basic * 0.12 * (1 + topUp) + basic * 0.12) / 12);
   return {
     id: `${QUICK_ID_PREFIX}epf-${member.id}`,
     type: "EPF_VPF",

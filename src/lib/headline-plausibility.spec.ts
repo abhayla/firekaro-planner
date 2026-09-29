@@ -36,12 +36,7 @@ import { calculateYearsToTarget } from "@/lib/fire-math";
 import { computeIndividualFire } from "@/lib/individual-fire";
 import { computeRunway } from "@/lib/runway";
 import { toMonthly } from "@/lib/cashflow";
-import {
-  statutoryPfFor,
-  sumPf,
-  totalPf,
-  PROFESSIONAL_TAX_ANNUAL_PER_EARNER,
-} from "@/lib/salary-cash";
+import { pfFromInvestmentRows, PROFESSIONAL_TAX_ANNUAL_PER_EARNER } from "@/lib/salary-cash";
 import { buildContributionResolver } from "@/lib/contribution-schedule";
 import { runMonteCarloFire, headlineBandInputs } from "@/lib/monte-carlo";
 import { captureSnapshot, milestoneBandFor } from "@/lib/lifecycle-digest";
@@ -973,12 +968,11 @@ describe("gh #218 — the cash figure is net of PF, and savings did not move", (
       expect(annualCash, `${ctx} — cash must exceed 80% of post-tax gross`).toBeGreaterThan(
         0.8 * postTaxGross,
       );
-      // (3) the exact term-by-term identity.
-      const pf = sumPf(k.lensedEarners.map((m) => statutoryPfFor(m.salary)));
+      // (3) the exact term-by-term identity — PF read from the very rows the corpus receives.
       expect(k.monthlyTakeHome, `${ctx} — term identity`).toBe(
         Math.round(
           (postTaxGross -
-            totalPf(pf) -
+            pfFromInvestmentRows(h.data, null) -
             k.lensedEarners.length * PROFESSIONAL_TAX_ANNUAL_PER_EARNER) /
             12,
         ),
@@ -1003,19 +997,22 @@ describe("gh #218 — the cash figure is net of PF, and savings did not move", (
       );
     });
 
-    it(`${persona.name}: every auto-flowed EPF row equals statutoryPfFor for that earner`, () => {
+    it(`${persona.name}: the PF deducted from cash is EXACTLY the households' EPF rows`, () => {
       const h = useHouseholdStore();
       const a = useAssumptionsStore();
       persona.load(h, a);
-      for (const m of h.data.members) {
-        if (!m.salary?.annualCTC) continue;
-        const row = h.data.investments.find((i) => i.type === "EPF_VPF" && i.ownerId === m.id);
-        const pf = statutoryPfFor(m.salary);
-        expect((row?.monthlyContribution ?? 0) * 12, `${persona.name}/${m.id}`).toBeCloseTo(
-          pf.employeePF + pf.vpf + pf.employerPF,
-          -1,
-        );
-      }
+      // No second basic base: the deduction is a read of the same rows the corpus grows from,
+      // which is why nothing downstream of the headline moves.
+      const fromRows = h.data.investments
+        .filter((i) => i.type === "EPF_VPF")
+        .reduce((sum, i) => sum + (i.monthlyContribution ?? 0) * 12, 0);
+      expect(pfFromInvestmentRows(h.data, null), persona.name).toBe(fromRows);
+      // Per-member scoping is clean — EPF is never "Joint".
+      const perMember = h.data.members.reduce(
+        (sum, m) => sum + pfFromInvestmentRows(h.data, m.id),
+        0,
+      );
+      expect(perMember, `${persona.name}: member scopes partition the household PF`).toBe(fromRows);
     });
   }
 

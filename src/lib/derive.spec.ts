@@ -30,12 +30,7 @@ import type { OtherIncomeLine } from "@/types/household";
 import { calculateNpsWithdrawal, postTaxAnnuityIncome } from "@/lib/nps-withdrawal";
 import { calculateYearsToTarget, calculateFIRENumber } from "@/lib/fire-math";
 import { toMonthly } from "@/lib/cashflow";
-import {
-  statutoryPfFor,
-  sumPf,
-  totalPf,
-  PROFESSIONAL_TAX_ANNUAL_PER_EARNER,
-} from "@/lib/salary-cash";
+import { pfFromInvestmentRows, PROFESSIONAL_TAX_ANNUAL_PER_EARNER } from "@/lib/salary-cash";
 
 /**
  * ADR-0006 Phase 1d — the calendar year every `derive()` call in this file is evaluated in.
@@ -992,17 +987,7 @@ describe("seed-anchor regression locks (gh-issue #17 — catch silent adequacy-l
     // tapering at 50; lifestyle creep defaults to 0) -- also moving FIRE earlier, since income is a
     // larger base than the residual. Values below are the ACTUAL merged-kernel output, MEASURED
     // (not hand-derived) -- see the evidence table in the merge commit.
-    //
-    // RE-ANCHORED 2026-09-29 (gh #218, ONE term): 21.00y -> 21.08y, FIRE age 52.00 -> 52.08.
-    // `fireNumber` is UNCHANGED (₹8.74 Cr) -- the target did not move, only the trajectory. The
-    // cause is NOT the take-home fix (that figure is reporting-only; with the basic base held at
-    // 40% every seed's FIRE age is byte-identical to before -- measured). It is the single basic
-    // base: the EPF auto-flow used a local `0.4 x CTC` while the salary form defaulted basic to
-    // 50% of CTC, and `resolveBasicAnnual` (salary-cash.ts) now serves both. The Sharmas' EPF
-    // rows rise from ₹20,000 + ₹14,400 to ₹25,000 + ₹18,000 /mo, so MORE of the unchanged
-    // savings residual is routed into the EPF bucket (8.25% nominal) instead of the blended
-    // portfolio -- a marginally slower corpus, hence +0.08y. Reported, not reverted.
-    expect(k.yearsToRegular).toBeCloseTo(21.08, 2);
+    expect(k.yearsToRegular).toBeCloseTo(21, 2);
     expect(Math.round(k.fireNumber)).toBe(87_372_837);
   });
 });
@@ -1379,13 +1364,11 @@ describe("gh #218 — take-home is cash; savings is the residual (identity locks
       const a = useAssumptionsStore();
       seed.load(h, a);
       const k = derive(h.data, a.values, LENS_176);
-      const pf = sumPf(k.lensedEarners.map((m) => statutoryPfFor(m.salary)));
+      const pf = pfFromInvestmentRows(h.data, null);
       const expected =
         k.annualIncome.total -
         k.annualTax -
-        pf.employeePF -
-        pf.vpf -
-        pf.employerPF -
+        pf -
         k.lensedEarners.length * PROFESSIONAL_TAX_ANNUAL_PER_EARNER;
       expect(k.monthlyTakeHome, `${seed.name}: cash figure`).toBe(Math.round(expected / 12));
       // …and therefore strictly BELOW the old `gross − tax` figure it replaced.
@@ -1397,26 +1380,32 @@ describe("gh #218 — take-home is cash; savings is the residual (identity locks
       const a = useAssumptionsStore();
       seed.load(h, a);
       const k = derive(h.data, a.values, LENS_176);
-      const pf = sumPf(k.lensedEarners.map((m) => statutoryPfFor(m.salary)));
       expect(k.annualSavings).toBeGreaterThanOrEqual(
-        totalPf(pf) + k.lensedEarners.length * PROFESSIONAL_TAX_ANNUAL_PER_EARNER,
+        pfFromInvestmentRows(h.data, null) +
+          k.lensedEarners.length * PROFESSIONAL_TAX_ANNUAL_PER_EARNER,
       );
     });
 
-    it(`${seed.name}: the auto-flowed EPF row equals statutoryPfFor for that earner`, () => {
+    it(`${seed.name}: the PF deducted from cash IS the PF the corpus receives (same rows)`, () => {
       const h = useHouseholdStore();
       const a = useAssumptionsStore();
       seed.load(h, a);
-      for (const m of h.data.members) {
-        if (!m.salary?.annualCTC) continue;
-        const row = h.data.investments.find((i) => i.type === "EPF_VPF" && i.ownerId === m.id);
-        expect(row, `${seed.name}: ${m.id} should have an auto-flowed EPF row`).toBeTruthy();
-        const pf = statutoryPfFor(m.salary);
-        expect((row?.monthlyContribution ?? 0) * 12, `${seed.name}: ${m.id} EPF annual`).toBeCloseTo(
-          pf.employeePF + pf.vpf + pf.employerPF,
-          -1,
-        );
-      }
+      const k = derive(h.data, a.values, LENS_176);
+      // The rupees leaving the payslip and the rupees entering the corpus are read from the SAME
+      // EPF_VPF rows — this is what makes the take-home fix introduce no second basic base and
+      // therefore move nothing downstream.
+      const fromRows = h.data.investments
+        .filter((i) => i.type === "EPF_VPF")
+        .reduce((sum, i) => sum + (i.monthlyContribution ?? 0) * 12, 0);
+      expect(pfFromInvestmentRows(h.data, null)).toBe(fromRows);
+      expect(fromRows, `${seed.name} has a real EPF outflow`).toBeGreaterThan(0);
+      expect(k.monthlyTakeHome * 12).toBeCloseTo(
+        k.annualIncome.total -
+          k.annualTax -
+          fromRows -
+          k.lensedEarners.length * PROFESSIONAL_TAX_ANNUAL_PER_EARNER,
+        -1,
+      );
     });
   }
 });

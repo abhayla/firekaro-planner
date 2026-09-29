@@ -48,12 +48,9 @@ import type { Assumptions } from "@/types/assumptions";
 import { derive, type DeriveLens } from "@/lib/derive";
 import { projectCorpus } from "@/lib/fire-math";
 import { toMonthly } from "@/lib/cashflow";
-import { isEarningMember } from "@/lib/member-earning";
 import {
   netCashSalary,
-  statutoryPfFor,
-  sumPf,
-  totalPf,
+  pfFromInvestmentRows,
   PROFESSIONAL_TAX_ANNUAL_PER_EARNER,
 } from "@/lib/salary-cash";
 import type { ContributionSegments } from "@/lib/contribution-schedule";
@@ -348,17 +345,11 @@ export function requiredMonthlyContributionFor(
   const scopeMember = atTargetAdult
     ? snapshot.members.find((m) => m.id === atTargetAdult.memberId) ?? null
     : null;
-  const ceilingPf = atTargetAdult
-    ? statutoryPfFor(scopeMember?.salary)
-    : sumPf(
-        snapshot.members
-          .filter((m) => isEarningMember(m, snapshot.businesses))
-          .map((m) => statutoryPfFor(m.salary)),
-      );
+  const ceilingPf = pfFromInvestmentRows(snapshot, atTargetAdult ? atTargetAdult.memberId : null);
   const monthlyTakeHome = atTargetAdult
     ? netCashSalary({
         annualCTC: atTargetAdult.attributableAnnualIncome,
-        pf: ceilingPf,
+        annualPf: ceilingPf,
         annualTax: atTargetAdult.attributableAnnualTax,
         professionalTax: scopeMember?.salary?.annualCTC ? PROFESSIONAL_TAX_ANNUAL_PER_EARNER : 0,
       }).monthly
@@ -376,7 +367,7 @@ export function requiredMonthlyContributionFor(
   const livingFloor = Math.max(committedMonthly, MIN_LIVING_RETENTION * monthlyExpenses);
   // The PF already committed is investable headroom by definition (it IS an investment), so it
   // is added back on top of the cash figure before the living floor is taken off.
-  const hi = Math.max(0, monthlyTakeHome + Math.round(totalPf(ceilingPf) / 12) - livingFloor);
+  const hi = Math.max(0, monthlyTakeHome + Math.round(ceilingPf / 12) - livingFloor);
 
   let requiredMonthlyReal: number;
   const solve = input.solve !== false;

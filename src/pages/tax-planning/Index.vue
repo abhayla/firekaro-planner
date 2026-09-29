@@ -9,8 +9,7 @@ import { getCurrentFinancialYear } from "@/lib/expense-history";
 import { toAnnual } from "@/lib/cashflow";
 import {
   netCashSalary,
-  statutoryPfFor,
-  sumPf,
+  pfFromInvestmentRows,
   PROFESSIONAL_TAX_ANNUAL_PER_EARNER,
 } from "@/lib/salary-cash";
 import { formatINRCompact, formatPercent, formatINR } from "@/lib/formatters";
@@ -253,15 +252,16 @@ const monthlyTakeHome = computed(() => {
     .filter((i) => i.type !== "EPF_VPF")
     .reduce((s, i) => s + (i.monthlyContribution ?? 0) * 12, 0);
   const annualGrossPostTax = totalTaxable.value - activeResult.value.totalTax;
-  // gh #218 — the CASH figure: gross minus BOTH PF legs (+ any VPF), income tax and professional
-  // tax, from the ONE shared helper the dashboard headline and the per-earner cards use.
-  const pf = sumPf(scopedHousehold.value.members.map((m) => statutoryPfFor(m.salary)));
+  // gh #218 — the CASH figure: gross minus the PF the household's EPF_VPF rows already carry,
+  // income tax and professional tax, from the ONE shared helper the dashboard headline and the
+  // per-earner cards use.
+  const annualPf = pfFromInvestmentRows(scopedHousehold.value, null);
   const earnerCount = scopedHousehold.value.members.filter(
     (m) => (m.salary?.annualCTC ?? 0) > 0,
   ).length;
   const annualTake = netCashSalary({
     annualCTC: totalTaxable.value,
-    pf,
+    annualPf,
     annualTax: activeResult.value.totalTax,
     professionalTax: earnerCount * PROFESSIONAL_TAX_ANNUAL_PER_EARNER,
   }).annual;
@@ -304,7 +304,14 @@ const perEarner = computed(() =>
       },
       { asOfDate: todayIsoLocal() },
     );
-    return computeEarnerTaxCard(m, selectedFY.value, earnerDeductions.totalDeductions, effectiveRegime.value);
+    return computeEarnerTaxCard(
+      m,
+      selectedFY.value,
+      earnerDeductions.totalDeductions,
+      effectiveRegime.value,
+      // gh #218 — that earner's OWN PF outflow, read from their EPF_VPF rows.
+      pfFromInvestmentRows(scopedHousehold.value, m.id),
+    );
   }),
 );
 

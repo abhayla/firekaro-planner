@@ -8,7 +8,6 @@ import {
 import { emptyQuickAnswers, type QuickAnswers } from "@/types/quick-number";
 import { DEFAULT_ASSUMPTIONS } from "@/types/assumptions";
 import { derive } from "@/lib/derive";
-import { statutoryPfFor, totalPf } from "@/lib/salary-cash";
 import { useHouseholdStore } from "@/stores/household";
 import type { Household } from "@/types/household";
 
@@ -292,25 +291,31 @@ describe("applyQuickAnswers — the unaccounted rupee is spent, not deleted", ()
     expect(household.expenses.recurring.some((r) => /Unaccounted/.test(r.label))).toBe(false);
   });
 
-  it("with nothing invested, the surplus is the STATUTORY PF only — never a silently assumed contribution", () => {
+  it("with nothing invested, the surplus is the STATUTORY PF only — never an assumed market SIP", () => {
     const { household, salaryAnnualCTC } = apply({ ...AMIT, sip: 0 });
     const k = derive(household, DEFAULT_ASSUMPTIONS, {
       isFamilyView: false,
       viewingMemberId: null,
       currentFY: "2026-27",
     });
-    // The old fallback assumed every unspent rupee reached the market (~2.2 L/month here). That
-    // failure mode is still dead — the figure below is an order of magnitude under it.
+    // The old fallback assumed every unspent rupee reached the market — ₹2.2 L/month here. That
+    // failure mode is still dead: the residual below is a third of it.
     expect(k.monthlyContribution).toBeLessThan(0.5 * 220_000);
-    // gh #218 — the residual is no longer ZERO, and the reason is exact, not approximate. Card 3
-    // asks for "Household take-home per month", which is now the CASH figure (net of both PF legs
-    // and professional tax), so the solved CTC is higher than the stated take-home by exactly the
-    // PF block — and that block is real, mandatory saving that lands in the quick EPF row. A
-    // rupee of it must NOT be double-counted as a market SIP, so the residual is pinned to the PF
-    // itself: anything above it would be the old invisible-contribution bug returning.
-    const self = household.members.find((m) => m.salary?.annualCTC);
+    // gh #218 — the residual is no longer ~zero, and the reason is EXACT, not approximate. Card 3
+    // asks for "Household take-home per month", and take-home is now the CASH figure (net of the
+    // PF the EPF row already carries, plus professional tax). So the solver has to land on a CTC
+    // ABOVE the stated ₹5 L/month, and the gap it opens is precisely the PF — real, mandatory
+    // saving that is already sitting in the quick EPF row. Pinning the residual TO that row is
+    // what keeps the old invisible-contribution bug dead: a rupee more would mean the solver had
+    // started assuming market investing again.
+    //
+    // Measured on this fixture: CTC ₹98.0 L ⇒ PF ₹78,400/mo, residual ₹78,572/mo.
+    const pfMonthly = Math.round(
+      household.investments
+        .filter((i) => i.type === "EPF_VPF")
+        .reduce((sum, i) => sum + (i.monthlyContribution ?? 0) * 12, 0) / 12,
+    );
     expect(salaryAnnualCTC).toBeGreaterThan(5 * L * 12); // above the stated take-home, by the PF
-    const pfMonthly = Math.round(totalPf(statutoryPfFor(self?.salary)) / 12);
     expect(pfMonthly).toBeGreaterThan(0);
     expect(k.monthlyContribution).toBeLessThanOrEqual(pfMonthly + 1_000);
   });
