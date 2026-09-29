@@ -329,6 +329,14 @@ function classifyRealEstate(
   const unlockAge = saleAgeGiven
     ? Math.max(retirementAge, planned!)
     : retirementAge + ASSUMED_PROPERTY_SALE_LAG_YEARS;
+  // GAIN BASIS (#211 review, accepted deliberately). The haircut is applied BEFORE Phase B, so
+  // `liquidation-tax.ts` takes its 70% unknown-basis gain fraction on the POST-haircut gross rather
+  // than the property's market value. That under-states the taxable gain by
+  // 0.7 x 10% x 12.5% x 1.04 = ~0.9% of value, i.e. ~0.3% of the net proceeds. It is ACCEPTED
+  // rather than threading a real-estate-only "cost of sale" concept through the generic post-tax
+  // function for a third of a percent: it errs optimistic by that sliver, which is dominated many
+  // times over by the 10% haircut and the 3-year sale lag in the other direction, and it becomes
+  // exact the moment an acquisition date lets a real cost basis replace the 70% assumption (#215).
   const grossAtSale = Math.max(0, value * (1 - REAL_ESTATE_ILLIQUIDITY_HAIRCUT));
   const label = asset.label ?? "Investment property";
 
@@ -347,7 +355,7 @@ function classifyRealEstate(
         ? `a property is only spendable once sold; a ${Math.round(REAL_ESTATE_ILLIQUIDITY_HAIRCUT * 100)}% illiquidity haircut covers brokerage, closing costs and a time-pressured sale (real-estate LTCG is applied on top)`
         : `no planned sale age is set, so the sale is dated ${ASSUMED_PROPERTY_SALE_LAG_YEARS} years into retirement — a property is only spendable once sold, and an unplanned resale takes time; a ${Math.round(REAL_ESTATE_ILLIQUIDITY_HAIRCUT * 100)}% illiquidity haircut covers brokerage, closing costs and a time-pressured sale (real-estate LTCG is applied on top)`,
       impact:
-        "until that age the property is NOT part of your spendable runway — only its rental income counts; if you do not intend to sell it, it should not be counted as retirement corpus at all",
+        "until that age the property is NOT part of your spendable runway — only its rental income counts; if you do not intend to sell it, it should not be counted as retirement corpus at all. Capital gains are taken at the flat 12.5% unindexed rate: a property acquired before 23 Jul 2024 may instead qualify for the LOWER of 12.5% unindexed or 20% with indexation, so recording an acquisition date could reduce the tax (gh #215) — until then the engine takes the higher-tax unindexed route",
       fixField: "plannedSaleAge",
     },
   };

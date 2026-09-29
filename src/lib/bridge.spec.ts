@@ -717,3 +717,70 @@ describe("#211 per-seed bounds through the real derive() path", () => {
     });
   }
 });
+
+// ---------------------------------------------------------------------------
+// #211 REVIEW — THE GATE FIRES ON THE DEFAULT PATH (no stated sale age).
+//
+// Why this exists. The #212 locked-heavy fixture above proves the gate fires, but
+// only because it now states `plannedSaleAge: 75` — remove that one field and the
+// assumed sale three years in rescues it. So nothing proved the gate can fire for
+// the case EVERY real user hits: a property household that has typed no sale age
+// at all, where the assumed lag is the only thing holding the property out of the
+// runway. This is that proof, and it is exactly the three-year window the lag
+// creates that has to go underwater.
+//
+// The profile: a household retiring at 50 whose corpus is almost entirely a
+// ₹3 Cr let-out flat with a thin ₹25 L liquid slice, against a ₹40 L/yr bill.
+// The flat is assumed sold at 53; the liquid slice cannot carry 50-52, so the
+// verdict is NOT covered and the shortfall lands inside the lag window.
+// ---------------------------------------------------------------------------
+describe("#211 the gate fires with NO plannedSaleAge — the default-lag window is underwater", () => {
+  it("thin liquid slice + an assumed-sale property → covered:false inside the lag window", () => {
+    const r = computeBridgeCoverage(
+      baseInput({
+        retirementAge: 50,
+        anchorAge: 40,
+        planToAge: 90,
+        annualExpenses: 4_000_000,
+        exitLumpNet: 0,
+        income: { rentalAnnualPostTax: 600_000, epsAnnualPostTax: 0, epsStartAge: 58 },
+        holdings: [
+          holding("FD", 2_500_000),
+          // NO plannedSaleAge — the whole point of this fixture.
+          holding("RealEstate", 30_000_000, { realEstateRole: "Investment" }),
+        ],
+      }),
+    );
+    const saleAge = 50 + ASSUMED_PROPERTY_SALE_LAG_YEARS;
+    // The property is the only tranche, dated by the assumed lag alone.
+    expect(r.unlockTimeline).toHaveLength(1);
+    expect(r.unlockTimeline[0].age).toBe(saleAge);
+    // THE GATE, on the default path: the liquid slice cannot fund the years before the sale.
+    expect(r.covered).toBe(false);
+    expect(r.shortfallYears).toBeGreaterThanOrEqual(1);
+    expect(r.shortfallAmount).toBeGreaterThan(0);
+    // The deficit is inside the lag window — the shortfall years cannot exceed it, because the
+    // sale closes the gap the moment it lands.
+    expect(r.shortfallYears).toBeLessThanOrEqual(ASSUMED_PROPERTY_SALE_LAG_YEARS);
+    // ...and the headline moves later, with a surfaced reason rather than a silent shift.
+    expect(r.effectiveFireAge).toBeGreaterThan(r.corpusOnlyFireAge);
+    expect(r.assumptions.some((x) => x.id === "bridge-shortfall")).toBe(true);
+    // The counterfactual that makes this fixture load-bearing: state the sale AT retirement and the
+    // same household is covered — so what fails here is the LAG, not an under-funded portfolio.
+    const sameButSoldAtRetirement = computeBridgeCoverage(
+      baseInput({
+        retirementAge: 50,
+        anchorAge: 40,
+        planToAge: 90,
+        annualExpenses: 4_000_000,
+        exitLumpNet: 0,
+        income: { rentalAnnualPostTax: 600_000, epsAnnualPostTax: 0, epsStartAge: 58 },
+        holdings: [
+          holding("FD", 2_500_000),
+          holding("RealEstate", 30_000_000, { realEstateRole: "Investment", plannedSaleAge: 50 }),
+        ],
+      }),
+    );
+    expect(sameButSoldAtRetirement.covered).toBe(true);
+  });
+});
