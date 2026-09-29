@@ -15,6 +15,7 @@ import { useAssumptionsStore } from "@/stores/assumptions";
 import { useUiStore } from "@/stores/ui";
 import {
   assumptionsLine,
+  epfNote,
   howWeGotThis,
   whySoBigBullets,
   type ExplainerInput,
@@ -70,6 +71,11 @@ const hasTarget = computed(() => req.value.hasTarget && req.value.needReal > 0);
 const bullets = computed(() => whySoBigBullets(input.value));
 const steps = computed(() => howWeGotThis(input.value));
 const assumptions = computed(() => assumptionsLine(input.value));
+// #223 — the toggle's ground truth is whether the household actually carries an EPF row for the
+// self member, so this stays correct through a reload with no extra state to keep in sync.
+const note = computed(() =>
+  epfNote(h.data.investments.some((i) => i.type === "EPF_VPF" && i.ownerId === "quick-self")),
+);
 </script>
 
 <template>
@@ -90,6 +96,9 @@ const assumptions = computed(() => assumptionsLine(input.value));
       <ol class="quick-explainer__list" data-testid="quick-steps-list">
         <li v-for="(line, i) in steps" :key="i" class="text-body-2 mb-2">{{ line }}</li>
       </ol>
+      <p v-if="note" class="text-caption text-medium-emphasis mt-3" data-testid="quick-epf-note">
+        {{ note }}
+      </p>
       <p class="text-caption text-medium-emphasis mt-3" data-testid="quick-assumptions">
         {{ assumptions }}
       </p>

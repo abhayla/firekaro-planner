@@ -21,6 +21,13 @@ export const quickAnswersSchema = z.object({
   spend: z.number().min(0),
   /** Card 3 — monthly household take-home. Sanity check only; the plan is anchored on `sip`. */
   income: z.number().min(0).optional(),
+  /**
+   * Card 3 — does the user's salary have EPF (PF deducted)? Default true (#223): most of the
+   * persona's salaried members do, but a no-PF employee (no salaried job, or a role EPF does not
+   * cover) must never have ~16% of CTC of saving invented for them. Rendered as a toggle INSIDE
+   * the existing salary/income card, not an eleventh card.
+   */
+  hasEpf: z.boolean().optional(),
 
   /** Card 4 — every investment except the home they live in (₹). */
   corpus: z.number().min(0).optional(),
@@ -74,6 +81,7 @@ export type QuickAnswersDraft = QuickAnswers &
       QuickAnswers,
       | "guess"
       | "income"
+      | "hasEpf"
       | "corpus"
       | "sip"
       | "includeSpouse"
@@ -100,6 +108,7 @@ export function emptyQuickAnswers(currentAge = 35): QuickAnswersDraft {
     targetAge: 50,
     spend: 0,
     income: 0,
+    hasEpf: true,
     corpus: 0,
     directPlans: null,
     sip: 0,

@@ -10,6 +10,7 @@ import {
   QUICK_PORTFOLIO_CAVEAT,
   sanityLine,
   overCommitmentWarning,
+  epfNote,
   type ExplainerInput,
 } from "./quick-number-copy";
 import { formatINRCompact } from "@/lib/formatters";
@@ -238,5 +239,11 @@ describe("quick-number copy — QN-4 explainers", () => {
   it("keeps the honesty framing and the full-planner list", () => {
     expect(PLAN_HONESTY_LINE.toLowerCase()).toContain("arithmetic");
     expect(FULL_PLANNER_ADDS.length).toBeGreaterThanOrEqual(4);
+  });
+
+  it("#223 — epfNote speaks only when hasEpf is true, and says nothing otherwise", () => {
+    expect(epfNote(true)).not.toBe("");
+    expect(epfNote(true).toLowerCase()).toContain("epf");
+    expect(epfNote(false)).toBe("");
   });
 });

@@ -199,7 +199,11 @@ function finish() {
   // The store owns these two effects; re-running them over rows we already wrote is a no-op
   // (same ids), and it keeps the express path on exactly one auto-flow implementation.
   household.autoFlowEMIToRecurring();
-  household.autoFlowSalaryToEPF();
+  // #223 — the store's own salary→EPF auto-flow has no concept of "no EPF": it rebuilds an EPF
+  // row for ANY member with `salary.annualCTC` set, which would silently undo the toggle the
+  // instant this runs. `/quick` only ever gives a salary to `self`, so skipping this single call
+  // when the user said "no EPF" is exact, not a household-wide behaviour change.
+  if (answers.value.hasEpf !== false) household.autoFlowSalaryToEPF();
   household.markProfileComplete();
   household.markWizardComplete();
   features.markWizardCompleted();
@@ -305,6 +309,19 @@ function editAnswers() {
                   label="Household take-home per month"
                   testid="quick-income"
                 />
+              </div>
+              <div class="d-flex align-center justify-space-between mt-4">
+                <span class="text-body-2">Does your salary have EPF (PF deducted)?</span>
+                <v-btn-toggle
+                  v-model="answers.hasEpf"
+                  mandatory
+                  density="compact"
+                  color="primary"
+                  data-testid="quick-has-epf"
+                >
+                  <v-btn :value="true" data-testid="quick-has-epf-yes">Yes</v-btn>
+                  <v-btn :value="false" data-testid="quick-has-epf-no">No</v-btn>
+                </v-btn-toggle>
               </div>
               <v-alert
                 v-if="sanity"
