@@ -518,3 +518,20 @@ export function recommendRegime(args: Omit<ComputeTaxArgs, "regime">): {
     savings: Math.abs(oldR.totalTax - newR.totalTax),
   };
 }
+
+// gh-issue #157: single-earner 80CCD(2) args, SECTOR-AWARE. Both single-earner scalar
+// consumers (EarnerSalaryForm.vue's take-home preview, tax-planning/Index.vue's per-earner
+// cards) MUST build their computeTax/recommendRegime args via this helper instead of passing
+// bare `employerNps`/`employerNpsBasic` scalars — the scalar aggregate fallback in computeTax
+// hardcodes the "private" ceiling (see the fallback's comment above), which silently caps a
+// GOVERNMENT earner's OLD-regime 80CCD(2) at 10% of basic instead of the correct 14%, diverging
+// from the headline `derive()` path (which is sector-aware via tax-deductions.ts). Routing a
+// single earner through `employerNpsByMember` (the sector-aware per-member path) removes that
+// divergence entirely instead of threading a new sector field through the scalar fallback.
+export function singleEarnerNpsArgs(
+  nps: number,
+  basic: number,
+  sector: "private" | "government" = "private",
+): Pick<ComputeTaxArgs, "employerNpsByMember"> {
+  return { employerNpsByMember: [{ nps, basic, sector }] };
+}

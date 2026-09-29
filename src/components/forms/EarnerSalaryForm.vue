@@ -3,7 +3,7 @@ import { computed, ref, watch } from "vue";
 import { useHouseholdStore } from "@/stores/household";
 import { useUiStore } from "@/stores/ui";
 import { formatINRCompact, formatPercent } from "@/lib/formatters";
-import { computeTax, recommendRegime } from "@/lib/tax";
+import { computeTax, recommendRegime, singleEarnerNpsArgs } from "@/lib/tax";
 import { ageFromDOB } from "@/lib/age";
 import InfoTip from "@/components/shared/InfoTip.vue";
 import {
@@ -19,17 +19,25 @@ const props = defineProps<{ earner: Member }>();
 const household = useHouseholdStore();
 const ui = useUiStore();
 
-function deriveTakeHomeFor(ctc: number, employerNps: number, employerNpsBasic: number) {
+function deriveTakeHomeFor(
+  ctc: number,
+  employerNps: number,
+  employerNpsBasic: number,
+  employerSector: "private" | "government" = "private",
+) {
   if (!ctc) return null;
   const oldDed = 175000;
-  const rec = recommendRegime({ grossIncome: ctc, fy: ui.currentFY, deductions: oldDed, employerNps, employerNpsBasic });
+  // gh-issue #157: route through the sector-aware per-member helper — the bare scalar
+  // employerNps/employerNpsBasic args hardcode the private 10% OLD-regime ceiling, which
+  // silently overtaxed a government earner's preview vs the headline derive() path.
+  const npsArgs = singleEarnerNpsArgs(employerNps, employerNpsBasic, employerSector);
+  const rec = recommendRegime({ grossIncome: ctc, fy: ui.currentFY, deductions: oldDed, ...npsArgs });
   const result = computeTax({
     grossIncome: ctc,
     regime: rec.recommended,
     fy: ui.currentFY,
     deductions: rec.recommended === "OLD" ? oldDed : 0,
-    employerNps,
-    employerNpsBasic,
+    ...npsArgs,
   });
   const annual = ctc - result.totalTax;
   return {
@@ -49,7 +57,10 @@ const ctc = computed(() => props.earner.salary?.annualCTC ?? 0);
 const hike = computed(() => props.earner.salary?.hikePercent ?? 8);
 const employerNps = computed(() => props.earner.salary?.employerNpsAnnual ?? 0);
 const basicAnnual = computed(() => props.earner.salary?.basicAnnual ?? 0);
-const takeHome = computed(() => deriveTakeHomeFor(ctc.value, employerNps.value, basicAnnual.value));
+const employerSector = computed(() => props.earner.salary?.employerSector ?? "private");
+const takeHome = computed(() =>
+  deriveTakeHomeFor(ctc.value, employerNps.value, basicAnnual.value, employerSector.value),
+);
 
 // Q4 (v3) + ISSUES-v2 #1: salary fields are no longer inline-editable. Pencil opens
 // a focused dialog. Read-only summary card outside.

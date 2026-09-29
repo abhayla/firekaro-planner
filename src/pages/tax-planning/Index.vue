@@ -3,7 +3,7 @@ import { computed, ref } from "vue";
 import { useHouseholdStore } from "@/stores/household";
 import { useFireDerive } from "@/lib/useFireDerive";
 import { useUiStore } from "@/stores/ui";
-import { computeTax, npsCeilingFor, AVAILABLE_FYS } from "@/lib/tax";
+import { computeTax, npsCeilingFor, singleEarnerNpsArgs, AVAILABLE_FYS } from "@/lib/tax";
 import { getCurrentFinancialYear } from "@/lib/expense-history";
 import { toAnnual } from "@/lib/cashflow";
 import { formatINRCompact, formatPercent, formatINR } from "@/lib/formatters";
@@ -252,8 +252,13 @@ const perEarner = computed(() => {
     const gross = m.salary?.annualCTC ?? 0;
     const earnerNps = m.salary?.employerNpsAnnual ?? 0;
     const earnerBasic = m.salary?.basicAnnual ?? 0;
-    const earnerOld = computeTax({ grossIncome: gross, regime: "OLD", fy: selectedFY.value, deductions: derivedDeductions.value.totalDeductions, employerNps: earnerNps, employerNpsBasic: earnerBasic });
-    const earnerNew = computeTax({ grossIncome: gross, regime: "NEW", fy: selectedFY.value, employerNps: earnerNps, employerNpsBasic: earnerBasic });
+    // gh-issue #157: route through the sector-aware per-member helper — the bare scalar
+    // employerNps/employerNpsBasic args hardcode the private 10% OLD-regime ceiling, diverging
+    // from this SAME screen's sector-aware LimitMeter (npsCeilingFor(regime, m.sector) above)
+    // for a government earner.
+    const earnerNpsArgs = singleEarnerNpsArgs(earnerNps, earnerBasic, m.salary?.employerSector ?? "private");
+    const earnerOld = computeTax({ grossIncome: gross, regime: "OLD", fy: selectedFY.value, deductions: derivedDeductions.value.totalDeductions, ...earnerNpsArgs });
+    const earnerNew = computeTax({ grossIncome: gross, regime: "NEW", fy: selectedFY.value, ...earnerNpsArgs });
     const rec = earnerOld.totalTax <= earnerNew.totalTax ? "OLD" : "NEW";
     const active = effectiveRegime.value === "OLD" ? earnerOld : earnerNew;
     return {
