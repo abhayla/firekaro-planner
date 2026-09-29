@@ -91,6 +91,21 @@ liquidity really is short. The zero deltas above are a property of the seeds, no
   an optimism the bridge structurally cannot catch (no tranche ⇒ no window ⇒ trivially covered).
   This applies to the **household** path identically. Worth its own finding row.
 
+**STEP 1 RE-RUN 2026-09-29 (late night), on the post-#213/#214 bridge.** Same per-member construction,
+re-run after the per-tranche projection (#213) and the property sale event (#214) landed. First print
+showed **Rohit 48→55 (Δ7)**; an independent FinTech review (Opus, read-only) traced it to the
+prototype's expense repricer — it fed the bridge the member's **nominal two-leg** target curve
+(base at basket 6.24% + reservation at healthcare 9%, never deflated by CPI) instead of the §4.2
+real-frame base-leg ratio `((1+basket)/(1+CPI))^t`. At t=18 the ratio was 3.26 instead of 1.04, so
+the 13-year bill was ≈₹820L instead of ≈₹178L. With the §4.2 formula restored the re-run gives
+**Δ = 0 for every adult on every seed again** (Rohit pre=48 gated=48, locked ₹36.7L, reachable
+₹471L, covered; Priya 47; Vikram 45; Aanya 63; Ashwin 47; Lakshmi 84; Abhay 56; Ravi 41; Madhu
+unreachable). Households all covered. The §2 finding stands: the gate moves no current seed. Two
+notes for whoever builds §4.1–4.3 later: (1) T2 must assert the expense repricer's FRAME
+(`annualExpensesAt(t)/annualExpenses ≤ ((1+basket)/(1+CPI))^t + ε`) — that assertion would have gone
+red on the prototype instantly; (2) a Joint holding's `contributionSchedule` must be weighted by the
+split like its value, or the member gets 100% of Joint contributions against 50% of Joint value.
+
 The §4.4 reservation-leg inflation fix is unaffected by all of the above: it is a real, measurable
 target-trajectory change (healthcareInflation 9% vs basket 6.24% on a 20% reservation share) and
 moves member ages later on its own arithmetic, independent of the gate.
