@@ -477,7 +477,12 @@ export function previewEarnerTakeHome(
     },
     { asOfDate: todayIsoLocal() },
   );
-  const annualPf = pfFromRows(household.investments, effectiveMember.id);
+  // #223 — a draft `hasEpf:false` must zero the preview's PF even though the member's real EPF
+  // row still exists (it is only removed by `autoFlowSalaryToEPF` on SAVE, via `updateMember`).
+  // Without this, previewing "switch EPF off" would keep showing the old PF-reduced take-home
+  // until after save — the opposite of what the toggle is for.
+  const annualPf =
+    effectiveMember.salary?.hasEpf === false ? 0 : pfFromRows(household.investments, effectiveMember.id);
 
   // Peek at the AUTO-recommended regime first (independent of the `effectiveRegime` arg),
   // then re-call with that regime so the returned tax/takeHome/effRate are the ACTIVE figures
