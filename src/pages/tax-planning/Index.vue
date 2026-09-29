@@ -252,10 +252,25 @@ const monthlyTakeHome = computed(() => {
 // computeEarnerTaxCard (src/lib/tax-deductions.ts) — extracted from this screen so a
 // behaviour spec can call the exact function the screen renders from, and so the SAME sector
 // handling as the LimitMeter above (npsCeilingFor(regime, m.sector)) applies here too.
+//
+// gh-issue #201: derivedDeductions.value.totalDeductions is the WHOLE household's 80C/80D/
+// §24 pool — passing it to EVERY earner's card meant a two-earner household double-claimed the
+// shared deductions (each card claimed 100% of the pool, so an earner with none of a given
+// deduction still showed it, understating their tax). Each earner's card now uses the SAME
+// per-member attribution the headline computeIndividualFire() path uses
+// (src/lib/individual-fire.ts: deriveDeductions scoped to that member's own investments/
+// liabilities/insurance) — one shared attribution, not a second formula.
 const perEarner = computed(() =>
-  household.earners.map((m) =>
-    computeEarnerTaxCard(m, selectedFY.value, derivedDeductions.value.totalDeductions, effectiveRegime.value),
-  ),
+  household.earners.map((m) => {
+    const earnerDeductions = deriveDeductions({
+      ...scopedHousehold.value,
+      members: [m],
+      investments: scopedHousehold.value.investments.filter((i) => i.ownerId === m.id),
+      liabilities: scopedHousehold.value.liabilities.filter((l) => l.ownerId === m.id),
+      insurance: scopedHousehold.value.insurance.filter((p) => p.insuredPersonId === m.id),
+    });
+    return computeEarnerTaxCard(m, selectedFY.value, earnerDeductions.totalDeductions, effectiveRegime.value);
+  }),
 );
 
 // Per-earner avatar visuals (mirror the Profile per-member colour language).
