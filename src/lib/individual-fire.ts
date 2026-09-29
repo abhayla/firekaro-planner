@@ -12,8 +12,19 @@
  *
  * DELIBERATE SIMPLIFICATIONS (each either CONSERVATIVE — never makes individual FIRE look EARLIER
  * than reality, the safe direction for the accumulator — or a disclosed bound):
- *   - gross attributable expenses (no NPS-annuity offset); no bridge/glide/family-layer/healthcare
- *     reservation overlay — all conservative (a higher target / no early-money credit).
+ *   - gross attributable expenses (no NPS-annuity offset); no bridge/glide/family-layer overlay —
+ *     all conservative (a higher target / no early-money credit). The HEALTHCARE reservation IS
+ *     now included (#162 part 1, `calculateFireTarget` shared with the household path) — it is
+ *     no longer a simplification, see the residual-drift note below.
+ *   - RESERVATION-LEG INFLATION DRIFT (disclosed bound, #162 part 2 — NOT fixed tonight): the
+ *     household path (`derive.ts`) grows its healthcare reservation leg at `healthcareInflation`
+ *     (~9%) while everything else — including this member path's WHOLE target, reservation
+ *     included — grows at the household basket (`resolveHouseholdBasket`, ADR-0007(d)). Where
+ *     healthcareInflation > the basket (the common case), the household reservation leg rises
+ *     FASTER than this member path's reservation share does over time, so a member's target
+ *     understates the household-grade reservation more the further out their FIRE date is — a
+ *     SMALL, deferred, residual optimism (bounded by the gap between the two rates × the
+ *     reservation's ~20% share of base), tracked alongside the per-member bridge gate on #162.
  *   - rental income is taxed at FULL gross in the attributable tax (the household path applies the
  *     §24(a) 30% / §24(b) / §71 house-property collapse; the individual path does NOT). This
  *     OVER-taxes the individual → savings lower → individual FIRE LATER → conservative/safe; it only
