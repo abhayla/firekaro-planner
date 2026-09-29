@@ -1,0 +1,82 @@
+fix(fire): household tax is the sum of each earner's own tax, never one pooled filer (#87)
+
+RCA: derive.ts built the household's annual income tax with ONE recommendRegime +
+ONE computeTax over pooled income (salary + businessShare + otherTaxable -
+rentalTaxDeduction) - a single-filer model. India taxes each adult separately, so
+pooling pushed the second earner's whole income through the first earner's marginal
+slabs and granted the household ONE basic exemption, ONE standard deduction and ONE
+87A rebate instead of one each. Every one of those errors runs in the same direction:
+too much tax -> too little annualSavings -> a FIRE date reported LATER and a
+prescription HIGHER than the truth. Tier-0 honesty defect for the dual-income
+salaried-accumulator persona.
+
+Class: every household with >= 2 earning adults. Before: one pooled return. After:
+annualTax = sum over earning adults of that adult's own tax on that adult's own income
+(own salary CTC; own/Joint-split other income and business share; unowned rows to the
+anchor adult; rental collapse split by the same complementary share), each adult's own
+deductions via deductionsForMember (#204) and each adult electing their own regime.
+Single-earner households byte-identical.
+
+Proof (default lens, FY 2025-26):
+
+  Seed      Earners  Tax before   Tax after    Delta
+  sharmas   2        11,65,840     7,16,560    -4,49,280
+  iyers     2         8,81,400     6,31,800    -2,49,600
+  mehtas    2        19,99,140    13,57,200    -6,41,940
+  mauryas   1        10,44,014    10,44,014     0   (byte-identical)
+  ravi      1                0            0     0   (byte-identical)
+
+  Seed      annualSavings          monthlyContribution   savingsRate    monthlyTakeHome
+  sharmas   19,27,164 -> 23,76,444  160,597 -> 198,037   48.1 -> 53.4   298,863 -> 336,303
+  iyers     14,75,608 -> 17,25,208  122,967 -> 143,767   43.2 -> 47.0   250,067 -> 270,867
+  mehtas    27,65,864 -> 34,07,804  230,489 -> 283,984   52.2 -> 57.3   382,922 -> 436,417
+  mauryas   1,510,982 (unchanged)   125,915 (unchanged)  38.1 (same)    296,357 (unchanged)
+
+  savings rose by EXACTLY the tax delta, to the rupee, on all three dual-earner seeds.
+
+  Seed      fireAge          requiredMonthlyReal (live defaults)
+  sharmas   52.00 -> 50.08   Infinity -> 268,414  (plan became REACHABLE)
+  iyers     56.25 -> 54.83   160,512 -> 160,456   (within the +/-8% band, no re-record)
+  mehtas    50.83 -> 50.08   Infinity (unchanged)
+  mauryas   65.67 (unchanged) Infinity (unchanged)
+
+Golden-master re-baseline, field by field (docs/adr/0008 has the reasoning):
+  sharmas: annualSavings, corpusOnlyYearsToRegular 21 -> 19.0833, fireAge 52 -> 50.08,
+           monthlyContribution, monthlyTakeHome, savingsRate 48.1 -> 53.4,
+           yearsToFat 21.4167 -> 19.25, yearsToLean 9.5833 -> 8.3333,
+           yearsToRegular 21 -> 19.0833
+  iyers:   annualSavings, corpusOnlyYearsToRegular 18.25 -> 16.8333,
+           fireAge 56.25 -> 54.83, monthlyContribution, monthlyTakeHome,
+           savingsRate 43.2 -> 47, yearsToFat 18 -> 16.6667,
+           yearsToLean 6.0833 -> 5.5833, yearsToRegular 18.25 -> 16.8333
+  mehtas:  annualSavings, corpusOnlyYearsToRegular 5.8333 -> 5.0833,
+           fireAge 50.83 -> 50.08, monthlyContribution, monthlyTakeHome,
+           savingsRate 52.2 -> 57.3, yearsToFat 8.6667 -> 7.5,
+           yearsToRegular 5.8333 -> 5.0833
+  mauryas: NO field moved (single earner - the no-op guarantee).
+  UNCHANGED on every seed: fireNumber, totalCorpus, fireWithdrawableCorpus, anchorAge,
+  targetRetirementAge, progressPercent, effectiveSWR, lensedEarners. The target's SIZE
+  never moved - only how fast the household reaches it, which is the signature of a
+  cashflow change, not a target change.
+
+Detection upgrade: src/lib/per-assessee-tax-coherence.spec.ts (8 locks) - sum identity
+to the rupee on every seed; dual-earner strictly below the measured pooled figures
+(written into the spec as the defect's own evidence, so a regression to pooling trips
+it); single-earner byte-identical; attribution conserves taxable income. Plus 4
+direction locks in derive.spec.ts including the #225 cash identity.
+
+headline-plausibility.spec.ts: all 89 bands hold UNCHANGED - no band was widened. Its
+#218 savings baselines were re-recorded by exactly the tax delta.
+
+Also: /tax-planning's household total, its Old-vs-New comparison and its per-earner
+cards now all read the SAME perAssesseeHouseholdTax derivation - previously the screen's
+own table did not sum to the screen's own total, and neither agreed with the dashboard.
+The #221 zero-tax collapse still fires on Ravi (Index.zero-tax.binding.spec.ts green).
+
+Removes two throwaway measurement specs (zz-step1/zz-step2-scratch) added in the wip
+checkpoints of this branch.
+
+Tier A. Gate: root type-check + 13 named spec files, 428 tests green.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01SuZ26hodEPkQFVbzsPaV66

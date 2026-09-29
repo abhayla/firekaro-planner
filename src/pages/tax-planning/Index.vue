@@ -26,6 +26,7 @@ import {
   LIMIT_80D_SELF,
   LIMIT_80D_PARENTS,
   LIMIT_SECTION_24,
+  perAssesseeHouseholdTax,
 } from "@/lib/tax-deductions";
 import { buildDonutSegments } from "@/lib/donut";
 import LeafPageHeader from "@/components/income-layout/LeafPageHeader.vue";
@@ -214,23 +215,74 @@ const totalExempt = computed(() =>
   incomeRows.value.filter((r) => !r.isTaxable).reduce((s, r) => s + r.amount, 0),
 );
 
-const oldResult = computed(() =>
-  computeTax({
-    grossIncome: taxableIncomeForTax.value,
-    regime: "OLD",
-    fy: selectedFY.value,
-    deductions: derivedDeductions.value.totalDeductions,
-    employerNpsByMember: derivedDeductions.value.employerNpsByMember,
-  }),
+/**
+ * #87 — THE PER-ASSESSEE RETURNS BEHIND EVERY FIGURE ON THIS SCREEN.
+ *
+ * India taxes each adult separately. This page used to run ONE `computeTax` over the POOLED
+ * household income for its Old/New comparison AND its headline total, while the per-earner table
+ * below ran a SECOND, per-member computation — so the household total and the sum of the cards
+ * could (and for every dual-earner seed did) disagree by lakhs, and the kernel's `annualTax`
+ * agreed with neither. `perAssesseeHouseholdTax` is the SINGLE derivation `derive.ts` now uses,
+ * so this page's total, its per-earner cards and the dashboard headline are one number.
+ */
+const perAssessee = computed(() =>
+  perAssesseeHouseholdTax(
+    scopedHousehold.value,
+    {
+      earners: household.earners,
+      businesses: scopedHousehold.value.businesses,
+      otherIncome: scopedHousehold.value.otherIncome,
+      rentalTaxDeduction: rentalTaxDeduction.value,
+    },
+    selectedFY.value,
+    assumptions.values.householdSplitPercent ?? 50,
+    new Date(),
+  ),
 );
-const newResult = computed(() =>
-  computeTax({
-    grossIncome: taxableIncomeForTax.value,
-    regime: "NEW",
-    fy: selectedFY.value,
-    employerNpsByMember: derivedDeductions.value.employerNpsByMember,
-  }),
-);
+
+/**
+ * The household's tax under a FORCED regime, still assessee by assessee: each adult's own income
+ * and own deductions run through the named regime, then summed. This is what the Old-vs-New
+ * comparison must compare — forcing the whole household through one pooled return would answer a
+ * question about a filer that does not exist.
+ */
+function householdTaxUnderRegime(regime: "OLD" | "NEW") {
+  const rows = perAssessee.value.perAssessee.map((a) =>
+    computeTax({
+      grossIncome: a.grossIncome,
+      regime,
+      fy: selectedFY.value,
+      deductions: a.deductions,
+      employerNpsByMember: deductionsForMember(
+        scopedHousehold.value,
+        a.memberId,
+        assumptions.values.householdSplitPercent ?? 50,
+        { asOfDate: todayIsoLocal() },
+      ).employerNpsByMember,
+      taxpayerAge: a.age,
+      isSalaried: (household.earners.find((m) => m.id === a.memberId)?.salary?.annualCTC ?? 0) > 0,
+    }),
+  );
+  const totalTax = rows.reduce((t, r) => t + r.totalTax, 0);
+  const taxableIncome = rows.reduce((t, r) => t + r.taxableIncome, 0);
+  const gross = taxableIncomeForTax.value;
+  return {
+    grossIncome: gross,
+    standardDeduction: rows.reduce((t, r) => t + r.standardDeduction, 0),
+    estimatedDeductions: rows.reduce((t, r) => t + r.estimatedDeductions, 0),
+    taxableIncome,
+    slabTax: rows.reduce((t, r) => t + r.slabTax, 0),
+    rebate: rows.reduce((t, r) => t + r.rebate, 0),
+    taxAfterRebate: rows.reduce((t, r) => t + r.taxAfterRebate, 0),
+    surcharge: rows.reduce((t, r) => t + r.surcharge, 0),
+    cess: rows.reduce((t, r) => t + r.cess, 0),
+    totalTax,
+    effectiveRate: gross > 0 ? (totalTax / gross) * 100 : 0,
+  };
+}
+
+const oldResult = computed(() => householdTaxUnderRegime("OLD"));
+const newResult = computed(() => householdTaxUnderRegime("NEW"));
 const activeResult = computed(() => (effectiveRegime.value === "OLD" ? oldResult.value : newResult.value));
 const savings = computed(() => Math.abs(oldResult.value.totalTax - newResult.value.totalTax));
 
@@ -290,6 +342,13 @@ const monthlyTakeHome = computed(() => {
 // per-member attribution the headline computeIndividualFire() path uses
 // (src/lib/individual-fire.ts: deriveDeductions scoped to that member's own investments/
 // liabilities/insurance) — one shared attribution, not a second formula.
+/**
+ * #87 — the cards are now a RENDERING of `perAssessee` above, not a second computation. Each
+ * row's `gross` is that adult's ATTRIBUTED taxable income (own salary + own/Joint-split other
+ * income and business share − their share of the rental collapse), which is what they actually
+ * file on; it used to be salary CTC alone, so the card sum could never equal the household total
+ * for a household with business or rental income. `Σ row.tax === kernel annualTax` is spec-locked.
+ */
 const perEarner = computed(() =>
   household.earners.map((m) => {
     // #204: own-owned (100%) + Joint-owned (× householdSplitPercent) — the SAME shared
@@ -302,7 +361,8 @@ const perEarner = computed(() =>
       assumptions.values.householdSplitPercent ?? 50,
       { asOfDate: todayIsoLocal() },
     );
-    return computeEarnerTaxCard(
+    const assessee = perAssessee.value.perAssessee.find((a) => a.memberId === m.id);
+    const card = computeEarnerTaxCard(
       m,
       selectedFY.value,
       earnerDeductions.totalDeductions,
@@ -310,6 +370,25 @@ const perEarner = computed(() =>
       // gh #218 — that earner's OWN PF outflow, read from their EPF_VPF rows.
       pfFromInvestmentRows(scopedHousehold.value, m.id),
     );
+    if (!assessee) return card;
+    // #87 — override the card's salary-only gross/tax with this adult's REAL assessed position,
+    // so the table sums to the household total shown above it. `takeHome` keeps the #218 cash
+    // formula (CTC − PF − tax − professional tax) but on the real tax figure.
+    const pf = pfFromInvestmentRows(scopedHousehold.value, m.id);
+    const ctc = m.salary?.annualCTC ?? 0;
+    return {
+      ...card,
+      gross: assessee.grossIncome,
+      tax: assessee.tax,
+      rec: assessee.regime,
+      effRate: assessee.grossIncome > 0 ? (assessee.tax / assessee.grossIncome) * 100 : 0,
+      takeHome: netCashSalary({
+        annualCTC: ctc,
+        annualPf: pf,
+        annualTax: assessee.tax,
+        professionalTax: ctc > 0 ? PROFESSIONAL_TAX_ANNUAL_PER_EARNER : 0,
+      }).annual,
+    };
   }),
 );
 
