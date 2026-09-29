@@ -287,10 +287,18 @@ describe("QN-5 plan levers — buildPlanLevers / evaluatePlanLevers (Sharmas, re
     throw new Error("Sharmas never reachable between 50 and 65 — fixture drifted");
   }
 
-  it("emits exactly the five spec levers, in catalog order, every one with label + note", () => {
+  it("emits exactly the seven catalog levers, in catalog order, every one with label + note", () => {
     const { snapshot, assumptions } = sharmas();
     const levers = buildPlanLevers(snapshot, assumptions, ctxFor(snapshot, assumptions));
-    expect(levers.map((l) => l.key)).toEqual(["step-up-10", "delay-3", "trim-expenses", "direct-plans", "no-prepay-roll-emi"]);
+    expect(levers.map((l) => l.key)).toEqual([
+      "step-up-10",
+      "delay-3",
+      "trim-expenses",
+      "direct-plans",
+      "no-prepay-roll-emi",
+      "raise-income",
+      "side-income",
+    ]);
     for (const l of levers) {
       expect(l.label.length).toBeGreaterThan(5);
       expect(l.note.length).toBeGreaterThan(10);
@@ -311,9 +319,19 @@ describe("QN-5 plan levers — buildPlanLevers / evaluatePlanLevers (Sharmas, re
     const baseline = planToFind(base, LENS);
     for (const l of levers.filter((x) => x.available)) {
       const one = planToFind(l.apply(base), LENS);
+      // gh #185 step 7: `raise-income` patches `salaryGrowthRealPercent`, which the T-377 solver
+      // contract (`required-contribution.ts` / `derive.ts` "the override REPLACES the residual")
+      // deliberately does NOT re-grow during the bisection — only a DELIBERATE step-up
+      // (`householdSavingsStepUpPercent`, the `step-up-10` lever) survives that override. So
+      // `raise-income` is genuinely inert on `requiredMonthlyReal`/`currentMonthlyReal` BY DESIGN;
+      // its honest effect shows up in `gapReal` (`atTarget`'s own income-path-driven schedule is
+      // never overridden) — exactly why `PlanLeverEffect.gapClosed` exists. Accept a `gapReal`
+      // move as evidence too, so this guard still catches a lever that moves NOTHING.
       expect(
-        one.requiredMonthlyReal !== baseline.requiredMonthlyReal || one.currentMonthlyReal !== baseline.currentMonthlyReal,
-        `${l.key} is INERT — it does not move the solver (required ${baseline.requiredMonthlyReal} → ${one.requiredMonthlyReal})`,
+        one.requiredMonthlyReal !== baseline.requiredMonthlyReal ||
+          one.currentMonthlyReal !== baseline.currentMonthlyReal ||
+          one.gapReal !== baseline.gapReal,
+        `${l.key} is INERT — it does not move the solver (required ${baseline.requiredMonthlyReal} → ${one.requiredMonthlyReal}, gap ${baseline.gapReal} → ${one.gapReal})`,
       ).toBe(true);
     }
   });

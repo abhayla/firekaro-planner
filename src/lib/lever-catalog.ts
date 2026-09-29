@@ -195,7 +195,9 @@ export type PlanLeverKey =
   | "delay-3"
   | "trim-expenses"
   | "direct-plans"
-  | "no-prepay-roll-emi";
+  | "no-prepay-roll-emi"
+  | "raise-income"
+  | "side-income";
 
 export interface PlanLever {
   key: PlanLeverKey;
@@ -213,6 +215,25 @@ export interface PlanLever {
 export const PLAN_STEP_UP_PERCENT = 10;
 export const PLAN_DELAY_YEARS = 3;
 export const PLAN_TRIM_FRACTION = 0.1;
+
+// ---- Income-side levers (gh #185 step 7) --------------------------------------------------
+// The two INCOME-side moves the kernel can now evaluate now that ADR-0007's per-earner income
+// path is live (`income-path.ts`, `derive.ts`): raising the CONSERVATIVE real growth rate that
+// feeds the headline itself, and adding a start-dated side-income stream. Both go through the
+// SAME `planToFind` re-solve as every other plan lever — no parallel math.
+
+/** Real growth uplift applied on top of the household's conservative default (percentage points). */
+export const PLAN_RAISE_INCOME_UPLIFT_PP = 2;
+/** `salaryGrowthRealPercent`'s own schema bound (`src/types/assumptions.ts`) — the lever must never
+ *  ask the solver to resolve an assumption value the store itself would reject. */
+export const SALARY_GROWTH_REAL_PERCENT_MAX = 10;
+/** Real, today's-₹ monthly amount the side-income lever adds. */
+export const PLAN_SIDE_INCOME_MONTHLY = 5000;
+/** Side income never starts before this age, regardless of how young the earner is today. */
+export const PLAN_SIDE_INCOME_MIN_START_AGE = 25;
+/** …and never sooner than this many years from today, so it always reads as a genuine plan, not
+ *  an instant "and you already have it" for someone already past 25. */
+export const PLAN_SIDE_INCOME_YEARS_FROM_NOW = 3;
 
 /**
  * The ONE trimmable monthly spend base — shared by BOTH "Trim spending 10%" levers (the ranked
@@ -403,7 +424,58 @@ export function buildPlanLevers(
       : identity,
   };
 
-  return [stepUp, delay, trim, direct, noPrepay];
+  // 6) Raise income: lift the CONSERVATIVE real salary-growth default (the rate that feeds the
+  //    headline itself, `assumptions.salaryGrowthRealPercent` → `income-path.ts` →
+  //    `derive.ts`'s per-earner income path) by a realistic uplift, capped at the assumption's own
+  //    schema bound so the solver never sees a value the store would reject. Needs at least one
+  //    earner with income — a household with no salary has nothing for this lever to raise, and
+  //    a member lens has no bearing here (the household-level assumption drives every earner's path
+  //    the same as it does for the headline; no lensing exclusion is needed).
+  const hasEarnerIncome = snapshot.members.some((m) => (m.salary?.annualCTC ?? 0) > 0);
+  const currentSalaryGrowth = assumptions.salaryGrowthRealPercent ?? 0;
+  const raiseIncomeAvailable = hasEarnerIncome && currentSalaryGrowth < SALARY_GROWTH_REAL_PERCENT_MAX;
+  const raisedGrowth = Math.min(
+    SALARY_GROWTH_REAL_PERCENT_MAX,
+    currentSalaryGrowth + PLAN_RAISE_INCOME_UPLIFT_PP,
+  );
+  const raiseIncome: PlanLever = {
+    key: "raise-income",
+    label: `Raise your income ${PLAN_RAISE_INCOME_UPLIFT_PP}pp/yr faster`,
+    note: `push your real salary growth from ${currentSalaryGrowth}% to ${raisedGrowth}%/yr above inflation — a promotion, a switch, or a skill that pays more`,
+    available: raiseIncomeAvailable,
+    unavailableReason: raiseIncomeAvailable
+      ? undefined
+      : hasEarnerIncome
+        ? `you're already at the ${SALARY_GROWTH_REAL_PERCENT_MAX}% realistic ceiling for this move`
+        : "no salary income to raise yet",
+    apply: raiseIncomeAvailable
+      ? (p) => withAssumptions(p, { salaryGrowthRealPercent: raisedGrowth })
+      : identity,
+  };
+
+  // 7) Side income: a genuinely NEW, start-dated income stream (freelance, a side business, a
+  //    second job) modelled the same way as the no-prepay lever — a real ₹/month
+  //    `ContributionSegment` added to the solver's `extraSegments` from a start age. `OtherIncomeLine`
+  //    has no `startAge` field yet (step 6 of this spec has not landed), so this is deliberately an
+  //    EVALUATION-time override, never a persisted field (spec step 7 brief). Available for every
+  //    household — it does not depend on existing earnings, which is the whole point of the lever
+  //    for a low-band household with little room to raise its primary salary.
+  const sideIncomeStartAge = Math.max(
+    PLAN_SIDE_INCOME_MIN_START_AGE,
+    ctx.anchorAge + PLAN_SIDE_INCOME_YEARS_FROM_NOW,
+  );
+  const sideIncome: PlanLever = {
+    key: "side-income",
+    label: `Add ${formatINRCompact(PLAN_SIDE_INCOME_MONTHLY)}/month side income from age ${sideIncomeStartAge}`,
+    note: `a freelance gig, a side business, or a second job bringing in ${formatINRCompact(PLAN_SIDE_INCOME_MONTHLY)}/month (today's ₹) starting at age ${sideIncomeStartAge} — on top of today's plan`,
+    available: true,
+    apply: (p) => ({
+      ...p,
+      extraSegments: [...p.extraSegments, { amount: PLAN_SIDE_INCOME_MONTHLY, startAtAge: sideIncomeStartAge }],
+    }),
+  };
+
+  return [stepUp, delay, trim, direct, noPrepay, raiseIncome, sideIncome];
 }
 
 /** Stack the switched-on levers onto the inputs (pure; order = catalog order). */
