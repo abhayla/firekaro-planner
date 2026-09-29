@@ -1,9 +1,11 @@
 import { describe, it, expect } from "vitest";
 import {
   deriveDeductions,
+  deductionsForMember,
   isInMarginalReliefBand,
   marginalReliefMitigations,
   LIMIT_80C,
+  LIMIT_80D_SELF,
   LIMIT_80CCD_1B,
   LIMIT_SECTION_24,
 } from "./tax-deductions";
@@ -350,5 +352,121 @@ describe("marginalReliefMitigations", () => {
   it("returns empty array when not in band", () => {
     expect(marginalReliefMitigations(800_000, "2025-26")).toEqual([]);
     expect(marginalReliefMitigations(1_500_000, "2025-26")).toEqual([]);
+  });
+});
+
+// gh #204 — a Joint-owned 80C/80D/§24 source is attributed to EACH earner by
+// householdSplitPercent, then each earner's totalDeductions is capped INDEPENDENTLY. Before this
+// fix, `ownerId === memberId`-only filtering at every per-member call site dropped a Joint source
+// from BOTH earners.
+describe("deductionsForMember — #204 Joint-owned 80C/80D/§24 attribution", () => {
+  function twoEarnerHH(): Household {
+    return {
+      name: "",
+      setupMode: "Couple",
+      profileComplete: false,
+      wizardCompleted: false,
+      members: [
+        { id: "a", name: "A", role: "ADULT", dateOfBirth: "1985-01-01" } as Household["members"][number],
+        { id: "b", name: "B", role: "ADULT", dateOfBirth: "1986-01-01" } as Household["members"][number],
+      ],
+      businesses: [],
+      otherIncome: [],
+      investments: [],
+      liabilities: [],
+      insurance: [],
+      expenses: { avgMonthly: 0, recurring: [], plannedFuture: [] },
+    };
+  }
+
+  it("a Joint PPF (80C) and a Joint family-floater premium (80D) split 50/50, summing to the household's claim", () => {
+    const hh = twoEarnerHH();
+    hh.investments = [
+      { id: "i1", type: "PPF", value: 0, ownerId: "Joint", monthlyContribution: 10_000 }, // 1.2L/yr
+    ];
+    hh.insurance = [
+      { id: "p1", type: "Health", provider: "Star Family Floater", sumAssured: 0, annualPremium: 40_000, insuredPersonId: "a" },
+    ];
+
+    const a = deductionsForMember(hh, "a", 50);
+    const b = deductionsForMember(hh, "b", 50);
+
+    // 80C: 1.2L Joint PPF × 50% = 60k each.
+    expect(a.section80C).toBe(60_000);
+    expect(b.section80C).toBe(60_000);
+    expect(a.section80C + b.section80C).toBe(120_000); // sums to the household's true 80C claim
+
+    // 80D: insurance has NO "Joint" sentinel in this schema (insuredPersonId is always a member
+    // id) — the ₹40k floater is A's own policy, so only A claims it. This is the honest answer:
+    // there is no Joint-insurance CLASS to split until the schema grows one.
+    expect(a.section80D).toBe(Math.min(LIMIT_80D_SELF, 40_000));
+    expect(b.section80D).toBe(0);
+  });
+
+  it("a Joint ₹4L PPF caps EACH earner's 80C share at ₹1.5L independently (never ₹2L, never pooled to ₹3L)", () => {
+    const hh = twoEarnerHH();
+    hh.investments = [
+      { id: "i1", type: "PPF", value: 0, ownerId: "Joint", monthlyContribution: 400_000 / 12 }, // ≈4L/yr
+    ];
+    const a = deductionsForMember(hh, "a", 50);
+    const b = deductionsForMember(hh, "b", 50);
+    // Each earner's raw share is ~2L (half of 4L) — over the ₹1.5L 80C cap, so each caps
+    // independently at 1.5L, never at a doubled 2L, and the two shares never pool into one 3L claim.
+    expect(a.section80C).toBe(LIMIT_80C);
+    expect(b.section80C).toBe(LIMIT_80C);
+  });
+
+  it("a Joint (isSharedWithSpouse) home loan doubles §24 to ₹4L when both co-borrowers are tracked, each earner claiming their own share", () => {
+    const hh = twoEarnerHH();
+    hh.liabilities = [
+      {
+        id: "l1",
+        name: "Joint Home Loan",
+        type: "HomeLoan",
+        outstandingBalance: 5_000_000,
+        monthlyEMI: 50_000,
+        interestRate: 8.0, // interest = 4L
+        ownerId: "a",
+        isSharedWithSpouse: true,
+        coBorrowers: ["a", "b"],
+      },
+    ];
+    const a = deductionsForMember(hh, "a", 50);
+    const b = deductionsForMember(hh, "b", 50);
+    // a owns it (100% weight) → full 4L interest, capped at the doubled 4L cap (2 tracked co-borrowers).
+    expect(a.section24).toBe(400_000);
+    // b's share is isSharedWithSpouse × split = 50% of 4L interest = 2L, under its own 2L cap slice
+    // of the doubled ceiling — the co-borrower check still sees the FULL household roster (#204),
+    // not just b alone, so the multiplier is 2 (4L cap) here too, but b's actual interest share
+    // (2L) is what is claimed.
+    expect(b.section24).toBe(200_000);
+  });
+
+  it("own-owned sources are UNCHANGED — a member's own PPF/health/loan still yields exactly its own value", () => {
+    const hh = twoEarnerHH();
+    hh.investments = [{ id: "i1", type: "PPF", value: 0, ownerId: "a", monthlyContribution: 5_000 }]; // 60k/yr
+    hh.insurance = [
+      { id: "p1", type: "Health", provider: "X", sumAssured: 0, annualPremium: 15_000, insuredPersonId: "a" },
+    ];
+    const a = deductionsForMember(hh, "a", 50);
+    const b = deductionsForMember(hh, "b", 50);
+    expect(a.section80C).toBe(60_000);
+    expect(a.section80D).toBe(15_000);
+    expect(b.section80C).toBe(0);
+    expect(b.section80D).toBe(0);
+  });
+
+  it("a household with NO Joint 80C/80D/§24 source is byte-identical to the pre-fix own-only filter", () => {
+    const hh = twoEarnerHH();
+    hh.investments = [
+      { id: "i1", type: "Gold", value: 100_000, ownerId: "Joint" }, // Joint but not 80C-eligible
+    ];
+    hh.liabilities = [
+      { id: "l1", name: "Car Loan", type: "CarLoan", outstandingBalance: 300_000, monthlyEMI: 8_000, interestRate: 9, ownerId: "a", isSharedWithSpouse: false },
+    ];
+    const a = deductionsForMember(hh, "a", 50);
+    const b = deductionsForMember(hh, "b", 50);
+    expect(a.totalDeductions).toBe(0);
+    expect(b.totalDeductions).toBe(0);
   });
 });

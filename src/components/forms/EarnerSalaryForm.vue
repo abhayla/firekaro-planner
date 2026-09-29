@@ -2,6 +2,7 @@
 import { computed, ref, watch } from "vue";
 import { useHouseholdStore } from "@/stores/household";
 import { useUiStore } from "@/stores/ui";
+import { useAssumptionsStore } from "@/stores/assumptions";
 import { formatINRCompact, formatPercent } from "@/lib/formatters";
 import { ageAsOf, todayIsoLocal } from "@/lib/as-of-date";
 import InfoTip from "@/components/shared/InfoTip.vue";
@@ -18,6 +19,7 @@ const props = defineProps<{ earner: Member }>();
 
 const household = useHouseholdStore();
 const ui = useUiStore();
+const assumptions = useAssumptionsStore();
 
 // gh-issue #222: was a bare `computeTax`/`recommendRegime` call with a hardcoded
 // `oldDed = 175000` old-regime deduction — every earner whose REAL 80C/80D/§24/80CCD(1B)
@@ -33,13 +35,19 @@ function deriveTakeHomeFor(
   hasEpf = true,
 ) {
   if (!ctc) return null;
-  const card = previewEarnerTakeHome(household.data, props.earner, ui.currentFY, {
-    annualCTC: ctc,
-    employerNpsAnnual: employerNps,
-    basicAnnual: employerNpsBasic,
-    employerSector,
-    hasEpf,
-  });
+  const card = previewEarnerTakeHome(
+    household.data,
+    props.earner,
+    ui.currentFY,
+    {
+      annualCTC: ctc,
+      employerNpsAnnual: employerNps,
+      basicAnnual: employerNpsBasic,
+      employerSector,
+      hasEpf,
+    },
+    assumptions.values.householdSplitPercent ?? 50,
+  );
   if (!card) return null;
   return {
     annual: card.takeHome,
