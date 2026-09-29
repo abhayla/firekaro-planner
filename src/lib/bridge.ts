@@ -392,7 +392,15 @@ export function computeBridgeCoverage(input: BridgeInput): BridgeCoverage {
       if (liq.assumption) assumptions.push(liq.assumption);
       equityExemptionRemaining = Math.max(0, equityExemptionRemaining - liq.equityExemptionUsed);
 
-      if (acc.illiquid) {
+      // #211 — a holding that is illiquid AND has no unlock event (primary residence, or any
+      // future family with `unlockAge: Infinity`) is locked forever: it counts in the portfolio
+      // total but NEVER becomes runway. A holding that is illiquid but HAS a finite unlock age is
+      // a dated sale event (an investment property at its `plannedSaleAge`): it is locked until
+      // that age and then credited as a tranche, net of tax + the illiquidity haircut. Before this
+      // fix the second case fell into the first, so a property's rupees propped up the adequacy
+      // total while contributing exactly ₹0 of runway — and the gate read `covered` on money the
+      // household could not spend (Tier-0, optimistic).
+      if (acc.illiquid && !Number.isFinite(acc.unlockAge)) {
         lockedCorpus += Math.max(0, projected.value);
       } else if (acc.unlockAge <= retAge) {
         reachableCorpus += liq.net;

@@ -10,7 +10,11 @@
  * No derive() change here — this is the pure foundation Phase C builds on.
  */
 import { describe, it, expect } from "vitest";
-import { accessibleAtAge } from "./accessibility";
+import {
+  accessibleAtAge,
+  ASSUMED_PROPERTY_SALE_LAG_YEARS,
+  REAL_ESTATE_ILLIQUIDITY_HAIRCUT,
+} from "./accessibility";
 import type { Investment, InvestmentType } from "@/types/household";
 
 // A fixed clock so unlock-age arithmetic is deterministic (testing.md: no
@@ -157,20 +161,51 @@ describe("accessibleAtAge — real estate", () => {
     expect(r.illiquid).toBe(true);
   });
 
-  it("investment property → illiquid: NOT in the bridge runway (rent counts elsewhere) + note", () => {
+  // #211 — an investment/inherited property is NOT always-locked and NOT liquid at retirement: it
+  // unlocks through a dated SALE EVENT, net of an illiquidity haircut (LTCG is Phase B's job).
+  it("investment property → a dated sale event, haircut applied, still illiquid pre-sale (#211)", () => {
     const r = accessibleAtAge(
       makeInv("RealEstate", { value: 15_000_000, realEstateRole: "Investment" }),
       50,
       DOB_1990,
       ASOF,
     );
-    expect(r.accessibleLumpGross).toBe(0);
+    // No plan stated ⇒ the sale is dated the assumed lag into retirement, never at retirement
+    // itself (which would make unplanned property fully spendable on day one — the optimistic
+    // direction this fix exists to close).
+    expect(r.unlockAge).toBe(50 + ASSUMED_PROPERTY_SALE_LAG_YEARS);
+    expect(r.accessibleLumpGross).toBe(15_000_000 * (1 - REAL_ESTATE_ILLIQUIDITY_HAIRCUT));
+    // Illiquid until the sale closes → it is not part of the pre-sale liquid pool.
     expect(r.illiquid).toBe(true);
     expect(r.assumption).toBeDefined();
-    expect(r.assumption!.assumed).toMatch(/illiquid|not.*sell/i);
+    expect(r.assumption!.assumed).toMatch(/sold at age/i);
+    expect(r.assumption!.fixField).toBe("plannedSaleAge");
   });
 
-  it("inherited property → illiquid too", () => {
+  it("an explicit plannedSaleAge dates the unlock exactly there (#211)", () => {
+    const r = accessibleAtAge(
+      makeInv("RealEstate", { value: 15_000_000, realEstateRole: "Investment", plannedSaleAge: 62 }),
+      50,
+      DOB_1990,
+      ASOF,
+    );
+    expect(r.unlockAge).toBe(62);
+    expect(r.illiquid).toBe(true);
+  });
+
+  it("a plannedSaleAge at/before retirement clamps to the retirement age and is then liquid (#211)", () => {
+    const r = accessibleAtAge(
+      makeInv("RealEstate", { value: 15_000_000, realEstateRole: "Investment", plannedSaleAge: 44 }),
+      50,
+      DOB_1990,
+      ASOF,
+    );
+    expect(r.unlockAge).toBe(50);
+    // Sold at the retirement age ⇒ it IS spendable cash then, so it is no longer flagged illiquid.
+    expect(r.illiquid).toBe(false);
+  });
+
+  it("inherited property → the same dated sale event (#211)", () => {
     const r = accessibleAtAge(
       makeInv("RealEstate", { value: 8_000_000, realEstateRole: "Inherited" }),
       50,
@@ -178,6 +213,20 @@ describe("accessibleAtAge — real estate", () => {
       ASOF,
     );
     expect(r.illiquid).toBe(true);
+    expect(r.unlockAge).toBe(50 + ASSUMED_PROPERTY_SALE_LAG_YEARS);
+    expect(r.accessibleLumpGross).toBe(8_000_000 * (1 - REAL_ESTATE_ILLIQUIDITY_HAIRCUT));
+  });
+
+  // #211 — THE PROPERTY INVARIANT the issue asked for, stated at the classifier: a holding with no
+  // unlock EVENT contributes no lump at all. Primary residence is the only such real-estate case.
+  it("a holding that never unlocks yields no lump — the property invariant (#211)", () => {
+    const r = accessibleAtAge(
+      makeInv("RealEstate", { value: 20_000_000, realEstateRole: "PrimaryResidence" }),
+      50,
+      DOB_1990,
+      ASOF,
+    );
+    expect(Number.isFinite(r.unlockAge)).toBe(false);
     expect(r.accessibleLumpGross).toBe(0);
   });
 });

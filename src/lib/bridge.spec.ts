@@ -26,6 +26,10 @@ import {
   type BridgeProjection,
 } from "./bridge";
 import type { Investment, InvestmentType } from "@/types/household";
+import {
+  ASSUMED_PROPERTY_SALE_LAG_YEARS,
+  REAL_ESTATE_ILLIQUIDITY_HAIRCUT,
+} from "./accessibility";
 
 const DOB_1986 = "1986-01-01"; // age 40 as of ASOF
 const ASOF = new Date("2026-01-01T00:00:00Z");
@@ -527,7 +531,12 @@ describe("#212 the gate fires — a locked-heavy early retiree is NOT covered", 
         holdings: [
           holding("EPF_VPF", 12_000_000),
           holding("PPF", 4_000_000),
-          holding("RealEstate", 20_000_000, { realEstateRole: "Investment" }),
+          // #211 — this household INTENDS to hold the let-out flat (it is the rental income that
+          // funds them), so the sale is dated at 75. Before #211 the property was implicitly
+          // never-sold and this fixture needed no such field; it is stated explicitly now so the
+          // gate keeps testing what it was written to test — a household whose LIQUID slice cannot
+          // carry the early years — rather than being rescued by an assumed sale three years in.
+          holding("RealEstate", 20_000_000, { realEstateRole: "Investment", plannedSaleAge: 75 }),
           holding("MutualFunds", 1_500_000),
         ],
         projection: {
@@ -541,7 +550,7 @@ describe("#212 the gate fires — a locked-heavy early retiree is NOT covered", 
         },
       }),
     );
-    // The property is illiquid and the PPF is held past 48 → the liquid runway is thin.
+    // The property is held to 75 and the PPF past 48 → the liquid runway is thin.
     expect(r.lockedCorpus).toBeGreaterThan(20_000_000);
     expect(r.unlockTimeline.length).toBeGreaterThan(0);
     // THE GATE: the liquid money does not carry the bridge, so the headline moves LATER.
@@ -551,5 +560,227 @@ describe("#212 the gate fires — a locked-heavy early retiree is NOT covered", 
     expect(r.effectiveFireAge).toBeGreaterThan(r.corpusOnlyFireAge);
     // ...and it reports a surfaced reason, not a silent move.
     expect(r.assumptions.some((x) => x.id === "bridge-shortfall")).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// #211 — A PROPERTY IS RUNWAY ONLY FROM ITS SALE, AND ITS RUPEES ARE NOT IN THE
+// PRE-SALE LIQUID RESIDUAL.
+//
+// THE BUG. An investment/inherited property used to classify as `unlockAge:
+// Infinity`, so Phase C added its whole projected value to `lockedCorpus` and
+// created NO tranche. Its rupees therefore counted toward the corpus-adequacy
+// total the bridge is layered on, while contributing exactly ₹0 of spendable
+// runway — the household passed the gate on money it could not spend. Measured
+// on the mehtas seed: a ₹3.5 Cr Bandra flat, 40% of the retirement corpus, with
+// no unlock event anywhere in the timeline.
+//
+// THE MODEL. The property is a dated SALE EVENT: locked until `plannedSaleAge`
+// (assumed `ASSUMED_PROPERTY_SALE_LAG_YEARS` into retirement when unstated),
+// then credited as a tranche net of the illiquidity haircut and real-estate
+// LTCG. `reachableCorpus` — the money available AT the retirement age — never
+// includes it while it is unsold, which is the property this block pins.
+// ---------------------------------------------------------------------------
+describe("#211 investment property — a dated sale tranche, never pre-sale liquidity", () => {
+  const propertyInput = (extras: Partial<Investment> = {}) =>
+    baseInput({
+      retirementAge: 50,
+      anchorAge: 40,
+      planToAge: 90,
+      annualExpenses: 1_200_000,
+      holdings: [
+        holding("MutualFunds", 10_000_000),
+        holding("RealEstate", 20_000_000, { realEstateRole: "Investment", ...extras }),
+      ],
+    });
+
+  it("an unsold property is NOT in reachableCorpus but IS a dated tranche", () => {
+    const r = computeBridgeCoverage(propertyInput());
+    const saleAge = 50 + ASSUMED_PROPERTY_SALE_LAG_YEARS;
+    const tranche = r.unlockTimeline.find((t) => t.age === saleAge);
+    expect(tranche).toBeDefined();
+    // Net of the 10% haircut AND real-estate LTCG — strictly less than the market value, and
+    // strictly more than zero (the old behaviour).
+    expect(tranche!.netAmount).toBeGreaterThan(0);
+    expect(tranche!.netAmount).toBeLessThan(20_000_000 * (1 - REAL_ESTATE_ILLIQUIDITY_HAIRCUT));
+    // The liquid money at the retirement age is the MF slice only — the property's rupees are not
+    // in it (this is the anti-optimism assertion: ₹2 Cr of flat must not read as runway).
+    expect(r.reachableCorpus).toBeLessThan(10_000_000);
+    expect(r.lockedCorpus).toBeGreaterThan(0);
+  });
+
+  it("an explicit plannedSaleAge moves the tranche to exactly that age", () => {
+    const r = computeBridgeCoverage(propertyInput({ plannedSaleAge: 68 }));
+    expect(r.unlockTimeline.map((t) => t.age)).toContain(68);
+    expect(r.reachableCorpus).toBeLessThan(10_000_000);
+  });
+
+  it("a sale planned AT the retirement age is spendable then — no tranche, in reachableCorpus", () => {
+    const r = computeBridgeCoverage(propertyInput({ plannedSaleAge: 50 }));
+    expect(r.unlockTimeline).toHaveLength(0);
+    // Now it IS runway: the MF slice plus the post-haircut, post-LTCG property proceeds.
+    expect(r.reachableCorpus).toBeGreaterThan(10_000_000);
+  });
+
+  it("primary residence is never sold: no tranche, no lump, locked forever (the property invariant)", () => {
+    const r = computeBridgeCoverage(
+      baseInput({
+        retirementAge: 50,
+        holdings: [
+          holding("MutualFunds", 10_000_000),
+          holding("RealEstate", 20_000_000, { realEstateRole: "PrimaryResidence" }),
+        ],
+      }),
+    );
+    expect(r.unlockTimeline).toHaveLength(0);
+    expect(r.lockedCorpus).toBe(20_000_000);
+    expect(r.reachableCorpus).toBeLessThan(10_000_000);
+  });
+
+  it("a household with no real estate is byte-identical to its pre-#211 result", () => {
+    // The whole change is gated behind the realEstate accessibility class, so a portfolio without
+    // one must be bit-for-bit unchanged. Locked here as an exact-value snapshot of the same input
+    // used by the pre-existing fully-liquid case above.
+    const r = computeBridgeCoverage(
+      baseInput({ retirementAge: 50, holdings: [holding("Stocks", 30_000_000), holding("FD", 5_000_000)] }),
+    );
+    expect(r.covered).toBe(true);
+    expect(r.effectiveFireAge).toBe(50);
+    expect(r.lockedCorpus).toBe(0);
+    expect(r.unlockTimeline).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// #211 — PER-SEED BOUNDS, READ BACK FROM THE REAL `derive()` PATH.
+//
+// Derived from the T1 diagnostic run in PR #214, before AND after the fix. What
+// moved and what deliberately did not:
+//
+//   seed     | reachableCorpus   | lockedCorpus      | timeline (property)
+//   mehtas   | 599.3L → 599.3L   | 424.9L → 361.2L   | absent → Bandra flat @54
+//   mauryas  | 992.8L → 992.8L   | 60.0L  → 49.1L    | absent → let-out flat @69
+//   sharmas / iyers / ravi: every field byte-identical (no investment property).
+//
+// `reachableCorpus` is UNCHANGED on both property seeds, which is the fix's
+// whole point: the property's rupees were never in the pre-sale liquid pool and
+// still are not. `lockedCorpus` FALLS because the locked figure is now the
+// post-haircut, post-LTCG net of a dated sale instead of the raw market value,
+// and the same rupees now appear as a tranche the user can see. No seed's
+// VERDICT moved (every one is `covered` with a runway far wider than the sale
+// lag) — recorded honestly rather than engineered: the gate's ability to fire is
+// proven on the #212 locked-heavy fixture above, not on a seed.
+// ---------------------------------------------------------------------------
+describe("#211 per-seed bounds through the real derive() path", () => {
+  beforeEach(() => setActivePinia(createPinia()));
+
+  const EXPECT: Record<string, { propertyLabel: string | null; saleAge: number | null }> = {
+    sharmas: { propertyLabel: null, saleAge: null },
+    mehtas: { propertyLabel: "3BHK Bandra Mumbai", saleAge: 54 },
+    iyers: { propertyLabel: null, saleAge: null },
+    mauryas: { propertyLabel: "2BHK (let out)", saleAge: 69 },
+    ravi: { propertyLabel: null, saleAge: null },
+  };
+
+  for (const persona of IDENTITY_PERSONAS) {
+    it(`${persona.name}: the property (if any) is a dated tranche and never pre-sale liquidity`, () => {
+      const h = useHouseholdStore();
+      const a = useAssumptionsStore();
+      persona.load(h, a);
+      const k = derive(h.data, a.values, IDENTITY_LENS, { currentYear: 2026 });
+      const b = k.bridgeCoverage;
+      expect(b).not.toBeNull();
+      const want = EXPECT[persona.name];
+
+      if (want.propertyLabel == null) {
+        // NO INVESTMENT PROPERTY ⇒ nothing about this seed's bridge may change. Every tranche in
+        // the timeline is a financial instrument, never real estate.
+        const re = h.data.investments.filter(
+          (i) => i.type === "RealEstate" && i.realEstateRole !== "PrimaryResidence",
+        );
+        expect(re).toHaveLength(0);
+        for (const t of b!.unlockTimeline) {
+          expect(h.data.investments.find((i) => i.label === t.label)?.type).not.toBe("RealEstate");
+        }
+        return;
+      }
+
+      // The property is in the timeline, at its assumed sale age (the retirement age plus the lag),
+      // and NOT in the money available at the retirement age.
+      const tranche = b!.unlockTimeline.find((t) => t.label === want.propertyLabel);
+      expect(tranche).toBeDefined();
+      expect(tranche!.age).toBe(want.saleAge);
+      expect(tranche!.age).toBe(b!.corpusOnlyFireAge + ASSUMED_PROPERTY_SALE_LAG_YEARS);
+      expect(tranche!.netAmount).toBeGreaterThan(0);
+      // Its rupees sit in the LOCKED side until that age, not in the runway.
+      expect(b!.lockedCorpus).toBeGreaterThanOrEqual(tranche!.netAmount);
+    });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// #211 REVIEW — THE GATE FIRES ON THE DEFAULT PATH (no stated sale age).
+//
+// Why this exists. The #212 locked-heavy fixture above proves the gate fires, but
+// only because it now states `plannedSaleAge: 75` — remove that one field and the
+// assumed sale three years in rescues it. So nothing proved the gate can fire for
+// the case EVERY real user hits: a property household that has typed no sale age
+// at all, where the assumed lag is the only thing holding the property out of the
+// runway. This is that proof, and it is exactly the three-year window the lag
+// creates that has to go underwater.
+//
+// The profile: a household retiring at 50 whose corpus is almost entirely a
+// ₹3 Cr let-out flat with a thin ₹25 L liquid slice, against a ₹40 L/yr bill.
+// The flat is assumed sold at 53; the liquid slice cannot carry 50-52, so the
+// verdict is NOT covered and the shortfall lands inside the lag window.
+// ---------------------------------------------------------------------------
+describe("#211 the gate fires with NO plannedSaleAge — the default-lag window is underwater", () => {
+  it("thin liquid slice + an assumed-sale property → covered:false inside the lag window", () => {
+    const r = computeBridgeCoverage(
+      baseInput({
+        retirementAge: 50,
+        anchorAge: 40,
+        planToAge: 90,
+        annualExpenses: 4_000_000,
+        exitLumpNet: 0,
+        income: { rentalAnnualPostTax: 600_000, epsAnnualPostTax: 0, epsStartAge: 58 },
+        holdings: [
+          holding("FD", 2_500_000),
+          // NO plannedSaleAge — the whole point of this fixture.
+          holding("RealEstate", 30_000_000, { realEstateRole: "Investment" }),
+        ],
+      }),
+    );
+    const saleAge = 50 + ASSUMED_PROPERTY_SALE_LAG_YEARS;
+    // The property is the only tranche, dated by the assumed lag alone.
+    expect(r.unlockTimeline).toHaveLength(1);
+    expect(r.unlockTimeline[0].age).toBe(saleAge);
+    // THE GATE, on the default path: the liquid slice cannot fund the years before the sale.
+    expect(r.covered).toBe(false);
+    expect(r.shortfallYears).toBeGreaterThanOrEqual(1);
+    expect(r.shortfallAmount).toBeGreaterThan(0);
+    // The deficit is inside the lag window — the shortfall years cannot exceed it, because the
+    // sale closes the gap the moment it lands.
+    expect(r.shortfallYears).toBeLessThanOrEqual(ASSUMED_PROPERTY_SALE_LAG_YEARS);
+    // ...and the headline moves later, with a surfaced reason rather than a silent shift.
+    expect(r.effectiveFireAge).toBeGreaterThan(r.corpusOnlyFireAge);
+    expect(r.assumptions.some((x) => x.id === "bridge-shortfall")).toBe(true);
+    // The counterfactual that makes this fixture load-bearing: state the sale AT retirement and the
+    // same household is covered — so what fails here is the LAG, not an under-funded portfolio.
+    const sameButSoldAtRetirement = computeBridgeCoverage(
+      baseInput({
+        retirementAge: 50,
+        anchorAge: 40,
+        planToAge: 90,
+        annualExpenses: 4_000_000,
+        exitLumpNet: 0,
+        income: { rentalAnnualPostTax: 600_000, epsAnnualPostTax: 0, epsStartAge: 58 },
+        holdings: [
+          holding("FD", 2_500_000),
+          holding("RealEstate", 30_000_000, { realEstateRole: "Investment", plannedSaleAge: 50 }),
+        ],
+      }),
+    );
+    expect(sameButSoldAtRetirement.covered).toBe(true);
   });
 });
