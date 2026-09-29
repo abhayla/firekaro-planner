@@ -24,6 +24,8 @@ import type {
   Member,
   OtherIncomeLine,
 } from "@/types/household";
+import { isAdultRole } from "@/types/household";
+import { isEarningMember } from "@/lib/member-earning";
 import { ageAsOf, todayIsoLocal } from "@/lib/as-of-date";
 import { netCashSalary, pfFromRows, PROFESSIONAL_TAX_ANNUAL_PER_EARNER } from "@/lib/salary-cash";
 import { toAnnual } from "@/lib/cashflow";
@@ -170,14 +172,23 @@ export const JOINT_DEDUCTION_OWNER = "Joint";
  * DROPPED every Joint-owned source — a PPF/ELSS/NPS held `ownerId: "Joint"`, or a home loan flagged
  * `isSharedWithSpouse`, was claimed by NEITHER earner (RCA, gh #204).
  *
- * Attribution mirrors the SAME convention `individual-fire.ts`'s `corpusWeightOf`/`contribWeight`
- * and `useFireDerive.ts`'s `invWeight`/`liabWeight` already use for corpus/net-worth: own-owned =
- * 100%, "Joint"-owned (investments) or `isSharedWithSpouse` (liabilities) = × `householdSplitPercent`,
- * everyone else's = 0%. The two earners' shares of one Joint source always sum to the household's
- * true claim (e.g. a ₹1.2L Joint PPF splits ₹60k/₹60k at a 50/50 split, never ₹1.2L to each) —
- * `deriveDeductions` below then caps EACH earner's resulting `totalDeductions` independently at the
- * statutory limits, so a large-enough Joint source (e.g. a ₹4L Joint PPF) still cannot let either
- * earner individually exceed ₹1.5L under 80C.
+ * Round 3 (#204 review CRITICAL finding): a Joint 80C/80CCD(1B) investment's split must be
+ * COMPLEMENTARY across the two adults, not the same `householdSplitPercent` read twice — round 2's
+ * `weightOf` gave EVERY member queried the same `split` share regardless of who they were, so at a
+ * non-50 split (e.g. 60) a Joint ₹1.2L PPF yielded A ₹72k + B ₹72k = ₹1.44L, ₹24k more than the
+ * ₹1.2L actually contributed (the exact `deriveDeductions` double-count this whole fix exists to
+ * remove — see #204's original RCA). Fixed the same way §24 already was in round 2: an "anchor"
+ * adult's share and the OTHER adult's share must sum to 1. The anchor is the same one `derive.ts`'s
+ * `anchorAgeFor` uses for the household's primary-earner age (`earners[0]`, i.e. the FIRST EARNING
+ * adult in `household.members` array order — `jointAnchorMemberId` below) — with exactly 2 adults:
+ * anchor gets `split`, the other gets `1 − split` (both sum to 1, so the household's true claim is
+ * never inflated regardless of which value `householdSplitPercent` holds). A single-adult household
+ * gets 100% of every Joint source (there is no one else to split with). 3+ adults: `1/adultCount`
+ * equal shares each (no anchor concept scales past 2 — `householdSplitPercent` itself is documented
+ * elsewhere as a 2-adult convention; equal split is the least-surprising N-way default until a
+ * per-adult split model exists). `deriveDeductions` below then caps EACH earner's resulting
+ * `totalDeductions` independently at the statutory limits, so a large-enough Joint source (e.g. a
+ * ₹4L Joint PPF) still cannot let either earner individually exceed ₹1.5L under 80C.
  *
  * Insurance (`InsurancePolicy.insuredPersonId`) has NO "Joint" sentinel in this schema — the only
  * values a policy's `insuredPersonId` ever takes are household member ids (`InsurancePolicyForm.vue`'s
@@ -203,8 +214,24 @@ export function deductionsForMember(
 ): DeductionBreakdown {
   const split = Math.min(100, Math.max(0, householdSplitPercent)) / 100;
   const member = household.members.find((m) => m.id === memberId);
+  const adults = household.members.filter((m) => isAdultRole(m.role));
+
+  // #204 round 3 — the SAME anchor convention `derive.ts`'s `anchorAgeFor` uses for the household's
+  // primary earner: the FIRST EARNING adult in household member-array order, falling back to the
+  // first adult at all when nobody earns (mirrors `derive.ts`'s `earners[0] ?? ...` pattern).
+  const jointAnchorMemberId =
+    adults.find((m) => isEarningMember(m, household.businesses))?.id ?? adults[0]?.id;
+
+  /** A member's COMPLEMENTARY share of a Joint 80C/80CCD(1B) source — sums to 1 across all adults,
+   * never re-reads the same `split` for both queried members (round-3 fix). */
+  const jointShareFor = (thisMemberId: string): number => {
+    if (adults.length <= 1) return 1;
+    if (adults.length === 2) return thisMemberId === jointAnchorMemberId ? split : 1 - split;
+    return adults.some((m) => m.id === thisMemberId) ? 1 / adults.length : 0;
+  };
+  const jointShare = jointShareFor(memberId);
   const weightOf = (ownerId: string): number =>
-    ownerId === memberId ? 1 : ownerId === JOINT_DEDUCTION_OWNER ? split : 0;
+    ownerId === memberId ? 1 : ownerId === JOINT_DEDUCTION_OWNER ? jointShare : 0;
 
   const investments = household.investments
     .map((i) => ({ inv: i, w: weightOf(i.ownerId) }))

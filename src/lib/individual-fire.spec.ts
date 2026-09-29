@@ -10,6 +10,8 @@ import { loadMauryasSeed } from "@/seeds/mauryas";
 import { derive } from "@/lib/derive";
 import { computeIndividualFire } from "@/lib/individual-fire";
 import { resolveHouseholdBasket } from "@/lib/assumption-math";
+import { deductionsForMember, LIMIT_SECTION_24 } from "@/lib/tax-deductions";
+import { todayIsoLocal } from "@/lib/as-of-date";
 
 describe("computeIndividualFire (#81 Phase 2 — standalone per-adult FIRE)", () => {
   beforeEach(() => setActivePinia(createPinia()));
@@ -355,5 +357,45 @@ describe("computeIndividualFire (#81 Phase 2 — standalone per-adult FIRE)", ()
       a.values.housingInflation = originalHousing;
       h.data.healthcareCorpusReservationPercent = originalReservation;
     }
+  });
+});
+
+// gh #204 round 2/3 — the Iyers seed HAS a real shared home loan (ownerId: "ashwin",
+// isSharedWithSpouse: true, coBorrowers: ["ashwin", "lakshmi"]) that round 2's payment-split §24
+// fix changed with no rupee lock. Interest = outstandingBalance ₹36,00,000 × interestRate 8.5% =
+// ₹3,06,000/yr. At the default 50/50 householdSplitPercent, Ashwin's (owner) payment share =
+// (1 − 0.5) × 3,06,000 = ₹1,53,000; Lakshmi's (spouse) share = 0.5 × 3,06,000 = ₹1,53,000 — both
+// under the ₹2L per-assessee cap, so each claims their real share (never the round-1 bug's
+// owner-full + spouse-split double-count, which would have given ₹3,06,000 + ₹1,53,000 = ₹4,59,000
+// on ₹3,06,000 actually paid).
+describe("gh #204 — Iyers §24 rupee lock (real seed with a shared home loan)", () => {
+  beforeEach(() => setActivePinia(createPinia()));
+
+  it("Ashwin's and Lakshmi's §24 shares are exact and sum to the interest paid, never above the household cap", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    const asOf = new Date("2025-08-01T00:00:00.000Z");
+    loadIyersSeed(h, a, asOf);
+
+    const split = a.values.householdSplitPercent ?? 50;
+    expect(split).toBe(50); // Iyers seed does not override the default split
+    const ashwin = deductionsForMember(h.data, "ashwin", split, { asOfDate: todayIsoLocal(asOf) });
+    const lakshmi = deductionsForMember(h.data, "lakshmi", split, { asOfDate: todayIsoLocal(asOf) });
+
+    expect(ashwin.section24).toBe(153_000);
+    expect(lakshmi.section24).toBe(153_000);
+    expect(ashwin.section24 + lakshmi.section24).toBe(306_000); // = the interest actually paid
+    expect(ashwin.section24 + lakshmi.section24).toBeLessThanOrEqual(2 * LIMIT_SECTION_24);
+  });
+
+  it("Ashwin's and Lakshmi's individual FIRE ages are unmoved by the §24 payment-split fix (locked elsewhere at 47 / 84)", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    const asOf = new Date("2025-08-01T00:00:00.000Z");
+    loadIyersSeed(h, a, asOf);
+    const ashwin = computeIndividualFire(h.data, a.values, "ashwin", "2025-26", undefined, asOf)!;
+    const lakshmi = computeIndividualFire(h.data, a.values, "lakshmi", "2025-26", undefined, asOf)!;
+    expect(ashwin.individualFireAge).toBe(47);
+    expect(lakshmi.individualFireAge).toBe(84);
   });
 });
