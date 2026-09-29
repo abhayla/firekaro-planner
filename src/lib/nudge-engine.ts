@@ -20,6 +20,7 @@
 import type { Household, Investment } from "@/types/household";
 import type { DerivedFamilyLayer } from "./derived-records";
 import { isInMarginalReliefBand, deriveDeductions, LIMIT_80C, LIMIT_80CCD_1B } from "./tax-deductions";
+import { todayIsoLocal } from "./as-of-date";
 import { suggestNpsCap } from "./nps-withdrawal";
 import { epfVpfOpportunityCostYears } from "./epf-vpf";
 import { isEmergencyFundEligible } from "./investment-traits";
@@ -376,7 +377,7 @@ export function evaluateNudges(ctx: NudgeContext): Nudge[] {
   // taxable income above the basic exemption (where deductions actually save
   // tax). Body names the specific unused headroom(s). deriveDeductions is pure.
   if (ctx.taxableIncome > 500_000) {
-    const ded = deriveDeductions(ctx.household);
+    const ded = deriveDeductions(ctx.household, { asOfDate: todayIsoLocal() });
     const headroom80C = Math.max(0, LIMIT_80C - ded.section80C);
     const headroom80CCD1B = Math.max(0, LIMIT_80CCD_1B - ded.section80CCD1B);
     const gaps: string[] = [];

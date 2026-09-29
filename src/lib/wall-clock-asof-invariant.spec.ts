@@ -38,6 +38,32 @@ function stripComments(content: string): string {
     .join("\n");
 }
 
+/**
+ * Extract the full argument-list text of every `deriveDeductions(...)` call in `content`, by
+ * scanning for balanced parens from each call site — a single-line regex can't handle the
+ * multi-line calls (`derive.ts`, `individual-fire.ts`, `tax-planning/Index.vue` all wrap the
+ * object-literal argument across several lines).
+ */
+function deriveDeductionsCallArgs(content: string): string[] {
+  const calls: string[] = [];
+  const callSite = /deriveDeductions\s*\(/g;
+  let match: RegExpExecArray | null;
+  while ((match = callSite.exec(content)) !== null) {
+    let depth = 1;
+    let i = match.index + match[0].length;
+    const start = i;
+    while (i < content.length && depth > 0) {
+      if (content[i] === "(") depth++;
+      else if (content[i] === ")") depth--;
+      i++;
+    }
+    calls.push(content.slice(start, i - 1));
+  }
+  return calls;
+}
+
+const DEFINITION_FILES = new Set(["tax-deductions.ts"]);
+
 function sourceFiles(dir: string): string[] {
   const out: string[] = [];
   for (const entry of readdirSync(dir)) {
@@ -73,6 +99,20 @@ describe("#198 — wall-clock asOfDate invariant (grep-lock)", () => {
       if (ALLOWED_FILES.has(name) || ALLOWED_BARE_AGE_FILES.has(name)) continue;
       const content = stripComments(readFileSync(file, "utf-8"));
       if (BARE_AGE_FROM_DOB.test(content)) violations.push(file);
+    }
+    expect(violations).toEqual([]);
+  });
+
+  it("has zero deriveDeductions(...) calls whose argument list omits asOfDate", () => {
+    const files = sourceFiles(SRC);
+    const violations: string[] = [];
+    for (const file of files) {
+      const name = file.split(/[\\/]/).pop()!;
+      if (DEFINITION_FILES.has(name)) continue; // the function's own definition/signature
+      const content = stripComments(readFileSync(file, "utf-8"));
+      for (const args of deriveDeductionsCallArgs(content)) {
+        if (!/asOfDate/.test(args)) violations.push(`${file} :: deriveDeductions(${args.trim().slice(0, 60)}...)`);
+      }
     }
     expect(violations).toEqual([]);
   });
