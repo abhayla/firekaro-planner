@@ -101,6 +101,36 @@ describe("computeIndividualFire (#81 Phase 2 — standalone per-adult FIRE)", ()
     expect(Number.isFinite(r.individualFireAge)).toBe(false); // NOT a finite absurd age
   });
 
+  it("gh #162 part 1 — carries the household healthcare corpus reservation (never bare base)", () => {
+    // RCA: computeIndividualFire built the target as bare calculateFIRENumber(...) — no
+    // healthcareCorpusReservationPercent — so every member-lensed surface was ~17% optimistic
+    // vs the household path (derive.ts adds base × healthcareCorpusReservationPercent, default 20%).
+    const { h, a } = setup();
+    // A zero reservation reproduces the bare pre-fix base exactly (no double-count, no hidden
+    // floor) — measure it directly rather than back-computing, to avoid rounding noise.
+    h.data.healthcareCorpusReservationPercent = 0;
+    const zero = computeIndividualFire(h.data, a.values, "rohit", "2025-26")!;
+    const bareBase = zero.individualFireNumber;
+
+    h.data.healthcareCorpusReservationPercent = 0.2; // explicit default, not implicit
+    const withReservation = computeIndividualFire(h.data, a.values, "rohit", "2025-26")!;
+    // The FIX must add the reservation on top of the base — never leave the bare base standing.
+    expect(withReservation.individualFireNumber).toBeCloseTo(bareBase * 1.2, -2);
+    expect(withReservation.individualFireNumber).toBeGreaterThan(bareBase);
+
+    // Raising the household's reservation % must raise EVERY adult's individual target,
+    // through the SAME shared calculateFireTarget helper the household path uses.
+    h.data.healthcareCorpusReservationPercent = 0.3;
+    const higher = computeIndividualFire(h.data, a.values, "rohit", "2025-26")!;
+    expect(higher.individualFireNumber).toBeGreaterThan(withReservation.individualFireNumber);
+    expect(higher.individualFireNumber).toBeCloseTo(bareBase * 1.3, -2);
+
+    // The FIRE AGE must move LATER (or stay equal) as the target rises — never earlier.
+    expect(higher.individualFireAge === Infinity || withReservation.individualFireAge === Infinity
+      ? true
+      : higher.individualFireAge >= withReservation.individualFireAge).toBe(true);
+  });
+
   it("a member-OWNED expense lands fully in that adult, not split", () => {
     const { h, a } = setup();
     a.values.householdSplitPercent = 50;

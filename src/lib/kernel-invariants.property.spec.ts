@@ -38,6 +38,7 @@ import { derive } from "@/lib/derive";
 import { isEarningMember } from "@/lib/member-earning";
 import { computeTax, AVAILABLE_FYS } from "@/lib/tax";
 import { floorCeilingWithdrawal } from "@/lib/withdrawal-strategy";
+import { computeIndividualFire } from "@/lib/individual-fire";
 
 const LENS = { isFamilyView: false, viewingMemberId: null, currentFY: "2025-26" } as const;
 const EPS = 1e-9;
@@ -299,6 +300,63 @@ describe("A7.1 kernel invariants — per-persona metamorphic (fast-check)", () =
         ),
         { numRuns: 50 },
       );
+    });
+  }
+});
+
+describe("gh #162 part 1 — individual FIRE target always carries the healthcare reservation", () => {
+  beforeEach(() => setActivePinia(createPinia()));
+  // Review finding (#199 item 4): the property body mutated `h.data.healthcareCorpusReservationPercent`
+  // in place across fast-check runs with no reset on throw/early-exit. `beforeEach` re-creates
+  // Pinia for the NEXT `it`, but within a single `it` a thrown property could leave the mutation
+  // in place for the remainder of that run — the `try/finally` below (per test) closes that gap
+  // explicitly rather than relying on the next test's fresh Pinia to paper over it.
+
+  // Detection upgrade (per the fix contract): a property invariant, not just a fixed-fixture
+  // test, so ANY future edit to computeIndividualFire that drops the reservation OR silently
+  // doubles it goes red across every persona + every valid reservation %, not just the one seed
+  // the unit spec exercises. Two-sided (#199 review, item 4): a lower bound alone would pass a
+  // double-counted reservation (e.g. base × (1 + 2×reservation%)) — the upper bound catches that.
+  for (const persona of PERSONAS) {
+    it(`${persona.name}: every adult's individualFireNumber == base × (1 + reservation%), never above or below (double-count guard)`, () => {
+      const h = useHouseholdStore();
+      const a = useAssumptionsStore();
+      persona.load(h, a);
+      const originalReservationPercent = h.data.healthcareCorpusReservationPercent;
+      try {
+        fc.assert(
+          fc.property(
+            fc.double({ min: 0, max: 0.5, noNaN: true }), // household.healthcareCorpusReservationPercent zod bound
+            (reservationPercent) => {
+              h.data.healthcareCorpusReservationPercent = 0;
+              const adults = h.data.members.filter((m) => m.role === "ADULT");
+              for (const member of adults) {
+                const zero = computeIndividualFire(h.data, a.values, member.id, "2025-26");
+                if (!zero || !Number.isFinite(zero.individualFireNumber) || zero.individualFireNumber <= 0) continue;
+                h.data.healthcareCorpusReservationPercent = reservationPercent;
+                const withReservation = computeIndividualFire(h.data, a.values, member.id, "2025-26")!;
+                h.data.healthcareCorpusReservationPercent = 0;
+                // Allow ±1 rupee of rounding slack (both legs round to the nearest rupee independently).
+                const expected = Math.round(zero.individualFireNumber * (1 + reservationPercent));
+                expect(withReservation.individualFireNumber).toBeGreaterThanOrEqual(
+                  Math.max(expected - 1, zero.individualFireNumber - 1),
+                );
+                // Upper bound (#199 review item 4): catches a double-applied reservation (e.g. the
+                // 20% applied twice, or stacked with a second copy of the same formula) that a
+                // lower-bound-only check would silently pass.
+                expect(withReservation.individualFireNumber).toBeLessThanOrEqual(expected + 1);
+              }
+            },
+          ),
+          { numRuns: 25 },
+        );
+      } finally {
+        // Reset regardless of pass/fail/throw so this test never leaks state into a sibling `it`
+        // that happens to reuse the same store instance (defensive — Pinia is normally
+        // re-created per-test by `beforeEach`, but the household object itself is persona-loaded
+        // fresh each time too; this closes the gap explicitly per the review finding).
+        h.data.healthcareCorpusReservationPercent = originalReservationPercent;
+      }
     });
   }
 });

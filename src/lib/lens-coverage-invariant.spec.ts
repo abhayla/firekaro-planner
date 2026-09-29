@@ -145,19 +145,35 @@ describe("fire-goals member-lens coverage — Goals lenses, the 4 simulation scr
     ).toEqual([]);
   });
 
-  // FinTech drift-lock (D-2026-06-13-03): Goals' member caveat and the Dashboard hero caveat describe
-  // the SAME individual FIRE number, so both MUST disclose that this number SKIPS the healthcare reserve
-  // + locked-money bridge the household plan carries. Goals once dropped that clause (under-disclosure on
-  // the commitment screen — caught by FinTech review); this pins both to parity so they can never drift.
-  it("Goals member caveat discloses the same individual-FIRE omissions as the hero caveat (no honesty drift)", () => {
+  // FinTech drift-lock (D-2026-06-13-03, updated #162 part 1): Goals' member caveat and the
+  // Dashboard hero caveat describe the SAME individual FIRE number, so both MUST disclose the
+  // SAME omission set — and must NEVER claim an omission the code no longer has. Since #162 part 1
+  // the individual target carries the household healthcare reservation, so only the locked-money
+  // bridge check remains excluded; the old "skips the healthcare reserve" claim is now FALSE and
+  // must not appear on either screen (an inaccurate-in-the-optimistic-direction disclosure is as
+  // bad as a missing one — it tells the user their number is worse than it is, but a stale claim
+  // that later flips silently is the drift class this lock exists to catch either direction of).
+  it("Goals + hero member caveats disclose the CURRENT individual-FIRE omissions (no honesty drift)", () => {
     const goals = readFileSync(join(PAGES, "fire-goals", "Goals.vue"), "utf8");
     const hero = readFileSync(join(PAGES, "..", "components", "dashboard", "FireHero.vue"), "utf8");
-    for (const phrase of ["healthcare reserve", "locked-money bridge"]) {
+    for (const phrase of ["locked-money bridge"]) {
       expect(hero.includes(phrase), `hero caveat (the precedent) must mention "${phrase}"`).toBe(true);
       expect(
         goals.includes(phrase),
         `Goals member caveat must mention "${phrase}" to match the hero's disclosure for the same individual FIRE number`,
       ).toBe(true);
     }
+    // #162 part 1: the individual target now carries the healthcare reservation — neither screen's
+    // USER-FACING copy may claim it still skips the reserve. FireHero keeps the phrase only inside
+    // an HTML comment (dev-facing history, never rendered); Goals must not have it at all.
+    const heroRenderedCopy = hero.replace(/<!--[\s\S]*?-->/g, "");
+    expect(
+      heroRenderedCopy.includes("skips the healthcare reserve"),
+      "hero's RENDERED copy must not claim the healthcare reserve is skipped (#162 part 1 added it)",
+    ).toBe(false);
+    expect(
+      goals.includes("skips the healthcare reserve"),
+      "Goals copy must not claim the healthcare reserve is skipped (#162 part 1 added it)",
+    ).toBe(false);
   });
 });

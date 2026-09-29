@@ -600,13 +600,13 @@ function yearsLabel(years: number): string {
       </p>
 
       <!-- D-2026-06-13-02 member caveat — the honesty anchor under the lens: names what the
-           individual view excludes (children + shared split, AND the healthcare reserve +
-           locked-money bridge check the household plan carries — FinTech Q7) and keeps the
-           household figure one glance away. -->
+           individual view excludes (children + shared split) and what it still skips vs the
+           household plan (the locked-money bridge check only — gh #162 part 1 added the
+           healthcare reserve to the individual target itself, so it is no longer an exclusion). -->
       <p v-if="hh.isMember" class="fire-hero__subline" data-testid="fire-hero-member-caveat">
         This is <b>{{ hh.memberName }}'s individual</b> FIRE — it funds only their own lifestyle
-        (excludes the children + their split of shared costs) and skips the healthcare reserve and
-        locked-money bridge check the household plan includes.
+        (excludes the children + their split of shared costs) and skips the locked-money bridge
+        check the household plan includes.
         <template v-if="fire.householdFireAge.value != null">
           The <b>whole household</b> can stop at <b>age {{ fire.householdFireAge.value }}</b>
           ({{ formatINRCompact(fire.fireNumber.value) }}).

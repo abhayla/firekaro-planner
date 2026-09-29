@@ -150,8 +150,8 @@ const allGoals = computed<GoalCard[]>(() => [retirementCard.value, ...lifeEventC
       data-testid="goals-member-caveat"
     >
       This is <b>{{ memberCaveat.name }}'s individual</b> FIRE goal — it funds only their own lifestyle
-      (excludes the children + their split of shared costs) and skips the healthcare reserve and
-      locked-money bridge check the household plan includes.
+      (excludes the children + their split of shared costs) and skips the locked-money bridge
+      check the household plan includes.
       <template v-if="memberCaveat.householdFireAge != null">
         The <b>whole household's</b> FIRE goal is {{ formatINRCompact(memberCaveat.householdFireNumber) }}
         (age {{ memberCaveat.householdFireAge }}).

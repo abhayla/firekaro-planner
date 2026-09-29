@@ -571,14 +571,22 @@ describe("member-lensed FIRE headline (heroHeadline) — D-2026-06-13-02 locks",
         expect(hh.annualSavings, `${ctx} — savings == the member's attributable savings`).toBe(
           r.attributableAnnualSavings,
         );
-        // Magnitude lock (FinTech): target ≈ expenses ÷ SWR, so the ratio must sit in the
-        // 1/SWR band for SWR 2.5–8%. A 100× SWR-unit bug or a double-applied split passes the
-        // bare bounds above but trips this.
+        // Magnitude lock (FinTech, re-based #162 part 1 review): target = (1 + healthcare
+        // reservation%) × expenses ÷ SWR, so the ratio must sit in the (1+reservation)/SWR band.
+        // The live horizon-SWR table (fire-math.ts SWR_HORIZON_TABLE) resolves to 3.0%–4.5% and
+        // the household default reservation is 20% (household.healthcareCorpusReservationPercent,
+        // clamped [0, 0.5] — but the SANE persona seeds never override it off the 20% default), so
+        // the band is 1.2/SWR ∈ [1.2/0.045, 1.2/0.03] = [26.67, 40.0]. Floor 26 / ceiling 41 leave a
+        // small margin either side of that live range while still discriminating a 100×-unit bug or
+        // a double-applied split (pre-fix, the un-reserved floor was 1/0.045 ≈ 22.2 and ceiling
+        // 1/0.03 ≈ 33.3 — the OLD [12.5, 40] band no longer discriminates post-fix: the floor 12.5
+        // never rejects anything since the minimum possible ratio rose to ~26.7, and a missing
+        // reservation would still land inside the old ceiling of 40).
         expect(
           r.individualFireNumber / r.attributableAnnualExpenses,
-          `${ctx} — fireNumber/expenses within the 1/SWR band`,
-        ).toBeGreaterThanOrEqual(12.5);
-        expect(r.individualFireNumber / r.attributableAnnualExpenses, ctx).toBeLessThanOrEqual(40);
+          `${ctx} — fireNumber/expenses within the (1+reservation)/SWR band`,
+        ).toBeGreaterThanOrEqual(26);
+        expect(r.individualFireNumber / r.attributableAnnualExpenses, ctx).toBeLessThanOrEqual(41);
         const memberPlanTo = h.data.members.find((m) => m.id === r.memberId)?.planToAge ?? 90;
         if (Number.isFinite(r.yearsToIndividualFire)) {
           expect(hh.reachable, ctx).toBe(true);

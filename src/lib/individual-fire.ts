@@ -12,8 +12,19 @@
  *
  * DELIBERATE SIMPLIFICATIONS (each either CONSERVATIVE — never makes individual FIRE look EARLIER
  * than reality, the safe direction for the accumulator — or a disclosed bound):
- *   - gross attributable expenses (no NPS-annuity offset); no bridge/glide/family-layer/healthcare
- *     reservation overlay — all conservative (a higher target / no early-money credit).
+ *   - gross attributable expenses (no NPS-annuity offset); no bridge/glide/family-layer overlay —
+ *     all conservative (a higher target / no early-money credit). The HEALTHCARE reservation IS
+ *     now included (#162 part 1, `calculateFireTarget` shared with the household path) — it is
+ *     no longer a simplification, see the residual-drift note below.
+ *   - RESERVATION-LEG INFLATION DRIFT (disclosed bound, #162 part 2 — NOT fixed tonight): the
+ *     household path (`derive.ts`) grows its healthcare reservation leg at `healthcareInflation`
+ *     (~9%) while everything else — including this member path's WHOLE target, reservation
+ *     included — grows at the household basket (`resolveHouseholdBasket`, ADR-0007(d)). Where
+ *     healthcareInflation > the basket (the common case), the household reservation leg rises
+ *     FASTER than this member path's reservation share does over time, so a member's target
+ *     understates the household-grade reservation more the further out their FIRE date is — a
+ *     SMALL, deferred, residual optimism (bounded by the gap between the two rates × the
+ *     reservation's ~20% share of base), tracked alongside the per-member bridge gate on #162.
  *   - rental income is taxed at FULL gross in the attributable tax (the household path applies the
  *     §24(a) 30% / §24(b) / §71 house-property collapse; the individual path does NOT). This
  *     OVER-taxes the individual → savings lower → individual FIRE LATER → conservative/safe; it only
@@ -31,7 +42,7 @@ import type { Assumptions } from "@/types/assumptions";
 import { isEarningMember } from "@/lib/member-earning";
 import { toMonthly, toAnnual } from "@/lib/cashflow";
 import { ageFromDOB } from "@/lib/age";
-import { calculateFIRENumber, calculateYearsToTarget } from "@/lib/fire-math";
+import { calculateFIRENumber, calculateFireTarget, calculateYearsToTarget } from "@/lib/fire-math";
 import { computeTax, recommendRegime, marginalSlabRate, getTaxConfigForFY } from "@/lib/tax";
 import { deriveDeductions } from "@/lib/tax-deductions";
 import { epfBucketAfterTaxReturn } from "@/lib/epf-vpf";
@@ -240,8 +251,22 @@ export function computeIndividualFire(
   const householdBasket = resolveHouseholdBasket(assumptions);
 
   const effectiveSWR = resolveEffectiveSWRByHorizon(assumptions, targetRetirementAge, planToAge);
+  const individualBaseFireNumber = calculateFIRENumber(attributableAnnualExpenses, effectiveSWR, anchorAge);
+  // gh #162 part 1 — the individual target must carry the SAME healthcare corpus reservation the
+  // household path adds (derive.ts, `healthcareCorpusReservationPercent`, default 20%), through the
+  // SAME shared `calculateFireTarget` helper — one formula, not a second one drifting from it.
+  // `familyLayerCorpus: 0` is deliberate (ring-3 exclusion, contract §3): planned goals/extended-
+  // family contingency are a household obligation, never one adult's personal FIRE target.
+  // Part 2 (NOT in this change, tracked on #162): the accessible-money bridge gate needs a
+  // per-member accessibility split and is a larger design question — the individual age below
+  // still has no bridge check.
+  const healthcareReservationPercent = household.healthcareCorpusReservationPercent ?? 0.2;
   const individualFireNumber = Math.round(
-    calculateFIRENumber(attributableAnnualExpenses, effectiveSWR, anchorAge),
+    calculateFireTarget({
+      baseFireNumber: individualBaseFireNumber,
+      familyLayerCorpus: 0,
+      healthcareReservationPercent,
+    }),
   );
 
   // calculateYearsToTarget caps its loop at 1200 months and returns a FINITE value (up to 100.0)
