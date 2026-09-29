@@ -237,6 +237,9 @@ function saveEdit() {
                 max="25"
                 step="0.5"
                 :rules="hikeRules"
+                hint="Used for your expected FIRE age; the headline uses a conservative default."
+                persistent-hint
+                data-testid="hike-percent-hint"
               />
             </v-col>
             <v-col cols="6" md="3">
