@@ -346,22 +346,57 @@ describe("evaluateNudges — first-mile nudges (gh #185 step 7)", () => {
     });
   }
 
-  // ---- no-protection-cover ----
-  it("fires no-protection-cover on Ravi (no Life/Health policy on the earning adult)", () => {
+  // ---- no-term-cover / no-health-cover (#208 split) ----
+  it("fires BOTH no-term-cover and no-health-cover on Ravi (no Life/Health policy at all)", () => {
     const out = evaluateNudges(ctx({ household: raviLikeHousehold(), annualExpenses: 250_000 }));
-    expect(kinds(out)).toContain("no-protection-cover");
-    const n = out.find((x) => x.kind === "no-protection-cover")!;
-    expect(n.severity).toBe("alert");
+    expect(kinds(out)).toContain("no-term-cover");
+    expect(kinds(out)).toContain("no-health-cover");
+    const term = out.find((x) => x.kind === "no-term-cover")!;
+    const health = out.find((x) => x.kind === "no-health-cover")!;
+    expect(term.severity).toBe("alert");
+    expect(health.severity).toBe("alert");
   });
 
-  it("does NOT fire no-protection-cover on Sharmas (covered)", () => {
+  it("fires NEITHER no-term-cover nor no-health-cover on Sharmas (both covered)", () => {
     const out = evaluateNudges(ctx({ household: sharmasLikeHousehold(), annualExpenses: 600_000 }));
-    expect(kinds(out)).not.toContain("no-protection-cover");
+    expect(kinds(out)).not.toContain("no-term-cover");
+    expect(kinds(out)).not.toContain("no-health-cover");
   });
 
-  it("does NOT fire no-protection-cover when there is no earning adult at all", () => {
+  it("fires ONLY no-term-cover when the household has health cover but no term/Life policy on an earner", () => {
+    const household = emptyHousehold({
+      members: [earningAdult()],
+      investments: [inv({ id: "epf", type: "EPF_VPF", value: 50_000, monthlyContribution: 1800, ownerId: "ravi" })],
+      insurance: [
+        { id: "health", type: "Health", provider: "Star", sumAssured: 500_000, annualPremium: 8_000, insuredPersonId: "ravi" },
+      ],
+    });
+    const out = evaluateNudges(ctx({ household, annualExpenses: 250_000 }));
+    expect(kinds(out)).toContain("no-term-cover");
+    expect(kinds(out)).not.toContain("no-health-cover");
+  });
+
+  it("fires ONLY no-health-cover when the household has term cover on the earner but no Health policy", () => {
+    const household = emptyHousehold({
+      members: [earningAdult()],
+      investments: [inv({ id: "epf", type: "EPF_VPF", value: 50_000, monthlyContribution: 1800, ownerId: "ravi" })],
+      insurance: [
+        { id: "term", type: "Life", provider: "LIC", sumAssured: 5_000_000, annualPremium: 6_000, insuredPersonId: "ravi" },
+      ],
+    });
+    const out = evaluateNudges(ctx({ household, annualExpenses: 250_000 }));
+    expect(kinds(out)).not.toContain("no-term-cover");
+    expect(kinds(out)).toContain("no-health-cover");
+  });
+
+  it("does NOT fire no-term-cover when there is no earning adult at all", () => {
     const out = evaluateNudges(ctx({ household: emptyHousehold({ members: [parentMember()] }) }));
-    expect(kinds(out)).not.toContain("no-protection-cover");
+    expect(kinds(out)).not.toContain("no-term-cover");
+  });
+
+  it("STILL fires no-health-cover for a non-earning household (health risk isn't gated on income)", () => {
+    const out = evaluateNudges(ctx({ household: emptyHousehold({ members: [parentMember()] }) }));
+    expect(kinds(out)).toContain("no-health-cover");
   });
 
   // ---- first-sip ----
@@ -391,16 +426,17 @@ describe("evaluateNudges — first-mile nudges (gh #185 step 7)", () => {
   });
 
   // ---- the whole first-mile stack, together ----
-  it("all three first-mile nudges fire together on Ravi and none fire on Sharmas", () => {
+  it("all four first-mile nudges fire together on Ravi and none fire on Sharmas", () => {
     const raviOut = kinds(evaluateNudges(ctx({ household: raviLikeHousehold(), annualExpenses: 250_000 })));
     expect(raviOut).toEqual(
-      expect.arrayContaining(["no-protection-cover", "first-sip", "emergency-fund-shortfall"]),
+      expect.arrayContaining(["no-term-cover", "no-health-cover", "first-sip", "emergency-fund-shortfall"]),
     );
     const sharmasOut = kinds(evaluateNudges(ctx({ household: sharmasLikeHousehold(), annualExpenses: 600_000 })));
     expect(sharmasOut).not.toEqual(
-      expect.arrayContaining(["no-protection-cover", "first-sip", "emergency-fund-shortfall"]),
+      expect.arrayContaining(["no-term-cover", "no-health-cover", "first-sip", "emergency-fund-shortfall"]),
     );
-    expect(sharmasOut).not.toContain("no-protection-cover");
+    expect(sharmasOut).not.toContain("no-term-cover");
+    expect(sharmasOut).not.toContain("no-health-cover");
     expect(sharmasOut).not.toContain("first-sip");
     expect(sharmasOut).not.toContain("emergency-fund-shortfall");
   });

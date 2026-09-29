@@ -64,7 +64,8 @@ export type NudgeKind =
   | "epf-vpf-opportunity-cost"
   | "emergency-fund-shortfall"
   | "over-committed-sips"
-  | "no-protection-cover"
+  | "no-term-cover"
+  | "no-health-cover"
   | "first-sip";
 
 export interface NudgeContext {
@@ -268,31 +269,47 @@ export function evaluateNudges(ctx: NudgeContext): Nudge[] {
   // cap, international allocation, ESOP cliff, estate gaps): these fire on the household having
   // NONE of a basic safeguard, not on having "too much" of something.
 
-  // 9b-i. No protection cover — no Life (term-equivalent; the schema has no separate "Term" type,
-  // `insuranceTypeSchema` is Vehicle/Health/Life) or Health policy insures any earning adult. Fires
-  // once per household, not once per uncovered earner — the point is "you have a gap", not a count.
+  // 9b-i/ii. No term cover / no health cover — split (#208) because a Life-only OR Health-only
+  // policy used to silence a single "no-protection-cover" nudge, hiding the larger risk for the
+  // locked persona (salaried accumulator): an income shock with zero term cover. The schema has
+  // no separate "Term" type (`insuranceTypeSchema` is Vehicle/Health/Life) — "Life" IS the
+  // term-equivalent here. Each condition is independent and fires once per household (not once
+  // per uncovered earner/member) — the point is "you have this specific gap", not a count. A
+  // household with neither fires both; one with both fires neither.
   const earningAdultIds = new Set(
     ctx.household.members.filter((m) => isAdultRole(m.role) && (m.salary?.annualCTC ?? 0) > 0).map((m) => m.id),
   );
   if (earningAdultIds.size > 0) {
-    const coveredIds = new Set(
-      ctx.household.insurance
-        .filter((p) => p.type === "Life" || p.type === "Health")
-        .map((p) => p.insuredPersonId),
+    const lifeCoveredIds = new Set(
+      ctx.household.insurance.filter((p) => p.type === "Life").map((p) => p.insuredPersonId),
     );
-    const anyEarnerCovered = [...earningAdultIds].some((id) => coveredIds.has(id));
-    if (!anyEarnerCovered) {
+    const anyEarnerHasTermCover = [...earningAdultIds].some((id) => lifeCoveredIds.has(id));
+    if (!anyEarnerHasTermCover) {
       out.push({
-        id: "no-protection-cover",
-        kind: "no-protection-cover",
+        id: "no-term-cover",
+        kind: "no-term-cover",
         severity: "alert",
-        title: "No term or health cover yet",
-        body: `Nobody earning in your household has a term life or health insurance policy on record. A single medical or income shock can undo years of saving — this comes before any FIRE-acceleration move.`,
+        title: "No term cover yet",
+        body: `Nobody earning in your household has a term life insurance policy on record. If your income stopped, nothing replaces it — a term plan of roughly 10-15x annual income is the cheapest way to cover that gap, and this comes before any FIRE-acceleration move. This is decision support, not financial advice.`,
         routes: ["fire-dashboard", "insurance"],
         ctaTarget: "/insurance",
-        ctaLabel: "Add a policy",
+        ctaLabel: "Add a term policy",
       });
     }
+  }
+
+  const householdHasHealthCover = ctx.household.insurance.some((p) => p.type === "Health");
+  if (ctx.household.members.length > 0 && !householdHasHealthCover) {
+    out.push({
+      id: "no-health-cover",
+      kind: "no-health-cover",
+      severity: "alert",
+      title: "No health cover yet",
+      body: `Your household has no health insurance policy on record. A single hospitalization can wipe out years of saving faster than almost anything else — this comes before any FIRE-acceleration move. This is decision support, not financial advice.`,
+      routes: ["fire-dashboard", "insurance"],
+      ctaTarget: "/insurance",
+      ctaLabel: "Add a health policy",
+    });
   }
 
   // 9b-ii. First SIP — no investment with a real monthly contribution outside EPF/VPF (the
