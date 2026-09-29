@@ -10,6 +10,7 @@ import { formatINRCompact, formatPercent, formatINR } from "@/lib/formatters";
 import {
   deriveDeductions,
   computeHousePropertyTax,
+  computeEarnerTaxCard,
   isInMarginalReliefBand,
   marginalReliefMitigations,
   LIMIT_80C,
@@ -247,25 +248,15 @@ const monthlyTakeHome = computed(() => {
   };
 });
 
-const perEarner = computed(() => {
-  return household.earners.map((m) => {
-    const gross = m.salary?.annualCTC ?? 0;
-    const earnerNps = m.salary?.employerNpsAnnual ?? 0;
-    const earnerBasic = m.salary?.basicAnnual ?? 0;
-    const earnerOld = computeTax({ grossIncome: gross, regime: "OLD", fy: selectedFY.value, deductions: derivedDeductions.value.totalDeductions, employerNps: earnerNps, employerNpsBasic: earnerBasic });
-    const earnerNew = computeTax({ grossIncome: gross, regime: "NEW", fy: selectedFY.value, employerNps: earnerNps, employerNpsBasic: earnerBasic });
-    const rec = earnerOld.totalTax <= earnerNew.totalTax ? "OLD" : "NEW";
-    const active = effectiveRegime.value === "OLD" ? earnerOld : earnerNew;
-    return {
-      name: m.name || "Earner",
-      gross,
-      tax: active.totalTax,
-      takeHome: gross - active.totalTax,
-      effRate: gross > 0 ? (active.totalTax / gross) * 100 : 0,
-      rec,
-    };
-  });
-});
+// gh-issue #157: the per-earner tax computation is the shared, sector-aware
+// computeEarnerTaxCard (src/lib/tax-deductions.ts) — extracted from this screen so a
+// behaviour spec can call the exact function the screen renders from, and so the SAME sector
+// handling as the LimitMeter above (npsCeilingFor(regime, m.sector)) applies here too.
+const perEarner = computed(() =>
+  household.earners.map((m) =>
+    computeEarnerTaxCard(m, selectedFY.value, derivedDeductions.value.totalDeductions, effectiveRegime.value),
+  ),
+);
 
 // Per-earner avatar visuals (mirror the Profile per-member colour language).
 const EARNER_COLORS = ["#2563eb", "#f59e0b", "#10b981", "#6366f1", "#ef4444"];

@@ -1,4 +1,14 @@
 import { describe, it, expect } from "vitest";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { setActivePinia, createPinia } from "pinia";
+import { useHouseholdStore } from "@/stores/household";
+import { useAssumptionsStore } from "@/stores/assumptions";
+import { loadSeedPersona } from "@/lib/seed-persona";
+import { loadEmptySeed } from "@/seeds/empty";
+import { computeIndividualFire } from "@/lib/individual-fire";
+import { deriveDeductions, computeEarnerTaxCard } from "@/lib/tax-deductions";
 import {
   computeTax,
   recommendRegime,
@@ -10,6 +20,7 @@ import {
   getCurrentFYTaxStaleness,
   TAX_CONFIG_LAST_VERIFIED,
   oldRegimeSlabsForAge,
+  singleEarnerNpsArgs,
   type TaxSlabEntry,
 } from "./tax";
 
@@ -457,5 +468,276 @@ describe("getCurrentFYTaxStaleness (current-FY honesty guard — obj-1 must-have
 
   it("TAX_CONFIG_LAST_VERIFIED is an ISO date string the guard can read", () => {
     expect(TAX_CONFIG_LAST_VERIFIED).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+});
+
+describe("computeTax — scalar-vs-per-member coherence for government-sector 80CCD(2) (gh-issue #157)", () => {
+  // RCA: EarnerSalaryForm.vue's take-home preview (via recommendRegime + computeTax) and
+  // tax-planning/Index.vue's per-earner cards call computeTax with the SCALAR
+  // employerNps/employerNpsBasic args, which the aggregate fallback hardcodes to the
+  // "private" ceiling (tax.ts's aggregate fallback). The headline path (tax-deductions.ts →
+  // derive.ts) uses employerNpsByMember with the earner's real sector. For a government
+  // earner on the OLD regime this makes the two scalar consumers show DIFFERENT tax than the
+  // headline for the SAME earner. `singleEarnerNpsArgs` is the sector-aware helper both
+  // consumers must now build their args with — this spec locks it against the legacy scalar
+  // shape (which the helper's OWN behaviour replaces) for both sectors and both regimes.
+  const basic = 1_000_000;
+  const nps = 140_000; // 14% of basic — exceeds the private 10% OLD ceiling
+  const gross = 2_000_000;
+
+  function scalarCallShape(regime: "OLD" | "NEW") {
+    // The LEGACY (pre-fix) call shape still used directly by EarnerSalaryForm.vue /
+    // tax-planning/Index.vue before this fix lands — sector is NOT threaded through.
+    return computeTax({
+      grossIncome: gross,
+      regime,
+      fy: "2025-26",
+      isSalaried: false,
+      deductions: 0,
+      employerNps: nps,
+      employerNpsBasic: basic,
+    });
+  }
+
+  function memberCallShape(regime: "OLD" | "NEW", sector: "private" | "government") {
+    // The sector-aware call shape both consumers MUST use post-fix, built via the shared
+    // singleEarnerNpsArgs helper — not hand-rolled inline in either Vue file.
+    return computeTax({
+      grossIncome: gross,
+      regime,
+      fy: "2025-26",
+      isSalaried: false,
+      deductions: 0,
+      ...singleEarnerNpsArgs(nps, basic, sector),
+    });
+  }
+
+  it("government + OLD: singleEarnerNpsArgs('government') gives the 14% figure (₹18.6L taxable), diverging from the legacy scalar shape (₹19L)", () => {
+    const member = memberCallShape("OLD", "government");
+    expect(member.taxableIncome).toBe(1_860_000);
+    // The legacy scalar call shape (no sector channel) is wrongly capped at 10% (private) —
+    // this is the exact defect #157 fixes once both Vue consumers stop using it.
+    const legacyScalar = scalarCallShape("OLD");
+    expect(legacyScalar.taxableIncome).toBe(1_900_000);
+    expect(member.taxableIncome).not.toBe(legacyScalar.taxableIncome);
+  });
+
+  it("private + OLD: singleEarnerNpsArgs('private') matches the legacy scalar shape (unaffected by the fix)", () => {
+    const member = memberCallShape("OLD", "private");
+    const legacyScalar = scalarCallShape("OLD");
+    expect(member.taxableIncome).toBe(legacyScalar.taxableIncome);
+    expect(member.taxableIncome).toBe(1_900_000);
+  });
+
+  it("private + NEW: singleEarnerNpsArgs('private') matches the legacy scalar shape (unaffected by the fix)", () => {
+    const member = memberCallShape("NEW", "private");
+    const legacyScalar = scalarCallShape("NEW");
+    expect(member.taxableIncome).toBe(legacyScalar.taxableIncome);
+  });
+
+  it("government + NEW: singleEarnerNpsArgs('government') matches the legacy scalar shape (NEW regime is 14% regardless of sector)", () => {
+    const member = memberCallShape("NEW", "government");
+    const legacyScalar = scalarCallShape("NEW");
+    expect(member.taxableIncome).toBe(legacyScalar.taxableIncome);
+  });
+
+  it("defaults to 'private' when sector is omitted (conservative)", () => {
+    const defaulted = computeTax({
+      grossIncome: gross,
+      regime: "OLD",
+      fy: "2025-26",
+      isSalaried: false,
+      deductions: 0,
+      ...singleEarnerNpsArgs(nps, basic),
+    });
+    expect(defaulted.taxableIncome).toBe(1_900_000);
+  });
+});
+
+describe("EarnerSalaryForm.vue / tax-planning/Index.vue use the sector-aware NPS path, not bare scalars (gh-issue #157 source lock)", () => {
+  // The class this issue fixes is "a scalar consumer passes employerNps/employerNpsBasic
+  // directly instead of routing through the sector-aware helper". A coherence spec at the
+  // computeTax boundary can't observe what argument SHAPE the Vue files actually build (no
+  // @vue/test-utils component-mount harness exists in this repo — every other spec in this
+  // project is a pure-function unit spec, so this mirrors that convention) — so this reads the
+  // source text directly as the enforcement mechanism, the same technique the sibling audit in
+  // gh-issue #157 used to find both call sites in the first place.
+  //
+  // MUTATION-PROVED (code review round 1 finding): a whole-file `toContain("singleEarnerNpsArgs")`
+  // is DEAD — it also matches the import statement, so reverting the actual call site to bare
+  // scalars still passes. These locks instead extract the SPECIFIC function/computed body text
+  // (deriveTakeHomeFor's block, perEarner's computed callback) and assert on that slice only.
+  const root = path.resolve(fileURLToPath(import.meta.url), "../../..");
+
+  /**
+   * Extracts the body of the first `startPattern` match in `src`.
+   * - Default mode: a brace-delimited `{ ... }` block (a normal function/statement body) —
+   *   returns the FIRST balanced `{...}` found after the match.
+   * - `endPattern` mode (for an implicit-return arrow expression with no `{}` body, e.g.
+   *   `const x = computed(() => expr);`): returns everything from the match up to and
+   *   including the first `endPattern` match.
+   */
+  function extractBlock(src: string, startPattern: RegExp, endPattern?: RegExp): string {
+    const m = startPattern.exec(src);
+    if (!m) throw new Error(`extractBlock: pattern not found: ${startPattern}`);
+    if (endPattern) {
+      const rest = src.slice(m.index);
+      const endMatch = endPattern.exec(rest);
+      if (!endMatch) throw new Error(`extractBlock: end pattern not found: ${endPattern}`);
+      return rest.slice(0, endMatch.index + endMatch[0].length);
+    }
+    let depth = 0;
+    let i = m.index;
+    let bodyStart = -1;
+    for (; i < src.length; i++) {
+      const ch = src[i];
+      if (ch === "{") {
+        if (bodyStart === -1) bodyStart = i;
+        depth++;
+      } else if (ch === "}") {
+        depth--;
+        if (depth === 0 && bodyStart !== -1) return src.slice(bodyStart, i + 1);
+      }
+    }
+    throw new Error(`extractBlock: unbalanced braces after ${startPattern}`);
+  }
+
+  it("EarnerSalaryForm.vue's deriveTakeHomeFor call-site body routes through the sector-aware helper, not bare scalars", () => {
+    const src = fs.readFileSync(path.join(root, "src/components/forms/EarnerSalaryForm.vue"), "utf-8");
+    const body = extractBlock(src, /function deriveTakeHomeFor\(/);
+    expect(body).toMatch(/singleEarnerNpsArgs\(|\.\.\.npsArgs/);
+    // The buggy (pre-fix) shape passed employerNps/employerNpsBasic as trailing SHORTHAND
+    // object-literal properties directly to computeTax/recommendRegime, immediately followed by
+    // the object's closing `}` — e.g. `{ ..., employerNps, employerNpsBasic }` /
+    // `{ ..., employerNps, employerNpsBasic,\n  });`. The (correct) call
+    // `singleEarnerNpsArgs(employerNps, employerNpsBasic, employerSector)` never has
+    // `employerNpsBasic` immediately followed by `}` — a third argument (`employerSector`)
+    // always comes next — so this pattern cannot match the fixed helper call.
+    expect(body).not.toMatch(/\bemployerNps,\s*employerNpsBasic\s*,?\s*\}/);
+  });
+
+  it("tax-planning/Index.vue's perEarner call-site body routes through computeEarnerTaxCard, not bare scalars", () => {
+    const src = fs.readFileSync(path.join(root, "src/pages/tax-planning/Index.vue"), "utf-8");
+    const body = extractBlock(src, /const perEarner = computed\(/, /\)\s*;/);
+    expect(body).toMatch(/computeEarnerTaxCard\(/);
+    expect(body).not.toMatch(/employerNps:\s*earnerNps/);
+    expect(body).not.toMatch(/employerNpsBasic:\s*earnerBasic/);
+  });
+});
+
+describe("government-earner preview === headline behaviour lock (gh-issue #157 — code review round 1, item 2)", () => {
+  // The REAL defect class this issue fixes: for a government earner, the salary-form preview
+  // and the tax-planning per-earner card must show the SAME tax as the headline
+  // computeIndividualFire() path — built through the actual store/seed helpers (not a bespoke
+  // fixture), exercising the exact functions each surface calls.
+  //
+  // Uses a MINIMAL single-adult household from the empty seed (loadEmptySeed + addMember),
+  // not one of the 5-persona seeds — a persona seed's other income/investments feed into
+  // computeIndividualFire's attributable-income split, which would make this a test of THAT
+  // attribution logic (already covered elsewhere) rather than an isolated NPS-sector lock.
+  function buildGovtEarnerHousehold(h: ReturnType<typeof useHouseholdStore>, a: ReturnType<typeof useAssumptionsStore>) {
+    loadEmptySeed(h, a);
+    h.addMember({
+      id: "gov1",
+      name: "Gov Earner",
+      dateOfBirth: "1994-01-01",
+      role: "ADULT",
+      targetRetirementAge: 55,
+      planToAge: 90,
+      city: "Metro",
+      health: "Healthy",
+      riskAppetite: "Moderate",
+      marital: "Single",
+      employmentStatus: "Employed",
+      salary: {
+        annualCTC: 2_000_000,
+        hikePercent: 8,
+        basicAnnual: 1_000_000,
+        employerNpsAnnual: 140_000, // 14% of basic — exceeds the private 10% OLD ceiling
+        employerSector: "government",
+      },
+    });
+  }
+
+  it("computeEarnerTaxCard's OLD-regime tax matches computeIndividualFire's internal OLD-regime tax for a government earner", () => {
+    setActivePinia(createPinia());
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    buildGovtEarnerHousehold(h, a);
+
+    const fy = "2025-26";
+    const member = h.data.members.find((m) => m.id === "gov1")!;
+    const deductions = deriveDeductions(h.data);
+    const headline = computeIndividualFire(h.data, a.values, "gov1", fy)!;
+    expect(headline).not.toBeNull();
+
+    // The NEW regime is 14%-of-basic for EVERY sector (npsCeilingFor), so it can never expose a
+    // sector mismatch — force OLD explicitly on both sides (computeEarnerTaxCard's 4th arg picks
+    // which regime's tax it DISPLAYS; forcing "OLD" exercises the exact `earnerOld` computeTax
+    // call inside it). The headline's own recommendRegime happens to prefer NEW at this income,
+    // so its OLD-regime tax is reconstructed the same way computeIndividualFire builds it
+    // internally (same deduction basis, same taxpayerAge/isSalaried) — never re-deriving the
+    // 80CCD(2) figure by hand, only calling the same functions each real surface calls.
+    const card = computeEarnerTaxCard(member, fy, deductions.totalDeductions, "OLD");
+    const headlineOld = computeTax({
+      grossIncome: member.salary!.annualCTC,
+      regime: "OLD",
+      fy,
+      deductions: deductions.totalDeductions,
+      employerNpsByMember: deductions.employerNpsByMember,
+      taxpayerAge: headline.anchorAge,
+      isSalaried: true,
+    });
+    // Both surfaces must show the SAME OLD-regime tax for the same government earner — this is
+    // the exact cross-screen figure-divergence class #157 fixes. (Pre-fix, computeEarnerTaxCard's
+    // inline scalar call capped the 80CCD(2) deduction at 10% of basic instead of 14%,
+    // overstating this earner's OLD-regime tax by the extra tax on ₹40k of taxable income.)
+    expect(card.tax).toBe(headlineOld.totalTax);
+  });
+
+  it("EarnerSalaryForm.vue's take-home preview basis (recommendRegime + computeTax via singleEarnerNpsArgs) applies the SAME government 80CCD(2) cap as the headline path", () => {
+    setActivePinia(createPinia());
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    loadSeedPersona(h, a);
+    h.updateMember("priya", { salary: { annualCTC: 0, hikePercent: 0 } });
+    h.updateMember("rohit", {
+      salary: {
+        annualCTC: 2_000_000,
+        hikePercent: 9,
+        basicAnnual: 1_000_000,
+        employerNpsAnnual: 140_000, // 14% of basic — exceeds the private 10% OLD ceiling
+        employerSector: "government",
+      },
+    });
+    const fy = "2025-26";
+
+    // Mirrors EarnerSalaryForm.vue's deriveTakeHomeFor exactly: the sector-aware NPS args
+    // (via singleEarnerNpsArgs) on the OLD regime, compared against the SAME regime on the
+    // headline's own deduction basis (deriveDeductions — used by both computeIndividualFire and
+    // tax-planning/Index.vue). Deduction TOTALS legitimately differ between the two paths (the
+    // form hardcodes a flat ₹1.75L OLD estimate; the headline derives 80C/80D/etc from real
+    // data) — so this isolates the 80CCD(2) NPS-CAP component specifically, which must agree.
+    const npsArgs = singleEarnerNpsArgs(140_000, 1_000_000, "government");
+    const formOld = computeTax({ grossIncome: 2_000_000, regime: "OLD", fy, deductions: 0, ...npsArgs });
+    const formOldNoNps = computeTax({ grossIncome: 2_000_000, regime: "OLD", fy, deductions: 0 });
+    const formNpsDeducted = formOldNoNps.taxableIncome - formOld.taxableIncome;
+
+    const headlineDeductions = deriveDeductions(h.data);
+    const headlineOld = computeTax({
+      grossIncome: 2_000_000,
+      regime: "OLD",
+      fy,
+      deductions: 0,
+      employerNpsByMember: headlineDeductions.employerNpsByMember,
+    });
+    const headlineOldNoNps = computeTax({ grossIncome: 2_000_000, regime: "OLD", fy, deductions: 0 });
+    const headlineNpsDeducted = headlineOldNoNps.taxableIncome - headlineOld.taxableIncome;
+
+    // Both deduct the full ₹1.4L (14% of ₹10L basic) — the government ceiling, not the ₹1L
+    // (10%) private default the pre-fix scalar call would have produced.
+    expect(formNpsDeducted).toBe(140_000);
+    expect(headlineNpsDeducted).toBe(140_000);
+    expect(formNpsDeducted).toBe(headlineNpsDeducted);
   });
 });
