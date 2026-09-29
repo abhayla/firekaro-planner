@@ -25,7 +25,7 @@ import type {
   OtherIncomeLine,
 } from "@/types/household";
 import { ageAsOf, todayIsoLocal } from "@/lib/as-of-date";
-import { netCashSalary, PROFESSIONAL_TAX_ANNUAL_PER_EARNER } from "@/lib/salary-cash";
+import { netCashSalary, pfFromRows, PROFESSIONAL_TAX_ANNUAL_PER_EARNER } from "@/lib/salary-cash";
 import { toAnnual } from "@/lib/cashflow";
 import { computeTax, singleEarnerNpsArgs } from "@/lib/tax";
 
@@ -428,4 +428,60 @@ export function computeEarnerTaxCard(
     effRate: gross > 0 ? (active.totalTax / gross) * 100 : 0,
     rec,
   };
+}
+
+/**
+ * gh-issue #222: the ONE derivation behind any "preview this earner's take-home" surface
+ * (today: EarnerSalaryForm.vue's take-home strip). Callers previously hardcoded
+ * `oldDed = 175000` for the old-regime deduction instead of this earner's REAL deductions
+ * (80C/80CCD(1B)/80D/§24 from their own investments/liabilities/insurance) — the same
+ * ₹1.75L-flat mistake `tax-planning/Index.vue`'s per-earner table stopped making in gh-issue
+ * #201/#157. That let the salary-form preview's regime pick AND take-home disagree with the
+ * tax-planning page's per-earner card for the exact same person on the exact same data.
+ *
+ * This helper is a thin, member-scoped wrapper around `computeEarnerTaxCard` — the SAME
+ * function the tax-planning page's per-earner table calls — so there is one derivation, not
+ * two. Regime is AUTO-recommended (cheaper of OLD/NEW for this earner), matching what the
+ * salary-form preview showed before (it always used `recommendRegime`, never a page-level
+ * regime override).
+ *
+ * `draftSalary` lets a caller preview an UNSAVED edit (e.g. a CTC the user just typed but
+ * has not saved yet) without writing it to the store first — merged onto the member's
+ * current `salary` before deriving deductions/tax, exactly as EarnerSalaryForm.vue's local
+ * `editing` draft state works today.
+ */
+export function previewEarnerTakeHome(
+  household: Household,
+  member: Member,
+  fy: string,
+  draftSalary?: Partial<NonNullable<Member["salary"]>>,
+): EarnerTaxCard | null {
+  const effectiveMember: Member = draftSalary
+    ? {
+        ...member,
+        salary: { annualCTC: 0, hikePercent: 0, ...member.salary, ...draftSalary },
+      }
+    : member;
+  const gross = effectiveMember.salary?.annualCTC ?? 0;
+  if (!gross) return null;
+
+  // Same member-scoped attribution as tax-planning/Index.vue's `perEarner` (gh-issue #201):
+  // this earner's OWN investments/liabilities/insurance, never the whole household's pool.
+  const earnerDeductions = deriveDeductions(
+    {
+      ...household,
+      members: [effectiveMember],
+      investments: household.investments.filter((i) => i.ownerId === effectiveMember.id),
+      liabilities: household.liabilities.filter((l) => l.ownerId === effectiveMember.id),
+      insurance: household.insurance.filter((p) => p.insuredPersonId === effectiveMember.id),
+    },
+    { asOfDate: todayIsoLocal() },
+  );
+  const annualPf = pfFromRows(household.investments, effectiveMember.id);
+
+  // Peek at the AUTO-recommended regime first (independent of the `effectiveRegime` arg),
+  // then re-call with that regime so the returned tax/takeHome/effRate are the ACTIVE figures
+  // for the cheaper regime — matching the AUTO mode the preview always used.
+  const peek = computeEarnerTaxCard(effectiveMember, fy, earnerDeductions.totalDeductions, "OLD", annualPf);
+  return computeEarnerTaxCard(effectiveMember, fy, earnerDeductions.totalDeductions, peek.rec, annualPf);
 }

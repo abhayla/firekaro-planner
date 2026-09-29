@@ -3,7 +3,6 @@ import { computed, ref, watch } from "vue";
 import { useHouseholdStore } from "@/stores/household";
 import { useUiStore } from "@/stores/ui";
 import { formatINRCompact, formatPercent } from "@/lib/formatters";
-import { computeTax, recommendRegime, singleEarnerNpsArgs } from "@/lib/tax";
 import { ageAsOf, todayIsoLocal } from "@/lib/as-of-date";
 import InfoTip from "@/components/shared/InfoTip.vue";
 import {
@@ -12,11 +11,7 @@ import {
   employerNpsAnnualFromPercents,
   salaryEditPercents,
 } from "@/lib/salary-percent";
-import {
-  netCashSalary,
-  pfFromInvestmentRows,
-  PROFESSIONAL_TAX_ANNUAL_PER_EARNER,
-} from "@/lib/salary-cash";
+import { previewEarnerTakeHome } from "@/lib/tax-deductions";
 import type { Member } from "@/types/household";
 
 const props = defineProps<{ earner: Member }>();
@@ -24,41 +19,31 @@ const props = defineProps<{ earner: Member }>();
 const household = useHouseholdStore();
 const ui = useUiStore();
 
+// gh-issue #222: was a bare `computeTax`/`recommendRegime` call with a hardcoded
+// `oldDed = 175000` old-regime deduction — every earner whose REAL 80C/80D/§24/80CCD(1B)
+// deductions differ from ₹1.75L got a wrong regime pick and take-home here, disagreeing
+// with the tax-planning page's per-earner card for the same person on the same data. Now
+// routes through `previewEarnerTakeHome` (`tax-deductions.ts`), the SAME derivation
+// `computeEarnerTaxCard` gives the tax-planning page — one derivation, not two.
 function deriveTakeHomeFor(
   ctc: number,
   employerNps: number,
   employerNpsBasic: number,
   employerSector: "private" | "government" = "private",
-  annualPf = 0,
 ) {
   if (!ctc) return null;
-  const oldDed = 175000;
-  // gh-issue #157: route through the sector-aware per-member helper — the bare scalar
-  // employerNps/employerNpsBasic args hardcode the private 10% OLD-regime ceiling, which
-  // silently overtaxed a government earner's preview vs the headline derive() path.
-  const npsArgs = singleEarnerNpsArgs(employerNps, employerNpsBasic, employerSector);
-  const rec = recommendRegime({ grossIncome: ctc, fy: ui.currentFY, deductions: oldDed, ...npsArgs });
-  const result = computeTax({
-    grossIncome: ctc,
-    regime: rec.recommended,
-    fy: ui.currentFY,
-    deductions: rec.recommended === "OLD" ? oldDed : 0,
-    ...npsArgs,
-  });
-  // gh #218 — the preview shows CASH: CTC minus the PF this earner's own EPF row already
-  // carries, income tax and professional tax, via the ONE shared helper (`salary-cash.ts`) the
-  // dashboard headline uses. (The hardcoded `oldDed = 175000` above is a separate defect — #222.)
-  const { annual } = netCashSalary({
+  const card = previewEarnerTakeHome(household.data, props.earner, ui.currentFY, {
     annualCTC: ctc,
-    annualPf,
-    annualTax: result.totalTax,
-    professionalTax: PROFESSIONAL_TAX_ANNUAL_PER_EARNER,
+    employerNpsAnnual: employerNps,
+    basicAnnual: employerNpsBasic,
+    employerSector,
   });
+  if (!card) return null;
   return {
-    annual,
-    monthly: Math.round(annual / 12),
-    regime: rec.recommended,
-    effectiveRate: result.effectiveRate,
+    annual: card.takeHome,
+    monthly: Math.round(card.takeHome / 12),
+    regime: card.rec,
+    effectiveRate: card.effRate,
   };
 }
 
@@ -73,13 +58,7 @@ const employerNps = computed(() => props.earner.salary?.employerNpsAnnual ?? 0);
 const basicAnnual = computed(() => props.earner.salary?.basicAnnual ?? 0);
 const employerSector = computed(() => props.earner.salary?.employerSector ?? "private");
 const takeHome = computed(() =>
-  deriveTakeHomeFor(
-    ctc.value,
-    employerNps.value,
-    basicAnnual.value,
-    employerSector.value,
-    pfFromInvestmentRows(household.data, props.earner.id),
-  ),
+  deriveTakeHomeFor(ctc.value, employerNps.value, basicAnnual.value, employerSector.value),
 );
 
 // Q4 (v3) + ISSUES-v2 #1: salary fields are no longer inline-editable. Pencil opens
