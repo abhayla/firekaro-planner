@@ -34,7 +34,66 @@
 | Shared ring-2 monthly (45 + 35 + 4 + 1.5 + 40) | ₹125.5k | — | ₹125.5k |
 | Attributable annual expenses (ring 1 = ₹0, + 50% × ring 2) | **≈ ₹7.53 L** | ≈ ₹7.53 L | ₹15.06 L |
 
-**Estimates — flagged as estimates, to be replaced by step 1's printed values:** at Rohit's solved adequacy age (~47 pre-gate) the PPF has no dated maturity, so `classifyPpf` locks it to **60** with a transparency note; `classifyNps` at an early exit frees only 20% as cash (₹0.8L today, × `corpusScale`) and annuitises 80%. The bridge window is therefore **13 years, 47 → 60**, funded by ~₹76L-today × `corpusScale` of liquid money against ~₹7.5L/yr of drifting base expenses net of post-tax rental + the NPS annuity. **Estimated gate: Rohit +1 to +3 years; Priya +0** (no locked holding at all). The household gate on this same seed is the ~0-to-1-year case — that spread *is* the asymmetry of §1. These three figures are **estimates, not facts**; step 1 prints the real pair and §2 is amended to the printed values before step 3 starts (Evidence-before-claims R1).
+**STEP 1 CORE PROOF — RUN 2026-09-29, real numbers replacing the estimates above.** A throwaway
+per-member bridge prototype (§4.1–4.3 attribution, member DOB, member expenses with the
+`annualExpensesAt` resolver, member marginal rate, member EPS/gratuity, member `corpusScale`) was
+run across all five seeds × every adult. **Result: the gate is COVERED for every adult on every
+seed — Δ = 0 years everywhere.**
+
+| Seed | Adult | Pre-gate age | Gated age | Δ | lockedCorpus | reachableCorpus | shortfallYears | Window | corpusScale |
+|---|---|---|---|---|---|---|---|---|---|
+| sharmas | rohit | 47 | 47 | **0** | ₹35L | ₹428L | 0 | 47→60 (PPF) | 5.854 |
+| sharmas | priya | 46 | 46 | **0** | ₹0 | ₹286L | 0 | none | 12.231 |
+| mehtas | vikram | 45 | 45 | **0** | ₹176L | ₹286L | 0 | 45→60 (PPF) | 0.866 |
+| mehtas | aanya | 59 | 59 | **0** | ₹372L | ₹116L | 0 | 59→60 (PPF) | 1.859 |
+| iyers | ashwin | 47 | 47 | **0** | ₹0 | ₹382L | 0 | none | 2.776 |
+| iyers | lakshmi | 77 | 77 | **0** | ₹0 | ₹254L | 0 | none | 10.621 |
+| mauryas | abhay | 55 | 55 | **0** | ₹145L | ₹442L | 0 | 55→60 (PPF) | 2.645 |
+| mauryas | madhu | ∞ (unreachable) | ∞ | n/a | — | — | — | — | — |
+| ravi | ravi | 40 | 40 | **0** | ₹0 | ₹1L | 0 | none | 1.000 |
+
+Household bridge on the same run, for contrast: **covered on all five seeds too** (sharmas eff=50
+corpusOnly=50; mehtas 50/50; iyers 55/55; mauryas 65/65; ravi 63/63).
+
+**Why the estimate was wrong (the mechanism, measured).** §2's estimate assumed the member's ₹76L
+liquid pool faced ~₹7.5L/yr for 13 years. Two reads were wrong:
+
+1. **Attributable expenses are ₹13.12L/yr, not ₹7.53L** — the seed's `avgMonthly` ₹45k is the
+   shared lump AND the five recurring lines add on top; the printed figure is the real one.
+2. **`corpusScale` dominates everything.** A member 17 years from FIRE must grow their corpus
+   5.85× to hit the drifted target, and the bridge scales *every* holding by that one multiplier.
+   So Rohit's PPF ₹6L scales to ₹35L locked while his liquid slice scales to ₹428L — against a
+   13-year window costing ≈ ₹175L. The locked *share* is unchanged by scaling, but the absolute
+   liquid pool is ~2.4× the whole bridge bill. The gate can only bind when the locked share is
+   high **and** `corpusScale` ≈ 1 (an already-FIRE member), which no current seed is.
+
+**Confirmed the bridge itself is not broken.** A minimal direct fixture (PPF ₹200L + liquid ₹50L,
+retire 48, ₹13.5L/yr, scale 1) returns `covered: false`, `effectiveFireAge: 57`,
+`shortfallYears: 9`, `shortfallAmount: ₹1.16 Cr` — so `computeBridgeCoverage` does bind when the
+liquidity really is short. The zero deltas above are a property of the seeds, not a dead gate.
+
+**Consequences for the rest of this spec, which the owner must rule on before step 2:**
+
+- **§7's acceptance criterion "Rohit's member age ≥ his pre-change age, delta matching step 1's
+  printed gate" is satisfied trivially at Δ0.** There is no seed on which this change moves a
+  single rendered number. The gate would ship as pure insurance.
+- **T4 (the strongest instrument) cannot be written as specified.** The spec names the Mauryas as
+  "single-earner ⇒ member gate === household gate", but the Mauryas have **two adults**
+  (single-*income*, not single-*adult*): Madhu owns ₹83L and the Joint holdings split 50/50, so the
+  member path is correctly a strict subset of the household and the two ages differ (abhay 55 vs
+  household 65). **Ravi** is the only true single-adult household — and Ravi holds **zero locked
+  money**, so both bridges are trivially covered and T4 would assert `47 === 47` on two no-ops.
+  There is no seed that makes T4 a real coherence test. A new fixture would have to be authored.
+- **A separate, larger optimism surfaced and is NOT this spec's scope:** Aanya's ₹372L
+  `lockedCorpus` is dominated by an **illiquid investment property**, which `classifyRealEstate`
+  marks illiquid so it never enters the unlock timeline — yet the adequacy solve counts its full
+  value in `attributableCorpus`. Money that is counted toward the target but can never be spent is
+  an optimism the bridge structurally cannot catch (no tranche ⇒ no window ⇒ trivially covered).
+  This applies to the **household** path identically. Worth its own finding row.
+
+The §4.4 reservation-leg inflation fix is unaffected by all of the above: it is a real, measurable
+target-trajectory change (healthcareInflation 9% vs basket 6.24% on a 20% reservation share) and
+moves member ages later on its own arithmetic, independent of the gate.
 
 ## 3. Product rules
 
@@ -138,6 +197,15 @@ Steps 3 + 4 land as **one PR** (4 depends on 3's adequacy age) with both review 
 
 ## 8. Open facts (each blocks the step named)
 
+0. **[RAISED BY STEP 1, BLOCKS STEPS 2–6] Is a gate that moves no current seed worth building?**
+   The prototype run (§2) shows Δ0 for every adult on every seed. The gate is correct-by-design
+   insurance against a member who is locked-heavy AND near-FIRE (`corpusScale` ≈ 1) — a real
+   persona (the mid-40s PPF/NPS-heavy accumulator who is nearly there), just not one any seed
+   represents today. Options: (a) build it anyway as insurance and author the locked-heavy fixture
+   that makes T2/T4 real; (b) build **§4.4 only** (which does move numbers) and defer §4.1–4.3
+   until a fixture or a real user exhibits the class; (c) drop it. **Recommended: (a)** — the class
+   is real and the fix is the same `max()` the household already uses, but it needs a new
+   near-FIRE locked-heavy fixture, which is scope the spec did not budget. **Owner call.**
 1. **Does the parents-support line belong to Rohit?** It is labelled "Rohit's parents" but carries no `ownerId`, so it is ring-2 and each adult bears 50%. If it is really his ring 1, his attributable expenses rise ~₹2.4L/yr and the gate binds harder. **Blocks:** §2's final numbers — step 1 prints both readings. Owner call, not an engineering one.
 2. **Member's marginal rate or the household's for the member bridge?** This spec says the member's (a member's liquidation tax is their own). That is an **Assumption**, and needs the FinTech verdict in step 4; the household rate would be the conservative choice only for the higher earner.
 3. **Will a member-owned dated goal ever be modelled?** Today ring 3 is excluded by design, so the member target has exactly two legs. If a member-owned goal appears, §4.4 grows to three. **Blocks:** nothing now — noted so step 3 does not hard-code "two".
@@ -155,4 +223,13 @@ Steps 3 + 4 land as **one PR** (4 depends on 3's adequacy age) with both review 
 
 ## 10. Revisions
 
+- **2026-09-29 (step 1, core proof run)** — §2's estimate table replaced with the real printed
+  numbers from the T1 prototype across all five seeds × every adult. **The core did not prove as
+  the spec predicted: the gate is covered (Δ0) for every adult on every seed.** Three blockers
+  raised for the owner: (a) the gate ships as pure insurance with no seed moving, (b) T4 as written
+  is unwritable (Mauryas is two-adult; Ravi has no locked money) so a new fixture is needed, and
+  (c) a separate illiquid-investment-property optimism surfaced that affects the household path
+  too. Steps 2–6 are **HELD** pending that ruling; §4.4 (the reservation-leg inflation fix) is
+  unaffected and remains buildable on its own arithmetic. Per the Prove-the-core-first rule R3, no
+  scaffolding was built around an unproven core.
 - **2026-09-29** — created. Splits #162 part 2 into the per-member bridge gate (§4.1–4.3) and the reservation-leg inflation asymmetry (§4.4) that the `individual-fire.ts` docblock currently discloses as a residual bound.
