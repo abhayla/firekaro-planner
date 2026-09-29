@@ -25,6 +25,11 @@ import type {
   OtherIncomeLine,
 } from "@/types/household";
 import { ageAsOf, todayIsoLocal } from "@/lib/as-of-date";
+import {
+  netCashSalary,
+  statutoryPfFor,
+  PROFESSIONAL_TAX_ANNUAL_PER_EARNER,
+} from "@/lib/salary-cash";
 import { toAnnual } from "@/lib/cashflow";
 import { computeTax, singleEarnerNpsArgs } from "@/lib/tax";
 
@@ -407,7 +412,15 @@ export function computeEarnerTaxCard(
     name: member.name || "Earner",
     gross,
     tax: active.totalTax,
-    takeHome: gross - active.totalTax,
+    // gh #218 — the card's cash figure is net of BOTH PF legs (+ any VPF) and professional
+    // tax, from the ONE helper the dashboard headline uses (`salary-cash.ts`). `gross - tax`
+    // overstated a salaried earner's bank credit by the whole 24%-of-basic PF block.
+    takeHome: netCashSalary({
+      annualCTC: gross,
+      pf: statutoryPfFor(member.salary),
+      annualTax: active.totalTax,
+      professionalTax: gross > 0 ? PROFESSIONAL_TAX_ANNUAL_PER_EARNER : 0,
+    }).annual,
     effRate: gross > 0 ? (active.totalTax / gross) * 100 : 0,
     rec,
   };

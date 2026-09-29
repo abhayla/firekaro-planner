@@ -7,6 +7,12 @@ import { todayIsoLocal } from "@/lib/as-of-date";
 import { computeTax, npsCeilingFor, AVAILABLE_FYS, getTaxConfigForFY } from "@/lib/tax";
 import { getCurrentFinancialYear } from "@/lib/expense-history";
 import { toAnnual } from "@/lib/cashflow";
+import {
+  netCashSalary,
+  statutoryPfFor,
+  sumPf,
+  PROFESSIONAL_TAX_ANNUAL_PER_EARNER,
+} from "@/lib/salary-cash";
 import { formatINRCompact, formatPercent, formatINR } from "@/lib/formatters";
 import {
   deriveDeductions,
@@ -240,14 +246,37 @@ const monthlyTakeHome = computed(() => {
     (s, i) => s + (i.monthlyContribution ?? 0) * 12,
     0,
   );
-  const annualTake = totalTaxable.value - activeResult.value.totalTax;
+  // gh #218 — EPF/VPF rows are excluded HERE because PF is already subtracted inside the cash
+  // figure below. Netting the auto-flowed EPF row off again would take the same rupees twice and
+  // show a discretionary figure several thousand ₹/month too low.
+  const annualNonPfInvesting = scopedHousehold.value.investments
+    .filter((i) => i.type !== "EPF_VPF")
+    .reduce((s, i) => s + (i.monthlyContribution ?? 0) * 12, 0);
+  const annualGrossPostTax = totalTaxable.value - activeResult.value.totalTax;
+  // gh #218 — the CASH figure: gross minus BOTH PF legs (+ any VPF), income tax and professional
+  // tax, from the ONE shared helper the dashboard headline and the per-earner cards use.
+  const pf = sumPf(scopedHousehold.value.members.map((m) => statutoryPfFor(m.salary)));
+  const earnerCount = scopedHousehold.value.members.filter(
+    (m) => (m.salary?.annualCTC ?? 0) > 0,
+  ).length;
+  const annualTake = netCashSalary({
+    annualCTC: totalTaxable.value,
+    pf,
+    annualTax: activeResult.value.totalTax,
+    professionalTax: earnerCount * PROFESSIONAL_TAX_ANNUAL_PER_EARNER,
+  }).annual;
   return {
     annualGross: totalTaxable.value,
     annualTax: activeResult.value.totalTax,
+    annualGrossPostTax,
     annualSavingsContrib,
+    annualNonPfInvesting,
     annualTake,
     monthlyTake: Math.round(annualTake / 12),
-    monthlyPostSavings: Math.round((annualTake - annualSavingsContrib) / 12),
+    // Cash left after ALL PLANNED (non-PF) investing — a different concept from take-home.
+    monthlyDiscretionaryAfterInvesting: Math.round(
+      Math.max(0, annualTake - annualNonPfInvesting) / 12,
+    ),
   };
 });
 
@@ -385,10 +414,14 @@ const taxBreakdownSegments = computed<ProportionSegment[]>(() => {
 // Take-home split of gross: in-hand vs auto-invested vs tax.
 const takeHomeSegments = computed<ProportionSegment[]>(() => {
   const mt = monthlyTakeHome.value;
-  const inHand = Math.max(0, mt.annualTake - mt.annualSavingsContrib);
+  // gh #218 — the invested slice is the NON-PF investing only; PF gets its own segment, because
+  // `annualTake` is already net of it (double-subtracting it made "in hand" too small).
+  const inHand = Math.max(0, mt.annualTake - mt.annualNonPfInvesting);
+  const pfSlice = Math.max(0, mt.annualGrossPostTax - mt.annualTake);
   return [
     { key: "inhand", label: "In hand", value: inHand, color: "success" },
-    { key: "invested", label: "Auto-invested", value: mt.annualSavingsContrib, color: "info" },
+    { key: "invested", label: "Auto-invested", value: mt.annualNonPfInvesting, color: "info" },
+    { key: "pf", label: "PF + prof. tax", value: pfSlice, color: "secondary" },
     { key: "tax", label: "Tax", value: mt.annualTax, color: "error" },
   ].filter((s) => s.value > 0);
 });
@@ -505,7 +538,9 @@ const zeroTaxSectionVisible = computed(() => !isZeroTaxRecommended.value || show
       </div>
       <div class="row-line">
         <span class="text-medium-emphasis">Income after tax (before PF)</span>
-        <span class="text-currency font-weight-bold">{{ formatINRCompact(monthlyTakeHome.annualTake) }}</span>
+        <span class="text-currency font-weight-bold">{{
+          formatINRCompact(monthlyTakeHome.annualGrossPostTax)
+        }}</span>
       </div>
       <v-btn
         variant="text"
@@ -641,7 +676,7 @@ const zeroTaxSectionVisible = computed(() => !isZeroTaxRecommended.value || show
         <PanelCard title="Take-home" icon="mdi-wallet-outline" icon-color="success" class="h-100">
           <ProportionBar :segments="takeHomeSegments" :format-value="formatINRCompact" class="mb-3" />
           <div class="row-line mb-1">
-            <span>Annual (post-tax)</span>
+            <span>Annual (after tax + PF)</span>
             <span class="text-currency font-weight-bold">{{ formatINRCompact(monthlyTakeHome.annualTake) }}</span>
           </div>
           <div class="row-line">
@@ -650,8 +685,10 @@ const zeroTaxSectionVisible = computed(() => !isZeroTaxRecommended.value || show
           </div>
           <v-divider class="my-3" />
           <div class="row-line text-caption text-medium-emphasis">
-            <span>Less investing ({{ formatINRCompact(monthlyTakeHome.annualSavingsContrib) }}/yr)</span>
-            <span class="text-currency">{{ formatINRCompact(monthlyTakeHome.monthlyPostSavings) }} / mo</span>
+            <span>Less investing ({{ formatINRCompact(monthlyTakeHome.annualNonPfInvesting) }}/yr)</span>
+            <span class="text-currency"
+              >{{ formatINRCompact(monthlyTakeHome.monthlyDiscretionaryAfterInvesting) }} / mo</span
+            >
           </div>
           <div class="text-caption text-medium-emphasis mt-2">
             Cash in hand each month after your automatic investment contributions.

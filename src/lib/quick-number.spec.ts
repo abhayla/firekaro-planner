@@ -8,6 +8,7 @@ import {
 import { emptyQuickAnswers, type QuickAnswers } from "@/types/quick-number";
 import { DEFAULT_ASSUMPTIONS } from "@/types/assumptions";
 import { derive } from "@/lib/derive";
+import { statutoryPfFor, totalPf } from "@/lib/salary-cash";
 import { useHouseholdStore } from "@/stores/household";
 import type { Household } from "@/types/household";
 
@@ -291,15 +292,27 @@ describe("applyQuickAnswers — the unaccounted rupee is spent, not deleted", ()
     expect(household.expenses.recurring.some((r) => /Unaccounted/.test(r.label))).toBe(false);
   });
 
-  it("with nothing invested, the surplus is spending — not a silently assumed contribution", () => {
-    const { household } = apply({ ...AMIT, sip: 0 });
+  it("with nothing invested, the surplus is the STATUTORY PF only — never a silently assumed contribution", () => {
+    const { household, salaryAnnualCTC } = apply({ ...AMIT, sip: 0 });
     const k = derive(household, DEFAULT_ASSUMPTIONS, {
       isFamilyView: false,
       viewingMemberId: null,
       currentFY: "2026-27",
     });
-    // The old fallback assumed every unspent rupee reached the market (~2.2 L/month here).
-    expect(k.monthlyContribution).toBeLessThan(10_000);
+    // The old fallback assumed every unspent rupee reached the market (~2.2 L/month here). That
+    // failure mode is still dead — the figure below is an order of magnitude under it.
+    expect(k.monthlyContribution).toBeLessThan(0.5 * 220_000);
+    // gh #218 — the residual is no longer ZERO, and the reason is exact, not approximate. Card 3
+    // asks for "Household take-home per month", which is now the CASH figure (net of both PF legs
+    // and professional tax), so the solved CTC is higher than the stated take-home by exactly the
+    // PF block — and that block is real, mandatory saving that lands in the quick EPF row. A
+    // rupee of it must NOT be double-counted as a market SIP, so the residual is pinned to the PF
+    // itself: anything above it would be the old invisible-contribution bug returning.
+    const self = household.members.find((m) => m.salary?.annualCTC);
+    expect(salaryAnnualCTC).toBeGreaterThan(5 * L * 12); // above the stated take-home, by the PF
+    const pfMonthly = Math.round(totalPf(statutoryPfFor(self?.salary)) / 12);
+    expect(pfMonthly).toBeGreaterThan(0);
+    expect(k.monthlyContribution).toBeLessThanOrEqual(pfMonthly + 1_000);
   });
 });
 

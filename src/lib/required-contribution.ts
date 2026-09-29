@@ -48,6 +48,14 @@ import type { Assumptions } from "@/types/assumptions";
 import { derive, type DeriveLens } from "@/lib/derive";
 import { projectCorpus } from "@/lib/fire-math";
 import { toMonthly } from "@/lib/cashflow";
+import { isEarningMember } from "@/lib/member-earning";
+import {
+  netCashSalary,
+  statutoryPfFor,
+  sumPf,
+  totalPf,
+  PROFESSIONAL_TAX_ANNUAL_PER_EARNER,
+} from "@/lib/salary-cash";
 import type { ContributionSegments } from "@/lib/contribution-schedule";
 
 /** Bisection stops once the bracket is this tight (rupees/month). */
@@ -332,8 +340,28 @@ export function requiredMonthlyContributionFor(
   // Scope matters: under a member lens this must be THAT adult's take-home and THAT adult's
   // expenses, never the couple's — the household figure would let the card quote one spouse
   // more than twice their own income (FinTech re-review §D).
+  // gh #218 — `base.monthlyTakeHome` is now NET of both PF legs and professional tax, but PF is
+  // still money the household is CONTRIBUTING (it lands in the corpus via the auto-flowed EPF
+  // row), so a ceiling on "how much can you invest" must add it back. The net effect on the
+  // ceiling is exactly minus professional tax (≈₹208/earner/month) versus the old figure — the
+  // one term that is a genuine outflow and was previously counted as investable.
+  const scopeMember = atTargetAdult
+    ? snapshot.members.find((m) => m.id === atTargetAdult.memberId) ?? null
+    : null;
+  const ceilingPf = atTargetAdult
+    ? statutoryPfFor(scopeMember?.salary)
+    : sumPf(
+        snapshot.members
+          .filter((m) => isEarningMember(m, snapshot.businesses))
+          .map((m) => statutoryPfFor(m.salary)),
+      );
   const monthlyTakeHome = atTargetAdult
-    ? Math.max(0, Math.round((atTargetAdult.attributableAnnualIncome - atTargetAdult.attributableAnnualTax) / 12))
+    ? netCashSalary({
+        annualCTC: atTargetAdult.attributableAnnualIncome,
+        pf: ceilingPf,
+        annualTax: atTargetAdult.attributableAnnualTax,
+        professionalTax: scopeMember?.salary?.annualCTC ? PROFESSIONAL_TAX_ANNUAL_PER_EARNER : 0,
+      }).monthly
     : safe(base.monthlyTakeHome);
   const monthlyExpenses = atTargetAdult
     ? Math.max(0, atTargetAdult.attributableAnnualExpenses / 12)
@@ -346,7 +374,9 @@ export function requiredMonthlyContributionFor(
     .filter((r) => r.source === "auto-loan" || r.source === "auto-insurance")
     .reduce((sum, r) => sum + toMonthly({ amount: r.amount, period: r.frequency }) * scopeSplit, 0);
   const livingFloor = Math.max(committedMonthly, MIN_LIVING_RETENTION * monthlyExpenses);
-  const hi = Math.max(0, monthlyTakeHome - livingFloor);
+  // The PF already committed is investable headroom by definition (it IS an investment), so it
+  // is added back on top of the cash figure before the living floor is taken off.
+  const hi = Math.max(0, monthlyTakeHome + Math.round(totalPf(ceilingPf) / 12) - livingFloor);
 
   let requiredMonthlyReal: number;
   const solve = input.solve !== false;

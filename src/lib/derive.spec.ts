@@ -30,6 +30,12 @@ import type { OtherIncomeLine } from "@/types/household";
 import { calculateNpsWithdrawal, postTaxAnnuityIncome } from "@/lib/nps-withdrawal";
 import { calculateYearsToTarget, calculateFIRENumber } from "@/lib/fire-math";
 import { toMonthly } from "@/lib/cashflow";
+import {
+  statutoryPfFor,
+  sumPf,
+  totalPf,
+  PROFESSIONAL_TAX_ANNUAL_PER_EARNER,
+} from "@/lib/salary-cash";
 
 /**
  * ADR-0006 Phase 1d — the calendar year every `derive()` call in this file is evaluated in.
@@ -986,7 +992,17 @@ describe("seed-anchor regression locks (gh-issue #17 — catch silent adequacy-l
     // tapering at 50; lifestyle creep defaults to 0) -- also moving FIRE earlier, since income is a
     // larger base than the residual. Values below are the ACTUAL merged-kernel output, MEASURED
     // (not hand-derived) -- see the evidence table in the merge commit.
-    expect(k.yearsToRegular).toBeCloseTo(21, 2);
+    //
+    // RE-ANCHORED 2026-09-29 (gh #218, ONE term): 21.00y -> 21.08y, FIRE age 52.00 -> 52.08.
+    // `fireNumber` is UNCHANGED (₹8.74 Cr) -- the target did not move, only the trajectory. The
+    // cause is NOT the take-home fix (that figure is reporting-only; with the basic base held at
+    // 40% every seed's FIRE age is byte-identical to before -- measured). It is the single basic
+    // base: the EPF auto-flow used a local `0.4 x CTC` while the salary form defaulted basic to
+    // 50% of CTC, and `resolveBasicAnnual` (salary-cash.ts) now serves both. The Sharmas' EPF
+    // rows rise from ₹20,000 + ₹14,400 to ₹25,000 + ₹18,000 /mo, so MORE of the unchanged
+    // savings residual is routed into the EPF bucket (8.25% nominal) instead of the blended
+    // portfolio -- a marginally slower corpus, hence +0.08y. Reported, not reverted.
+    expect(k.yearsToRegular).toBeCloseTo(21.08, 2);
     expect(Math.round(k.fireNumber)).toBe(87_372_837);
   });
 });
@@ -1323,4 +1339,84 @@ describe("T-377/QN-2 — the additive `overrides` seam the required-contribution
     expect(later.effectiveSWR).toBeGreaterThanOrEqual(base.effectiveSWR);
     expect(later.fireNumber).toBeLessThanOrEqual(base.fireNumber);
   });
+});
+
+/**
+ * gh #218 — the CASH-vs-SAVINGS identity locks.
+ *
+ * `monthlyTakeHome` became a real cash figure (net of both PF legs, any VPF and professional
+ * tax). The thing that MUST NOT move with it is the savings/corpus side: PF is funded OUT of
+ * the savings residual and already reaches the corpus through the auto-flowed EPF investment
+ * row (gh #11 LOCK), so subtracting it from `annualSavings` too would count the same rupees
+ * twice and push every EPF household's FIRE date years later.
+ *
+ * These three identities are what a future "just net PF off savings as well" edit trips on.
+ */
+describe("gh #218 — take-home is cash; savings is the residual (identity locks)", () => {
+  beforeEach(() => setActivePinia(createPinia()));
+
+  const SEEDS: Array<{ name: string; load: (h: ReturnType<typeof useHouseholdStore>, a: ReturnType<typeof useAssumptionsStore>) => void }> = [
+    { name: "sharmas", load: (h, a) => loadSeedPersona(h, a, LENS_176.currentFY) },
+    { name: "iyers", load: (h, a) => loadIyersSeed(h, a) },
+    { name: "mehtas", load: (h, a) => loadMehtasSeed(h, a) },
+    { name: "mauryas", load: (h, a) => loadMauryasSeed(h, a, LENS_176.currentFY) },
+  ];
+
+  for (const seed of SEEDS) {
+    it(`${seed.name}: savings is still income − tax − expenses (PF NOT netted off)`, () => {
+      const h = useHouseholdStore();
+      const a = useAssumptionsStore();
+      seed.load(h, a);
+      const k = derive(h.data, a.values, LENS_176);
+      expect(
+        k.annualIncome.total - k.annualTax,
+        `${seed.name}: annualSavings + expenses must reconstruct post-tax income`,
+      ).toBeCloseTo(k.annualSavings + k.annualExpensesToday, 0);
+    });
+
+    it(`${seed.name}: take-home is post-tax gross MINUS every PF leg and professional tax`, () => {
+      const h = useHouseholdStore();
+      const a = useAssumptionsStore();
+      seed.load(h, a);
+      const k = derive(h.data, a.values, LENS_176);
+      const pf = sumPf(k.lensedEarners.map((m) => statutoryPfFor(m.salary)));
+      const expected =
+        k.annualIncome.total -
+        k.annualTax -
+        pf.employeePF -
+        pf.vpf -
+        pf.employerPF -
+        k.lensedEarners.length * PROFESSIONAL_TAX_ANNUAL_PER_EARNER;
+      expect(k.monthlyTakeHome, `${seed.name}: cash figure`).toBe(Math.round(expected / 12));
+      // …and therefore strictly BELOW the old `gross − tax` figure it replaced.
+      expect(k.monthlyTakeHome).toBeLessThan(Math.round((k.annualIncome.total - k.annualTax) / 12));
+    });
+
+    it(`${seed.name}: annualSavings is large enough to FUND the PF it is charged with`, () => {
+      const h = useHouseholdStore();
+      const a = useAssumptionsStore();
+      seed.load(h, a);
+      const k = derive(h.data, a.values, LENS_176);
+      const pf = sumPf(k.lensedEarners.map((m) => statutoryPfFor(m.salary)));
+      expect(k.annualSavings).toBeGreaterThanOrEqual(
+        totalPf(pf) + k.lensedEarners.length * PROFESSIONAL_TAX_ANNUAL_PER_EARNER,
+      );
+    });
+
+    it(`${seed.name}: the auto-flowed EPF row equals statutoryPfFor for that earner`, () => {
+      const h = useHouseholdStore();
+      const a = useAssumptionsStore();
+      seed.load(h, a);
+      for (const m of h.data.members) {
+        if (!m.salary?.annualCTC) continue;
+        const row = h.data.investments.find((i) => i.type === "EPF_VPF" && i.ownerId === m.id);
+        expect(row, `${seed.name}: ${m.id} should have an auto-flowed EPF row`).toBeTruthy();
+        const pf = statutoryPfFor(m.salary);
+        expect((row?.monthlyContribution ?? 0) * 12, `${seed.name}: ${m.id} EPF annual`).toBeCloseTo(
+          pf.employeePF + pf.vpf + pf.employerPF,
+          -1,
+        );
+      }
+    });
+  }
 });

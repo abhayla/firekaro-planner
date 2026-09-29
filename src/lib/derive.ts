@@ -36,6 +36,12 @@ import {
 import { derivedFamilyLayer, plannedGoalInflationBucket } from "@/lib/derived-records";
 import { computeTax, recommendRegime, marginalSlabRate, getTaxConfigForFY } from "@/lib/tax";
 import { epfBucketAfterTaxReturn } from "@/lib/epf-vpf";
+import {
+  netCashSalary,
+  statutoryPfFor,
+  sumPf,
+  PROFESSIONAL_TAX_ANNUAL_PER_EARNER,
+} from "@/lib/salary-cash";
 import { ageFromDOB } from "@/lib/age";
 import { todayIsoLocal } from "@/lib/as-of-date";
 import { toMonthly, toAnnual } from "@/lib/cashflow";
@@ -528,8 +534,30 @@ export function derive(
     // T-377: the solver replaces ONLY the corpus inflow — `annualSavings`/`savingsRate` keep
     // describing the household's real cashflow, so no display figure is silently rewritten.
     const monthlyContribution = contributionOverride ?? Math.round(annualSavings / 12);
-    const monthlyTakeHome = Math.round((annualIncome.total - annualTax) / 12);
-    const savingsRate = calculateSavingsRate(monthlyTakeHome, Math.round(annualSavings / 12));
+    // gh #218 — `monthlyTakeHome` is the CASH figure a user can recognise on a payslip:
+    // CTC minus BOTH PF legs (and any VPF top-up), income tax and professional tax. It used
+    // to be `gross - tax`, which for the salaried-accumulator persona overstated the bank
+    // credit by the whole 24%-of-basic PF block. ONE helper owns the formula
+    // (`salary-cash.ts`) and the EPF auto-flow reads the SAME basic resolver, so the PF
+    // deducted here and the PF flowing into the corpus can never disagree.
+    //
+    // PF is deliberately NOT removed from `annualSavings`/`monthlyContribution` above: it is
+    // funded out of that residual and already reaches the corpus through the auto-flowed EPF
+    // investment row (gh #11 LOCK). Subtracting it twice would move every EPF household's
+    // FIRE date years later for no real change in their finances.
+    const scopePf = sumPf(scopeEarners.map((m) => statutoryPfFor(m.salary)));
+    const scopeProfessionalTax = scopeEarners.length * PROFESSIONAL_TAX_ANNUAL_PER_EARNER;
+    const monthlyTakeHome = netCashSalary({
+      annualCTC: annualIncome.total,
+      pf: scopePf,
+      annualTax,
+      professionalTax: scopeProfessionalTax,
+    }).monthly;
+    // `savingsRate` keeps its ORIGINAL post-tax-gross base - the savings residual is measured
+    // against the same gross it was carved out of, so re-basing it on the smaller cash figure
+    // would inflate the percentage without any behaviour changing (gh #218).
+    const monthlyGrossPostTax = Math.round((annualIncome.total - annualTax) / 12);
+    const savingsRate = calculateSavingsRate(monthlyGrossPostTax, Math.round(annualSavings / 12));
 
     // ===== ADR-0007 / gh #185 — the per-earner INCOME path (replaces the savings step-up proxy) ==
     //

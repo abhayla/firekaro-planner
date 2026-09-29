@@ -36,6 +36,12 @@ import { calculateYearsToTarget } from "@/lib/fire-math";
 import { computeIndividualFire } from "@/lib/individual-fire";
 import { computeRunway } from "@/lib/runway";
 import { toMonthly } from "@/lib/cashflow";
+import {
+  statutoryPfFor,
+  sumPf,
+  totalPf,
+  PROFESSIONAL_TAX_ANNUAL_PER_EARNER,
+} from "@/lib/salary-cash";
 import { buildContributionResolver } from "@/lib/contribution-schedule";
 import { runMonteCarloFire, headlineBandInputs } from "@/lib/monte-carlo";
 import { captureSnapshot, milestoneBandFor } from "@/lib/lifecycle-digest";
@@ -917,4 +923,112 @@ describe("gh #162 part 2 T7 — the member hero's FIRE age stays persona-sane af
       }
     });
   }
+});
+
+/**
+ * gh #218 — take-home is CASH, and it is the only thing that moved.
+ *
+ * The defect: five surfaces reported `CTC − income tax` as take-home. For a salaried
+ * accumulator with a statutory EPF row — this product's persona default — that overstates the
+ * bank credit by the whole 24%-of-basic PF block plus professional tax. An optimistic cash
+ * figure is a Tier-0 honesty defect (rule 31).
+ *
+ * The trap on the other side: PF is funded out of the savings residual and already reaches the
+ * corpus via the auto-flowed EPF investment row (gh #11 LOCK). So the cash figure must fall and
+ * `annualSavings` / `monthlyContribution` must NOT — these bounds assert both halves at once.
+ */
+describe("gh #218 — the cash figure is net of PF, and savings did not move", () => {
+  beforeEach(() => setActivePinia(createPinia()));
+
+  // The savings baselines below are the values MEASURED before the #218 change (default lens,
+  // pinned FY) — they are asserted with `toBe` precisely so a future edit that nets PF off the
+  // savings side trips here instead of silently moving every EPF household's FIRE date.
+  const SAVINGS_BASELINE: Record<string, { annualSavings: number; monthlyContribution: number }> = {
+    sharmas: { annualSavings: 1_927_164, monthlyContribution: 160_597 },
+    iyers: { annualSavings: 1_475_608, monthlyContribution: 122_967 },
+    mehtas: { annualSavings: 2_765_864, monthlyContribution: 230_489 },
+    mauryas: { annualSavings: 1_510_982, monthlyContribution: 125_915 },
+  };
+
+  for (const persona of PERSONAS) {
+    it(`${persona.name}: monthlyTakeHome is BELOW post-tax gross but within 20% of it`, () => {
+      const h = useHouseholdStore();
+      const a = useAssumptionsStore();
+      persona.load(h, a);
+      const k = derive(h.data, a.values, DEFAULT_PRODUCT_LENS);
+      const epfEarners = h.data.members.filter(
+        (m) =>
+          (m.salary?.annualCTC ?? 0) > 0 &&
+          h.data.investments.some((i) => i.type === "EPF_VPF" && i.ownerId === m.id),
+      );
+      expect(epfEarners.length, `${persona.name} has an EPF auto-flow row`).toBeGreaterThan(0);
+
+      const postTaxGross = k.annualIncome.total - k.annualTax;
+      const annualCash = k.monthlyTakeHome * 12;
+      const ctx = `${persona.name}: cash=${annualCash} postTaxGross=${postTaxGross}`;
+      // (1) STRICTLY below — the #218 defect (cash == post-tax gross) is now a CI failure.
+      expect(annualCash, `${ctx} — cash must be below post-tax gross`).toBeLessThan(postTaxGross);
+      // (2) …but not absurdly below: PF + professional tax is a bounded slice (24% of basic,
+      // i.e. ~12% of CTC at the 50% default), so anything under 80% means a double-subtraction.
+      expect(annualCash, `${ctx} — cash must exceed 80% of post-tax gross`).toBeGreaterThan(
+        0.8 * postTaxGross,
+      );
+      // (3) the exact term-by-term identity.
+      const pf = sumPf(k.lensedEarners.map((m) => statutoryPfFor(m.salary)));
+      expect(k.monthlyTakeHome, `${ctx} — term identity`).toBe(
+        Math.round(
+          (postTaxGross -
+            totalPf(pf) -
+            k.lensedEarners.length * PROFESSIONAL_TAX_ANNUAL_PER_EARNER) /
+            12,
+        ),
+      );
+    });
+
+    it(`${persona.name}: annualSavings + monthlyContribution are UNCHANGED by the cash fix`, () => {
+      const h = useHouseholdStore();
+      const a = useAssumptionsStore();
+      persona.load(h, a);
+      const k = derive(h.data, a.values, DEFAULT_PRODUCT_LENS);
+      const want = SAVINGS_BASELINE[persona.name];
+      expect(want, `${persona.name} has a savings baseline`).toBeTruthy();
+      expect(Math.round(k.annualSavings), `${persona.name} annualSavings`).toBe(want.annualSavings);
+      expect(Math.round(k.monthlyContribution), `${persona.name} monthlyContribution`).toBe(
+        want.monthlyContribution,
+      );
+      // The residual must still reconstruct post-tax income with expenses (the gh #11 identity).
+      expect(k.annualIncome.total - k.annualTax).toBeCloseTo(
+        k.annualSavings + k.annualExpensesToday,
+        0,
+      );
+    });
+
+    it(`${persona.name}: every auto-flowed EPF row equals statutoryPfFor for that earner`, () => {
+      const h = useHouseholdStore();
+      const a = useAssumptionsStore();
+      persona.load(h, a);
+      for (const m of h.data.members) {
+        if (!m.salary?.annualCTC) continue;
+        const row = h.data.investments.find((i) => i.type === "EPF_VPF" && i.ownerId === m.id);
+        const pf = statutoryPfFor(m.salary);
+        expect((row?.monthlyContribution ?? 0) * 12, `${persona.name}/${m.id}`).toBeCloseTo(
+          pf.employeePF + pf.vpf + pf.employerPF,
+          -1,
+        );
+      }
+    });
+  }
+
+  it("ravi (the lower-middle persona the rule exists for) loses PF from cash, keeps his savings", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    loadRaviSeed(h, a);
+    const k = derive(h.data, a.values, DEFAULT_PRODUCT_LENS);
+    const postTaxGross = k.annualIncome.total - k.annualTax;
+    expect(k.monthlyTakeHome * 12).toBeLessThan(postTaxGross);
+    expect(k.monthlyTakeHome * 12).toBeGreaterThan(0.8 * postTaxGross);
+    // Zero tax at ₹3L, so the whole gap is PF + professional tax — and savings is untouched.
+    expect(Math.round(k.annualSavings)).toBe(50_004);
+    expect(Math.round(k.monthlyContribution)).toBe(4_167);
+  });
 });

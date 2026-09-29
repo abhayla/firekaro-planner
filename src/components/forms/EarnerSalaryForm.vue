@@ -12,6 +12,11 @@ import {
   employerNpsAnnualFromPercents,
   salaryEditPercents,
 } from "@/lib/salary-percent";
+import {
+  netCashSalary,
+  statutoryPfFor,
+  PROFESSIONAL_TAX_ANNUAL_PER_EARNER,
+} from "@/lib/salary-cash";
 import type { Member } from "@/types/household";
 
 const props = defineProps<{ earner: Member }>();
@@ -24,6 +29,7 @@ function deriveTakeHomeFor(
   employerNps: number,
   employerNpsBasic: number,
   employerSector: "private" | "government" = "private",
+  vpfTopUpPercent?: number,
 ) {
   if (!ctc) return null;
   const oldDed = 175000;
@@ -39,7 +45,17 @@ function deriveTakeHomeFor(
     deductions: rec.recommended === "OLD" ? oldDed : 0,
     ...npsArgs,
   });
-  const annual = ctc - result.totalTax;
+  // gh #218 — the preview shows CASH: CTC minus BOTH PF legs (+ any VPF top-up), income tax and
+  // professional tax, via the ONE shared helper (`salary-cash.ts`) the dashboard headline uses.
+  // `employerNpsBasic` here IS the stored `basicAnnual`, so the resolver falls back to the 50%
+  // default only when the user has not entered one. (The hardcoded `oldDed = 175000` above is a
+  // separate defect — gh #222.)
+  const { annual } = netCashSalary({
+    annualCTC: ctc,
+    pf: statutoryPfFor({ annualCTC: ctc, basicAnnual: employerNpsBasic, vpfTopUpPercent }),
+    annualTax: result.totalTax,
+    professionalTax: PROFESSIONAL_TAX_ANNUAL_PER_EARNER,
+  });
   return {
     annual,
     monthly: Math.round(annual / 12),
@@ -59,7 +75,13 @@ const employerNps = computed(() => props.earner.salary?.employerNpsAnnual ?? 0);
 const basicAnnual = computed(() => props.earner.salary?.basicAnnual ?? 0);
 const employerSector = computed(() => props.earner.salary?.employerSector ?? "private");
 const takeHome = computed(() =>
-  deriveTakeHomeFor(ctc.value, employerNps.value, basicAnnual.value, employerSector.value),
+  deriveTakeHomeFor(
+    ctc.value,
+    employerNps.value,
+    basicAnnual.value,
+    employerSector.value,
+    props.earner.salary?.vpfTopUpPercent,
+  ),
 );
 
 // Q4 (v3) + ISSUES-v2 #1: salary fields are no longer inline-editable. Pencil opens

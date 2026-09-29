@@ -5,6 +5,11 @@ import { useUiStore } from "@/stores/ui";
 import { derive } from "@/lib/derive";
 import { todayIsoLocal } from "@/lib/as-of-date";
 import {
+  netCashSalary,
+  statutoryPfFor,
+  PROFESSIONAL_TAX_ANNUAL_PER_EARNER,
+} from "@/lib/salary-cash";
+import {
   buildPlanLevers,
   applyPlanLevers,
   evaluatePlanLevers,
@@ -197,7 +202,19 @@ export function useFireDerive() {
       netWorth: totalAssets - totalLiabilities,
       liquid,
       // Health-score inputs — each member-scoped (one Joint convention) when lensed, kernel by default.
-      monthlyTakeHome: adult ? Math.round(annualTakeHome / 12) : k.monthlyTakeHome,
+      // gh #218 — the DISPLAYED cash figure is net of that member's own PF legs + professional
+      // tax (one helper, `salary-cash.ts`); `annualTakeHome` above stays post-tax GROSS because
+      // `surplus` and `savingsRatePercent` measure the residual against the gross it came out of.
+      monthlyTakeHome: adult
+        ? netCashSalary({
+            annualCTC: annualIncome,
+            pf: statutoryPfFor(adultMember?.salary),
+            annualTax,
+            professionalTax: adultMember?.salary?.annualCTC
+              ? PROFESSIONAL_TAX_ANNUAL_PER_EARNER
+              : 0,
+          }).monthly
+        : k.monthlyTakeHome,
       monthlyEMI,
       savingsRatePercent: adult
         ? annualTakeHome > 0

@@ -63,6 +63,17 @@ const r = (x: number, dp = 4) => (Number.isFinite(x) ? Math.round(x * 10 ** dp) 
 // mauryas' `anchorAge` is unchanged (explicit DOBs, not `dobFromAge`), so only the EMI-exclusion
 // term applies there (FIRE age 68.92→66.58). iyers (loan has no endYear) and mehtas (no loan)
 // snapshots are unchanged — the no-op guarantee for lines that don't end early.
+// RE-ANCHORED 2026-09-29 (gh #218) — sharmas + mehtas moved by ONE MONTH (+0.0833y), and ONLY on
+// the years/age fields. `fireNumber`, `totalCorpus`, `fireWithdrawableCorpus`, `annualSavings`,
+// `monthlyContribution`, `savingsRate` and `effectiveSWR` are byte-identical, and iyers + mauryas
+// are unchanged outright. The cause is NOT the take-home fix: measured with the basic base held at
+// the old 40%, every seed's FIRE age reproduces the pre-change baseline exactly. It is the single
+// basic base — the EPF auto-flow used a local `0.4 × CTC` while the salary form defaulted basic to
+// 50% of CTC, and `resolveBasicAnnual` (salary-cash.ts) now serves both, so slightly MORE of the
+// (unchanged) savings residual is routed into the 8.25% EPF bucket instead of the blended
+// portfolio. mauryas is unmoved because its seed sets `basicAnnual` explicitly (40% of CTC), which
+// the resolver honours; iyers' shift lands inside the rounding step. `monthlyTakeHome` is a NEW
+// field in the snapshot below — that part is an addition, not a drift.
 describe("A7.2 golden-master — per-persona headline (DEFAULT lens)", () => {
   beforeEach(() => setActivePinia(createPinia()));
 
@@ -84,6 +95,10 @@ describe("A7.2 golden-master — per-persona headline (DEFAULT lens)", () => {
         yearsToLean: r(k.yearsToLean),
         yearsToFat: r(k.yearsToFat),
         savingsRate: k.savingsRate,
+        // gh #218 — the CASH figure joins the golden master. It is the number a user reads on
+        // the hero stat block, and it was silently `gross − tax` (optimistic by the whole PF
+        // block) for five releases with every gate green. Locked here so it cannot drift back.
+        monthlyTakeHome: k.monthlyTakeHome,
         progressPercent: k.progressPercent,
         fireNumber: Math.round(k.fireNumber),
         totalCorpus: Math.round(k.totalCorpus),

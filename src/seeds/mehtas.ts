@@ -57,8 +57,14 @@ export function loadMehtasSeed(household: HStore, assumptions: AStore, asOf: Dat
   household.addInvestment({
     type: "Stocks",
     label: "Direct equity (large + mid cap)",
+    // gh #218 — trimmed ₹50,000 → ₹35,000. The EPF auto-flow now computes PF off ONE basic base
+    // (50% of CTC via `resolveBasicAnnual`, was a local 40%), so this couple's statutory EPF rose
+    // from ₹58,400 to ₹73,000/mo. Their discretionary equity SIP has to give way by the same
+    // amount or the persona is over-committed — Σ SIP would exceed the monthly surplus, which is
+    // exactly the #12 consistency lock in `seed-consistency.spec.ts`. Mandatory PF crowds out
+    // discretionary investing; that is what it does to a real household too.
     value: 8500000,
-    monthlyContribution: 50000,
+    monthlyContribution: 35000,
     ownerId: "vikram",
     holdingsCount: 24,
   });

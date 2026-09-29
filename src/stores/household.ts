@@ -1,4 +1,5 @@
 import { defineStore } from "pinia";
+import { statutoryPfFor } from "@/lib/salary-cash";
 import { ref, computed, watch } from "vue";
 import type {
   Household,
@@ -531,16 +532,18 @@ export const useHouseholdStore = defineStore("household", () => {
     }
   }
   function autoFlowSalaryToEPF() {
-    // For each earner with salary, ensure an EPF·VPF investment exists with derived monthly contribution.
-    // 12% statutory of basic (estimated as 40% of CTC) + 12% employer match; monthly = (annual × (1 + topUp%)) / 12
+    // For each earner with salary, ensure an EPF·VPF investment exists with derived monthly
+    // contribution: 12% statutory of Basic+DA + 12% employer match (+ any VPF top-up).
+    //
+    // gh #218 — basic comes from `resolveBasicAnnual` (the user's own `salary.basicAnnual`, else
+    // 50% of CTC per the Code on Wages 2019 floor). It used to be a local `0.4 × CTC`, a SECOND
+    // basic base that disagreed with the salary form's 50% default and with the PF now deducted
+    // from take-home; two bases can never reconcile, so there is exactly one resolver.
     for (const m of data.value.members) {
       // gh #67: EPF auto-flow is salary-driven — an adult with actual CTC. Earning is derived.
       if (m.role !== "ADULT" || !m.salary?.annualCTC) continue;
-      const basic = m.salary.annualCTC * 0.4;
-      const topUp = (m.salary.vpfTopUpPercent ?? 0) / 100;
-      const annualEmpEmployee = basic * 0.12 * (1 + topUp);
-      const annualEmployer = basic * 0.12;
-      const monthly = Math.round((annualEmpEmployee + annualEmployer) / 12);
+      const { employeePF, vpf, employerPF } = statutoryPfFor(m.salary);
+      const monthly = Math.round((employeePF + vpf + employerPF) / 12);
 
       const existing = data.value.investments.find(
         (i) => i.type === "EPF_VPF" && i.ownerId === m.id,
