@@ -16,7 +16,7 @@ import type { FireBaseline, Lever } from "./lever-impact";
 import { formatINRCompact } from "@/lib/formatters";
 import { LIMIT_80CCD_1B } from "./tax-deductions";
 import type { Expenses, Household } from "@/types/household";
-import type { Assumptions } from "@/types/assumptions";
+import { SALARY_GROWTH_REAL_PERCENT_MAX, type Assumptions } from "@/types/assumptions";
 import { toMonthly } from "./cashflow";
 import type { ContributionSegments } from "./contribution-schedule";
 import type { DeriveLens } from "./derive";
@@ -224,9 +224,9 @@ export const PLAN_TRIM_FRACTION = 0.1;
 
 /** Real growth uplift applied on top of the household's conservative default (percentage points). */
 export const PLAN_RAISE_INCOME_UPLIFT_PP = 2;
-/** `salaryGrowthRealPercent`'s own schema bound (`src/types/assumptions.ts`) — the lever must never
- *  ask the solver to resolve an assumption value the store itself would reject. */
-export const SALARY_GROWTH_REAL_PERCENT_MAX = 10;
+// `SALARY_GROWTH_REAL_PERCENT_MAX` is imported from `@/types/assumptions` (the schema's own
+// `.max()` bound) — the lever must never ask the solver to resolve a value the store itself would
+// reject. Was duplicated here as a magic `10`; gh #185 step 7 review.
 /** Real, today's-₹ monthly amount the side-income lever adds. */
 export const PLAN_SIDE_INCOME_MONTHLY = 5000;
 /** Side income never starts before this age, regardless of how young the earner is today. */
@@ -440,8 +440,8 @@ export function buildPlanLevers(
   );
   const raiseIncome: PlanLever = {
     key: "raise-income",
-    label: `Raise your income ${PLAN_RAISE_INCOME_UPLIFT_PP}pp/yr faster`,
-    note: `push your real salary growth from ${currentSalaryGrowth}% to ${raisedGrowth}%/yr above inflation — a promotion, a switch, or a skill that pays more`,
+    label: `Grow your income ${PLAN_RAISE_INCOME_UPLIFT_PP}% faster than inflation, every year`,
+    note: `sustained every year to age ${assumptions.salaryGrowthTaperAge ?? 50} — a real career step-change, not a single hike; if it stops, the gain shrinks. Never moves your headline; shown beside it.`,
     available: raiseIncomeAvailable,
     unavailableReason: raiseIncomeAvailable
       ? undefined

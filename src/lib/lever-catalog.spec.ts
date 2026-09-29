@@ -13,6 +13,7 @@ import {
   type AccelerationContext,
   type PlanInputs,
   type PlanLeverContext,
+  type PlanLeverKey,
 } from "./lever-catalog";
 import { REQUIRED_CONTRIBUTION_TOLERANCE } from "./required-contribution";
 import { derive, type DeriveLens } from "./derive";
@@ -311,7 +312,29 @@ describe("QN-5 plan levers — buildPlanLevers / evaluatePlanLevers (Sharmas, re
     expect(levers.every((l) => l.available)).toBe(true);
   });
 
-  it("NO-INERT-LEVER GUARD: every available lever CHANGES the solver output on Sharmas (lesson: unassumed baseline)", () => {
+  // gh #185 step 7 review: a lever's expected CHANNEL of effect is not the same for every lever.
+  // `step-up-10`/`delay-3`/`trim-expenses`/`direct-plans`/`no-prepay-roll-emi` all perturb inputs
+  // the BISECTION itself re-solves against, so they must move `requiredMonthlyReal`. `raise-income`
+  // and `side-income` patch the income-path residual/segments that the T-377 solver contract
+  // (`required-contribution.ts` / `derive.ts` "the override REPLACES the residual") deliberately
+  // does NOT re-grow during bisection — only a DELIBERATE step-up
+  // (`householdSavingsStepUpPercent`) survives that override. Their honest effect shows up in
+  // `gapReal` instead (`atTarget`'s own income-path-driven schedule is never overridden) — exactly
+  // why `PlanLeverEffect.gapClosed` exists. A three-way OR let a genuinely broken lever hide behind
+  // whichever channel happened to move; this map pins EACH lever to the channel it must move, by
+  // AT LEAST the solver's own tolerance (`REQUIRED_CONTRIBUTION_TOLERANCE`), so a rounding-noise
+  // "move" can never pass as evidence.
+  const LEVER_EFFECT_CHANNEL: Record<PlanLeverKey, "requiredMonthlyReal" | "gapReal"> = {
+    "step-up-10": "requiredMonthlyReal",
+    "delay-3": "requiredMonthlyReal",
+    "trim-expenses": "requiredMonthlyReal",
+    "direct-plans": "requiredMonthlyReal",
+    "no-prepay-roll-emi": "requiredMonthlyReal",
+    "raise-income": "gapReal",
+    "side-income": "gapReal",
+  };
+
+  it("NO-INERT-LEVER GUARD: every available lever moves its EXPECTED channel on Sharmas, by more than solver noise", () => {
     const { snapshot, assumptions } = sharmas();
     const targetAge = reachableTargetAge(snapshot, assumptions);
     const base: PlanInputs = { snapshot, assumptions, targetAge, extraSegments: [] };
@@ -319,21 +342,75 @@ describe("QN-5 plan levers — buildPlanLevers / evaluatePlanLevers (Sharmas, re
     const baseline = planToFind(base, LENS);
     for (const l of levers.filter((x) => x.available)) {
       const one = planToFind(l.apply(base), LENS);
-      // gh #185 step 7: `raise-income` patches `salaryGrowthRealPercent`, which the T-377 solver
-      // contract (`required-contribution.ts` / `derive.ts` "the override REPLACES the residual")
-      // deliberately does NOT re-grow during the bisection — only a DELIBERATE step-up
-      // (`householdSavingsStepUpPercent`, the `step-up-10` lever) survives that override. So
-      // `raise-income` is genuinely inert on `requiredMonthlyReal`/`currentMonthlyReal` BY DESIGN;
-      // its honest effect shows up in `gapReal` (`atTarget`'s own income-path-driven schedule is
-      // never overridden) — exactly why `PlanLeverEffect.gapClosed` exists. Accept a `gapReal`
-      // move as evidence too, so this guard still catches a lever that moves NOTHING.
+      const channel = LEVER_EFFECT_CHANNEL[l.key];
+      const delta = Math.abs(one[channel] - baseline[channel]);
       expect(
-        one.requiredMonthlyReal !== baseline.requiredMonthlyReal ||
-          one.currentMonthlyReal !== baseline.currentMonthlyReal ||
-          one.gapReal !== baseline.gapReal,
-        `${l.key} is INERT — it does not move the solver (required ${baseline.requiredMonthlyReal} → ${one.requiredMonthlyReal}, gap ${baseline.gapReal} → ${one.gapReal})`,
+        Number.isFinite(delta) && delta >= REQUIRED_CONTRIBUTION_TOLERANCE,
+        `${l.key} did not move its expected channel '${channel}' by >= ${REQUIRED_CONTRIBUTION_TOLERANCE} ` +
+          `(baseline ${baseline[channel]} → ${one[channel]}, delta ${delta})`,
       ).toBe(true);
     }
+  });
+
+  it("raise-income: Ravi's FIRE-age delta sits in a sane 8-16yr band, and hikePercent/taperAge are untouched", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    setActivePinia(createPinia());
+    loadRaviSeed(h, a);
+    const snapshot = h.data;
+    const assumptions = a.values;
+    const anchorAge = derive(snapshot, assumptions, LENS).anchorAge;
+    const levers = buildPlanLevers(snapshot, assumptions, {
+      anchorAge,
+      directPlans: null,
+      memberLens: false,
+      currentYear: new Date().getFullYear(),
+    });
+    const raiseIncome = levers.find((l) => l.key === "raise-income")!;
+    const baseK = derive(snapshot, assumptions, LENS);
+    const baseFireAge = baseK.anchorAge + baseK.yearsToRegular;
+    const { assumptions: raised } = raiseIncome.apply({ snapshot, assumptions, targetAge: 65, extraSegments: [] });
+    const raisedK = derive(snapshot, raised, LENS);
+    const raisedFireAge = raisedK.anchorAge + raisedK.yearsToRegular;
+    const delta = baseFireAge - raisedFireAge;
+    expect(delta, `raise-income Ravi delta=${delta.toFixed(2)}yr — sane band 8-16yr`).toBeGreaterThanOrEqual(8);
+    expect(delta, `raise-income Ravi delta=${delta.toFixed(2)}yr — sane band 8-16yr`).toBeLessThanOrEqual(16);
+    // The lever must ONLY touch salaryGrowthRealPercent — never the user's own typed hike% (which
+    // drives the SEPARATE "expected" band, spec §3.2) or the taper age.
+    expect(raised.salaryGrowthRealPercent).not.toBe(assumptions.salaryGrowthRealPercent);
+    for (const m of snapshot.members) {
+      expect(m.salary?.hikePercent).toBe(
+        h.data.members.find((x) => x.id === m.id)?.salary?.hikePercent,
+      );
+    }
+    expect(raised.salaryGrowthTaperAge).toBe(assumptions.salaryGrowthTaperAge);
+  });
+
+  it("side-income: Ravi's FIRE-age delta sits in a sane 4-9yr band", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    setActivePinia(createPinia());
+    loadRaviSeed(h, a);
+    const snapshot = h.data;
+    const assumptions = a.values;
+    const anchorAge = derive(snapshot, assumptions, LENS).anchorAge;
+    const levers = buildPlanLevers(snapshot, assumptions, {
+      anchorAge,
+      directPlans: null,
+      memberLens: false,
+      currentYear: new Date().getFullYear(),
+    });
+    const sideIncome = levers.find((l) => l.key === "side-income")!;
+    const baseK = derive(snapshot, assumptions, LENS);
+    const baseFireAge = baseK.anchorAge + baseK.yearsToRegular;
+    const withSide = sideIncome.apply({ snapshot, assumptions, targetAge: 65, extraSegments: [] });
+    const boostedK = derive(withSide.snapshot, withSide.assumptions, LENS, {
+      extraContributionSegments: withSide.extraSegments,
+    });
+    const boostedFireAge = boostedK.anchorAge + boostedK.yearsToRegular;
+    const delta = baseFireAge - boostedFireAge;
+    expect(delta, `side-income Ravi delta=${delta.toFixed(2)}yr — sane band 4-9yr`).toBeGreaterThanOrEqual(4);
+    expect(delta, `side-income Ravi delta=${delta.toFixed(2)}yr — sane band 4-9yr`).toBeLessThanOrEqual(9);
   });
 
   it("every lever's 'less to find' is >= 0 and finite; unavailable levers report 0", () => {
