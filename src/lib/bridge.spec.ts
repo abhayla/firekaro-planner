@@ -7,7 +7,15 @@
  * a locked-heavy early-retiree fails the bridge (effective FIRE age moves later).
  */
 import { describe, it, expect } from "vitest";
-import { computeBridgeCoverage, type BridgeHolding, type BridgeInput } from "./bridge";
+import fc from "fast-check";
+import {
+  computeBridgeCoverage,
+  projectHoldingToRetirement,
+  PPF_ANNUAL_CONTRIBUTION_CAP,
+  type BridgeHolding,
+  type BridgeInput,
+  type BridgeProjection,
+} from "./bridge";
 import type { Investment, InvestmentType } from "@/types/household";
 
 const DOB_1986 = "1986-01-01"; // age 40 as of ASOF
@@ -218,5 +226,214 @@ describe("computeBridgeCoverage — defensive / pure", () => {
   it("is pure: same inputs → deep-equal result", () => {
     const input = baseInput({ holdings: [holding("PPF", 5_000_000), holding("Stocks", 3_000_000)] });
     expect(computeBridgeCoverage(input)).toEqual(computeBridgeCoverage(input));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// #212 — PER-TRANCHE PROJECTION. The bug: one portfolio-wide `corpusScale` grew
+// EVERY holding as if the household's whole savings residual landed in it, so
+// the locked slice was projected past what its instrument can physically reach
+// (measured on the sharmas seed: a 6L PPF -> 53.32L at 8.89x, ~3.4x what
+// 1.5L/yr at 7.1% can reach) while the ABSOLUTE liquid pool was inflated
+// against a bill rising only at CPI-real. Every seed read `covered: true`:
+// leniency, not coverage. These tests pin the three properties that make the
+// replacement honest AND frame-consistent.
+// ---------------------------------------------------------------------------
+
+/** A projection whose returns/contributions are uniform unless a test overrides them. */
+function projection(over: Partial<BridgeProjection> = {}): BridgeProjection {
+  return {
+    targetReal: 50_000_000,
+    realReturnFor: () => 0.05,
+    realMonthlyContributionFor: () => 0,
+    yearsToRetirement: 10,
+    ...over,
+  };
+}
+
+describe("#212 projectHoldingToRetirement — each family grows by its OWN rule", () => {
+  it("PPF: the statutory 1.5L/yr cap BINDS — a larger plan cannot buy a larger PPF", () => {
+    const ppf = (monthly: number) =>
+      projectHoldingToRetirement(
+        { id: "p", type: "PPF", value: 600_000, ownerId: "self" },
+        projection({
+          realReturnFor: () => 0.071,
+          realMonthlyContributionFor: () => monthly,
+          yearsToRetirement: 21,
+        }),
+      );
+    // 1.5L/yr is 12,500/mo. Anything above it must produce the SAME value — the cap BINDS.
+    const atCap = ppf(12_500);
+    expect(ppf(50_000)).toBeCloseTo(atCap, 6);
+    expect(ppf(200_000)).toBeCloseTo(atCap, 6);
+    // Below the cap the plan DOES move the value (proving the cap is a ceiling, not a flat rule).
+    expect(ppf(5_000)).toBeLessThan(atCap);
+    // A capped PPF at its own return can never reach the old uniform-scaled figure. The bridge's
+    // REAL frame is what the seeds see (7.1% nominal is ~1% real), and there the measured sharmas
+    // value is 42.45L against the old 53.32L — a strictly SMALLER locked slice.
+    const atCapReal = projectHoldingToRetirement(
+      { id: "p", type: "PPF", value: 600_000, ownerId: "self" },
+      projection({
+        realReturnFor: () => 0.0104, // 7.1% nominal de-inflated at ~6% general CPI
+        realMonthlyContributionFor: () => 12_500,
+        yearsToRetirement: 21,
+      }),
+    );
+    expect(atCapReal).toBeLessThan(5_332_000);
+    expect(atCapReal / 100_000).toBeGreaterThan(35);
+    expect(atCapReal / 100_000).toBeLessThan(50);
+  });
+
+  it("real estate: appreciation ONLY — a contribution plan never tops a property up", () => {
+    const p = (monthly: number) =>
+      projectHoldingToRetirement(
+        {
+          id: "re",
+          type: "RealEstate",
+          value: 6_000_000,
+          ownerId: "self",
+          realEstateRole: "Investment",
+        },
+        projection({
+          realReturnFor: () => 0,
+          realMonthlyContributionFor: () => monthly,
+          yearsToRetirement: 22,
+        }),
+      );
+    // Zero real appreciation + no top-ups => exactly today's value, whatever the plan says.
+    expect(p(0)).toBeCloseTo(6_000_000, 6);
+    expect(p(100_000)).toBeCloseTo(6_000_000, 6);
+  });
+
+  it("EPF/NPS: grows on its OWN contributions, never on the rest of the plan", () => {
+    const nps = projectHoldingToRetirement(
+      { id: "n", type: "NPS", value: 1_200_000, ownerId: "self" },
+      projection({
+        realReturnFor: () => 0.04,
+        realMonthlyContributionFor: (a) => (a.id === "n" ? 10_000 : 999_999),
+        yearsToRetirement: 22,
+      }),
+    );
+    // 1.2M at 4% for 22y plus 1.2L/yr for 22y — bounded well under any whole-plan scaling.
+    expect(nps).toBeGreaterThan(1_200_000 * 1.04 ** 22);
+    expect(nps).toBeLessThan(1_200_000 * 1.04 ** 22 + 120_000 * 22 * 1.04 ** 22);
+  });
+});
+
+describe("#212 property invariant — a capped instrument never exceeds its own cap-ceiling", () => {
+  it("PPF projected value <= (value + cap contributions) compounded at its OWN return, any plan", () => {
+    fc.assert(
+      fc.property(
+        fc.double({ min: 0, max: 20_000_000, noNaN: true }),
+        fc.double({ min: 0, max: 1_000_000, noNaN: true }),
+        fc.double({ min: 0, max: 0.2, noNaN: true }),
+        fc.integer({ min: 0, max: 40 }),
+        (value, monthly, r, years) => {
+          const got = projectHoldingToRetirement(
+            { id: "ppf", type: "PPF", value, ownerId: "self" },
+            projection({
+              realReturnFor: () => r,
+              realMonthlyContributionFor: () => monthly,
+              yearsToRetirement: years,
+            }),
+          );
+          // The ceiling: today's value plus the STATUTORY cap every year, at its own return.
+          let ceiling = value;
+          for (let t = 0; t < years; t++) {
+            ceiling = ceiling * (1 + r) + PPF_ANNUAL_CONTRIBUTION_CAP;
+          }
+          // A tiny relative tolerance for float accumulation over 40 compounding steps.
+          expect(got).toBeLessThanOrEqual(ceiling * (1 + 1e-9) + 1e-6);
+        },
+      ),
+      { numRuns: 400 },
+    );
+  });
+});
+
+describe("#212 reconciliation identity — the household total still equals the adequacy target", () => {
+  it("the liquid pool ABSORBS the residual: a bigger target grows the liquid side, not the PPF", () => {
+    const run = (targetReal: number) =>
+      computeBridgeCoverage(
+        baseInput({
+          retirementAge: 52,
+          anchorAge: 31,
+          holdings: [holding("Stocks", 1_800_000), holding("PPF", 600_000)],
+          projection: {
+            targetReal,
+            realReturnFor: (a) => (a.type === "PPF" ? 0.071 : 0.06),
+            realMonthlyContributionFor: () => 12_500,
+            yearsToRetirement: 21,
+          },
+        }),
+      );
+    const small = run(50_000_000);
+    const big = run(100_000_000);
+    // The PPF tranche is CAPPED — doubling the target must not move it at all.
+    expect(big.lockedCorpus).toBe(small.lockedCorpus);
+    // The liquid runway is what absorbs the extra.
+    expect(big.reachableCorpus).toBeGreaterThan(small.reachableCorpus);
+  });
+
+  it("floors at 0: bounded projections exceeding the target leave NO liquid runway (gate fires)", () => {
+    const r = computeBridgeCoverage(
+      baseInput({
+        retirementAge: 50,
+        anchorAge: 40,
+        annualExpenses: 1_200_000,
+        holdings: [holding("Stocks", 1_000_000), holding("PPF", 30_000_000)],
+        projection: {
+          targetReal: 1_000_000, // absurdly below the PPF alone
+          realReturnFor: () => 0.07,
+          realMonthlyContributionFor: () => 0,
+          yearsToRetirement: 10,
+        },
+      }),
+    );
+    // Liquid budget floors at 0 (never negative) and the PPF is locked until 60 -> bridge fails.
+    expect(r.reachableCorpus).toBe(0);
+    expect(r.covered).toBe(false);
+    expect(r.effectiveFireAge).toBeGreaterThan(50);
+  });
+});
+
+describe("#212 no-op guarantees — nothing changes where no rule applies", () => {
+  it("NO `projection` supplied => the pre-#212 corpusScale path, unchanged", () => {
+    const holdings = [
+      holding("Stocks", 3_000_000),
+      holding("PPF", 2_500_000),
+      holding("NPS", 1_000_000),
+    ];
+    const x1 = computeBridgeCoverage(baseInput({ retirementAge: 50, corpusScale: 1, holdings }));
+    const x4 = computeBridgeCoverage(baseInput({ retirementAge: 50, corpusScale: 4, holdings }));
+    // The scalar path still scales every holding UNIFORMLY: 4x the inputs, so the locked PPF
+    // tranche is exactly 4x too (it is EEE, so no tax haircut distorts the ratio).
+    expect(x4.lockedCorpus).toBe(x1.lockedCorpus * 4);
+    // And the liquid side grows with it (post-tax, so not exactly 4x — LTCG bites on the gain).
+    expect(x4.reachableCorpus).toBeGreaterThan(x1.reachableCorpus);
+  });
+
+  it("a household with NO locked holdings is covered, unmoved, and lands exactly on the target", () => {
+    const r = computeBridgeCoverage(
+      baseInput({
+        retirementAge: 50,
+        holdings: [holding("Stocks", 3_000_000), holding("FD", 500_000)],
+        projection: {
+          targetReal: 40_000_000,
+          realReturnFor: () => 0.06,
+          realMonthlyContributionFor: () => 30_000,
+          yearsToRetirement: 10,
+        },
+      }),
+    );
+    expect(r.covered).toBe(true);
+    expect(r.effectiveFireAge).toBe(50);
+    expect(r.lockedCorpus).toBe(0);
+    expect(r.unlockTimeline).toHaveLength(0);
+    // Nothing is bounded, so the liquid pool absorbs the WHOLE target. `reachableCorpus` is the
+    // POST-TAX net of liquidating it, so it sits just BELOW the target (the equity LTCG haircut on
+    // the gain) and never above it — the identity, read through the tax layer that follows it.
+    expect(r.reachableCorpus).toBeLessThan(40_000_000);
+    expect(r.reachableCorpus).toBeGreaterThan(40_000_000 * 0.9);
   });
 });
