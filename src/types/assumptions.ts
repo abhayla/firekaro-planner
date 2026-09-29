@@ -1,5 +1,12 @@
 import { z } from "zod";
 
+/**
+ * Single source of the `salaryGrowthRealPercent` upper bound — used by the schema below AND by
+ * `lever-catalog.ts`'s `raise-income` lever, so the lever can never ask the store to resolve a
+ * value the schema itself would reject (gh #185 step 7 review — was duplicated as a magic `10`).
+ */
+export const SALARY_GROWTH_REAL_PERCENT_MAX = 10;
+
 export const assumptionsSchema = z.object({
   // `inflation` is the GENERAL bucket (audit Entry #3). The household blend is
   // computed from the four buckets below via lib/fire-math.blendedInflation().
@@ -100,7 +107,7 @@ export const assumptionsSchema = z.object({
    * "expected" number only (spec §3.2), because an optimistic headline makes this persona
    * UNDER-SAVE (Tier-0).
    */
-  salaryGrowthRealPercent: z.number().min(0).max(10).default(2),
+  salaryGrowthRealPercent: z.number().min(0).max(SALARY_GROWTH_REAL_PERCENT_MAX).default(2),
   /**
    * The age at which real salary growth stops compounding. Real income then HOLDS flat (it never
    * drops) while expenses keep rising, so the surplus falls — intended, and the reason a plan
