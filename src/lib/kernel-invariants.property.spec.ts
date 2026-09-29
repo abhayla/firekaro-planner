@@ -38,6 +38,7 @@ import { derive } from "@/lib/derive";
 import { isEarningMember } from "@/lib/member-earning";
 import { computeTax, AVAILABLE_FYS } from "@/lib/tax";
 import { floorCeilingWithdrawal } from "@/lib/withdrawal-strategy";
+import { computeIndividualFire } from "@/lib/individual-fire";
 
 const LENS = { isFamilyView: false, viewingMemberId: null, currentFY: "2025-26" } as const;
 const EPS = 1e-9;
@@ -298,6 +299,43 @@ describe("A7.1 kernel invariants — per-persona metamorphic (fast-check)", () =
           },
         ),
         { numRuns: 50 },
+      );
+    });
+  }
+});
+
+describe("gh #162 part 1 — individual FIRE target always carries the healthcare reservation", () => {
+  beforeEach(() => setActivePinia(createPinia()));
+
+  // Detection upgrade (per the fix contract): a property invariant, not just a fixed-fixture
+  // test, so ANY future edit to computeIndividualFire that drops the reservation goes red across
+  // every persona + every valid reservation %, not just the one seed the unit spec exercises.
+  for (const persona of PERSONAS) {
+    it(`${persona.name}: every adult's individualFireNumber ≥ base × (1 + reservation%), never below the no-reservation number`, () => {
+      const h = useHouseholdStore();
+      const a = useAssumptionsStore();
+      persona.load(h, a);
+      fc.assert(
+        fc.property(
+          fc.double({ min: 0, max: 0.5, noNaN: true }), // household.healthcareCorpusReservationPercent zod bound
+          (reservationPercent) => {
+            h.data.healthcareCorpusReservationPercent = 0;
+            const adults = h.data.members.filter((m) => m.role === "ADULT");
+            for (const member of adults) {
+              const zero = computeIndividualFire(h.data, a.values, member.id, "2025-26");
+              if (!zero || !Number.isFinite(zero.individualFireNumber) || zero.individualFireNumber <= 0) continue;
+              h.data.healthcareCorpusReservationPercent = reservationPercent;
+              const withReservation = computeIndividualFire(h.data, a.values, member.id, "2025-26")!;
+              h.data.healthcareCorpusReservationPercent = 0;
+              // Allow ±1 rupee of rounding slack (both legs round to the nearest rupee independently).
+              expect(withReservation.individualFireNumber).toBeGreaterThanOrEqual(
+                Math.round(zero.individualFireNumber * (1 + reservationPercent)) - 1,
+              );
+              expect(withReservation.individualFireNumber).toBeGreaterThanOrEqual(zero.individualFireNumber - 1);
+            }
+          },
+        ),
+        { numRuns: 25 },
       );
     });
   }

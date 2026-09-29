@@ -31,7 +31,7 @@ import type { Assumptions } from "@/types/assumptions";
 import { isEarningMember } from "@/lib/member-earning";
 import { toMonthly, toAnnual } from "@/lib/cashflow";
 import { ageFromDOB } from "@/lib/age";
-import { calculateFIRENumber, calculateYearsToTarget } from "@/lib/fire-math";
+import { calculateFIRENumber, calculateFireTarget, calculateYearsToTarget } from "@/lib/fire-math";
 import { computeTax, recommendRegime, marginalSlabRate, getTaxConfigForFY } from "@/lib/tax";
 import { deriveDeductions } from "@/lib/tax-deductions";
 import { epfBucketAfterTaxReturn } from "@/lib/epf-vpf";
@@ -240,8 +240,22 @@ export function computeIndividualFire(
   const householdBasket = resolveHouseholdBasket(assumptions);
 
   const effectiveSWR = resolveEffectiveSWRByHorizon(assumptions, targetRetirementAge, planToAge);
+  const individualBaseFireNumber = calculateFIRENumber(attributableAnnualExpenses, effectiveSWR, anchorAge);
+  // gh #162 part 1 — the individual target must carry the SAME healthcare corpus reservation the
+  // household path adds (derive.ts, `healthcareCorpusReservationPercent`, default 20%), through the
+  // SAME shared `calculateFireTarget` helper — one formula, not a second one drifting from it.
+  // `familyLayerCorpus: 0` is deliberate (ring-3 exclusion, contract §3): planned goals/extended-
+  // family contingency are a household obligation, never one adult's personal FIRE target.
+  // Part 2 (NOT in this change, tracked on #162): the accessible-money bridge gate needs a
+  // per-member accessibility split and is a larger design question — the individual age below
+  // still has no bridge check.
+  const healthcareReservationPercent = household.healthcareCorpusReservationPercent ?? 0.2;
   const individualFireNumber = Math.round(
-    calculateFIRENumber(attributableAnnualExpenses, effectiveSWR, anchorAge),
+    calculateFireTarget({
+      baseFireNumber: individualBaseFireNumber,
+      familyLayerCorpus: 0,
+      healthcareReservationPercent,
+    }),
   );
 
   // calculateYearsToTarget caps its loop at 1200 months and returns a FINITE value (up to 100.0)
