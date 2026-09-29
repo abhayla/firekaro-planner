@@ -46,6 +46,7 @@ import {
   computeHousePropertyTax,
   SEC_24A_DEDUCTION_RATE,
   SEC_71_HP_LOSS_SETOFF_CAP,
+  perAssesseeHouseholdTax,
 } from "@/lib/tax-deductions";
 import { DEFAULT_FLOOR_CEILING } from "@/lib/withdrawal-strategy";
 import { calculateNpsWithdrawal, postTaxAnnuityIncome } from "@/lib/nps-withdrawal";
@@ -485,40 +486,90 @@ export function derive(
     // (gh-issue #4), more correct than the aggregate scalars for a multi-earner household.
     const employerNpsByMember = scopeDeductions.employerNpsByMember;
 
-    // taxpayerAge drives the OLD-regime senior (60+/80+) basic-exemption variant (gh-issue #6).
-    // anchorAge is the lensed member's age, else the primary earner's — the same anchor the
-    // rest of the projection uses, consistent with this engine's single-aggregate-earner model.
-    const householdTaxRecommendation = recommendRegime({
-      grossIncome:
-        annualIncome.salaryIncome +
-        annualIncome.businessShare +
-        annualIncome.otherTaxable -
-        rentalTaxDeduction, // §24a/§24b/municipal-tax/§71 collapse rent to taxable HP — cash stays full (#29/#32)
-      fy: lens.currentFY,
-      deductions: estimatedDeductionsForOld,
-      employerNpsByMember,
-      taxpayerAge: anchorAge,
-    });
+    // ===== #87 — the household's tax is the SUM of each earning adult's OWN tax =====
+    //
+    // India taxes each adult SEPARATELY. This block used to run ONE `recommendRegime` +
+    // `computeTax` over the POOLED household income (Σ salaries + business + other − rental
+    // collapse), a single-filer model. That pushed the second earner's whole income through the
+    // first earner's marginal slabs and granted only ONE basic exemption / standard deduction /
+    // 87A rebate for the household — always OVERSTATING tax for a dual-earner household (measured
+    // on the seeds: ₹2.5L–₹6.4L/yr too much), hence understating savings and pushing the honest
+    // FIRE date LATER than the truth. Single-earner households are byte-identical.
+    //
+    // `perAssesseeHouseholdTax` is the ONE derivation shared with /tax-planning's per-earner
+    // cards, so the card sum equals this kernel figure to the rupee (spec-locked). Attribution
+    // conventions (own 100% / Joint at the complementary split / unowned → anchor adult) are
+    // documented on the helper.
+    const perAssesseeTax = perAssesseeHouseholdTax(
+      household,
+      {
+        earners: scopeEarners,
+        businesses: scopeBusinesses,
+        otherIncome: scopeOtherIncome,
+        rentalTaxDeduction,
+      },
+      lens.currentFY,
+      assumptions.householdSplitPercent ?? 50,
+      pinnedAsOf,
+    );
+    const annualTax = perAssesseeTax.totalTax;
 
-    const fyTax = computeTax({
-      grossIncome:
-        annualIncome.salaryIncome +
-        annualIncome.businessShare +
-        annualIncome.otherTaxable -
-        rentalTaxDeduction, // §24a/§24b/municipal-tax/§71 collapse rent to taxable HP — cash stays full (#29/#32)
-      regime: householdTaxRecommendation.recommended,
+    /**
+     * The household-level tax DISPLAY bundle, synthesized from the per-assessee returns so every
+     * existing consumer (`fire.fyTax`, `fire.householdTaxRecommendation`, the dashboard tile, the
+     * nudge/lever/digest regime reads) keeps its shape. It is a ROLL-UP, not a second derivation:
+     * `totalTax` is the Σ above, `taxableIncome`/`estimatedDeductions` are Σ over assessees, and
+     * the reported regime is the one the LARGEST earner picked — the bracket a marginal household
+     * rupee actually lands in. `effectiveRate` is re-derived off the pooled gross so the
+     * percentage a user reads still divides the household's real tax by the household's real
+     * taxable gross.
+     */
+    const pooledTaxGross =
+      annualIncome.salaryIncome +
+      annualIncome.businessShare +
+      annualIncome.otherTaxable -
+      rentalTaxDeduction; // §24a/§24b/municipal-tax/§71 collapse rent to taxable HP — cash stays full (#29/#32)
+    const householdRegime = perAssesseeTax.marginalAssessee?.regime ?? "NEW";
+    const householdTaxRecommendation = recommendRegime({
+      grossIncome: pooledTaxGross,
       fy: lens.currentFY,
       deductions: estimatedDeductionsForOld,
       employerNpsByMember,
       taxpayerAge: anchorAge,
     });
-    const annualTax = fyTax.totalTax;
+    // The regime the household actually FILES under is per-assessee; report the largest earner's
+    // pick (falling back to the pooled recommendation only when there is no earner at all).
+    householdTaxRecommendation.recommended = perAssesseeTax.marginalAssessee
+      ? householdRegime
+      : householdTaxRecommendation.recommended;
+    const summedTaxableIncome = perAssesseeTax.perAssessee.reduce((s, a) => s + a.taxableIncome, 0);
+    const fyTax = {
+      grossIncome: pooledTaxGross,
+      standardDeduction: 0,
+      estimatedDeductions: perAssesseeTax.perAssessee.reduce((s, a) => s + a.deductions, 0),
+      taxableIncome: summedTaxableIncome,
+      slabTax: annualTax,
+      rebate: 0,
+      taxAfterRebate: annualTax,
+      surcharge: 0,
+      cess: 0,
+      totalTax: annualTax,
+      effectiveRate: pooledTaxGross > 0 ? (annualTax / pooledTaxGross) * 100 : 0,
+    };
 
     // Marginal slab rate — computed here so BOTH the NPS-annuity post-tax offset (A2, #7)
-    // and the EPF after-tax yield drag (A15.3) use the SAME scope's rate.
+    // and the EPF after-tax yield drag (A15.3) use the SAME scope's rate. #87: it is now the
+    // LARGEST assessee's own slab on their OWN taxable income, not a rate read off the pooled
+    // household total (which sat one or two brackets too high for a dual-earner household).
+    const marginalSlabSource = perAssesseeTax.marginalAssessee;
     const slabs =
-      householdTaxRecommendation.recommended === "NEW" ? cfg.newRegime.slabs : cfg.oldRegime.slabs;
-    const marginalRate = marginalSlabRate(fyTax.taxableIncome, slabs);
+      (marginalSlabSource?.regime ?? householdTaxRecommendation.recommended) === "NEW"
+        ? cfg.newRegime.slabs
+        : cfg.oldRegime.slabs;
+    const marginalRate = marginalSlabRate(
+      marginalSlabSource?.taxableIncome ?? summedTaxableIncome,
+      slabs,
+    );
 
     const annualSavings = Math.max(0, annualIncome.total - annualTax - annualExpensesToday);
     // gh-issue #11: the monthly amount flowing to the corpus is the savings residual ALONE. The
@@ -681,6 +732,9 @@ export function derive(
       householdTaxRecommendation,
       fyTax,
       annualTax,
+      // #87 — the per-assessee returns behind `annualTax`, exposed so /tax-planning renders the
+      // SAME per-earner numbers the kernel summed (one derivation, never two).
+      perAssesseeTax,
       marginalRate,
       annualSavings,
       monthlyContribution,
@@ -709,6 +763,7 @@ export function derive(
   const annualTax = lensedScope.annualTax;
   const estimatedDeductionsForOld = lensedScope.estimatedDeductionsForOld;
   const householdTaxRecommendation = lensedScope.householdTaxRecommendation;
+  const perAssesseeTax = lensedScope.perAssesseeTax;
 
   // Everything else (the ADEQUACY leg) reads the HOUSEHOLD scope — the family's one shared corpus.
   const anchorAge = householdScope.anchorAge;
@@ -1662,6 +1717,8 @@ export function derive(
     progressPercent,
     fyTax,
     householdTaxRecommendation,
+    // #87 — per-assessee tax returns behind `annualTax` (one derivation, shared with /tax-planning).
+    perAssesseeTax,
     estimatedDeductionsForOld,
     totalCorpus,
     totalLiabilitiesValue,
