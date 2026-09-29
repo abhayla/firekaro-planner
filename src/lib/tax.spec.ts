@@ -10,6 +10,7 @@ import {
   getCurrentFYTaxStaleness,
   TAX_CONFIG_LAST_VERIFIED,
   oldRegimeSlabsForAge,
+  singleEarnerNpsArgs,
   type TaxSlabEntry,
 } from "./tax";
 
@@ -457,5 +458,113 @@ describe("getCurrentFYTaxStaleness (current-FY honesty guard — obj-1 must-have
 
   it("TAX_CONFIG_LAST_VERIFIED is an ISO date string the guard can read", () => {
     expect(TAX_CONFIG_LAST_VERIFIED).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+});
+
+describe("computeTax — scalar-vs-per-member coherence for government-sector 80CCD(2) (gh-issue #157)", () => {
+  // RCA: EarnerSalaryForm.vue's take-home preview (via recommendRegime + computeTax) and
+  // tax-planning/Index.vue's per-earner cards call computeTax with the SCALAR
+  // employerNps/employerNpsBasic args, which the aggregate fallback hardcodes to the
+  // "private" ceiling (tax.ts's aggregate fallback). The headline path (tax-deductions.ts →
+  // derive.ts) uses employerNpsByMember with the earner's real sector. For a government
+  // earner on the OLD regime this makes the two scalar consumers show DIFFERENT tax than the
+  // headline for the SAME earner. `singleEarnerNpsArgs` is the sector-aware helper both
+  // consumers must now build their args with — this spec locks it against the legacy scalar
+  // shape (which the helper's OWN behaviour replaces) for both sectors and both regimes.
+  const basic = 1_000_000;
+  const nps = 140_000; // 14% of basic — exceeds the private 10% OLD ceiling
+  const gross = 2_000_000;
+
+  function scalarCallShape(regime: "OLD" | "NEW") {
+    // The LEGACY (pre-fix) call shape still used directly by EarnerSalaryForm.vue /
+    // tax-planning/Index.vue before this fix lands — sector is NOT threaded through.
+    return computeTax({
+      grossIncome: gross,
+      regime,
+      fy: "2025-26",
+      isSalaried: false,
+      deductions: 0,
+      employerNps: nps,
+      employerNpsBasic: basic,
+    });
+  }
+
+  function memberCallShape(regime: "OLD" | "NEW", sector: "private" | "government") {
+    // The sector-aware call shape both consumers MUST use post-fix, built via the shared
+    // singleEarnerNpsArgs helper — not hand-rolled inline in either Vue file.
+    return computeTax({
+      grossIncome: gross,
+      regime,
+      fy: "2025-26",
+      isSalaried: false,
+      deductions: 0,
+      ...singleEarnerNpsArgs(nps, basic, sector),
+    });
+  }
+
+  it("government + OLD: singleEarnerNpsArgs('government') gives the 14% figure (₹18.6L taxable), diverging from the legacy scalar shape (₹19L)", () => {
+    const member = memberCallShape("OLD", "government");
+    expect(member.taxableIncome).toBe(1_860_000);
+    // The legacy scalar call shape (no sector channel) is wrongly capped at 10% (private) —
+    // this is the exact defect #157 fixes once both Vue consumers stop using it.
+    const legacyScalar = scalarCallShape("OLD");
+    expect(legacyScalar.taxableIncome).toBe(1_900_000);
+    expect(member.taxableIncome).not.toBe(legacyScalar.taxableIncome);
+  });
+
+  it("private + OLD: singleEarnerNpsArgs('private') matches the legacy scalar shape (unaffected by the fix)", () => {
+    const member = memberCallShape("OLD", "private");
+    const legacyScalar = scalarCallShape("OLD");
+    expect(member.taxableIncome).toBe(legacyScalar.taxableIncome);
+    expect(member.taxableIncome).toBe(1_900_000);
+  });
+
+  it("private + NEW: singleEarnerNpsArgs('private') matches the legacy scalar shape (unaffected by the fix)", () => {
+    const member = memberCallShape("NEW", "private");
+    const legacyScalar = scalarCallShape("NEW");
+    expect(member.taxableIncome).toBe(legacyScalar.taxableIncome);
+  });
+
+  it("government + NEW: singleEarnerNpsArgs('government') matches the legacy scalar shape (NEW regime is 14% regardless of sector)", () => {
+    const member = memberCallShape("NEW", "government");
+    const legacyScalar = scalarCallShape("NEW");
+    expect(member.taxableIncome).toBe(legacyScalar.taxableIncome);
+  });
+
+  it("defaults to 'private' when sector is omitted (conservative)", () => {
+    const defaulted = computeTax({
+      grossIncome: gross,
+      regime: "OLD",
+      fy: "2025-26",
+      isSalaried: false,
+      deductions: 0,
+      ...singleEarnerNpsArgs(nps, basic),
+    });
+    expect(defaulted.taxableIncome).toBe(1_900_000);
+  });
+});
+
+describe("EarnerSalaryForm.vue / tax-planning/Index.vue use singleEarnerNpsArgs, not bare scalars (gh-issue #157 source lock)", () => {
+  // The class this issue fixes is "a scalar consumer passes employerNps/employerNpsBasic
+  // directly instead of routing through the sector-aware helper". A coherence spec at the
+  // computeTax boundary can't observe what argument SHAPE the Vue files actually build (no
+  // @vue/test-utils component-mount harness exists in this repo — every other spec in this
+  // project is a pure-function unit spec, so this mirrors that convention) — so this reads the
+  // source text directly as the enforcement mechanism, the same technique the sibling audit in
+  // gh-issue #157 used to find both call sites in the first place.
+  const fs = require("node:fs") as typeof import("node:fs");
+  const path = require("node:path") as typeof import("node:path");
+  const root = path.resolve(__dirname, "../..");
+
+  it("EarnerSalaryForm.vue's deriveTakeHomeFor no longer passes bare employerNps/employerNpsBasic scalars", () => {
+    const src = fs.readFileSync(path.join(root, "src/components/forms/EarnerSalaryForm.vue"), "utf-8");
+    expect(src).toContain("singleEarnerNpsArgs");
+    expect(src).not.toMatch(/employerNps,\s*employerNpsBasic\s*\}/);
+  });
+
+  it("tax-planning/Index.vue's per-earner cards no longer pass bare employerNps/employerNpsBasic scalars", () => {
+    const src = fs.readFileSync(path.join(root, "src/pages/tax-planning/Index.vue"), "utf-8");
+    expect(src).toContain("singleEarnerNpsArgs");
+    expect(src).not.toMatch(/employerNps:\s*earnerNps,\s*employerNpsBasic:\s*earnerBasic/);
   });
 });
