@@ -536,15 +536,29 @@ export const useHouseholdStore = defineStore("household", () => {
     for (const m of data.value.members) {
       // gh #67: EPF auto-flow is salary-driven — an adult with actual CTC. Earning is derived.
       if (m.role !== "ADULT" || !m.salary?.annualCTC) continue;
+      const existing = data.value.investments.find(
+        (i) => i.type === "EPF_VPF" && i.ownerId === m.id,
+      );
+      // #223 round 3 — "no EPF" is household state on the member's salary, honoured HERE, the one
+      // place every surface (quick, Profile, the salary form) funnels through. `existing` is the
+      // FIRST EPF_VPF row for this member — the exact row the dedupe branch below would otherwise
+      // overwrite, so this auto-flow already treats it as its own regardless of who created it
+      // (a household whose row predates the `autoFlowSource` marker never had that marker set, and
+      // must not keep an invented deduction forever). Remove exactly that row; a SECOND row for the
+      // same member (a hand-added extra, e.g. a previous employer's balance) is never touched — it
+      // was never the row this dedupe would have refreshed.
+      if (m.salary.hasEpf === false) {
+        if (existing) {
+          data.value.investments = data.value.investments.filter((i) => i !== existing);
+        }
+        continue;
+      }
       const basic = m.salary.annualCTC * 0.4;
       const topUp = (m.salary.vpfTopUpPercent ?? 0) / 100;
       const annualEmpEmployee = basic * 0.12 * (1 + topUp);
       const annualEmployer = basic * 0.12;
       const monthly = Math.round((annualEmpEmployee + annualEmployer) / 12);
 
-      const existing = data.value.investments.find(
-        (i) => i.type === "EPF_VPF" && i.ownerId === m.id,
-      );
       if (existing) {
         existing.monthlyContribution = monthly;
       } else {
@@ -555,6 +569,7 @@ export const useHouseholdStore = defineStore("household", () => {
           value: 0,
           monthlyContribution: monthly,
           ownerId: m.id,
+          autoFlowSource: true,
         });
       }
     }

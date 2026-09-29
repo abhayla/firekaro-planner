@@ -30,6 +30,7 @@ function deriveTakeHomeFor(
   employerNps: number,
   employerNpsBasic: number,
   employerSector: "private" | "government" = "private",
+  hasEpf = true,
 ) {
   if (!ctc) return null;
   const card = previewEarnerTakeHome(household.data, props.earner, ui.currentFY, {
@@ -37,6 +38,7 @@ function deriveTakeHomeFor(
     employerNpsAnnual: employerNps,
     basicAnnual: employerNpsBasic,
     employerSector,
+    hasEpf,
   });
   if (!card) return null;
   return {
@@ -57,8 +59,10 @@ const hike = computed(() => props.earner.salary?.hikePercent ?? 8);
 const employerNps = computed(() => props.earner.salary?.employerNpsAnnual ?? 0);
 const basicAnnual = computed(() => props.earner.salary?.basicAnnual ?? 0);
 const employerSector = computed(() => props.earner.salary?.employerSector ?? "private");
+// #223 — absent ⇒ true (most salaried members of the persona are EPF-covered).
+const hasEpf = computed(() => props.earner.salary?.hasEpf ?? true);
 const takeHome = computed(() =>
-  deriveTakeHomeFor(ctc.value, employerNps.value, basicAnnual.value, employerSector.value),
+  deriveTakeHomeFor(ctc.value, employerNps.value, basicAnnual.value, employerSector.value, hasEpf.value),
 );
 
 // Q4 (v3) + ISSUES-v2 #1: salary fields are no longer inline-editable. Pencil opens
@@ -67,7 +71,7 @@ const takeHome = computed(() =>
 // Law-grounded defaults prefill for a BRAND-NEW entry only; an existing record derives its
 // percentages from the stored ₹ amounts (absent → 0%, never resurrected to a default) —
 // salary-percent.ts owns the defaults + conversion and documents the why.
-const editing = ref<{ annualCTC: number; hikePercent: number; vpfTopUpPercent: number | null; basicPercent: number; employerNpsPercent: number; employerSector: "private" | "government" } | null>(null);
+const editing = ref<{ annualCTC: number; hikePercent: number; vpfTopUpPercent: number | null; basicPercent: number; employerNpsPercent: number; employerSector: "private" | "government"; hasEpf: boolean } | null>(null);
 const showEdit = computed({
   get: () => !!editing.value,
   set: (v) => { if (!v) editing.value = null; },
@@ -81,6 +85,7 @@ function startEdit() {
     basicPercent: pct.basicPercent,
     employerNpsPercent: pct.employerNpsPercent,
     employerSector: props.earner.salary?.employerSector ?? "private",
+    hasEpf: props.earner.salary?.hasEpf ?? true,
   };
 }
 
@@ -152,6 +157,7 @@ function saveEdit() {
       basicAnnual: editingBasicAnnual.value > 0 ? editingBasicAnnual.value : undefined,
       employerNpsAnnual: editingNpsAnnual.value > 0 ? editingNpsAnnual.value : undefined,
       employerSector: editing.value.employerSector,
+      hasEpf: editing.value.hasEpf,
     },
   });
   editing.value = null;
@@ -300,6 +306,19 @@ function saveEdit() {
                 persistent-hint
                 data-testid="employer-sector-select"
               />
+            </v-col>
+            <v-col cols="12" md="6" class="d-flex align-center justify-space-between">
+              <span class="text-body-2">My salary has EPF (PF deducted)</span>
+              <v-btn-toggle
+                v-model="editing.hasEpf"
+                mandatory
+                density="compact"
+                color="primary"
+                data-testid="salary-has-epf"
+              >
+                <v-btn :value="true" data-testid="salary-has-epf-yes">Yes</v-btn>
+                <v-btn :value="false" data-testid="salary-has-epf-no">No</v-btn>
+              </v-btn-toggle>
             </v-col>
           </v-row>
         </v-card-text>

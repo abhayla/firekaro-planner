@@ -41,6 +41,12 @@ export const memberSalarySchema = z.object({
   // OLD regime too (private = 10% old / 14% new). Optional; absent ⇒ "private" (conservative
   // default — never over-deducts). gh-issue #4.
   employerSector: z.enum(["private", "government"]).optional(),
+  // #223 round 2 — does this salary have EPF (PF deducted)? Optional; absent ⇒ true (most salaried
+  // members of the persona are EPF-covered, and every household persisted before this field existed
+  // keeps validating with no migration). The store's `autoFlowSalaryToEPF` is the ONE place this is
+  // read to decide whether to create/keep the member's EPF row — household state, not `/quick`-only
+  // state, so Profile/Salary-form saves can never silently rebuild a row a "no EPF" answer removed.
+  hasEpf: z.boolean().optional(),
 });
 export type MemberSalary = z.infer<typeof memberSalarySchema>;
 
@@ -312,6 +318,10 @@ export const investmentSchema = z.object({
   // there and spreads it back on read) — so NO Prisma change. Deliberately NOT `source`, which
   // already means something else (Direct/Regular, owner-entity id).
   quickSource: z.boolean().optional(),
+  // #223 round 2 — set true ONLY on the EPF row `autoFlowSalaryToEPF` itself created, so flipping
+  // `salary.hasEpf` to false can remove exactly that row and never a row the user added by hand in
+  // `InvestmentForm.vue`. Rides `subtypeData` too — no Prisma change.
+  autoFlowSource: z.boolean().optional(),
 });
 export type Investment = z.infer<typeof investmentSchema>;
 

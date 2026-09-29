@@ -199,6 +199,9 @@ function finish() {
   // The store owns these two effects; re-running them over rows we already wrote is a no-op
   // (same ids), and it keeps the express path on exactly one auto-flow implementation.
   household.autoFlowEMIToRecurring();
+  // #223 round 2 — the store's salary→EPF auto-flow now itself honours `salary.hasEpf` (removes
+  // its own row when false, never touches a user-added one), so this call is safe unconditionally
+  // and Profile/Salary-form saves later respect the same flag without any `/quick`-local gating.
   household.autoFlowSalaryToEPF();
   household.markProfileComplete();
   household.markWizardComplete();
@@ -305,6 +308,19 @@ function editAnswers() {
                   label="Household take-home per month"
                   testid="quick-income"
                 />
+              </div>
+              <div class="d-flex align-center justify-space-between mt-4">
+                <span class="text-body-2">Does your salary have EPF (PF deducted)?</span>
+                <v-btn-toggle
+                  v-model="answers.hasEpf"
+                  mandatory
+                  density="compact"
+                  color="primary"
+                  data-testid="quick-has-epf"
+                >
+                  <v-btn :value="true" data-testid="quick-has-epf-yes">Yes</v-btn>
+                  <v-btn :value="false" data-testid="quick-has-epf-no">No</v-btn>
+                </v-btn-toggle>
               </div>
               <v-alert
                 v-if="sanity"

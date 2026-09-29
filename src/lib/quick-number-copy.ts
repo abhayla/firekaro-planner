@@ -269,6 +269,20 @@ export function howWeGotThis(input: ExplainerInput): string[] {
   ];
 }
 
+/**
+ * #223 — a one-line honesty note for the result screen, shown ONLY when the user said their
+ * salary has EPF. It exists so the plan is transparent about WHY the monthly contribution figure
+ * includes PF, without touching `howWeGotThis()`'s locked 5-bullet shape (`quick-number-copy.spec.ts`).
+ * When `hasEpf` is false there is nothing to caveat — the module invents no PF for that case.
+ */
+export function epfNote(hasEpf: boolean): string {
+  if (!hasEpf) return "";
+  return (
+    "Your monthly investing figure includes the EPF your employer deducts and matches — real, " +
+    "mandatory saving, not something we added on top."
+  );
+}
+
 /** The assumptions strip — names the horizon the SWR was chosen for (B2). */
 export function assumptionsLine(input: ExplainerInput): string {
   const drawdown = Math.max(0, Math.round(input.planToAge - input.targetAge));

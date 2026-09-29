@@ -25,7 +25,7 @@ import { loadMehtasSeed } from "@/seeds/mehtas";
 import { loadMauryasSeed } from "@/seeds/mauryas";
 import { loadRaviSeed } from "@/seeds/ravi";
 import { deriveDeductions, computeEarnerTaxCard, previewEarnerTakeHome } from "@/lib/tax-deductions";
-import { pfFromInvestmentRows } from "@/lib/salary-cash";
+import { pfFromInvestmentRows, PROFESSIONAL_TAX_ANNUAL_PER_EARNER } from "@/lib/salary-cash";
 import { todayIsoLocal } from "@/lib/as-of-date";
 
 // Pinned so persona ages / FY selection never drift with the wall clock (matches
@@ -117,5 +117,26 @@ describe("gh-222 — salary-form preview matches the tax-planning per-earner car
     const member = household.earners.find((m) => (m.salary?.annualCTC ?? 0) > 0)!;
 
     expect(previewEarnerTakeHome(household.data, member, FY, { annualCTC: 0 })).toBeNull();
+  });
+
+  it("#223 — a hasEpf:false draft previews take-home = CTC − tax − professional tax, no PF", () => {
+    const household = useHouseholdStore();
+    const assumptions = useAssumptionsStore();
+    loadSeedPersona(household, assumptions);
+    const member = household.earners.find((m) => (m.salary?.annualCTC ?? 0) > 0)!;
+    const ctc = member.salary!.annualCTC;
+
+    // The member's EPF row still exists (round-1/2 only remove it via autoFlowSalaryToEPF on
+    // SAVE) — the preview must still zero PF from the DRAFT alone, before any save happens.
+    const noEpfPreview = previewEarnerTakeHome(household.data, member, FY, { hasEpf: false });
+    expect(noEpfPreview).not.toBeNull();
+
+    const expectedTakeHome = ctc - noEpfPreview!.tax - PROFESSIONAL_TAX_ANNUAL_PER_EARNER;
+    expect(noEpfPreview!.takeHome).toBe(Math.max(0, expectedTakeHome));
+
+    // And it must be HIGHER than the hasEpf:true (default) preview for the same CTC — PF no
+    // longer reduces the cash figure.
+    const withEpfPreview = previewEarnerTakeHome(household.data, member, FY);
+    expect(noEpfPreview!.takeHome).toBeGreaterThanOrEqual(withEpfPreview!.takeHome);
   });
 });

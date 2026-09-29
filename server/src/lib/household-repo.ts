@@ -90,7 +90,9 @@ function rowToInvestment(row: {
 
 // ---------- Member <-> row (salary split) ----------
 
-function rowToMember(row: {
+// #223 round 3 — exported so a no-DB unit spec can lock the row<->member round-trip without
+// touching Prisma; both were previously module-private with no direct test coverage.
+export function rowToMember(row: {
   entityId: string;
   name: string;
   dateOfBirth: string;
@@ -104,6 +106,7 @@ function rowToMember(row: {
   salaryEmployerNpsAnnual: number | null;
   salaryBasicAnnual: number | null;
   salaryEmployerSector: string | null;
+  salaryHasEpf: boolean | null;
   city: string;
   health: string;
   educationStage: string | null;
@@ -137,12 +140,15 @@ function rowToMember(row: {
         | "private"
         | "government"
         | undefined,
+      // #223 — round-trip the dedicated column; absent stays undefined (defaults to true at
+      // every consumer per memberSalarySchema), never coerced to a stored false.
+      hasEpf: row.salaryHasEpf ?? undefined,
     };
   }
   return m;
 }
 
-function memberToRow(m: Member, userId: string) {
+export function memberToRow(m: Member, userId: string) {
   return {
     userId,
     entityId: m.id,
@@ -158,6 +164,9 @@ function memberToRow(m: Member, userId: string) {
     salaryEmployerNpsAnnual: m.salary?.employerNpsAnnual ?? null,
     salaryBasicAnnual: m.salary?.basicAnnual ?? null,
     salaryEmployerSector: m.salary?.employerSector ?? null,
+    // #223 — undefined (absent) persists as NULL, never coerced to false, so an old household
+    // that never saw the toggle keeps reading "true" (the honest default) after this round-trips.
+    salaryHasEpf: m.salary?.hasEpf ?? null,
     city: m.city,
     health: m.health,
     educationStage: m.educationStage ?? null,

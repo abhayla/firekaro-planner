@@ -157,6 +157,7 @@ model Member {
   salaryEmployerNpsAnnual Float? // Sec 80CCD(2) employer NPS (gh-issue #2)
   salaryBasicAnnual       Float? // Basic+DA, caps 80CCD(2) at 10%/14% (gh-issue #3)
   salaryEmployerSector    String? // "private" | "government" — govt gets 14% OLD ceiling (gh-issue #4)
+  salaryHasEpf            Boolean? // #223 — does this salary have EPF (PF deducted)? Nullable ⇒ absent = true (most salaried members are EPF-covered); false ⇒ autoFlowSalaryToEPF creates/keeps no row for this member.
 
   // Q2.1 onboarding fields.
   city             String  @default("Metro")

@@ -319,6 +319,32 @@ describe("applyQuickAnswers — the unaccounted rupee is spent, not deleted", ()
     expect(pfMonthly).toBeGreaterThan(0);
     expect(k.monthlyContribution).toBeLessThanOrEqual(pfMonthly + 1_000);
   });
+
+  it("#223 — with no EPF, the surplus invents NOTHING: no EPF row, ~zero fallback contribution", () => {
+    const { household, salaryAnnualCTC } = apply({ ...AMIT, sip: 0, hasEpf: false });
+    const k = derive(household, DEFAULT_ASSUMPTIONS, {
+      isFamilyView: false,
+      viewingMemberId: null,
+      currentFY: "2026-27",
+    });
+    expect(
+      household.investments.some((i) => i.type === "EPF_VPF"),
+      "a no-EPF employee must carry no EPF row at all",
+    ).toBe(false);
+    // The CTC is solved to reach the stated take-home (gross − tax, no PF term at all — the
+    // fallback solve targets take-home with PF = 0), so it is not fabricated from thin air.
+    expect(salaryAnnualCTC).toBeGreaterThan(0);
+    // With no PF leaving the payslip, the residual the module has left to reconcile as
+    // "investing" is ~zero — never the ~16%-of-CTC PF figure the EPF=yes case shows.
+    expect(k.monthlyContribution).toBeLessThanOrEqual(1_000);
+  });
+
+  it("#223 — the EPF=yes case (default) is UNCHANGED by the toggle's existence", () => {
+    const { household, salaryAnnualCTC } = apply({ ...AMIT, sip: 0 }); // hasEpf defaults true
+    const withExplicitYes = apply({ ...AMIT, sip: 0, hasEpf: true });
+    expect(household.investments.some((i) => i.type === "EPF_VPF")).toBe(true);
+    expect(withExplicitYes.salaryAnnualCTC).toBe(salaryAnnualCTC);
+  });
 });
 
 describe("applyQuickAnswers — re-entry safety", () => {
