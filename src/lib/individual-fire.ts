@@ -135,6 +135,11 @@ export function computeIndividualFire(
   const attributableAnnualExpenses = Math.round((ownMonthly + split * sharedMonthly) * 12);
 
   // ---- attributable corpus: M-owned (100%) + Joint (× split); primary residence excluded ----
+  // #211: a non-primary property STILL counts toward this member's attributable target — the fix
+  // changed WHEN its rupees become spendable in the household bridge, not whether the property
+  // funds retirement. The member path has no bridge gate at all (see the #162 part-2 note below),
+  // so there is no unlock timeline here to date a sale into; the caveat on that line is what tells
+  // the user this age carries no liquidity check.
   const fireInvestments = household.investments.filter(
     (i) => !(i.type === "RealEstate" && i.realEstateRole === "PrimaryResidence"),
   );

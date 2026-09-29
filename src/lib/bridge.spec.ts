@@ -650,3 +650,70 @@ describe("#211 investment property — a dated sale tranche, never pre-sale liqu
     expect(r.unlockTimeline).toHaveLength(0);
   });
 });
+
+// ---------------------------------------------------------------------------
+// #211 — PER-SEED BOUNDS, READ BACK FROM THE REAL `derive()` PATH.
+//
+// Derived from the T1 diagnostic run in PR #214, before AND after the fix. What
+// moved and what deliberately did not:
+//
+//   seed     | reachableCorpus   | lockedCorpus      | timeline (property)
+//   mehtas   | 599.3L → 599.3L   | 424.9L → 361.2L   | absent → Bandra flat @54
+//   mauryas  | 992.8L → 992.8L   | 60.0L  → 49.1L    | absent → let-out flat @69
+//   sharmas / iyers / ravi: every field byte-identical (no investment property).
+//
+// `reachableCorpus` is UNCHANGED on both property seeds, which is the fix's
+// whole point: the property's rupees were never in the pre-sale liquid pool and
+// still are not. `lockedCorpus` FALLS because the locked figure is now the
+// post-haircut, post-LTCG net of a dated sale instead of the raw market value,
+// and the same rupees now appear as a tranche the user can see. No seed's
+// VERDICT moved (every one is `covered` with a runway far wider than the sale
+// lag) — recorded honestly rather than engineered: the gate's ability to fire is
+// proven on the #212 locked-heavy fixture above, not on a seed.
+// ---------------------------------------------------------------------------
+describe("#211 per-seed bounds through the real derive() path", () => {
+  beforeEach(() => setActivePinia(createPinia()));
+
+  const EXPECT: Record<string, { propertyLabel: string | null; saleAge: number | null }> = {
+    sharmas: { propertyLabel: null, saleAge: null },
+    mehtas: { propertyLabel: "3BHK Bandra Mumbai", saleAge: 54 },
+    iyers: { propertyLabel: null, saleAge: null },
+    mauryas: { propertyLabel: "2BHK (let out)", saleAge: 69 },
+    ravi: { propertyLabel: null, saleAge: null },
+  };
+
+  for (const persona of IDENTITY_PERSONAS) {
+    it(`${persona.name}: the property (if any) is a dated tranche and never pre-sale liquidity`, () => {
+      const h = useHouseholdStore();
+      const a = useAssumptionsStore();
+      persona.load(h, a);
+      const k = derive(h.data, a.values, IDENTITY_LENS, { currentYear: 2026 });
+      const b = k.bridgeCoverage;
+      expect(b).not.toBeNull();
+      const want = EXPECT[persona.name];
+
+      if (want.propertyLabel == null) {
+        // NO INVESTMENT PROPERTY ⇒ nothing about this seed's bridge may change. Every tranche in
+        // the timeline is a financial instrument, never real estate.
+        const re = h.data.investments.filter(
+          (i) => i.type === "RealEstate" && i.realEstateRole !== "PrimaryResidence",
+        );
+        expect(re).toHaveLength(0);
+        for (const t of b!.unlockTimeline) {
+          expect(h.data.investments.find((i) => i.label === t.label)?.type).not.toBe("RealEstate");
+        }
+        return;
+      }
+
+      // The property is in the timeline, at its assumed sale age (the retirement age plus the lag),
+      // and NOT in the money available at the retirement age.
+      const tranche = b!.unlockTimeline.find((t) => t.label === want.propertyLabel);
+      expect(tranche).toBeDefined();
+      expect(tranche!.age).toBe(want.saleAge);
+      expect(tranche!.age).toBe(b!.corpusOnlyFireAge + ASSUMED_PROPERTY_SALE_LAG_YEARS);
+      expect(tranche!.netAmount).toBeGreaterThan(0);
+      // Its rupees sit in the LOCKED side until that age, not in the runway.
+      expect(b!.lockedCorpus).toBeGreaterThanOrEqual(tranche!.netAmount);
+    });
+  }
+});

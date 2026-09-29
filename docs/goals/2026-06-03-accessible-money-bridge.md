@@ -46,7 +46,7 @@ Add `accessibleAtAge(asset, retirementAge, memberDob)` (extend `investment-trait
 - **EPF/VPF** → FIRE age (accessible on job exit; current law — withdrawable after ~2mo unemployment).
 - **PPF** → `openingYear + 15` if `openingYear` present; **else locked until age 60** (Q3) + an `assumption` note ("PPF open year not set → assumed locked till 60; add it for a usually-earlier unlock").
 - **NPS** → at/after 60: 60% lump / 40% annuity. **If `retirementAge < 60`: early-exit 20% lump / 80% annuity** (corpus > ₹2.5L; ≤₹2.5L full lump) (Q5). The annuitised slice is an `incomeStream` starting at the FIRE age. Emit an `assumption` note exposing BOTH options ("touching NPS now → 20% cash; waiting till 60 → 60% — selected: early-exit (your retirement age)").
-- **RealEstate** PrimaryResidence → already excluded from corpus (no-op); Investment/Inherited → `illiquid` (NOT in the bridge runway) (Q4).
+- **RealEstate** PrimaryResidence → already excluded from corpus, and never sold (no-op: no lump, no unlock event, `unlockAge: Infinity`). Investment/Inherited → **a dated SALE EVENT (#211, revised 2026-09-29)**: locked until `plannedSaleAge`, and when that field is unset the sale is dated `ASSUMED_PROPERTY_SALE_LAG_YEARS` (3) years INTO retirement, never at the retirement age itself. The gross realised is `value × (1 − REAL_ESTATE_ILLIQUIDITY_HAIRCUT)` (10%, covering brokerage, closing costs and a time-pressured resale), with real-estate LTCG applied on top by `liquidation-tax.ts`. It stays `illiquid` until the sale age, so it is never part of the pre-sale liquid runway. **Supersedes the original Q4 answer ("Investment/Inherited → illiquid, never in the runway")**, which counted the property in full toward the corpus-adequacy total while giving it zero unlock event — a household could pass the bridge gate on money it could not spend (Tier-0, optimistic; measured on the mehtas seed, a ₹3.5 Cr flat = 40% of the corpus with no timeline entry).
 
 **DoD:** pure fn + colocated spec covering every instrument branch + the PPF-blank fallback + the
 NPS-early-exit-vs-60 split + the assumption-note emission. No change to `derive()` yet.
@@ -102,7 +102,7 @@ for a household that triggers each fallback; no console errors; cross-page consu
 ---
 
 ## Out of scope (do NOT build)
-- An optional **"I'll sell this property at FIRE"** flag that moves investment real estate into the bridge as a lump — progressive enhancement, later (Q4 default is illiquid).
+- ~~An optional **"I'll sell this property at FIRE"** flag that moves investment real estate into the bridge as a lump~~ — **DELIVERED as `plannedSaleAge` (#211, 2026-09-29)**, see the RealEstate line above. What remains is the UI: a one-tap editor for `plannedSaleAge` on a real-estate holding (the assumption note already carries `fixField: "plannedSaleAge"`, so the field is disclosed but not yet editable), and a "sell to fund" lever showing how the sale age moves the bridge.
 - **New mandatory onboarding inputs** — Q2 locked auto-derive; only optional *hints* are allowed.
 - **CII-indexed LTCG** precision (gh-issue #6) — use flat post-Budget-2024 rates + disclose.
 - **Full Monte-Carlo / SORR bridge** — the deterministic year-by-year coverage check is the MVP.
