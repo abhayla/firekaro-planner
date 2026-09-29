@@ -36,6 +36,44 @@ export const PPF_LOCK_YEARS = 15;
 export const ASSUMED_PENSION_UNLOCK_AGE = 60;
 
 /**
+ * #211 — haircut applied to a property's market value when it is SOLD to fund retirement.
+ *
+ * A flat is not a brokerage account: realising its market value costs brokerage (~1-2%), stamp/
+ * registration and legal on the buyer side that shows up as a price concession, and above all TIME
+ * — an Indian residential resale that must close on a date typically clears below the asking
+ * quote. 10% is a deliberately modest, single, documented constant standing in for all of that; it
+ * is NOT a tax (real-estate LTCG is applied separately by `liquidation-tax.ts` on top of this).
+ *
+ * WHICH WAY IT ERRS: it makes the sale proceeds SMALLER, i.e. the bridge harder to cover — the
+ * conservative direction for the honesty layer. It is surfaced as an assumption note so the user
+ * can see it rather than discover it.
+ */
+export const REAL_ESTATE_ILLIQUIDITY_HAIRCUT = 0.1;
+
+/**
+ * #211 — years AFTER the retirement age at which an un-planned property sale is assumed to close.
+ *
+ * WHY IT IS NOT ZERO (this is the load-bearing choice of the fix, and it is what makes the fix
+ * CONSERVATIVE rather than optimistic). If an unplanned sale were dated at the retirement age
+ * itself, a property with no stated plan would become fully spendable cash on day one of
+ * retirement — which is MORE optimistic than the old always-locked treatment, and would move every
+ * property household's verdict EARLIER. That is the wrong direction for the layer whose whole job
+ * is to refuse to count money the household cannot spend.
+ *
+ * Two facts date the sale later instead. First, the household has not said it intends to sell: an
+ * investment or inherited flat is normally held, and its rental income is the retirement benefit
+ * (that income is already credited separately as bridge income). Second, even a household that does
+ * intend to sell does not close on demand — an Indian residential resale is measured in quarters,
+ * not days, and a seller who must close on a date takes the price the market gives.
+ *
+ * So the engine dates the assumed sale 3 years into retirement: the property is NOT runway for the
+ * first three bridge years, and the user is told so with a one-tap `plannedSaleAge` fix. A
+ * household that really will sell at retirement simply sets `plannedSaleAge` to its retirement age
+ * and gets exactly that.
+ */
+export const ASSUMED_PROPERTY_SALE_LAG_YEARS = 3;
+
+/**
  * A surfaced assumption (principle 1). The UI renders these uniformly:
  *  - `assumed` — what the engine assumed,
  *  - `why` — the missing field / rule that forced it,
@@ -140,7 +178,7 @@ export function accessibleAtAge(
       return classifyNps(asset, retirementAge, value);
 
     case "realEstate":
-      return classifyRealEstate(asset);
+      return classifyRealEstate(asset, retirementAge, value);
   }
 }
 
@@ -243,32 +281,74 @@ function classifyNps(
   return result;
 }
 
-function classifyRealEstate(asset: Investment): AccessibilityResult {
+/**
+ * #211 — a non-primary property enters the retirement timeline ONLY through an explicit SALE
+ * EVENT, never as a silent always-locked lump.
+ *
+ * THE BUG THIS FIXES (Tier-0, optimistic). Before this, an investment/inherited property returned
+ * `unlockAge: Infinity, accessibleLumpGross: 0, illiquid: true`. Phase C then added its FULL
+ * projected value to `lockedCorpus` but created NO tranche — so the money counted toward the
+ * corpus-adequacy total the bridge is layered on, while never appearing as something that becomes
+ * spendable. The household therefore passed the gate on rupees it could never spend: for the
+ * mehtas seed a ₹3.5 Cr Bandra flat was 40% of the retirement corpus and contributed exactly ₹0
+ * of runway, yet the bridge read `covered: true`.
+ *
+ * THE MODEL NOW. The property unlocks at `plannedSaleAge` (falling back to the retirement age, with
+ * a disclosed assumption), and the gross realised at that age is
+ * `value × (1 − REAL_ESTATE_ILLIQUIDITY_HAIRCUT)`; Phase B then applies real-estate LTCG on top.
+ * Primary residence stays a hard no-op — it is the roof over their head, not a retirement asset,
+ * and it is already excluded from the FIRE corpus upstream.
+ *
+ * WHAT DELIBERATELY DID NOT CHANGE: the adequacy target. The property still funds retirement — the
+ * fix is only about WHEN and HOW MUCH of it becomes spendable, and that its rupees do not sit in
+ * the pre-sale liquid residual. `illiquid` therefore stays TRUE until the sale age, which is what
+ * keeps the #212 reconciliation identity intact: the holding's projected value is still counted in
+ * the portfolio total (as a locked projection), it is now merely dated.
+ */
+function classifyRealEstate(
+  asset: Investment,
+  retirementAge: number,
+  value: number,
+): AccessibilityResult {
   const assetId = asset.id;
   const role = asset.realEstateRole;
 
   // Primary residence is already excluded from the FIRE corpus upstream — treat
-  // it as a pure no-op here (zero bridge lump, illiquid) for defensiveness.
+  // it as a pure no-op here (zero bridge lump, illiquid) for defensiveness. It is never
+  // assumed sold: selling the home you live in does not fund retirement, it relocates it.
   if (role === "PrimaryResidence") {
     return { assetId, unlockAge: Infinity, accessibleLumpGross: 0, illiquid: true };
   }
 
-  // Investment / inherited (or unspecified) property: illiquid — NOT in the
-  // liquid bridge runway. Its rental income (if any) is counted separately as
-  // bridge income in Phase C; the asset itself is never assumed sold.
+  // Investment / inherited (or unspecified) property: spendable ONLY at its sale age.
+  const planned = asset.plannedSaleAge;
+  const saleAgeGiven = typeof planned === "number" && Number.isFinite(planned) && planned > 0;
+  // Nothing is drawn before retirement begins, so a sale planned earlier is credited at the
+  // retirement age (the same clamp every other family uses). With no plan at all the sale is dated
+  // `ASSUMED_PROPERTY_SALE_LAG_YEARS` into retirement — see that constant for why it is not 0.
+  const unlockAge = saleAgeGiven
+    ? Math.max(retirementAge, planned!)
+    : retirementAge + ASSUMED_PROPERTY_SALE_LAG_YEARS;
+  const grossAtSale = Math.max(0, value * (1 - REAL_ESTATE_ILLIQUIDITY_HAIRCUT));
+  const label = asset.label ?? "Investment property";
+
   return {
     assetId,
-    unlockAge: Infinity,
-    accessibleLumpGross: 0,
-    illiquid: true,
+    unlockAge,
+    accessibleLumpGross: grossAtSale,
+    // Still illiquid: it is NOT part of the pre-sale liquid pool. It becomes a dated tranche in
+    // Phase C, not cash at the retirement age (unless the sale age IS the retirement age).
+    illiquid: unlockAge > retirementAge,
     assumption: {
-      id: `realestate-illiquid:${assetId}`,
+      id: saleAgeGiven ? `realestate-sale-planned:${assetId}` : `realestate-sale-assumed:${assetId}`,
       assetId,
-      assumed: `${asset.label ?? "Investment property"} is treated as illiquid — not sold to fund retirement`,
-      why: "investment / inherited property is not assumed liquidated for the bridge (only its rental income counts)",
+      assumed: `${label} assumed sold at age ${unlockAge}, realising ${Math.round((1 - REAL_ESTATE_ILLIQUIDITY_HAIRCUT) * 100)}% of its value before tax`,
+      why: saleAgeGiven
+        ? `a property is only spendable once sold; a ${Math.round(REAL_ESTATE_ILLIQUIDITY_HAIRCUT * 100)}% illiquidity haircut covers brokerage, closing costs and a time-pressured sale (real-estate LTCG is applied on top)`
+        : `no planned sale age is set, so the sale is dated ${ASSUMED_PROPERTY_SALE_LAG_YEARS} years into retirement — a property is only spendable once sold, and an unplanned resale takes time; a ${Math.round(REAL_ESTATE_ILLIQUIDITY_HAIRCUT * 100)}% illiquidity haircut covers brokerage, closing costs and a time-pressured sale (real-estate LTCG is applied on top)`,
       impact:
-        "it does not add to your spendable runway; if you DO plan to sell it at retirement, that flag is a later enhancement",
-      fixField: "realEstateRole",
+        "until that age the property is NOT part of your spendable runway — only its rental income counts; if you do not intend to sell it, it should not be counted as retirement corpus at all",
+      fixField: "plannedSaleAge",
     },
   };
 }
