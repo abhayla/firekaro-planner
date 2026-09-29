@@ -8,9 +8,13 @@ import type { Investment, InvestmentType } from "@/types/household";
 import { typeColor } from "@/lib/investment-traits";
 import PanelCard from "@/components/shared/PanelCard.vue";
 import EntityRow from "@/components/shared/EntityRow.vue";
+import { useInlineAddForm } from "@/composables/useInlineAddForm";
 
 const household = useHouseholdStore();
 const fire = useFireDerive();
+// #69 — clears stale Vuetify validation errors on the touched add fields after a successful
+// add resets the draft (see useInlineAddForm.ts for the mechanism).
+const { addForm, resetAfterAdd } = useInlineAddForm();
 
 // gh #66: the "Your holdings" DISPLAY list is member-lensed (selected member + "Joint"); equals
 // household.data.investments on the default "Whole household" view and in the onboarding wizard
@@ -369,6 +373,7 @@ function addInvestment() {
     fmvAtVest: null,
     bucket: null,
   };
+  resetAfterAdd();
 }
 
 function ownerNameFor(id: string): string {
@@ -490,6 +495,7 @@ function saveEdit() {
 <template>
   <div>
     <PanelCard title="Add an investment" icon="mdi-plus-circle-outline" icon-color="primary" class="mb-4">
+      <v-form ref="addForm">
       <v-row dense align="center">
         <v-col cols="12" md="3">
           <v-select
@@ -796,6 +802,7 @@ function saveEdit() {
           <v-icon icon="mdi-plus" class="mr-1" /> Add investment
         </v-btn>
       </div>
+      </v-form>
     </PanelCard>
 
     <v-alert

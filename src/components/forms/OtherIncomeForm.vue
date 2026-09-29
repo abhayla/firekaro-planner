@@ -11,9 +11,13 @@ import type {
   Period,
 } from "@/types/household";
 import EmptyState from "@/components/shared/EmptyState.vue";
+import { useInlineAddForm } from "@/composables/useInlineAddForm";
 
 const household = useHouseholdStore();
 const ui = useUiStore();
+// #69 — clears stale Vuetify validation errors on the touched add fields after a successful
+// add resets the draft (see useInlineAddForm.ts for the mechanism).
+const { addForm, resetAfterAdd } = useInlineAddForm();
 
 interface TypeMeta {
   value: OtherIncomeType;
@@ -113,6 +117,7 @@ function addOtherIncome() {
     homeLoanInterest: undefined,
     municipalTaxes: undefined,
   };
+  resetAfterAdd();
 }
 
 function onSourceChange(newSrc: string) {
@@ -281,6 +286,7 @@ function saveEdit() {
          ADD FORM — chip-style type picker + clear field grid
          ──────────────────────────────────────────────────────────── -->
     <v-card variant="outlined" class="add-card pa-4 mb-4">
+      <v-form ref="addForm">
       <div class="d-flex align-center mb-3" style="gap: 8px">
         <v-icon icon="mdi-plus-circle-outline" color="primary" />
         <h2 class="text-h6 font-weight-bold mb-0">Add income source</h2>
@@ -443,6 +449,7 @@ function saveEdit() {
           </div>
         </v-alert>
       </v-expand-transition>
+      </v-form>
     </v-card>
 
     <!-- ────────────────────────────────────────────────────────────
