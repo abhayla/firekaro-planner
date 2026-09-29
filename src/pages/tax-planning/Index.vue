@@ -3,6 +3,7 @@ import { computed, ref, watch } from "vue";
 import { useHouseholdStore } from "@/stores/household";
 import { useFireDerive } from "@/lib/useFireDerive";
 import { useUiStore } from "@/stores/ui";
+import { useAssumptionsStore } from "@/stores/assumptions";
 import { todayIsoLocal } from "@/lib/as-of-date";
 import { computeTax, npsCeilingFor, AVAILABLE_FYS, getTaxConfigForFY } from "@/lib/tax";
 import { getCurrentFinancialYear } from "@/lib/expense-history";
@@ -15,6 +16,7 @@ import {
 import { formatINRCompact, formatPercent, formatINR } from "@/lib/formatters";
 import {
   deriveDeductions,
+  deductionsForMember,
   computeHousePropertyTax,
   computeEarnerTaxCard,
   isInMarginalReliefBand,
@@ -38,6 +40,7 @@ import TaxCliffChart from "@/components/charts/TaxCliffChart.vue";
 const household = useHouseholdStore();
 const fire = useFireDerive();
 const ui = useUiStore();
+const assumptions = useAssumptionsStore();
 
 // gh #86 — lens the tax screen to the selected member (D-2026-06-08-05). FinTech "B'-fallback":
 // recompute at the page-local selectedFY over the MEMBER-SCOPED sets so income AND deductions are
@@ -289,14 +292,14 @@ const monthlyTakeHome = computed(() => {
 // liabilities/insurance) — one shared attribution, not a second formula.
 const perEarner = computed(() =>
   household.earners.map((m) => {
-    const earnerDeductions = deriveDeductions(
-      {
-        ...scopedHousehold.value,
-        members: [m],
-        investments: scopedHousehold.value.investments.filter((i) => i.ownerId === m.id),
-        liabilities: scopedHousehold.value.liabilities.filter((l) => l.ownerId === m.id),
-        insurance: scopedHousehold.value.insurance.filter((p) => p.insuredPersonId === m.id),
-      },
+    // #204: own-owned (100%) + Joint-owned (× householdSplitPercent) — the SAME shared
+    // `deductionsForMember` builder the headline path (`individual-fire.ts`) and the salary-form
+    // preview (`previewEarnerTakeHome`) use, so a Joint PPF/ELSS/NPS or shared home loan is no
+    // longer dropped from every earner's card.
+    const earnerDeductions = deductionsForMember(
+      scopedHousehold.value,
+      m.id,
+      assumptions.values.householdSplitPercent ?? 50,
       { asOfDate: todayIsoLocal() },
     );
     return computeEarnerTaxCard(

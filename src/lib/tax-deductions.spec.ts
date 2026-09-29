@@ -1,9 +1,11 @@
 import { describe, it, expect } from "vitest";
 import {
   deriveDeductions,
+  deductionsForMember,
   isInMarginalReliefBand,
   marginalReliefMitigations,
   LIMIT_80C,
+  LIMIT_80D_SELF,
   LIMIT_80CCD_1B,
   LIMIT_SECTION_24,
 } from "./tax-deductions";
@@ -350,5 +352,216 @@ describe("marginalReliefMitigations", () => {
   it("returns empty array when not in band", () => {
     expect(marginalReliefMitigations(800_000, "2025-26")).toEqual([]);
     expect(marginalReliefMitigations(1_500_000, "2025-26")).toEqual([]);
+  });
+});
+
+// gh #204 — a Joint-owned 80C/80D/§24 source is attributed to EACH earner by
+// householdSplitPercent, then each earner's totalDeductions is capped INDEPENDENTLY. Before this
+// fix, `ownerId === memberId`-only filtering at every per-member call site dropped a Joint source
+// from BOTH earners.
+describe("deductionsForMember — #204 Joint-owned 80C/80D/§24 attribution", () => {
+  function twoEarnerHH(): Household {
+    return {
+      name: "",
+      setupMode: "Couple",
+      profileComplete: false,
+      wizardCompleted: false,
+      members: [
+        { id: "a", name: "A", role: "ADULT", dateOfBirth: "1985-01-01" } as Household["members"][number],
+        { id: "b", name: "B", role: "ADULT", dateOfBirth: "1986-01-01" } as Household["members"][number],
+      ],
+      businesses: [],
+      otherIncome: [],
+      investments: [],
+      liabilities: [],
+      insurance: [],
+      expenses: { avgMonthly: 0, recurring: [], plannedFuture: [] },
+    };
+  }
+
+  it("a Joint PPF (80C) and a Joint family-floater premium (80D) split 50/50, summing to the household's claim", () => {
+    const hh = twoEarnerHH();
+    hh.investments = [
+      { id: "i1", type: "PPF", value: 0, ownerId: "Joint", monthlyContribution: 10_000 }, // 1.2L/yr
+    ];
+    hh.insurance = [
+      { id: "p1", type: "Health", provider: "Star Family Floater", sumAssured: 0, annualPremium: 40_000, insuredPersonId: "a" },
+    ];
+
+    const a = deductionsForMember(hh, "a", 50);
+    const b = deductionsForMember(hh, "b", 50);
+
+    // 80C: 1.2L Joint PPF × 50% = 60k each.
+    expect(a.section80C).toBe(60_000);
+    expect(b.section80C).toBe(60_000);
+    expect(a.section80C + b.section80C).toBe(120_000); // sums to the household's true 80C claim
+
+    // 80D: insurance has NO "Joint" sentinel in this schema (insuredPersonId is always a member
+    // id) — the ₹40k floater is A's own policy, so only A claims it. This is the honest answer:
+    // there is no Joint-insurance CLASS to split until the schema grows one.
+    expect(a.section80D).toBe(Math.min(LIMIT_80D_SELF, 40_000));
+    expect(b.section80D).toBe(0);
+  });
+
+  it("a Joint ₹4L PPF caps EACH earner's 80C share at ₹1.5L independently (never ₹2L, never pooled to ₹3L)", () => {
+    const hh = twoEarnerHH();
+    hh.investments = [
+      { id: "i1", type: "PPF", value: 0, ownerId: "Joint", monthlyContribution: 400_000 / 12 }, // ≈4L/yr
+    ];
+    const a = deductionsForMember(hh, "a", 50);
+    const b = deductionsForMember(hh, "b", 50);
+    // Each earner's raw share is ~2L (half of 4L) — over the ₹1.5L 80C cap, so each caps
+    // independently at 1.5L, never at a doubled 2L, and the two shares never pool into one 3L claim.
+    expect(a.section80C).toBe(LIMIT_80C);
+    expect(b.section80C).toBe(LIMIT_80C);
+  });
+
+  // Round 3 (#204 review CRITICAL finding): a Joint 80C share must be COMPLEMENTARY across the two
+  // adults — the anchor (first earning adult in member order; here neither "a" nor "b" earns, so
+  // `deductionsForMember` falls back to the first adult, "a") gets `split`, the OTHER gets
+  // `1 − split`. Before this fix both calls read the same `split`, so at split=60 A+B claimed
+  // ₹1.44L on a ₹1.2L PPF — ₹24k nobody contributed.
+  it("Joint PPF ₹1.2L at split=60: anchor A gets 60% (₹72k), B gets the complementary 40% (₹48k), summing to ₹1.2L", () => {
+    const hh = twoEarnerHH();
+    hh.investments = [
+      { id: "i1", type: "PPF", value: 0, ownerId: "Joint", monthlyContribution: 10_000 }, // 1.2L/yr
+    ];
+    const a = deductionsForMember(hh, "a", 60);
+    const b = deductionsForMember(hh, "b", 60);
+    expect(a.section80C).toBe(72_000);
+    expect(b.section80C).toBe(48_000);
+    expect(a.section80C + b.section80C).toBe(120_000);
+  });
+
+  it("Joint PPF ₹1.2L at split=50 is unchanged (50% each, as before round 3)", () => {
+    const hh = twoEarnerHH();
+    hh.investments = [
+      { id: "i1", type: "PPF", value: 0, ownerId: "Joint", monthlyContribution: 10_000 }, // 1.2L/yr
+    ];
+    const a = deductionsForMember(hh, "a", 50);
+    const b = deductionsForMember(hh, "b", 50);
+    expect(a.section80C).toBe(60_000);
+    expect(b.section80C).toBe(60_000);
+  });
+
+  it("Joint PPF ₹4L at 60/40 split: A's 60% share (₹2.4L) caps at ₹1.5L, B's 40% share (₹1.6L) caps at ₹1.5L, summing to ₹3L", () => {
+    const hh = twoEarnerHH();
+    hh.investments = [
+      { id: "i1", type: "PPF", value: 0, ownerId: "Joint", monthlyContribution: 400_000 / 12 }, // 4L/yr
+    ];
+    const a = deductionsForMember(hh, "a", 60);
+    const b = deductionsForMember(hh, "b", 60);
+    expect(a.section80C).toBe(LIMIT_80C); // 2.4L raw → capped 1.5L
+    expect(b.section80C).toBe(LIMIT_80C); // 1.6L raw → capped 1.5L
+    expect(a.section80C + b.section80C).toBe(300_000);
+  });
+
+  it("a single-adult household claims 100% of a Joint 80C source (no one else to split with)", () => {
+    const hh = twoEarnerHH();
+    hh.members = [hh.members[0]];
+    hh.investments = [
+      { id: "i1", type: "PPF", value: 0, ownerId: "Joint", monthlyContribution: 10_000 }, // 1.2L/yr
+    ];
+    const a = deductionsForMember(hh, "a", 60);
+    expect(a.section80C).toBe(120_000);
+  });
+
+  // Round 2 (#204 review finding): a shared home loan is a PAYMENT split, not an ownership split.
+  // Each co-borrower claims ONLY their own share of the interest, each capped at the per-assessee
+  // ₹2L — the shares must sum to the interest actually paid, never more (the round-1 fixture was
+  // an OVER-claim: owner ₹4L + spouse ₹2L = ₹6L on ₹4L of interest paid).
+  function sharedHomeLoan(interestRate: number): Household["liabilities"][number] {
+    return {
+      id: "l1",
+      name: "Joint Home Loan",
+      type: "HomeLoan",
+      outstandingBalance: 5_000_000,
+      monthlyEMI: 50_000,
+      interestRate, // interest = outstandingBalance × interestRate / 100
+      ownerId: "a",
+      isSharedWithSpouse: true,
+      coBorrowers: ["a", "b"],
+    };
+  }
+
+  it("shared ₹4L interest: each co-borrower's own share is already ≥ ₹2L → both cap at ₹2L, summing to ₹4L (never ₹6L)", () => {
+    const hh = twoEarnerHH();
+    hh.liabilities = [sharedHomeLoan(8.0)]; // 50L × 8% = 4L interest; 50/50 share = 2L each
+    const a = deductionsForMember(hh, "a", 50);
+    const b = deductionsForMember(hh, "b", 50);
+    expect(a.section24).toBe(200_000);
+    expect(b.section24).toBe(200_000);
+    expect(a.section24 + b.section24).toBe(400_000); // sums to interest paid, never doubled to 6L
+    expect(a.section24 + b.section24).toBeLessThanOrEqual(Math.min(400_000, 2 * LIMIT_SECTION_24));
+  });
+
+  it("shared ₹3L interest: each co-borrower's share (₹1.5L) is under the ₹2L cap → claims their real share", () => {
+    const hh = twoEarnerHH();
+    hh.liabilities = [sharedHomeLoan(6.0)]; // 50L × 6% = 3L interest; 50/50 share = 1.5L each
+    const a = deductionsForMember(hh, "a", 50);
+    const b = deductionsForMember(hh, "b", 50);
+    expect(a.section24).toBe(150_000);
+    expect(b.section24).toBe(150_000);
+    expect(a.section24 + b.section24).toBe(300_000);
+    expect(a.section24 + b.section24).toBeLessThanOrEqual(Math.min(300_000, 2 * LIMIT_SECTION_24));
+  });
+
+  it("shared ₹5L interest: each co-borrower's share (₹2.5L) exceeds ₹2L → both cap at ₹2L, summing to ₹4L, never ₹5L", () => {
+    const hh = twoEarnerHH();
+    hh.liabilities = [sharedHomeLoan(10.0)]; // 50L × 10% = 5L interest; 50/50 share = 2.5L each
+    const a = deductionsForMember(hh, "a", 50);
+    const b = deductionsForMember(hh, "b", 50);
+    expect(a.section24).toBe(200_000);
+    expect(b.section24).toBe(200_000);
+    expect(a.section24 + b.section24).toBe(400_000); // capped sum < actual 5L interest paid
+    expect(a.section24 + b.section24).toBeLessThanOrEqual(Math.min(500_000, 2 * LIMIT_SECTION_24));
+  });
+
+  it("a NON-shared home loan is 100% the owner's, 0% the spouse's, capped at ₹2L", () => {
+    const hh = twoEarnerHH();
+    hh.liabilities = [
+      {
+        id: "l2",
+        name: "Solo Home Loan",
+        type: "HomeLoan",
+        outstandingBalance: 5_000_000,
+        monthlyEMI: 50_000,
+        interestRate: 8.0, // 4L interest
+        ownerId: "a",
+        isSharedWithSpouse: false,
+      },
+    ];
+    const a = deductionsForMember(hh, "a", 50);
+    const b = deductionsForMember(hh, "b", 50);
+    expect(a.section24).toBe(LIMIT_SECTION_24);
+    expect(b.section24).toBe(0);
+  });
+
+  it("own-owned sources are UNCHANGED — a member's own PPF/health/loan still yields exactly its own value", () => {
+    const hh = twoEarnerHH();
+    hh.investments = [{ id: "i1", type: "PPF", value: 0, ownerId: "a", monthlyContribution: 5_000 }]; // 60k/yr
+    hh.insurance = [
+      { id: "p1", type: "Health", provider: "X", sumAssured: 0, annualPremium: 15_000, insuredPersonId: "a" },
+    ];
+    const a = deductionsForMember(hh, "a", 50);
+    const b = deductionsForMember(hh, "b", 50);
+    expect(a.section80C).toBe(60_000);
+    expect(a.section80D).toBe(15_000);
+    expect(b.section80C).toBe(0);
+    expect(b.section80D).toBe(0);
+  });
+
+  it("a household with NO Joint 80C/80D/§24 source is byte-identical to the pre-fix own-only filter", () => {
+    const hh = twoEarnerHH();
+    hh.investments = [
+      { id: "i1", type: "Gold", value: 100_000, ownerId: "Joint" }, // Joint but not 80C-eligible
+    ];
+    hh.liabilities = [
+      { id: "l1", name: "Car Loan", type: "CarLoan", outstandingBalance: 300_000, monthlyEMI: 8_000, interestRate: 9, ownerId: "a", isSharedWithSpouse: false },
+    ];
+    const a = deductionsForMember(hh, "a", 50);
+    const b = deductionsForMember(hh, "b", 50);
+    expect(a.totalDeductions).toBe(0);
+    expect(b.totalDeductions).toBe(0);
   });
 });

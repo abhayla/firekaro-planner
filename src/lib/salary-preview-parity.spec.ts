@@ -24,7 +24,7 @@ import { loadIyersSeed } from "@/seeds/iyers";
 import { loadMehtasSeed } from "@/seeds/mehtas";
 import { loadMauryasSeed } from "@/seeds/mauryas";
 import { loadRaviSeed } from "@/seeds/ravi";
-import { deriveDeductions, computeEarnerTaxCard, previewEarnerTakeHome } from "@/lib/tax-deductions";
+import { deductionsForMember, computeEarnerTaxCard, previewEarnerTakeHome } from "@/lib/tax-deductions";
 import { pfFromInvestmentRows, PROFESSIONAL_TAX_ANNUAL_PER_EARNER } from "@/lib/salary-cash";
 import { todayIsoLocal } from "@/lib/as-of-date";
 
@@ -58,17 +58,14 @@ describe("gh-222 — salary-form preview matches the tax-planning per-earner car
       expect(earners.length).toBeGreaterThan(0); // sanity: every persona used here has ≥1 earner
 
       for (const member of earners) {
-        // The tax-planning page's derivation (Index.vue `perEarner`): member-scoped
-        // deriveDeductions + computeEarnerTaxCard, with the AUTO-recommended regime for
-        // THIS earner (mirrors computeEarnerTaxCard's own internal `rec`).
-        const earnerDeductions = deriveDeductions(
-          {
-            ...household.data,
-            members: [member],
-            investments: household.data.investments.filter((i) => i.ownerId === member.id),
-            liabilities: household.data.liabilities.filter((l) => l.ownerId === member.id),
-            insurance: household.data.insurance.filter((p) => p.insuredPersonId === member.id),
-          },
+        // The tax-planning page's derivation (Index.vue `perEarner`): #204's shared
+        // `deductionsForMember` (own-owned 100% + Joint-owned × householdSplitPercent) +
+        // computeEarnerTaxCard, with the AUTO-recommended regime for THIS earner (mirrors
+        // computeEarnerTaxCard's own internal `rec`).
+        const earnerDeductions = deductionsForMember(
+          household.data,
+          member.id,
+          assumptions.values.householdSplitPercent ?? 50,
           { asOfDate: todayIsoLocal() },
         );
         const annualPf = pfFromInvestmentRows(household.data, member.id);
@@ -83,7 +80,13 @@ describe("gh-222 — salary-form preview matches the tax-planning per-earner car
 
         // The form's new derivation, previewing the earner's ALREADY-SAVED salary (no draft
         // edit — the "just opened the form" case).
-        const preview = previewEarnerTakeHome(household.data, member, FY);
+        const preview = previewEarnerTakeHome(
+          household.data,
+          member,
+          FY,
+          undefined,
+          assumptions.values.householdSplitPercent ?? 50,
+        );
 
         expect(preview).not.toBeNull();
         expect(preview!.rec).toBe(pageCard.rec);

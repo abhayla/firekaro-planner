@@ -24,6 +24,8 @@ import type {
   Member,
   OtherIncomeLine,
 } from "@/types/household";
+import { isAdultRole } from "@/types/household";
+import { isEarningMember } from "@/lib/member-earning";
 import { ageAsOf, todayIsoLocal } from "@/lib/as-of-date";
 import { netCashSalary, pfFromRows, PROFESSIONAL_TAX_ANNUAL_PER_EARNER } from "@/lib/salary-cash";
 import { toAnnual } from "@/lib/cashflow";
@@ -145,6 +147,136 @@ interface DeriveDeductionsOptions {
    * pinned `asOfDate`/`asOf` so this agrees with the SAME age the kernel uses elsewhere.
    */
   asOfDate?: string;
+  /**
+   * #204: the Sec-24 co-borrower "tracked household member" check must see the WHOLE household's
+   * member roster, even when a caller scopes `household.members` down to one earner for the
+   * 80CCD(2) employer-NPS sums (`section80CCD2`/`employerNpsBasicTotal`/`employerNpsByMember` are
+   * deliberately summed over `household.members` only). Without this, a per-member deduction call
+   * (`household.members = [thisEarner]`) could never see ≥2 tracked co-borrowers on a joint home
+   * loan, so the §24 cap silently narrowed from ₹4L to ₹2L the moment deductions were scoped to one
+   * earner — independent of, and in addition to, the Joint-attribution split below. Defaults to
+   * `household.members` (today's behaviour) when omitted.
+   */
+  coBorrowerTrackedMemberIds?: string[];
+}
+
+/** "Joint" ownership sentinel for a deduction-eligible investment/liability (matches
+ * `individual-fire.ts`'s `JOINT` and `Investment.ownerId`'s "member id or 'Joint'" contract). */
+export const JOINT_DEDUCTION_OWNER = "Joint";
+
+/**
+ * #204: the ONE member-scoped deduction-attribution builder, shared by every "this earner's own
+ * 80C/80D/§24" call site (`individual-fire.ts`'s standalone-FIRE tax leg, `tax-planning/Index.vue`'s
+ * per-earner card, and `previewEarnerTakeHome`'s salary-form preview). Before this fix each of those
+ * three sites independently filtered `ownerId === memberId` / `insuredPersonId === memberId` and
+ * DROPPED every Joint-owned source — a PPF/ELSS/NPS held `ownerId: "Joint"`, or a home loan flagged
+ * `isSharedWithSpouse`, was claimed by NEITHER earner (RCA, gh #204).
+ *
+ * Round 3 (#204 review CRITICAL finding): a Joint 80C/80CCD(1B) investment's split must be
+ * COMPLEMENTARY across the two adults, not the same `householdSplitPercent` read twice — round 2's
+ * `weightOf` gave EVERY member queried the same `split` share regardless of who they were, so at a
+ * non-50 split (e.g. 60) a Joint ₹1.2L PPF yielded A ₹72k + B ₹72k = ₹1.44L, ₹24k more than the
+ * ₹1.2L actually contributed (the exact `deriveDeductions` double-count this whole fix exists to
+ * remove — see #204's original RCA). Fixed the same way §24 already was in round 2: an "anchor"
+ * adult's share and the OTHER adult's share must sum to 1. The anchor is the same one `derive.ts`'s
+ * `anchorAgeFor` uses for the household's primary-earner age (`earners[0]`, i.e. the FIRST EARNING
+ * adult in `household.members` array order — `jointAnchorMemberId` below) — with exactly 2 adults:
+ * anchor gets `split`, the other gets `1 − split` (both sum to 1, so the household's true claim is
+ * never inflated regardless of which value `householdSplitPercent` holds). A single-adult household
+ * gets 100% of every Joint source (there is no one else to split with). 3+ adults: `1/adultCount`
+ * equal shares each (no anchor concept scales past 2 — `householdSplitPercent` itself is documented
+ * elsewhere as a 2-adult convention; equal split is the least-surprising N-way default until a
+ * per-adult split model exists). `deriveDeductions` below then caps EACH earner's resulting
+ * `totalDeductions` independently at the statutory limits, so a large-enough Joint source (e.g. a
+ * ₹4L Joint PPF) still cannot let either earner individually exceed ₹1.5L under 80C.
+ *
+ * Insurance (`InsurancePolicy.insuredPersonId`) has NO "Joint" sentinel in this schema — the only
+ * values a policy's `insuredPersonId` ever takes are household member ids (`InsurancePolicyForm.vue`'s
+ * "Insured person" selector lists members only) — so 80D stays own-owned-only; there is no Joint
+ * family-floater CLASS to split here today. If a Joint-insurance concept is ever added, it plugs into
+ * this same `weightOf` convention.
+ *
+ * Sec 24 round 2 (#204 review finding): a shared home loan is a PAYMENT split, not an OWNERSHIP
+ * split — the corpus-style "owner 100% + Joint × split" convention (right for who OWNS an asset)
+ * double-counted a shared loan's interest across both earners (owner ₹4L + spouse ₹2L = ₹6L
+ * claimed on ₹4L actually paid). Tax law: each co-borrower claims ONLY their own share of the
+ * interest, each capped at the per-assessee ₹2L, and the two shares always sum to the interest
+ * paid (never more). So §24 is computed HERE directly, per member, and passed straight into
+ * `totalDeductions` — it is NEVER routed through `deriveDeductions`'s own household-aggregate §24
+ * block (that block's co-borrower ₹2L→₹4L doubling is a HOUSEHOLD-total rule — exactly the SUM of
+ * two ₹2L caps — and would double-count again if applied a second time to an already-split share).
+ */
+export function deductionsForMember(
+  household: Household,
+  memberId: string,
+  householdSplitPercent: number,
+  options: Omit<DeriveDeductionsOptions, "coBorrowerTrackedMemberIds"> = {},
+): DeductionBreakdown {
+  const split = Math.min(100, Math.max(0, householdSplitPercent)) / 100;
+  const member = household.members.find((m) => m.id === memberId);
+  const adults = household.members.filter((m) => isAdultRole(m.role));
+
+  // #204 round 3 — the SAME anchor convention `derive.ts`'s `anchorAgeFor` uses for the household's
+  // primary earner: the FIRST EARNING adult in household member-array order, falling back to the
+  // first adult at all when nobody earns (mirrors `derive.ts`'s `earners[0] ?? ...` pattern).
+  const jointAnchorMemberId =
+    adults.find((m) => isEarningMember(m, household.businesses))?.id ?? adults[0]?.id;
+
+  /** A member's COMPLEMENTARY share of a Joint 80C/80CCD(1B) source — sums to 1 across all adults,
+   * never re-reads the same `split` for both queried members (round-3 fix). */
+  const jointShareFor = (thisMemberId: string): number => {
+    if (adults.length <= 1) return 1;
+    if (adults.length === 2) return thisMemberId === jointAnchorMemberId ? split : 1 - split;
+    return adults.some((m) => m.id === thisMemberId) ? 1 / adults.length : 0;
+  };
+  const jointShare = jointShareFor(memberId);
+  const weightOf = (ownerId: string): number =>
+    ownerId === memberId ? 1 : ownerId === JOINT_DEDUCTION_OWNER ? jointShare : 0;
+
+  const investments = household.investments
+    .map((i) => ({ inv: i, w: weightOf(i.ownerId) }))
+    .filter(({ w }) => w > 0)
+    .map(({ inv, w }) => ({
+      ...inv,
+      monthlyContribution: (inv.monthlyContribution ?? 0) * w,
+    }));
+
+  // No "Joint" sentinel for insurance (see doc comment above) — own-owned only, unchanged.
+  const insurance = household.insurance.filter((p) => p.insuredPersonId === memberId);
+
+  // ---- Sec 24 — PAYMENT share, not ownership share (round-2 fix) ----
+  // Owner's share = (1 − split); spouse's (non-owner) share = split — the two always sum to 1, so
+  // the two earners' §24 claims on one shared loan always sum to the interest actually paid, never
+  // more. A non-shared loan is 100% the owner's, 0% everyone else's. Each earner's share is capped
+  // independently at the per-assessee ₹2L (LIMIT_SECTION_24) — never at a doubled ₹4L; the ₹4L
+  // "household" figure is only ever the sum of two ₹2L per-assessee caps.
+  let section24 = 0;
+  for (const l of household.liabilities) {
+    if (l.type !== "HomeLoan") continue;
+    const annualInterest = estimateAnnualInterest(l);
+    const isOwner = l.ownerId === memberId;
+    const isSpouseShare = !isOwner && l.isSharedWithSpouse;
+    if (!isOwner && !isSpouseShare) continue;
+    const paymentShare = !l.isSharedWithSpouse ? (isOwner ? 1 : 0) : isOwner ? 1 - split : split;
+    section24 += Math.min(LIMIT_SECTION_24, annualInterest * paymentShare);
+  }
+
+  const rest = deriveDeductions(
+    {
+      ...household,
+      members: member ? [member] : [],
+      investments,
+      liabilities: [], // §24 computed above, independently — see doc comment
+      insurance,
+    },
+    options,
+  );
+
+  return {
+    ...rest,
+    section24,
+    totalDeductions: rest.section80C + rest.section80CCD1B + rest.section80D + section24,
+  };
 }
 
 /**
@@ -222,7 +354,9 @@ export function deriveDeductions(
   // deduction. So the cap doubles to ₹4L only when ≥2 co-borrowers are TRACKED
   // household members; a single filer on a joint loan whose spouse is not tracked
   // claims only their own ₹2L share (not the spouse's).
-  const memberIds = new Set(household.members.map((m) => m.id));
+  const memberIds = new Set(
+    options.coBorrowerTrackedMemberIds ?? household.members.map((m) => m.id),
+  );
   let section24 = 0;
   for (const l of liabilities) {
     if (l.type !== "HomeLoan") continue;
@@ -455,6 +589,9 @@ export function previewEarnerTakeHome(
   member: Member,
   fy: string,
   draftSalary?: Partial<NonNullable<Member["salary"]>>,
+  /** #204: same household split the headline/card paths use; defaults to 50 (the persona default,
+   * matching `individual-fire.ts`/`useFireDerive.ts`'s own `?? 50` fallback) when omitted. */
+  householdSplitPercent = 50,
 ): EarnerTaxCard | null {
   const effectiveMember: Member = draftSalary
     ? {
@@ -465,16 +602,14 @@ export function previewEarnerTakeHome(
   const gross = effectiveMember.salary?.annualCTC ?? 0;
   if (!gross) return null;
 
-  // Same member-scoped attribution as tax-planning/Index.vue's `perEarner` (gh-issue #201):
-  // this earner's OWN investments/liabilities/insurance, never the whole household's pool.
-  const earnerDeductions = deriveDeductions(
-    {
-      ...household,
-      members: [effectiveMember],
-      investments: household.investments.filter((i) => i.ownerId === effectiveMember.id),
-      liabilities: household.liabilities.filter((l) => l.ownerId === effectiveMember.id),
-      insurance: household.insurance.filter((p) => p.insuredPersonId === effectiveMember.id),
-    },
+  // #204: own-owned (100%) + Joint-owned (× split) attribution — the SAME convention as
+  // `individual-fire.ts`'s headline path and `tax-planning/Index.vue`'s `perEarner` card, via the
+  // one shared `deductionsForMember` builder. `effectiveMember` swapped in so a draft salary edit
+  // (employer NPS %, basic %) still reaches the member the deductions are scoped to.
+  const earnerDeductions = deductionsForMember(
+    { ...household, members: household.members.map((m) => (m.id === effectiveMember.id ? effectiveMember : m)) },
+    effectiveMember.id,
+    householdSplitPercent,
     { asOfDate: todayIsoLocal() },
   );
   // #223 — a draft `hasEpf:false` must zero the preview's PF even though the member's real EPF

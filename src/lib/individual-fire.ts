@@ -43,7 +43,7 @@ import { realIncomeScaleAt, type EarnerIncomePath } from "@/lib/income-path";
 import { todayIsoLocal } from "@/lib/as-of-date";
 import { calculateFIRENumber, calculateFireTarget, calculateYearsToTarget } from "@/lib/fire-math";
 import { computeTax, recommendRegime, marginalSlabRate, getTaxConfigForFY } from "@/lib/tax";
-import { deriveDeductions } from "@/lib/tax-deductions";
+import { deductionsForMember } from "@/lib/tax-deductions";
 import { epfBucketAfterTaxReturn } from "@/lib/epf-vpf";
 import { returnBucketKey } from "@/lib/investment-traits";
 import {
@@ -217,20 +217,13 @@ export function computeIndividualFire(
   const attrExemptIncome = ownExemptOther + split * jointExemptOther;
   const attributableAnnualIncome = Math.round(attrTaxableIncome + attrExemptIncome);
 
-  // ---- attributable tax: per-individual, on the adult's OWN deductions ----
-  const ownInvestments = fireInvestments.filter((i) => i.ownerId === memberId);
-  const ownLiabilities = household.liabilities.filter((l) => l.ownerId === memberId);
-  const ownInsurance = household.insurance.filter((p) => p.insuredPersonId === memberId);
-  const deductions = deriveDeductions(
-    {
-      ...household,
-      members: [member],
-      investments: ownInvestments,
-      liabilities: ownLiabilities,
-      insurance: ownInsurance,
-    },
-    { asOfDate: todayIsoLocal(asOf) },
-  );
+  // ---- attributable tax: per-individual, on the adult's OWN + Joint-split deductions (#204) ----
+  // #204: own-owned sources at 100% + "Joint"/isSharedWithSpouse sources × the SAME split used for
+  // corpus/income/liabilities above — a Joint PPF/ELSS/NPS or a shared home loan is no longer
+  // dropped from both earners' 80C/80D/§24. See `deductionsForMember`'s doc comment.
+  const deductions = deductionsForMember(household, memberId, assumptions.householdSplitPercent ?? 50, {
+    asOfDate: todayIsoLocal(asOf),
+  });
   // The ₹50k salaried standard deduction applies ONLY against salary income — a non-earning
   // adult with only split capital income must NOT receive it (else their tax is understated →
   // an optimistically EARLY individual FIRE). isSalaried = this adult actually draws a salary.
