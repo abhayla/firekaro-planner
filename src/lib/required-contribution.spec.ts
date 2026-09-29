@@ -11,6 +11,7 @@ import { useHouseholdStore } from "@/stores/household";
 import { useAssumptionsStore } from "@/stores/assumptions";
 import { loadSeedPersona } from "@/lib/seed-persona";
 import { loadMehtasSeed } from "@/seeds/mehtas";
+import { loadRaviSeed } from "@/seeds/ravi";
 import { derive } from "@/lib/derive";
 import {
   requiredMonthlyContributionFor,
@@ -432,5 +433,45 @@ describe("requiredMonthlyContributionFor — solves through the REAL derive() pa
     // Household stays the PRIMARY, bigger claim — the individual view funds only that adult.
     expect(member.needReal).not.toBe(household.needReal);
     expect(member.currentMonthlyReal).toBeLessThanOrEqual(household.currentMonthlyReal);
+  });
+  /**
+   * #207 — the solver's probe must honour the SAME income path the headline uses. Before this fix
+   * `derive()` treated `monthlyContributionReal` as a FLAT real scalar that replaced the income-path
+   * residual outright, so the prescription was solved against a kernel run in which the user's income
+   * never grew — pessimistic (over-prescribed), worst for the ₹2.5L-₹10L band whose future surplus is
+   * much larger than a flat probe assumes. Ravi (₹3L CTC, the band's floor) is the sample.
+   */
+  it("#207: the prescription FALLS when real income growth rises — the probe rides the income path", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    loadRaviSeed(h, a);
+    const targetAge = 60;
+    const solveAt = (growthPct: number) =>
+      requiredMonthlyContributionFor({
+        snapshot: h.data,
+        assumptions: { ...a.values, salaryGrowthRealPercent: growthPct },
+        lens: LENS,
+        targetAge,
+      }).requiredMonthlyReal;
+    const flat = solveAt(0);
+    const growing = solveAt(2);
+    expect(Number.isFinite(flat), `flat prescription must be solvable, got ${flat}`).toBe(true);
+    expect(Number.isFinite(growing), `growing prescription must be solvable, got ${growing}`).toBe(true);
+    expect(
+      growing,
+      `growth 2% prescription (${growing}) must be LOWER than growth 0% (${flat}) — the probe must ride the income path`,
+    ).toBeLessThan(flat - REQUIRED_CONTRIBUTION_TOLERANCE);
+  });
+
+  /**
+   * T-377 guarantee preserved: an override of 0 must still produce the empty-state Infinity
+   * sentinel, income path or not (`calculateYearsToTarget`'s `monthlySavings <= 0 -> Infinity`).
+   */
+  it("#207: an override of 0 still yields the empty-state sentinel (T-377 contract)", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    loadRaviSeed(h, a);
+    const k = derive(h.data, a.values, LENS, { monthlyContributionReal: 0, targetRetirementAge: 60 });
+    expect(k.householdFireAge == null || !Number.isFinite(k.householdFireAge)).toBe(true);
   });
 });

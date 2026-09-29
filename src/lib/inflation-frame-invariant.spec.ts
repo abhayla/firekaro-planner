@@ -101,7 +101,36 @@ const LIVE_DEFAULTS_REQUIRED_MONTHLY = {
   // mid-career earners, 17-year horizon) the creep on a large expense base outweighs the income
   // growth on a residual that is already a big share of income — so the honest flat prescription is
   // higher. Re-recorded, not widened: the ±8% allowance below is unchanged.
-  iyers: 183_414,
+  //
+  // RE-RECORDED 2026-09-29 at gh #207 (the solver probe rides the income path): 183,414 -> 160,512
+  // (-12.5%, outside the +/-8% band). The move is DOWNWARD - the OPTIMISTIC direction - so the term
+  // is named and RE-DERIVED, never merely re-recorded:
+  //
+  //   The ONLY changed term is the income-path scaling of the solver's PROBE. `derive()` used to
+  //   treat the T-377 `monthlyContributionReal` override as a FLAT real scalar that replaced the
+  //   income-path residual outright, so the prescription was solved against a kernel run in which
+  //   the household's income never grew - while the HEADLINE it is measured against grows income at
+  //   `salaryGrowthRealPercent`. Measured proof that this is exactly the term: running the NEW kernel
+  //   with `salaryGrowthRealPercent: 0` reproduces 183,414 to the rupee. The old constant WAS the
+  //   zero-growth answer.
+  //
+  //   Magnitude check. The Iyers' conservative real income path over their 17-year horizon
+  //   (anchor 38 -> target 55, earners 35L @ dob 1987 and 8L @ dob 1989, 2%/yr real, taper 50) has
+  //   income(17)/income(0) = 1.2778 and an arithmetic mean scale of 1.1639 across the horizon. The
+  //   observed prescription ratio is 183,414/160,512 = 1.1427 - just BELOW the arithmetic mean,
+  //   which is the correct side: a compounding corpus weights the EARLY years (scale near 1.0) more
+  //   heavily than the late ones, so the return-weighted effective scale must be smaller than the
+  //   unweighted mean. A ratio at or above 1.2778 would have meant the probe was scaling on the
+  //   END-of-horizon income (a real leak); 1.1427 is the honest middle.
+  //
+  //   Why DOWNWARD is honest here and not optimism: the prescription answers "what must I start
+  //   investing, in today's rupees, to hit my target at 55". The old figure demanded the user hold
+  //   that amount flat for 17 years while simultaneously telling them (on the headline) that their
+  //   income would grow 2%/yr real - two contradictory plans on one screen. The new figure is the
+  //   STARTING amount of a plan that rises with income, which is both smaller at the start and
+  //   strictly larger in later years. It is not a smaller total commitment; it is the same
+  //   commitment, honestly phased. Re-recorded, not widened: the +/-8% allowance below is unchanged.
+  iyers: 160_512,
   mauryas: Number.POSITIVE_INFINITY,
 } as const;
 /**
