@@ -5,7 +5,7 @@ import { useFireDerive } from "@/lib/useFireDerive";
 import { useUiStore } from "@/stores/ui";
 import { useAssumptionsStore } from "@/stores/assumptions";
 import { todayIsoLocal } from "@/lib/as-of-date";
-import { computeTax, npsCeilingFor, AVAILABLE_FYS, getTaxConfigForFY } from "@/lib/tax";
+import { npsCeilingFor, AVAILABLE_FYS, getTaxConfigForFY } from "@/lib/tax";
 import { getCurrentFinancialYear } from "@/lib/expense-history";
 import { toAnnual } from "@/lib/cashflow";
 import {
@@ -17,7 +17,6 @@ import { formatINRCompact, formatPercent, formatINR } from "@/lib/formatters";
 import {
   deriveDeductions,
   deductionsForMember,
-  computeHousePropertyTax,
   computeEarnerTaxCard,
   isInMarginalReliefBand,
   marginalReliefMitigations,
@@ -28,6 +27,7 @@ import {
   LIMIT_SECTION_24,
   perAssesseeHouseholdTax,
 } from "@/lib/tax-deductions";
+import { householdTaxUnderRegime } from "@/lib/household-tax-regime";
 import { buildDonutSegments } from "@/lib/donut";
 import LeafPageHeader from "@/components/income-layout/LeafPageHeader.vue";
 import StatDashboard, { type KpiTile } from "@/components/income-layout/StatDashboard.vue";
@@ -167,17 +167,9 @@ const totalTaxable = computed(() =>
   incomeRows.value.filter((r) => r.isTaxable).reduce((s, r) => s + r.amount, 0),
 );
 
-// Let-out rent is taxed on NET house-property income (§24a 30% standard deduction +
-// §24b interest + municipal tax, §71 loss cap), NOT on gross rent. We keep totalTaxable
-// as the CASH-basis figure (drives take-home + the income bars — the landlord receives
-// full rent), and feed this §24a-collapsed base into computeTax. SAME shared helper
-// derive.ts uses, so this screen and the Cash-Flow/FIRE-model tax can never diverge (gh-issue #65).
-const rentalTaxDeduction = computed(
-  () => computeHousePropertyTax(fire.lensedOtherIncome.value).rentalTaxDeduction,
-);
-const taxableIncomeForTax = computed(() =>
-  Math.max(0, totalTaxable.value - rentalTaxDeduction.value),
-);
+// totalTaxable is the CASH-basis figure (take-home + the income bars — the landlord receives full
+// rent). The tax base nets let-out rent per person (§24a/§24b, §71) inside the per-assessee returns
+// below, the same helper derive.ts uses (gh-issue #65, #87).
 
 // Phase 4 Stage J — marginal-relief band detection (audit Entry #13 A13.2-4).
 // The MR band is a NEW-regime 87A rebate-cliff construct, so test it against the actual
@@ -245,48 +237,20 @@ const perAssessee = computed(() =>
       ),
 );
 
-/**
- * The household's tax with each adult's regime chosen by `pick`: "AUTO" = each adult's OWN cheaper
- * regime (what the household actually pays — the headline, equal to the kernel's `annualTax`);
- * "OLD"/"NEW" = every adult forced through that regime, still assessee by assessee, for the
- * comparison. Forcing the whole household through one pooled return would answer a question about
- * a filer that does not exist.
- */
-function householdTaxUnderRegime(pick: "AUTO" | "OLD" | "NEW") {
-  const rows = perAssessee.value.perAssessee.map((a) =>
-    computeTax({
-      grossIncome: a.grossIncome,
-      regime: pick === "AUTO" ? a.regime : pick,
-      fy: selectedFY.value,
-      deductions: a.deductions,
-      employerNpsByMember: a.employerNpsByMember,
-      taxpayerAge: a.age,
-      isSalaried: a.isSalaried,
-    }),
-  );
-  const totalTax = rows.reduce((t, r) => t + r.totalTax, 0);
-  const taxableIncome = rows.reduce((t, r) => t + r.taxableIncome, 0);
-  const gross = taxableIncomeForTax.value;
-  return {
-    grossIncome: gross,
-    standardDeduction: rows.reduce((t, r) => t + r.standardDeduction, 0),
-    estimatedDeductions: rows.reduce((t, r) => t + r.estimatedDeductions, 0),
-    taxableIncome,
-    slabTax: rows.reduce((t, r) => t + r.slabTax, 0),
-    rebate: rows.reduce((t, r) => t + r.rebate, 0),
-    taxAfterRebate: rows.reduce((t, r) => t + r.taxAfterRebate, 0),
-    surcharge: rows.reduce((t, r) => t + r.surcharge, 0),
-    cess: rows.reduce((t, r) => t + r.cess, 0),
-    totalTax,
-    effectiveRate: gross > 0 ? (totalTax / gross) * 100 : 0,
-  };
-}
-
-const oldResult = computed(() => householdTaxUnderRegime("OLD"));
-const newResult = computed(() => householdTaxUnderRegime("NEW"));
+// #87 round 3 — every figure comes from the ONE exported `householdTaxUnderRegime` (src/lib), the
+// same function the page-vs-kernel lock calls. Forcing OLD/NEW still goes assessee by assessee:
+// one pooled return would answer a question about a filer that does not exist.
+const oldResult = computed(() =>
+  householdTaxUnderRegime(perAssessee.value.perAssessee, "OLD", selectedFY.value),
+);
+const newResult = computed(() =>
+  householdTaxUnderRegime(perAssessee.value.perAssessee, "NEW", selectedFY.value),
+);
 // #87 round 1 — AUTO's headline is the sum of each adult's OWN cheaper regime (= kernel
 // `annualTax`), never min(all-Old, all-New): two adults can each be cheaper under different regimes.
-const autoResult = computed(() => householdTaxUnderRegime("AUTO"));
+const autoResult = computed(() =>
+  householdTaxUnderRegime(perAssessee.value.perAssessee, "AUTO", selectedFY.value),
+);
 const activeResult = computed(() =>
   mode.value === "AUTO" ? autoResult.value : mode.value === "OLD" ? oldResult.value : newResult.value,
 );
@@ -390,16 +354,19 @@ const perEarner = computed(() =>
     // formula (CTC − PF − tax − professional tax) but on the real tax figure.
     const pf = pfFromInvestmentRows(scopedHousehold.value, m.id);
     const ctc = m.salary?.annualCTC ?? 0;
+    // #87 round 3 — a forced Old/New shows this person's tax under THAT regime, so the cards sum
+    // to the headline; "Better regime" stays their own cheaper one.
+    const tax = mode.value === "OLD" ? assessee.oldTax : mode.value === "NEW" ? assessee.newTax : assessee.tax;
     return {
       ...card,
       gross: assessee.grossIncome,
-      tax: assessee.tax,
+      tax,
       rec: assessee.regime,
-      effRate: assessee.grossIncome > 0 ? (assessee.tax / assessee.grossIncome) * 100 : 0,
+      effRate: assessee.grossIncome > 0 ? (tax / assessee.grossIncome) * 100 : 0,
       takeHome: netCashSalary({
         annualCTC: ctc,
         annualPf: pf,
-        annualTax: assessee.tax,
+        annualTax: tax,
         professionalTax: ctc > 0 ? PROFESSIONAL_TAX_ANNUAL_PER_EARNER : 0,
       }).annual,
     };
@@ -805,7 +772,7 @@ const zeroTaxSectionVisible = computed(() => !isZeroTaxRecommended.value || show
 
     <!-- ───── Per earner (household view only — the whole-household breakdown; the lensed view
              already IS a single member, so this comparison table is hidden then). gh #86. ───── -->
-    <template v-if="!lensActive && household.earners.length >= 2">
+    <template v-if="!lensActive && perEarner.length >= 2">
       <div class="section-eyebrow">Per earner</div>
       <PanelCard>
         <v-table density="comfortable" class="bg-transparent earner-table">
@@ -838,8 +805,7 @@ const zeroTaxSectionVisible = computed(() => !isZeroTaxRecommended.value || show
           </tbody>
         </v-table>
         <div class="text-caption text-medium-emphasis mt-3">
-          Each earner files their own ITR in India. Demo treats the whole-household regime uniformly;
-          production would allow a per-earner override.
+          Each adult files their own return, and in AUTO each person's tax uses their own cheaper regime.
         </div>
       </PanelCard>
     </template>

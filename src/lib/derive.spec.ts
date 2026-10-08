@@ -1047,16 +1047,16 @@ describe("#87 -- per-assessee household tax (direction locks)", () => {
     expect(k.annualTax).toBeLessThan(pooled.totalTax);
   });
 
-  it("a single-earner household with a NON-EARNING co-owner files TWO returns (#87 round 1)", () => {
-    // Mauryas: one salaried adult + a homemaker co-owning a Joint rental and a Joint FD. Each
-    // co-owner is assessed on her own share (§26 for house property), so Madhu files on her half
-    // (below the basic exemption → ₹0) and Abhay's return drops by that half. The household tax is
-    // still exactly the sum of the two returns.
+  it("a homemaker SPOUSE's Joint share is clubbed to the earning spouse: ONE return (#87 round 3)", () => {
+    // Mauryas: one salaried adult + a homemaker spouse co-owning a Joint rental and a Joint FD.
+    // §64(1)(iv)/§27(i), D-2026-10-08-02: a spouse with no own income source does not file on her
+    // share while the other spouse earns; it is taxed on Abhay. (Round 1 filed her separately and
+    // lowered the household tax by ₹29,827 — optimistic for this persona.)
     const h = useHouseholdStore();
     const a = useAssumptionsStore();
     loadMauryasSeed(h, a, LENS87.currentFY);
     const k = derive(h.data, a.values, LENS87);
-    expect(k.perAssesseeTax.perAssessee.map((x) => x.memberId)).toEqual(["abhay", "madhu"]);
+    expect(k.perAssesseeTax.perAssessee.map((x) => x.memberId)).toEqual(["abhay"]);
     expect(k.annualTax).toBe(k.perAssesseeTax.perAssessee.reduce((s, x) => s + x.tax, 0));
   });
 

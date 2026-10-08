@@ -194,6 +194,87 @@ export function jointShareFor(
   return 1 / adults.length;
 }
 
+const SPOUSE_RELATION = /\b(spouse|wife|husband)\b/i;
+
+/**
+ * #87 round 3 — §64(1)(iv) / §27(i) clubbing (D-2026-10-08-02). A planner cannot see whose money
+ * bought an asset, so the conservative default is the law's: a SPOUSE (by `relation`) with no own
+ * income source (no salary, no operated profit-making business — `isEarningMember`) does not file on
+ * her share of a row; it is clubbed to the earning spouse. Returns clubbed spouse id → earning
+ * spouse id. Empty when nobody among `adults` earns, or when both spouses earn. The earning spouse is
+ * the first earning adult (member order) whose relation is empty, "Self" or a spouse word — never an
+ * adult child or parent. A non-spouse adult always files on their own share.
+ */
+export function spouseClubbing(
+  household: Household,
+  adults: readonly Member[],
+): Map<string, string> {
+  const clubbing = new Map<string, string>();
+  const earns = (m: Member) => isEarningMember(m, household.businesses);
+  const isPartnerSide = (m: Member) => {
+    const rel = (m.relation ?? "").trim();
+    return rel === "" || /\bself\b/i.test(rel) || SPOUSE_RELATION.test(rel);
+  };
+  for (const m of adults) {
+    if (!SPOUSE_RELATION.test(m.relation ?? "") || earns(m)) continue;
+    const to = adults.find((e) => e.id !== m.id && earns(e) && isPartnerSide(e));
+    if (to) clubbing.set(m.id, to.id);
+  }
+  return clubbing;
+}
+
+/**
+ * #87 round 3 — the ONE income attribution rule `perAssesseeHouseholdTax` uses: who files a row
+ * owned by `ownerId`, and what share. Sums to exactly 1 over the returned people (the conservation
+ * law, spec-locked per row). Joint → `jointShareFor`; an in-scope adult → 100% theirs; anything else
+ * (a minor — §64(1A) — or an unknown id) → 100% the anchor adult. Then every clubbed spouse's share
+ * moves to the earning spouse (`spouseClubbing`) when that spouse is among `adults`.
+ */
+export function incomeRowShares(
+  household: Household,
+  adults: readonly Member[],
+  anchorId: string | undefined,
+  ownerId: string,
+  householdSplitPercent: number,
+  clubbing: ReadonlyMap<string, string>,
+): Map<string, number> {
+  const base = new Map<string, number>();
+  if (ownerId === JOINT_DEDUCTION_OWNER) {
+    for (const a of adults) base.set(a.id, jointShareFor(household, a.id, householdSplitPercent));
+  } else if (adults.some((a) => a.id === ownerId)) {
+    base.set(ownerId, 1);
+  } else if (anchorId) {
+    base.set(anchorId, 1);
+  }
+  const shares = new Map<string, number>();
+  for (const [id, w] of base) {
+    if (w === 0) continue;
+    const to = clubbing.get(id);
+    const target = to && adults.some((a) => a.id === to) ? to : id;
+    shares.set(target, (shares.get(target) ?? 0) + w);
+  }
+  return shares;
+}
+
+/**
+ * #87 round 3 — a deduction row's weight on ONE return that also carries the clubbed spouses in
+ * `claimantIds` (`[self, ...clubbed]`): own row → 1, Joint → that person's `jointShareFor`, summed
+ * over the claimant set. The weight `deductionsForMember` applies.
+ */
+export function deductionOwnerWeight(
+  household: Household,
+  claimantIds: readonly string[],
+  ownerId: string,
+  householdSplitPercent: number,
+): number {
+  let w = 0;
+  for (const id of claimantIds) {
+    if (ownerId === id) w += 1;
+    else if (ownerId === JOINT_DEDUCTION_OWNER) w += jointShareFor(household, id, householdSplitPercent);
+  }
+  return w;
+}
+
 /**
  * #204: the ONE member-scoped deduction-attribution builder, shared by every "this earner's own
  * 80C/80D/§24" call site (`individual-fire.ts`'s standalone-FIRE tax leg, `tax-planning/Index.vue`'s
@@ -240,15 +321,19 @@ export function deductionsForMember(
   household: Household,
   memberId: string,
   householdSplitPercent: number,
-  options: Omit<DeriveDeductionsOptions, "coBorrowerTrackedMemberIds"> = {},
+  options: Omit<DeriveDeductionsOptions, "coBorrowerTrackedMemberIds"> & {
+    /** #87 round 3 — spouses clubbed onto this member's return (`spouseClubbing`): their own and
+     * Joint deduction shares are claimed here, once, under this member's caps. */
+    clubbedMemberIds?: readonly string[];
+  } = {},
 ): DeductionBreakdown {
+  const { clubbedMemberIds = [], ...deriveOptions } = options;
   const split = Math.min(100, Math.max(0, householdSplitPercent)) / 100;
   const member = household.members.find((m) => m.id === memberId);
-  const adults = household.members.filter((m) => isAdultRole(m.role));
+  const claimants = [memberId, ...clubbedMemberIds];
 
-  const jointShare = jointShareFor(household, memberId, householdSplitPercent);
   const weightOf = (ownerId: string): number =>
-    ownerId === memberId ? 1 : ownerId === JOINT_DEDUCTION_OWNER ? jointShare : 0;
+    deductionOwnerWeight(household, claimants, ownerId, householdSplitPercent);
 
   const investments = household.investments
     .map((i) => ({ inv: i, w: weightOf(i.ownerId) }))
@@ -259,7 +344,7 @@ export function deductionsForMember(
     }));
 
   // No "Joint" sentinel for insurance (see doc comment above) — own-owned only, unchanged.
-  const insurance = household.insurance.filter((p) => p.insuredPersonId === memberId);
+  const insurance = household.insurance.filter((p) => claimants.includes(p.insuredPersonId));
 
   // ---- Sec 24 — PAYMENT share, not ownership share (round-2 fix) ----
   // Owner's share = (1 − split); spouse's (non-owner) share = split — the two always sum to 1, so
@@ -271,11 +356,14 @@ export function deductionsForMember(
   for (const l of household.liabilities) {
     if (l.type !== "HomeLoan") continue;
     const annualInterest = estimateAnnualInterest(l);
-    const isOwner = l.ownerId === memberId;
-    const isSpouseShare = !isOwner && l.isSharedWithSpouse;
-    if (!isOwner && !isSpouseShare) continue;
-    const paymentShare = !l.isSharedWithSpouse ? (isOwner ? 1 : 0) : isOwner ? 1 - split : split;
-    section24 += Math.min(LIMIT_SECTION_24, annualInterest * paymentShare);
+    let paymentShare = 0;
+    for (const id of claimants) {
+      const isOwner = l.ownerId === id;
+      if (!isOwner && !l.isSharedWithSpouse) continue;
+      paymentShare += !l.isSharedWithSpouse ? 1 : isOwner ? 1 - split : split;
+    }
+    if (paymentShare === 0) continue;
+    section24 += Math.min(LIMIT_SECTION_24, annualInterest * Math.min(1, paymentShare));
   }
 
   const rest = deriveDeductions(
@@ -286,7 +374,7 @@ export function deductionsForMember(
       liabilities: [], // §24 computed above, independently — see doc comment
       insurance,
     },
-    options,
+    deriveOptions,
   );
 
   return {
@@ -705,6 +793,10 @@ export interface PerAssesseeScope {
  *   - owned row       → `ownerId` === an in-scope adult: 100% theirs.
  *   - Joint row       → `jointShareFor` (the #204 complementary split, shared with
  *                       `deductionsForMember`): sums to 1 across the household's adults.
+ *   - CLUBBED SPOUSE  → (round 3, §64(1)(iv), D-2026-10-08-02) a spouse with no own income source in
+ *                       a household where an adult earns does not file: every share she would get
+ *                       goes to the earning spouse (`spouseClubbing`), deductions included.
+ *   The row rule itself is `incomeRowShares` (exported; the per-row conservation law is spec-locked).
  *   - UNOWNED row     → an owner that is not an in-scope adult (unknown id, or a minor — §64(1A)
  *                       clubbing) goes 100% to the ANCHOR adult (`jointAnchorMemberId`, or the first
  *                       in-scope adult when the anchor is out of scope). Never dropped — dropping
@@ -727,16 +819,20 @@ export function perAssesseeHouseholdTax(
   const adults = scope.members.filter((m) => isAdultRole(m.role));
   const householdAnchor = jointAnchorMemberId(household);
   const anchorId = adults.some((m) => m.id === householdAnchor) ? householdAnchor : adults[0]?.id;
-  const isInScopeAdult = (id: string): boolean => adults.some((m) => m.id === id);
+  const clubbing = spouseClubbing(household, adults);
   const asOfIso = todayIsoLocal(asOf);
+  const sharesCache = new Map<string, Map<string, number>>();
+  const sharesOf = (ownerId: string): Map<string, number> => {
+    let shares = sharesCache.get(ownerId);
+    if (!shares) {
+      shares = incomeRowShares(household, adults, anchorId, ownerId, householdSplitPercent, clubbing);
+      sharesCache.set(ownerId, shares);
+    }
+    return shares;
+  };
 
   const returns = adults.map((member) => {
-    const jointShare = jointShareFor(household, member.id, householdSplitPercent);
-    const weightOf = (ownerId: string): number => {
-      if (ownerId === JOINT_DEDUCTION_OWNER) return jointShare;
-      if (isInScopeAdult(ownerId)) return ownerId === member.id ? 1 : 0;
-      return member.id === anchorId ? 1 : 0;
-    };
+    const weightOf = (ownerId: string): number => sharesOf(ownerId).get(member.id) ?? 0;
 
     const salary = member.salary?.annualCTC ?? 0;
     let otherTaxable = 0;
@@ -768,7 +864,8 @@ export function perAssesseeHouseholdTax(
       rentalNet >= 0 ? rentalNet : -Math.min(Math.abs(rentalNet), SEC_71_HP_LOSS_SETOFF_CAP),
     );
     const grossIncome = salary + otherTaxable + businessShare + houseProperty;
-    const files = hasIncome || isEarningMember(member, household.businesses);
+    const files =
+      !clubbing.has(member.id) && (hasIncome || isEarningMember(member, household.businesses));
     return { member, grossIncome, salary, files };
   });
 
@@ -778,6 +875,7 @@ export function perAssesseeHouseholdTax(
   const perAssessee: AssesseeTax[] = filers.map(({ member, grossIncome, salary }) => {
     const deductions = deductionsForMember(household, member.id, householdSplitPercent, {
       asOfDate: asOfIso,
+      clubbedMemberIds: [...clubbing].filter(([, to]) => to === member.id).map(([from]) => from),
     });
     const isSalaried = salary > 0;
     const age = ageAsOf(member.dateOfBirth, asOfIso);

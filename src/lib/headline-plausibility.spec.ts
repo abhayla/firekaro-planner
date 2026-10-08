@@ -955,7 +955,8 @@ describe("gh #218 — the cash figure is net of PF, and savings did not move", (
     sharmas: { annualSavings: 2_376_444, monthlyContribution: 198_037 },
     iyers: { annualSavings: 1_725_208, monthlyContribution: 143_767 },
     mehtas: { annualSavings: 3_407_804, monthlyContribution: 283_984 },
-    mauryas: { annualSavings: 1_540_809, monthlyContribution: 128_401 },
+    // #87 round 3: Madhu's Joint share is clubbed to Abhay (§64(1)(iv)) — tax +₹29,827, savings −₹29,827.
+    mauryas: { annualSavings: 1_510_982, monthlyContribution: 125_915 },
   };
 
   for (const persona of PERSONAS) {

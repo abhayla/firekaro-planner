@@ -24,7 +24,9 @@ import {
   SEC_24A_DEDUCTION_RATE,
   SEC_71_HP_LOSS_SETOFF_CAP,
 } from "@/lib/tax-deductions";
-import { computeTax } from "@/lib/tax";
+import { householdTaxUnderRegime } from "@/lib/household-tax-regime";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { toAnnual } from "@/lib/cashflow";
 import type { OtherIncomeLine } from "@/types/household";
 
@@ -120,29 +122,18 @@ describe("cross-screen annual-tax coherence (gh-issue #65)", () => {
         0,
       );
 
-    // #87 — the page no longer runs ONE pooled computeTax: at the current FY it renders
-    // useFireDerive().perAssesseeTax (each adult's own return) and its AUTO headline re-runs
-    // computeTax per assessee with that adult's own regime (Index.vue householdTaxUnderRegime).
-    // Replicate EXACTLY that page path, so this stays a page-vs-kernel lock.
+    // #87 round 3 (per round-2 code review) — the page's headline IS
+    // `householdTaxUnderRegime(fire.perAssesseeTax.perAssessee, "AUTO", fy)` (source-locked below);
+    // this lock calls that SAME exported function, never a copy of the page logic.
     const fire = useFireDerive();
     const fy = ui.currentFY;
     const assessees = fire.perAssesseeTax.value.perAssessee;
     const pageTaxFor = (bumpLargestBy: number) => {
       const largest = assessees.reduce((b, x) => (x.grossIncome > b.grossIncome ? x : b));
-      return assessees.reduce(
-        (t, x) =>
-          t +
-          computeTax({
-            grossIncome: x.grossIncome + (x === largest ? bumpLargestBy : 0),
-            regime: x.regime,
-            fy,
-            deductions: x.deductions,
-            employerNpsByMember: x.employerNpsByMember,
-            taxpayerAge: x.age,
-            isSalaried: x.isSalaried,
-          }).totalTax,
-        0,
+      const bumped = assessees.map((x) =>
+        x === largest ? { ...x, grossIncome: x.grossIncome + bumpLargestBy } : x,
       );
+      return householdTaxUnderRegime(bumped, "AUTO", fy).totalTax;
     };
     const pageTax = pageTaxFor(0);
 
@@ -160,5 +151,45 @@ describe("cross-screen annual-tax coherence (gh-issue #65)", () => {
     // Guard against a no-op "fix": taxing the full gross rent (the OLD buggy base) costs more.
     const taxOnGrossRent = pageTaxFor(grossTaxable - pageTaxBase);
     expect(taxOnGrossRent).toBeGreaterThan(pageTax);
+  });
+});
+
+describe("#87 round 3 — the tax page renders from householdTaxUnderRegime (page-vs-kernel lock)", () => {
+  beforeEach(() => setActivePinia(createPinia()));
+  const page = readFileSync(
+    fileURLToPath(new URL("../pages/tax-planning/Index.vue", import.meta.url)),
+    "utf8",
+  );
+
+  it("Index.vue imports the ONE exported function and keeps no local copy of it", () => {
+    expect(page).toMatch(/import \{ householdTaxUnderRegime \} from "@\/lib\/household-tax-regime";/);
+    expect(page).not.toMatch(/function householdTaxUnderRegime\(/);
+    for (const pick of ["OLD", "NEW", "AUTO"]) {
+      expect(page).toMatch(
+        new RegExp(`householdTaxUnderRegime\\(\\s*perAssessee\\.value\\.perAssessee, "${pick}", selectedFY\\.value,?\\s*\\)`),
+      );
+    }
+    // At the current FY the page's perAssessee IS the kernel's own result.
+    expect(page).toMatch(/selectedFY\.value === ui\.currentFY\s*\?\s*fire\.perAssesseeTax\.value/);
+  });
+
+  it("a forced regime: each person's card shows their tax under that regime, so the cards sum to the headline", () => {
+    const h = useHouseholdStore();
+    const a = useAssumptionsStore();
+    const ui = useUiStore();
+    loadSeedPersona(h, a, ui.currentFY);
+    const assessees = useFireDerive().perAssesseeTax.value.perAssessee;
+    expect(assessees.length).toBeGreaterThanOrEqual(2);
+    const sumOld = assessees.reduce((t, x) => t + x.oldTax, 0);
+    const sumNew = assessees.reduce((t, x) => t + x.newTax, 0);
+    expect(householdTaxUnderRegime(assessees, "OLD", ui.currentFY).totalTax).toBe(sumOld);
+    expect(householdTaxUnderRegime(assessees, "NEW", ui.currentFY).totalTax).toBe(sumNew);
+    expect(sumOld).not.toBe(sumNew);
+    expect(page).toMatch(
+      /mode\.value === "OLD" \? assessee\.oldTax : mode\.value === "NEW" \? assessee\.newTax : assessee\.tax/,
+    );
+    // Effective rate uses the per-person gross base (the same base as the per-person table).
+    const r = householdTaxUnderRegime(assessees, "AUTO", ui.currentFY);
+    expect(r.grossIncome).toBe(assessees.reduce((t, x) => t + x.grossIncome, 0));
   });
 });
