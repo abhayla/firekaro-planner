@@ -25,22 +25,22 @@ exports[`A7.2 golden-master — per-persona headline (DEFAULT lens) > iyers: der
 exports[`A7.2 golden-master — per-persona headline (DEFAULT lens) > mauryas: derive() headline is locked 1`] = `
 {
   "anchorAge": 44,
-  "annualSavings": 1510982,
-  "corpusOnlyYearsToRegular": 21.6667,
+  "annualSavings": 1540809,
+  "corpusOnlyYearsToRegular": 21.5,
   "effectiveSWR": 0.0325,
-  "fireAge": 65.67,
+  "fireAge": 65.5,
   "fireNumber": 105335102,
   "fireWithdrawableCorpus": 35520000,
   "lensedEarners": 1,
-  "monthlyContribution": 125915,
-  "monthlyTakeHome": 296357,
+  "monthlyContribution": 128401,
+  "monthlyTakeHome": 298843,
   "progressPercent": 34,
-  "savingsRate": 38.1,
+  "savingsRate": 38.6,
   "targetRetirementAge": 50,
   "totalCorpus": 36000000,
-  "yearsToFat": 23.3333,
-  "yearsToLean": 4,
-  "yearsToRegular": 21.6667,
+  "yearsToFat": 23.1667,
+  "yearsToLean": 3.9167,
+  "yearsToRegular": 21.5,
 }
 `;
 

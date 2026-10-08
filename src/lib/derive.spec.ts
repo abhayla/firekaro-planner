@@ -1047,13 +1047,17 @@ describe("#87 -- per-assessee household tax (direction locks)", () => {
     expect(k.annualTax).toBeLessThan(pooled.totalTax);
   });
 
-  it("a SINGLE-earner household is byte-identical to one computeTax over its own income", () => {
+  it("a single-earner household with a NON-EARNING co-owner files TWO returns (#87 round 1)", () => {
+    // Mauryas: one salaried adult + a homemaker co-owning a Joint rental and a Joint FD. Each
+    // co-owner is assessed on her own share (§26 for house property), so Madhu files on her half
+    // (below the basic exemption → ₹0) and Abhay's return drops by that half. The household tax is
+    // still exactly the sum of the two returns.
     const h = useHouseholdStore();
     const a = useAssumptionsStore();
     loadMauryasSeed(h, a, LENS87.currentFY);
     const k = derive(h.data, a.values, LENS87);
-    expect(k.perAssesseeTax.perAssessee.length).toBe(1);
-    expect(k.annualTax).toBe(k.perAssesseeTax.perAssessee[0].tax);
+    expect(k.perAssesseeTax.perAssessee.map((x) => x.memberId)).toEqual(["abhay", "madhu"]);
+    expect(k.annualTax).toBe(k.perAssesseeTax.perAssessee.reduce((s, x) => s + x.tax, 0));
   });
 
   it("the #225 cash identity still closes: income - tax === savings + expenses", () => {

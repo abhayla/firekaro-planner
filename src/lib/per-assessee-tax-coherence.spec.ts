@@ -24,7 +24,7 @@ import { loadIyersSeed } from "@/seeds/iyers";
 import { loadMauryasSeed } from "@/seeds/mauryas";
 import { loadRaviSeed } from "@/seeds/ravi";
 import { derive } from "@/lib/derive";
-import { perAssesseeHouseholdTax, computeHousePropertyTax } from "@/lib/tax-deductions";
+import { perAssesseeHouseholdTax } from "@/lib/tax-deductions";
 import { isEarningMember } from "@/lib/member-earning";
 
 const LENS = { isFamilyView: false, viewingMemberId: null, currentFY: "2025-26" } as const;
@@ -32,12 +32,14 @@ const LENS = { isFamilyView: false, viewingMemberId: null, currentFY: "2025-26" 
 type H = ReturnType<typeof useHouseholdStore>;
 type A = ReturnType<typeof useAssumptionsStore>;
 
-const PERSONAS: Array<{ name: string; earners: number; load: (h: H, a: A) => void }> = [
-  { name: "sharmas", earners: 2, load: (h, a) => loadSeedPersona(h, a, LENS.currentFY) },
-  { name: "mehtas", earners: 2, load: (h, a) => loadMehtasSeed(h, a) },
-  { name: "iyers", earners: 2, load: (h, a) => loadIyersSeed(h, a) },
-  { name: "mauryas", earners: 1, load: (h, a) => loadMauryasSeed(h, a, LENS.currentFY) },
-  { name: "ravi", earners: 1, load: (h, a) => loadRaviSeed(h, a) },
+// `filers` = adults with taxable income (#87 round 1: a non-earning co-owner of a Joint rental /
+// FD files on her own share — the Mauryas' Madhu). `earners` = salary/business adults.
+const PERSONAS: Array<{ name: string; earners: number; filers: number; load: (h: H, a: A) => void }> = [
+  { name: "sharmas", earners: 2, filers: 2, load: (h, a) => loadSeedPersona(h, a, LENS.currentFY) },
+  { name: "mehtas", earners: 2, filers: 2, load: (h, a) => loadMehtasSeed(h, a) },
+  { name: "iyers", earners: 2, filers: 2, load: (h, a) => loadIyersSeed(h, a) },
+  { name: "mauryas", earners: 1, filers: 2, load: (h, a) => loadMauryasSeed(h, a, LENS.currentFY) },
+  { name: "ravi", earners: 1, filers: 1, load: (h, a) => loadRaviSeed(h, a) },
 ];
 
 describe("#87 — /tax-planning's per-earner sum EQUALS the kernel's household tax", () => {
@@ -53,14 +55,12 @@ describe("#87 — /tax-planning's per-earner sum EQUALS the kernel's household t
       // Reproduce EXACTLY what /tax-planning's `perAssessee` computed builds (same helper, same
       // scope, same split) — this is the screen's derivation, not a paraphrase of it.
       const earners = h.data.members.filter((m) => isEarningMember(m, h.data.businesses));
-      const { rentalTaxDeduction } = computeHousePropertyTax(h.data.otherIncome);
       const page = perAssesseeHouseholdTax(
         h.data,
         {
-          earners,
+          members: h.data.members,
           businesses: h.data.businesses,
           otherIncome: h.data.otherIncome,
-          rentalTaxDeduction,
         },
         LENS.currentFY,
         a.values.householdSplitPercent ?? 50,
@@ -99,12 +99,12 @@ describe("#87 — direction: per-assessee is never worse than pooled, and single
         POOLED_BEFORE[persona.name],
       );
       // Each earner files their own return — there are as many as there are earning adults.
-      expect(k.perAssesseeTax.perAssessee.length).toBe(persona.earners);
+      expect(k.perAssesseeTax.perAssessee.length).toBe(persona.filers);
     }
   });
 
-  it("every SINGLE-earner seed is byte-identical: one assessee, one return", () => {
-    for (const persona of PERSONAS.filter((p) => p.earners === 1)) {
+  it("every SINGLE-filer seed is byte-identical: one assessee, one return", () => {
+    for (const persona of PERSONAS.filter((p) => p.filers === 1)) {
       setActivePinia(createPinia());
       const h = useHouseholdStore();
       const a = useAssumptionsStore();

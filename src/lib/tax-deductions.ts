@@ -165,6 +165,36 @@ interface DeriveDeductionsOptions {
 export const JOINT_DEDUCTION_OWNER = "Joint";
 
 /**
+ * #204 round 3 — the household's "anchor" adult: the SAME convention `derive.ts`'s `anchorAgeFor`
+ * uses for the primary earner — the FIRST EARNING adult in member-array order, falling back to the
+ * first adult at all when nobody earns. #87: also the adult an unowned income row is attributed to.
+ */
+export function jointAnchorMemberId(household: Household): string | undefined {
+  const adults = household.members.filter((m) => isAdultRole(m.role));
+  return adults.find((m) => isEarningMember(m, household.businesses))?.id ?? adults[0]?.id;
+}
+
+/**
+ * #204 round 3 / #87 — a member's COMPLEMENTARY share of a "Joint" row. Sums to exactly 1 across the
+ * household's adults (2 adults: anchor gets `split`, the other `1 − split`; 1 adult: 1; 3+: equal
+ * shares; a non-adult: 0), so a Joint row is never double-counted and never dropped. The ONE split
+ * used for Joint deductions (`deductionsForMember`) AND Joint income / rental relief
+ * (`perAssesseeHouseholdTax`).
+ */
+export function jointShareFor(
+  household: Household,
+  memberId: string,
+  householdSplitPercent: number,
+): number {
+  const split = Math.min(100, Math.max(0, householdSplitPercent)) / 100;
+  const adults = household.members.filter((m) => isAdultRole(m.role));
+  if (!adults.some((m) => m.id === memberId)) return 0;
+  if (adults.length <= 1) return 1;
+  if (adults.length === 2) return memberId === jointAnchorMemberId(household) ? split : 1 - split;
+  return 1 / adults.length;
+}
+
+/**
  * #204: the ONE member-scoped deduction-attribution builder, shared by every "this earner's own
  * 80C/80D/§24" call site (`individual-fire.ts`'s standalone-FIRE tax leg, `tax-planning/Index.vue`'s
  * per-earner card, and `previewEarnerTakeHome`'s salary-form preview). Before this fix each of those
@@ -216,20 +246,7 @@ export function deductionsForMember(
   const member = household.members.find((m) => m.id === memberId);
   const adults = household.members.filter((m) => isAdultRole(m.role));
 
-  // #204 round 3 — the SAME anchor convention `derive.ts`'s `anchorAgeFor` uses for the household's
-  // primary earner: the FIRST EARNING adult in household member-array order, falling back to the
-  // first adult at all when nobody earns (mirrors `derive.ts`'s `earners[0] ?? ...` pattern).
-  const jointAnchorMemberId =
-    adults.find((m) => isEarningMember(m, household.businesses))?.id ?? adults[0]?.id;
-
-  /** A member's COMPLEMENTARY share of a Joint 80C/80CCD(1B) source — sums to 1 across all adults,
-   * never re-reads the same `split` for both queried members (round-3 fix). */
-  const jointShareFor = (thisMemberId: string): number => {
-    if (adults.length <= 1) return 1;
-    if (adults.length === 2) return thisMemberId === jointAnchorMemberId ? split : 1 - split;
-    return adults.some((m) => m.id === thisMemberId) ? 1 / adults.length : 0;
-  };
-  const jointShare = jointShareFor(memberId);
+  const jointShare = jointShareFor(household, memberId, householdSplitPercent);
   const weightOf = (ownerId: string): number =>
     ownerId === memberId ? 1 : ownerId === JOINT_DEDUCTION_OWNER ? jointShare : 0;
 
@@ -630,73 +647,75 @@ export function previewEarnerTakeHome(
 // #87 — PER-ASSESSEE household tax (India taxes each adult separately)
 // ---------------------------------------------------------------------------
 
-/** One earning adult's own tax return, as this household's tax is actually filed. */
+/** One adult's own tax return, as this household's tax is actually filed. */
 export interface AssesseeTax {
   memberId: string;
   name: string;
   /** This adult's own taxable gross: own salary CTC + own/Joint-split other-taxable + business
-   * share − their share of the §24a/§24b/§71 rental collapse. */
+   * share + their own share of each let-out property's §24a/§24b net (§71-capped on THIS return). */
   grossIncome: number;
   /** This adult's own OLD-regime deduction bundle (`deductionsForMember`). */
   deductions: number;
+  /** This adult's own per-member 80CCD(2) basis (`deductionsForMember`). */
+  employerNpsByMember: DeductionBreakdown["employerNpsByMember"];
+  /** Draws a salary — the only condition for the salaried standard deduction. */
+  isSalaried: boolean;
+  /** The cheaper of `oldTax` / `newTax` — each adult picks their own regime. */
   regime: "OLD" | "NEW";
   tax: number;
+  /** This adult's tax were they to file under each regime (the per-person comparison). */
+  oldTax: number;
+  newTax: number;
   taxableIncome: number;
   /** Age on the pinned reference date — drives the OLD-regime senior basic-exemption variant. */
   age: number;
 }
 
 export interface PerAssesseeHouseholdTax {
-  /** Σ over earning adults of that adult's own tax — the household's real annual income tax. */
+  /** Σ over assessees of that adult's own tax — the household's real annual income tax. */
   totalTax: number;
-  /** Σ taxable incomes — used only for the marginal-rate read on the LARGEST assessee. */
   perAssessee: AssesseeTax[];
   /** The assessee whose slab rate drives household marginal-rate-sensitive math (largest gross). */
   marginalAssessee: AssesseeTax | null;
 }
 
 export interface PerAssesseeScope {
-  /** The earning adults in scope, in household member-array order (first = anchor). */
-  earners: Member[];
+  /** The members in scope (any role), household member-array order. Adults among them file. */
+  members: Member[];
   /** The businesses visible to this scope. */
   businesses: Household["businesses"];
-  /** The other-income rows visible to this scope. */
+  /** The other-income rows visible to this scope (rentals included — collapsed per owner here). */
   otherIncome: OtherIncomeLine[];
-  /** §24a/§24b/municipal-tax/§71 rental collapse for this scope (split across assessees). */
-  rentalTaxDeduction: number;
 }
 
 /**
- * #87 — the household's annual income tax as INDIA actually levies it: the SUM of each earning
- * adult's own tax on their own income, each adult claiming their own deductions and picking their
- * own cheaper regime. It replaces a single pooled `computeTax` over `Σ income` with one `computeTax`
- * per assessee.
+ * #87 — the household's annual income tax as INDIA actually levies it: the SUM of each adult's own
+ * tax on their own income, each adult claiming their own deductions and picking their own cheaper
+ * regime. It replaces a single pooled `computeTax` over `Σ income` with one `computeTax` per
+ * assessee (pooling overstated a dual-earner household's tax by ₹2.5L–₹6.4L on the seeds).
  *
- * WHY THE POOLED MODEL WAS WRONG (and always PESSIMISTIC): pooling two salaries pushes the whole
- * household through ONE set of slabs, so the second earner's income is taxed at the first's marginal
- * rate and only ONE basic exemption / standard deduction / 87A rebate is granted. For a dual-earner
- * household this overstates tax — measured on the seeds, by ₹2.5L–₹6.4L a year — which understates
- * savings and pushes the honest FIRE date LATER than the truth. A single-earner household is
- * byte-identical (one assessee ⇒ one `computeTax` over the same gross).
+ * WHO FILES (#87 round 1, CRITICAL): every in-scope ADULT with any attributed taxable income — not
+ * only "earners" (salary / operated business). A retired, post-FIRE or capital-income-only adult
+ * still owes tax on rent, interest, dividends and business share; building the list from earners
+ * alone made a zero-earner household's tax ₹0. Earners always file (even at ₹0). When nobody has
+ * any income the anchor adult still files a ₹0 return, so the list is never empty.
  *
- * ATTRIBUTION (same conventions as `individual-fire.ts` / `deductionsForMember`, so the per-earner
- * card, the tax page and the kernel are ONE derivation):
- *   - salary          → the earner's own `salary.annualCTC` (100%).
- *   - other income    → `ownerId === member` at 100%; `ownerId === "Joint"` at that member's
- *                       COMPLEMENTARY split share (anchor gets `split`, the other `1 − split`, so
- *                       the two always sum to the whole — never double-counted, never dropped).
- *   - business        → `business.ownerId` by the same rule, on `annualProfit × sharePercent`.
- *   - UNOWNED rows    → a row whose `ownerId` matches no in-scope member and is not "Joint" is
- *                       attributed to the ANCHOR adult (the first earning adult). Stated explicitly
- *                       because the alternative — dropping it — would make income vanish from tax
- *                       while still counting as cash, the optimistic direction.
- *   - rental collapse → split by the same complementary share as Joint income (a let-out property's
- *                       §24 relief follows the same ownership convention the deduction split uses).
- *   - deductions      → `deductionsForMember` (the #204 helper) — the EXACT bundle the per-earner
- *                       card on /tax-planning renders, so the card sum equals the kernel to the rupee.
- *   - standard ded.   → granted only to an adult who actually draws a salary (`isSalaried`), so a
- *                       business-only or capital-income-only adult is not handed a ₹50k salaried
- *                       deduction they cannot claim.
+ * ATTRIBUTION — one rule for every row, so each row's shares sum to exactly the row:
+ *   - salary          → the adult's own `salary.annualCTC` (100%).
+ *   - owned row       → `ownerId` === an in-scope adult: 100% theirs.
+ *   - Joint row       → `jointShareFor` (the #204 complementary split, shared with
+ *                       `deductionsForMember`): sums to 1 across the household's adults.
+ *   - UNOWNED row     → an owner that is not an in-scope adult (unknown id, or a minor — §64(1A)
+ *                       clubbing) goes 100% to the ANCHOR adult (`jointAnchorMemberId`, or the first
+ *                       in-scope adult when the anchor is out of scope). Never dropped — dropping
+ *                       would make income vanish from tax while still counting as cash.
+ *   - business        → `annualProfit × sharePercent` by the same owner rule.
+ *   - let-out rental  → rent, municipal tax, the §24(a) 30% and the §24(b) interest ALL follow the
+ *                       SAME owner share as the rent (round-1 CRITICAL: the relief used to be split
+ *                       by the Joint share even for a one-owner property). Each adult's net
+ *                       house-property figure is §71-capped (₹2L loss set-off) on THEIR OWN return.
+ *   - deductions      → `deductionsForMember` (the #204 helper).
+ *   - standard ded.   → only for an adult who draws a salary (`isSalaried`).
  */
 export function perAssesseeHouseholdTax(
   household: Household,
@@ -705,47 +724,63 @@ export function perAssesseeHouseholdTax(
   householdSplitPercent: number,
   asOf: Date,
 ): PerAssesseeHouseholdTax {
-  const split = Math.min(100, Math.max(0, householdSplitPercent)) / 100;
-  const earners = scope.earners;
-  const anchorId = earners[0]?.id;
-  /** This member's COMPLEMENTARY share of a Joint source — mirrors `deductionsForMember`. */
-  const jointShareFor = (memberId: string): number => {
-    if (earners.length <= 1) return 1;
-    if (earners.length === 2) return memberId === anchorId ? split : 1 - split;
-    return 1 / earners.length;
-  };
-  const inScope = (ownerId: string): boolean => earners.some((m) => m.id === ownerId);
+  const adults = scope.members.filter((m) => isAdultRole(m.role));
+  const householdAnchor = jointAnchorMemberId(household);
+  const anchorId = adults.some((m) => m.id === householdAnchor) ? householdAnchor : adults[0]?.id;
+  const isInScopeAdult = (id: string): boolean => adults.some((m) => m.id === id);
+  const asOfIso = todayIsoLocal(asOf);
 
-  const perAssessee: AssesseeTax[] = earners.map((member) => {
-    const jointShare = jointShareFor(member.id);
+  const returns = adults.map((member) => {
+    const jointShare = jointShareFor(household, member.id, householdSplitPercent);
     const weightOf = (ownerId: string): number => {
-      if (ownerId === member.id) return 1;
       if (ownerId === JOINT_DEDUCTION_OWNER) return jointShare;
-      // An owner we cannot resolve to an in-scope member falls to the anchor adult (see doc above).
-      if (!inScope(ownerId)) return member.id === anchorId ? 1 : 0;
-      return 0;
+      if (isInScopeAdult(ownerId)) return ownerId === member.id ? 1 : 0;
+      return member.id === anchorId ? 1 : 0;
     };
 
     const salary = member.salary?.annualCTC ?? 0;
     let otherTaxable = 0;
+    let rentalNet = 0;
+    let hasIncome = salary > 0;
     for (const o of scope.otherIncome) {
       if (o.isTaxExempt) continue;
-      otherTaxable += toAnnual({ amount: o.amount, period: o.frequency }) * weightOf(o.ownerId);
+      const w = weightOf(o.ownerId);
+      if (w === 0) continue;
+      const annual = toAnnual({ amount: o.amount, period: o.frequency });
+      if (annual !== 0) hasIncome = true;
+      if (o.type === "Rental") {
+        const nav = Math.max(0, annual - (o.municipalTaxes ?? 0));
+        rentalNet += w * (nav * (1 - SEC_24A_DEDUCTION_RATE) - (o.homeLoanInterest ?? 0));
+      } else {
+        otherTaxable += annual * w;
+      }
     }
     let businessShare = 0;
     for (const b of scope.businesses) {
-      businessShare +=
-        toAnnual({ amount: b.annualProfit, period: b.frequency }) *
-        (b.sharePercent / 100) *
-        weightOf(b.ownerId);
+      const w = weightOf(b.ownerId);
+      if (w === 0) continue;
+      const share =
+        toAnnual({ amount: b.annualProfit, period: b.frequency }) * (b.sharePercent / 100) * w;
+      if (share !== 0) hasIncome = true;
+      businessShare += share;
     }
-    const grossIncome = salary + otherTaxable + businessShare - scope.rentalTaxDeduction * jointShare;
+    const houseProperty = Math.round(
+      rentalNet >= 0 ? rentalNet : -Math.min(Math.abs(rentalNet), SEC_71_HP_LOSS_SETOFF_CAP),
+    );
+    const grossIncome = salary + otherTaxable + businessShare + houseProperty;
+    const files = hasIncome || isEarningMember(member, household.businesses);
+    return { member, grossIncome, salary, files };
+  });
 
+  let filers = returns.filter((r) => r.files);
+  if (filers.length === 0) filers = returns.filter((r) => r.member.id === anchorId);
+
+  const perAssessee: AssesseeTax[] = filers.map(({ member, grossIncome, salary }) => {
     const deductions = deductionsForMember(household, member.id, householdSplitPercent, {
-      asOfDate: todayIsoLocal(asOf),
+      asOfDate: asOfIso,
     });
     const isSalaried = salary > 0;
-    const age = ageAsOf(member.dateOfBirth, todayIsoLocal(asOf));
+    const age = ageAsOf(member.dateOfBirth, asOfIso);
     const taxArgs = {
       grossIncome,
       fy,
@@ -754,24 +789,29 @@ export function perAssesseeHouseholdTax(
       taxpayerAge: age,
       isSalaried,
     };
-    const regime = recommendRegime(taxArgs).recommended;
-    const fyTax = computeTax({ ...taxArgs, regime });
+    const oldR = computeTax({ ...taxArgs, regime: "OLD" });
+    const newR = computeTax({ ...taxArgs, regime: "NEW" });
+    const regime: "OLD" | "NEW" = oldR.totalTax <= newR.totalTax ? "OLD" : "NEW";
+    const chosen = regime === "OLD" ? oldR : newR;
     return {
       memberId: member.id,
-      name: member.name || "Earner",
+      name: member.name || "Adult",
       grossIncome,
       deductions: deductions.totalDeductions,
+      employerNpsByMember: deductions.employerNpsByMember,
+      isSalaried,
       regime,
-      tax: fyTax.totalTax,
-      taxableIncome: fyTax.taxableIncome,
+      tax: chosen.totalTax,
+      oldTax: oldR.totalTax,
+      newTax: newR.totalTax,
+      taxableIncome: chosen.taxableIncome,
       age,
     };
   });
 
   const totalTax = perAssessee.reduce((s, a) => s + a.tax, 0);
   // Marginal rate is a per-assessee notion; household-level marginal-rate consumers (the NPS
-  // annuity post-tax offset, the EPF after-tax yield drag) read the LARGEST earner's slab — the
-  // adult whose bracket a marginal rupee of household income actually lands in.
+  // annuity post-tax offset, the EPF after-tax yield drag) read the LARGEST assessee's slab.
   const marginalAssessee =
     perAssessee.length === 0
       ? null

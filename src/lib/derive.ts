@@ -503,10 +503,9 @@ export function derive(
     const perAssesseeTax = perAssesseeHouseholdTax(
       household,
       {
-        earners: scopeEarners,
+        members: scopeMembers,
         businesses: scopeBusinesses,
         otherIncome: scopeOtherIncome,
-        rentalTaxDeduction,
       },
       lens.currentFY,
       assumptions.householdSplitPercent ?? 50,
@@ -529,19 +528,20 @@ export function derive(
       annualIncome.businessShare +
       annualIncome.otherTaxable -
       rentalTaxDeduction; // §24a/§24b/municipal-tax/§71 collapse rent to taxable HP — cash stays full (#29/#32)
-    const householdRegime = perAssesseeTax.marginalAssessee?.regime ?? "NEW";
-    const householdTaxRecommendation = recommendRegime({
-      grossIncome: pooledTaxGross,
-      fy: lens.currentFY,
-      deductions: estimatedDeductionsForOld,
-      employerNpsByMember,
-      taxpayerAge: anchorAge,
-    });
-    // The regime the household actually FILES under is per-assessee; report the largest earner's
-    // pick (falling back to the pooled recommendation only when there is no earner at all).
-    householdTaxRecommendation.recommended = perAssesseeTax.marginalAssessee
-      ? householdRegime
-      : householdTaxRecommendation.recommended;
+    // #87 round 1: the Old/New comparison is per person too — `oldTax`/`newTax` are what the
+    // household would pay if EVERY adult filed under that regime, each on their own return. The
+    // reported regime is the LARGEST assessee's pick (the bracket a marginal household rupee lands
+    // in); the household actually pays `annualTax` (each adult's own cheaper regime), which can be
+    // below both sums when the adults pick different regimes.
+    const oldTaxSum = perAssesseeTax.perAssessee.reduce((s, a) => s + a.oldTax, 0);
+    const newTaxSum = perAssesseeTax.perAssessee.reduce((s, a) => s + a.newTax, 0);
+    const householdTaxRecommendation = {
+      recommended:
+        perAssesseeTax.marginalAssessee?.regime ?? (oldTaxSum <= newTaxSum ? "OLD" : "NEW"),
+      oldTax: oldTaxSum,
+      newTax: newTaxSum,
+      savings: Math.abs(oldTaxSum - newTaxSum),
+    } as { recommended: "OLD" | "NEW"; oldTax: number; newTax: number; savings: number };
     const summedTaxableIncome = perAssesseeTax.perAssessee.reduce((s, a) => s + a.taxableIncome, 0);
     const fyTax = {
       grossIncome: pooledTaxGross,

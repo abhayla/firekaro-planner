@@ -948,13 +948,14 @@ describe("gh #218 — the cash figure is net of PF, and savings did not move", (
   //   sharmas  tax 11,65,840 -> 7,16,560  (-4,49,280) => savings 19,27,164 -> 23,76,444 (+4,49,280)
   //   iyers    tax  8,81,400 -> 6,31,800  (-2,49,600) => savings 14,75,608 -> 17,25,208 (+2,49,600)
   //   mehtas   tax 19,99,140 -> 13,57,200 (-6,41,940) => savings 27,65,864 -> 34,07,804 (+6,41,940)
-  //   mauryas  SINGLE-EARNER: tax and savings BYTE-IDENTICAL (one assessee = one computeTax).
-  // The mauryas row is the no-op guarantee: a single-earner household must not move at all.
+  //   mauryas  RE-RECORDED at #87 round 1: tax 10,44,014 -> 10,14,187 (-29,827) => savings
+  //            15,10,982 -> 15,40,809 (+29,827). Madhu (non-earning) co-owns the Joint rental + FD;
+  //            her half is now taxed on HER return (below the exemption) instead of Abhay's 30% slab.
   const SAVINGS_BASELINE: Record<string, { annualSavings: number; monthlyContribution: number }> = {
     sharmas: { annualSavings: 2_376_444, monthlyContribution: 198_037 },
     iyers: { annualSavings: 1_725_208, monthlyContribution: 143_767 },
     mehtas: { annualSavings: 3_407_804, monthlyContribution: 283_984 },
-    mauryas: { annualSavings: 1_510_982, monthlyContribution: 125_915 },
+    mauryas: { annualSavings: 1_540_809, monthlyContribution: 128_401 },
   };
 
   for (const persona of PERSONAS) {

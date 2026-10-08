@@ -226,41 +226,42 @@ const totalExempt = computed(() =>
  * so this page's total, its per-earner cards and the dashboard headline are one number.
  */
 const perAssessee = computed(() =>
-  perAssesseeHouseholdTax(
-    scopedHousehold.value,
-    {
-      earners: household.earners,
-      businesses: scopedHousehold.value.businesses,
-      otherIncome: scopedHousehold.value.otherIncome,
-      rentalTaxDeduction: rentalTaxDeduction.value,
-    },
-    selectedFY.value,
-    assumptions.values.householdSplitPercent ?? 50,
-    new Date(),
-  ),
+  // #87 round 1 — RENDER the kernel's own per-assessee result (same pinned asOfDate, same member
+  // lens, same attribution), never a second derivation with its own clock and earner list. Only a
+  // forward FY picked on this page (the kernel always runs the current FY) re-runs the SAME helper
+  // with the kernel's own inputs at that FY.
+  selectedFY.value === ui.currentFY
+    ? fire.perAssesseeTax.value
+    : perAssesseeHouseholdTax(
+        household.data,
+        {
+          members: fire.lensedMembers.value,
+          businesses: fire.lensedBusinesses.value,
+          otherIncome: fire.lensedOtherIncome.value,
+        },
+        selectedFY.value,
+        assumptions.values.householdSplitPercent ?? 50,
+        new Date(todayIsoLocal()),
+      ),
 );
 
 /**
- * The household's tax under a FORCED regime, still assessee by assessee: each adult's own income
- * and own deductions run through the named regime, then summed. This is what the Old-vs-New
- * comparison must compare — forcing the whole household through one pooled return would answer a
- * question about a filer that does not exist.
+ * The household's tax with each adult's regime chosen by `pick`: "AUTO" = each adult's OWN cheaper
+ * regime (what the household actually pays — the headline, equal to the kernel's `annualTax`);
+ * "OLD"/"NEW" = every adult forced through that regime, still assessee by assessee, for the
+ * comparison. Forcing the whole household through one pooled return would answer a question about
+ * a filer that does not exist.
  */
-function householdTaxUnderRegime(regime: "OLD" | "NEW") {
+function householdTaxUnderRegime(pick: "AUTO" | "OLD" | "NEW") {
   const rows = perAssessee.value.perAssessee.map((a) =>
     computeTax({
       grossIncome: a.grossIncome,
-      regime,
+      regime: pick === "AUTO" ? a.regime : pick,
       fy: selectedFY.value,
       deductions: a.deductions,
-      employerNpsByMember: deductionsForMember(
-        scopedHousehold.value,
-        a.memberId,
-        assumptions.values.householdSplitPercent ?? 50,
-        { asOfDate: todayIsoLocal() },
-      ).employerNpsByMember,
+      employerNpsByMember: a.employerNpsByMember,
       taxpayerAge: a.age,
-      isSalaried: (household.earners.find((m) => m.id === a.memberId)?.salary?.annualCTC ?? 0) > 0,
+      isSalaried: a.isSalaried,
     }),
   );
   const totalTax = rows.reduce((t, r) => t + r.totalTax, 0);
@@ -283,7 +284,12 @@ function householdTaxUnderRegime(regime: "OLD" | "NEW") {
 
 const oldResult = computed(() => householdTaxUnderRegime("OLD"));
 const newResult = computed(() => householdTaxUnderRegime("NEW"));
-const activeResult = computed(() => (effectiveRegime.value === "OLD" ? oldResult.value : newResult.value));
+// #87 round 1 — AUTO's headline is the sum of each adult's OWN cheaper regime (= kernel
+// `annualTax`), never min(all-Old, all-New): two adults can each be cheaper under different regimes.
+const autoResult = computed(() => householdTaxUnderRegime("AUTO"));
+const activeResult = computed(() =>
+  mode.value === "AUTO" ? autoResult.value : mode.value === "OLD" ? oldResult.value : newResult.value,
+);
 const savings = computed(() => Math.abs(oldResult.value.totalTax - newResult.value.totalTax));
 
 // The cheaper regime per the displayed Old/New comparison. This supersedes
@@ -350,7 +356,15 @@ const monthlyTakeHome = computed(() => {
  * for a household with business or rental income. `Σ row.tax === kernel annualTax` is spec-locked.
  */
 const perEarner = computed(() =>
-  household.earners.map((m) => {
+  // #87 round 1 — every adult who FILES gets a card (an adult with only rent/interest income files
+  // too), so the card sum equals the headline; earners keep their card even at ₹0.
+  household.data.members
+    .filter(
+      (m) =>
+        household.earners.some((e) => e.id === m.id) ||
+        perAssessee.value.perAssessee.some((a) => a.memberId === m.id),
+    )
+    .map((m) => {
     // #204: own-owned (100%) + Joint-owned (× householdSplitPercent) — the SAME shared
     // `deductionsForMember` builder the headline path (`individual-fire.ts`) and the salary-form
     // preview (`previewEarnerTakeHome`) use, so a Joint PPF/ELSS/NPS or shared home loan is no
