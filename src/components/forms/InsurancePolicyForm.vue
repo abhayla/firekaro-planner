@@ -9,9 +9,13 @@ import type { InsuranceType, InsurancePolicy } from "@/types/household";
 import EmptyState from "@/components/shared/EmptyState.vue";
 import PanelCard from "@/components/shared/PanelCard.vue";
 import EntityRow from "@/components/shared/EntityRow.vue";
+import { useInlineAddForm } from "@/composables/useInlineAddForm";
 
 const household = useHouseholdStore();
 const fire = useFireDerive();
+// #69 — clears stale Vuetify validation errors on the touched add fields after a successful
+// add resets the draft (see useInlineAddForm.ts for the mechanism).
+const { addForm, resetAfterAdd } = useInlineAddForm();
 
 // gh #66: the "Your policies" DISPLAY list is member-lensed (selected member + "Joint"); equals
 // household.data.insurance on the default "Whole household" view and in the onboarding wizard.
@@ -82,6 +86,7 @@ function addPolicy() {
     insuredPersonId: draft.value.insuredPersonId,
     premiumPer: "yearly",
   };
+  resetAfterAdd();
 }
 
 function adequacyFor(policy: InsurancePolicy) {
@@ -130,6 +135,7 @@ function saveEdit() {
 <template>
   <div>
     <PanelCard title="Add a policy" icon="mdi-shield-plus-outline" icon-color="primary" class="mb-4">
+      <v-form ref="addForm">
       <v-row dense align="center">
         <v-col cols="12" md="2">
           <v-select
@@ -185,6 +191,7 @@ function saveEdit() {
           </v-btn>
         </v-col>
       </v-row>
+      </v-form>
     </PanelCard>
 
     <template v-if="lensedInsurance.length">

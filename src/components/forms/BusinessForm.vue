@@ -5,8 +5,12 @@ import { formatINRCompact } from "@/lib/formatters";
 import type { Business, BusinessLegalKind, Period } from "@/types/household";
 import EmptyState from "@/components/shared/EmptyState.vue";
 import { BUSINESS_LEGAL_KINDS as LEGAL_KINDS, labelForLegalKind } from "@/lib/business-legal-kinds";
+import { useInlineAddForm } from "@/composables/useInlineAddForm";
 
 const household = useHouseholdStore();
+// #69 — clears stale Vuetify validation errors on the touched add fields after a successful
+// add resets the draft (see useInlineAddForm.ts for the mechanism).
+const { addForm, resetAfterAdd } = useInlineAddForm();
 
 const earnerOptions = computed(() =>
   household.adults.map((m) => ({ value: m.id, label: m.name || "Earner" })),
@@ -64,6 +68,7 @@ function addBusiness() {
     ownerId: bizDraft.value.ownerId,
     isOperated: true,
   };
+  resetAfterAdd();
 }
 
 // Q3 (v3): group businesses for the list view — Active (isOperated: true, generating profit)
@@ -107,6 +112,7 @@ function saveEdit() {
       to register a passive entity (HUF/family-LLP) used only as a label for other income.
     </div>
     <v-card variant="outlined" class="pa-3 mb-2">
+      <v-form ref="addForm">
       <v-row dense align="center">
         <v-col cols="12" md="3">
           <v-text-field v-model="bizDraft.name" label="Business name *" density="compact" :rules="nameRules" />
@@ -163,6 +169,7 @@ function saveEdit() {
           />
         </v-col>
       </v-row>
+      </v-form>
     </v-card>
 
     <div v-if="activeBusinesses.length" class="mt-3">

@@ -11,8 +11,12 @@ import EmptyState from "@/components/shared/EmptyState.vue";
 import PanelCard from "@/components/shared/PanelCard.vue";
 import EntityRow from "@/components/shared/EntityRow.vue";
 import ExpenseOwnerSelect from "@/components/expenses/ExpenseOwnerSelect.vue";
+import { useInlineAddForm } from "@/composables/useInlineAddForm";
 
 const household = useHouseholdStore();
+// #69 — clears stale Vuetify validation errors on the touched add fields after a successful
+// add resets the draft (see useInlineAddForm.ts for the mechanism).
+const { addForm, resetAfterAdd } = useInlineAddForm();
 const assumptions = useAssumptionsStore();
 // #81 Phase 1 — the displayed list is the KERNEL's member-lensed planned set (single source
 // of the lens; household total unchanged). Selected adult → own + shared Household; else all.
@@ -104,6 +108,7 @@ function addPlanned() {
     inflationBucket: "general",
     ownerId: EXPENSE_OWNER_HOUSEHOLD,
   };
+  resetAfterAdd();
 }
 
 // Q4 (v3) — pencil-edit dialog pattern.
@@ -137,6 +142,7 @@ function saveEdit() {
 <template>
   <div>
     <PanelCard title="Add a planned expense" icon="mdi-calendar-plus" icon-color="primary" class="mb-4">
+      <v-form ref="addForm">
       <v-row dense align="center">
         <v-col cols="12" md="3">
           <v-text-field v-model="plannedDraft.label" label="Label *" density="compact" :rules="labelRules" />
@@ -184,6 +190,7 @@ function saveEdit() {
         ~{{ formatINRCompact(inflatedAt(plannedDraft.todayAmount, plannedDraft.targetYear)) }}
         in {{ plannedDraft.targetYear }} at {{ Math.round(assumptions.values.inflation * 100) }}% inflation.
       </div>
+      </v-form>
     </PanelCard>
 
     <template v-if="visiblePlanned.length">
