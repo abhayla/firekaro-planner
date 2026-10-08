@@ -18,13 +18,13 @@ import { useAssumptionsStore } from "@/stores/assumptions";
 import { useUiStore } from "@/stores/ui";
 import { loadSeedPersona } from "@/lib/seed-persona";
 import { derive } from "@/lib/derive";
+import { useFireDerive } from "@/lib/useFireDerive";
 import {
   computeHousePropertyTax,
-  deriveDeductions,
   SEC_24A_DEDUCTION_RATE,
   SEC_71_HP_LOSS_SETOFF_CAP,
 } from "@/lib/tax-deductions";
-import { computeTax, recommendRegime } from "@/lib/tax";
+import { computeTax } from "@/lib/tax";
 import { toAnnual } from "@/lib/cashflow";
 import type { OtherIncomeLine } from "@/types/household";
 
@@ -120,39 +120,45 @@ describe("cross-screen annual-tax coherence (gh-issue #65)", () => {
         0,
       );
 
-    // The #65 fix: the page MUST collapse rent to taxable house-property income
-    // (the SAME shared helper derive uses) before computeTax.
-    const { rentalTaxDeduction } = computeHousePropertyTax(h.data.otherIncome);
-    const pageTaxBase = grossTaxable - rentalTaxDeduction;
-
-    const ded = deriveDeductions(h.data);
+    // #87 — the page no longer runs ONE pooled computeTax: at the current FY it renders
+    // useFireDerive().perAssesseeTax (each adult's own return) and its AUTO headline re-runs
+    // computeTax per assessee with that adult's own regime (Index.vue householdTaxUnderRegime).
+    // Replicate EXACTLY that page path, so this stays a page-vs-kernel lock.
+    const fire = useFireDerive();
     const fy = ui.currentFY;
-    const rec = recommendRegime({
-      grossIncome: pageTaxBase,
-      fy,
-      deductions: ded.totalDeductions,
-      employerNpsByMember: ded.employerNpsByMember,
-    });
-    const pageTax = computeTax({
-      grossIncome: pageTaxBase,
-      regime: rec.recommended,
-      fy,
-      deductions: ded.totalDeductions,
-      employerNpsByMember: ded.employerNpsByMember,
-    }).totalTax;
+    const assessees = fire.perAssesseeTax.value.perAssessee;
+    const pageTaxFor = (bumpLargestBy: number) => {
+      const largest = assessees.reduce((b, x) => (x.grossIncome > b.grossIncome ? x : b));
+      return assessees.reduce(
+        (t, x) =>
+          t +
+          computeTax({
+            grossIncome: x.grossIncome + (x === largest ? bumpLargestBy : 0),
+            regime: x.regime,
+            fy,
+            deductions: x.deductions,
+            employerNpsByMember: x.employerNpsByMember,
+            taxpayerAge: x.age,
+            isSalaried: x.isSalaried,
+          }).totalTax,
+        0,
+      );
+    };
+    const pageTax = pageTaxFor(0);
 
-    // Coherence invariant: same household + FY + regime ⇒ identical annual tax on
-    // both screens. (Before the fix, the page over-stated tax by ~₹56k for Sharmas.)
+    // Coherence invariant: same household + FY ⇒ identical annual tax on both screens.
+    // (#65: before the §24a fix, the page over-stated tax by ~₹56k for Sharmas.)
     expect(pageTax).toBe(k.householdAnnualTax);
 
-    // Guard against a no-op "fix": the §24a collapse genuinely lowers the bill.
-    const taxOnGrossRent = computeTax({
-      grossIncome: grossTaxable, // the OLD buggy base (full gross rent, no §24a)
-      regime: rec.recommended,
-      fy,
-      deductions: ded.totalDeductions,
-      employerNpsByMember: ded.employerNpsByMember,
-    }).totalTax;
+    // The #65 fix: the page's tax base nets §24a — the per-assessee gross incomes sum to the
+    // household's cash gross MINUS the shared helper's rental collapse, not the full gross rent.
+    const { rentalTaxDeduction } = computeHousePropertyTax(h.data.otherIncome);
+    expect(rentalTaxDeduction).toBeGreaterThan(0);
+    const pageTaxBase = assessees.reduce((s, x) => s + x.grossIncome, 0);
+    expect(pageTaxBase).toBe(grossTaxable - rentalTaxDeduction);
+
+    // Guard against a no-op "fix": taxing the full gross rent (the OLD buggy base) costs more.
+    const taxOnGrossRent = pageTaxFor(grossTaxable - pageTaxBase);
     expect(taxOnGrossRent).toBeGreaterThan(pageTax);
   });
 });

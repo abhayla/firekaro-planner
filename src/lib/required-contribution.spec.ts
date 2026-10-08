@@ -548,25 +548,28 @@ describe("required-contribution — living floor, scopeSplit, and binary-search 
   it("committedMonthly filters to ONLY auto-loan/auto-insurance — an equally-large MANUAL recurring line does NOT tighten the living floor the same way (kills the `.filter(() => true)` / `.filter(() => false)` / `&&` ArrowFunction+LogicalOperator mutants at l.346)", () => {
     // Both a manual and an auto-loan line of the SAME amount raise overall household expenses
     // identically (they're both real outgoings) — the discriminator is specifically the
-    // COMMITTED-outflow living floor, which only auto-loan/auto-insurance feed. At ₹2L/month this
+    // COMMITTED-outflow living floor, which only auto-loan/auto-insurance feed. At ₹2.5L/month this
     // manual line still leaves a reachable target-60 prescription, while the SAME amount tagged
     // auto-loan pushes `committedMonthly` above the feasible ceiling `hi` and the household can no
     // longer be prescribed a number at all (verified against the real kernel, not asserted from
     // memory). A `.filter(() => true)` mutant would apply this to manual too (no divergence); a
     // `.filter(() => false)` mutant would make the auto-loan row invisible too (no divergence
     // either) — only the correct filter produces exactly this asymmetry.
+    // #87: per-assessee tax raised Sharmas' take-home, so the old ₹2L line no longer crossed the
+    // ceiling (auto-loan stayed solvable at ₹1,48,949). Measured window where the asymmetry holds
+    // at target 60: ₹2.25L–₹2.75L; ₹2.5L sits in the middle of it.
     const h = useHouseholdStore();
     const a = useAssumptionsStore();
     loadSeedPersona(h, a);
 
     h.data.expenses.recurring = [
-      { id: "r1", label: "Discretionary spend", amount: 200_000, frequency: "M", source: "manual" },
+      { id: "r1", label: "Discretionary spend", amount: 250_000, frequency: "M", source: "manual" },
     ];
     const withManual = requiredMonthlyContributionFor({ snapshot: h.data, assumptions: a.values, lens: LENS, targetAge: 60 });
     expect(Number.isFinite(withManual.requiredMonthlyReal), "manual line must still leave a solvable prescription").toBe(true);
 
     h.data.expenses.recurring = [
-      { id: "r2", label: "Home loan EMI", amount: 200_000, frequency: "M", source: "auto-loan" },
+      { id: "r2", label: "Home loan EMI", amount: 250_000, frequency: "M", source: "auto-loan" },
     ];
     const withAutoLoan = requiredMonthlyContributionFor({ snapshot: h.data, assumptions: a.values, lens: LENS, targetAge: 60 });
     expect(
