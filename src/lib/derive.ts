@@ -34,7 +34,7 @@ import {
   type TargetSchedule,
 } from "@/lib/fire-math";
 import { derivedFamilyLayer, plannedGoalInflationBucket } from "@/lib/derived-records";
-import { computeTax, recommendRegime, marginalSlabRate, getTaxConfigForFY } from "@/lib/tax";
+import { marginalSlabRate, getTaxConfigForFY } from "@/lib/tax";
 import { epfBucketAfterTaxReturn } from "@/lib/epf-vpf";
 import { netCashSalary, pfFromRows, PROFESSIONAL_TAX_ANNUAL_PER_EARNER } from "@/lib/salary-cash";
 import { ageFromDOB } from "@/lib/age";
@@ -481,11 +481,6 @@ export function derive(
       insurance: scopeInsurance,
     }, { asOfDate: todayIsoLocal(pinnedAsOf) });
     const estimatedDeductionsForOld = scopeDeductions.totalDeductions;
-    // 80CCD(2) employer NPS — applies in both regimes, passed separately (gh-issue #2);
-    // employerNpsByMember lets computeTax cap each member at their own basic's ceiling
-    // (gh-issue #4), more correct than the aggregate scalars for a multi-earner household.
-    const employerNpsByMember = scopeDeductions.employerNpsByMember;
-
     // ===== #87 — the household's tax is the SUM of each earning adult's OWN tax =====
     //
     // India taxes each adult SEPARATELY. This block used to run ONE `recommendRegime` +

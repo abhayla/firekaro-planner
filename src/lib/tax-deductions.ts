@@ -29,7 +29,7 @@ import { isEarningMember } from "@/lib/member-earning";
 import { ageAsOf, todayIsoLocal } from "@/lib/as-of-date";
 import { netCashSalary, pfFromRows, PROFESSIONAL_TAX_ANNUAL_PER_EARNER } from "@/lib/salary-cash";
 import { toAnnual } from "@/lib/cashflow";
-import { computeTax, recommendRegime, singleEarnerNpsArgs } from "@/lib/tax";
+import { computeTax, singleEarnerNpsArgs } from "@/lib/tax";
 
 // ---------- Statutory limits (audit-grounded, FY 2025-26 onward) ----------
 // These are STATUTORY FACTS per R1.4 — they appear read-only on /preferences
