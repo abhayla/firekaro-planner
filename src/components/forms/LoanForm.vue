@@ -10,10 +10,14 @@ import type { LoanType, Liability } from "@/types/household";
 import EmptyState from "@/components/shared/EmptyState.vue";
 import PanelCard from "@/components/shared/PanelCard.vue";
 import EntityRow from "@/components/shared/EntityRow.vue";
+import { useInlineAddForm } from "@/composables/useInlineAddForm";
 
 const household = useHouseholdStore();
 const fire = useFireDerive();
 const ui = useUiStore();
+// #69 — clears stale Vuetify validation errors on the touched add fields after a successful
+// add resets the draft (see useInlineAddForm.ts for the mechanism).
+const { addForm, resetAfterAdd } = useInlineAddForm();
 // #176 round 2: BOTH startYear and startMonth are now REQUIRED on derivedEndYear() — pin startYear
 // to the SAME year the kernel resolves from `lens.currentFY` (never the wall clock), and startMonth
 // to April (the FY's own start month). This form has NO field for "which month did you take out
@@ -141,6 +145,7 @@ function addLoan() {
     isSharedWithSpouse: false,
     coBorrowers: [],
   };
+  resetAfterAdd();
 }
 
 function typeLabelFor(t: LoanType): string {
@@ -190,6 +195,7 @@ function saveEdit() {
 <template>
   <div>
     <PanelCard title="Add a loan" icon="mdi-bank-plus" icon-color="primary" class="mb-4">
+      <v-form ref="addForm">
       <v-row dense align="center">
         <v-col cols="12" md="3">
           <v-text-field v-model="draft.name" label="Loan name *" density="compact" placeholder="SBI Home Loan" :rules="nameRules" />
@@ -255,6 +261,7 @@ function saveEdit() {
       <v-alert v-if="helperForType" type="warning" density="compact" variant="tonal" class="mt-2">
         {{ helperForType }}
       </v-alert>
+      </v-form>
     </PanelCard>
 
     <template v-if="lensedLiabilities.length">

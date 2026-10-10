@@ -13,8 +13,12 @@ import { expenseOwnerLabel, EXPENSE_OWNER_HOUSEHOLD } from "@/lib/expense-attrib
 import PanelCard from "@/components/shared/PanelCard.vue";
 import EntityRow from "@/components/shared/EntityRow.vue";
 import ExpenseOwnerSelect from "@/components/expenses/ExpenseOwnerSelect.vue";
+import { useInlineAddForm } from "@/composables/useInlineAddForm";
 
 const household = useHouseholdStore();
+// #69 — clears stale Vuetify validation errors on the touched add fields after a successful
+// add resets the draft (see useInlineAddForm.ts for the mechanism).
+const { addForm, resetAfterAdd } = useInlineAddForm();
 // #81 Phase 1 — the displayed list is the KERNEL's member-lensed set (single source of the
 // lens; no re-derivation here). A selected adult sees own + shared "Household"; consolidated =
 // all. The household total is unchanged — this only filters what's shown.
@@ -89,6 +93,7 @@ function addRecurring() {
     inflationBucket: "general",
     ownerId: EXPENSE_OWNER_HOUSEHOLD,
   };
+  resetAfterAdd();
 }
 
 // Q5 (v3) — reactive validation. Add disabled until label + positive amount.
@@ -139,6 +144,7 @@ function saveEdit() {
 <template>
   <div>
     <PanelCard title="Add a recurring expense" icon="mdi-calendar-sync-outline" icon-color="warning" class="mb-4">
+      <v-form ref="addForm">
       <v-row dense align="center">
         <v-col cols="12" md="3">
           <v-text-field v-model="recurringDraft.label" label="Label *" density="compact" :rules="labelRules" />
@@ -183,6 +189,7 @@ function saveEdit() {
           <ExpenseOwnerSelect v-model="recurringDraft.ownerId" />
         </v-col>
       </v-row>
+      </v-form>
     </PanelCard>
 
     <template v-if="manualRecurring.length">
