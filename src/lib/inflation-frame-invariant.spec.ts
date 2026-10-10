@@ -83,7 +83,20 @@ const PRE_ADR_0006 = {
  * appearing there would mean the kernel had started inventing one again.
  */
 const LIVE_DEFAULTS_REQUIRED_MONTHLY = {
-  sharmas: Number.POSITIVE_INFINITY,
+  // RE-RECORDED 2026-09-29 at gh #87 (per-assessee household tax): Infinity -> 268,414. The
+  // Sharmas' plan became REACHABLE at their stored target age. The move is DOWNWARD (the
+  // optimistic direction), so the term is named and re-derived rather than merely re-recorded:
+  //
+  //   The ONLY changed term is the household's annual income tax. `derive()` used to run ONE
+  //   `computeTax` over the POOLED household income - a single-filer model. India taxes each
+  //   adult separately, so pooling pushed Priya's entire income through Rohit's marginal slabs
+  //   and granted the household ONE basic exemption / standard deduction / 87A rebate instead of
+  //   two. Measured on this seed: pooled tax 11,65,840 vs the truth (Rohit 5,48,496 + Priya
+  //   1,68,064) 7,16,560 - the old model charged this household 4,49,280/yr of tax it does not
+  //   owe. That phantom tax came straight out of `annualSavings` (19,27,164 -> 23,76,444), which
+  //   is why the solver previously could not reach the target at all. The new figure is not the
+  //   kernel inventing reachability - it is the kernel no longer inventing a tax bill.
+  sharmas: 268_414,
   mehtas: Number.POSITIVE_INFINITY,
   // RE-RECORDED at ADR-0006 Phase 1c: 146,273 → 158,421 (+8.3%, just outside the ±8% band).
   // The move is UPWARD — the conservative direction — and the cause is named: the healthcare
