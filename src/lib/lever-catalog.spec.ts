@@ -279,13 +279,18 @@ describe("QN-5 plan levers — buildPlanLevers / evaluatePlanLevers (Sharmas, re
   function ctxFor(snapshot: Household, assumptions: Assumptions, memberLens = false): PlanLeverContext {
     return { anchorAge: derive(snapshot, assumptions, LENS).anchorAge, directPlans: null, memberLens, currentYear: YEAR };
   }
-  /** First target age (from 50) at which today's plan is reachable — the levers need a finite baseline. */
+  /**
+   * Earliest target age at which today's plan is reachable AND still leaves something to find —
+   * the levers need a finite baseline with a real gap to close. #87: per-assessee tax made Sharmas
+   * FIRE-ready at 50.08, so age 50 left NOTHING to find and every lever reported 0; searching
+   * upward from 50 then tested nothing. Search from 40 and require toFind > 0.
+   */
   function reachableTargetAge(snapshot: Household, assumptions: Assumptions): number {
-    for (let age = 50; age <= 65; age++) {
+    for (let age = 40; age <= 65; age++) {
       const r = planToFind({ snapshot, assumptions, targetAge: age, extraSegments: [] }, LENS);
-      if (Number.isFinite(r.toFind)) return age;
+      if (Number.isFinite(r.toFind) && r.toFind > REQUIRED_CONTRIBUTION_TOLERANCE) return age;
     }
-    throw new Error("Sharmas never reachable between 50 and 65 — fixture drifted");
+    throw new Error("Sharmas has no reachable target with a gap between 40 and 65 — fixture drifted");
   }
 
   it("emits exactly the seven catalog levers, in catalog order, every one with label + note", () => {

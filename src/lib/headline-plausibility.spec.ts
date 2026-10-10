@@ -938,10 +938,24 @@ describe("gh #218 — the cash figure is net of PF, and savings did not move", (
   // The savings baselines below are the values MEASURED before the #218 change (default lens,
   // pinned FY) — they are asserted with `toBe` precisely so a future edit that nets PF off the
   // savings side trips here instead of silently moving every EPF household's FIRE date.
+  //
+  // RE-RECORDED 2026-09-29 at gh #87 (per-assessee household tax). The #218 lock's POINT is
+  // unchanged and still enforced: PF must not be netted off the savings side. What moved is the
+  // TAX term feeding `annualSavings = income - tax - expenses`. `derive()` used to run ONE
+  // `computeTax` over POOLED household income (a single-filer model); India taxes each adult
+  // separately, so the pooled model charged every DUAL-EARNER household a phantom tax bill.
+  // Removing it RAISES savings by exactly the tax delta, to the rupee:
+  //   sharmas  tax 11,65,840 -> 7,16,560  (-4,49,280) => savings 19,27,164 -> 23,76,444 (+4,49,280)
+  //   iyers    tax  8,81,400 -> 6,31,800  (-2,49,600) => savings 14,75,608 -> 17,25,208 (+2,49,600)
+  //   mehtas   tax 19,99,140 -> 13,57,200 (-6,41,940) => savings 27,65,864 -> 34,07,804 (+6,41,940)
+  //   mauryas  RE-RECORDED at #87 round 1: tax 10,44,014 -> 10,14,187 (-29,827) => savings
+  //            15,10,982 -> 15,40,809 (+29,827). Madhu (non-earning) co-owns the Joint rental + FD;
+  //            her half is now taxed on HER return (below the exemption) instead of Abhay's 30% slab.
   const SAVINGS_BASELINE: Record<string, { annualSavings: number; monthlyContribution: number }> = {
-    sharmas: { annualSavings: 1_927_164, monthlyContribution: 160_597 },
-    iyers: { annualSavings: 1_475_608, monthlyContribution: 122_967 },
-    mehtas: { annualSavings: 2_765_864, monthlyContribution: 230_489 },
+    sharmas: { annualSavings: 2_376_444, monthlyContribution: 198_037 },
+    iyers: { annualSavings: 1_725_208, monthlyContribution: 143_767 },
+    mehtas: { annualSavings: 3_407_804, monthlyContribution: 283_984 },
+    // #87 round 3: Madhu's Joint share is clubbed to Abhay (§64(1)(iv)) — tax +₹29,827, savings −₹29,827.
     mauryas: { annualSavings: 1_510_982, monthlyContribution: 125_915 },
   };
 

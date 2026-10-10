@@ -518,6 +518,9 @@ export function useFireDerive() {
     progressPercent: computed(() => d.value.progressPercent),
     fyTax: computed(() => d.value.fyTax),
     householdTaxRecommendation: computed(() => d.value.householdTaxRecommendation),
+    // #87 round 1 — the per-assessee returns behind `annualTax`, so /tax-planning renders the
+    // kernel's figure (same pinned asOfDate, same member lens) instead of re-deriving it.
+    perAssesseeTax: computed(() => d.value.perAssesseeTax),
     // Preserved as a function for the original call-site API (NudgeStack).
     estimatedDeductionsForOld: () => d.value.estimatedDeductionsForOld,
     totalCorpus: computed(() => d.value.totalCorpus),

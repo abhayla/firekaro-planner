@@ -5,7 +5,7 @@ import { useFireDerive } from "@/lib/useFireDerive";
 import { useUiStore } from "@/stores/ui";
 import { useAssumptionsStore } from "@/stores/assumptions";
 import { todayIsoLocal } from "@/lib/as-of-date";
-import { computeTax, npsCeilingFor, AVAILABLE_FYS, getTaxConfigForFY } from "@/lib/tax";
+import { npsCeilingFor, AVAILABLE_FYS, getTaxConfigForFY } from "@/lib/tax";
 import { getCurrentFinancialYear } from "@/lib/expense-history";
 import { toAnnual } from "@/lib/cashflow";
 import {
@@ -17,7 +17,6 @@ import { formatINRCompact, formatPercent, formatINR } from "@/lib/formatters";
 import {
   deriveDeductions,
   deductionsForMember,
-  computeHousePropertyTax,
   computeEarnerTaxCard,
   isInMarginalReliefBand,
   marginalReliefMitigations,
@@ -26,7 +25,9 @@ import {
   LIMIT_80D_SELF,
   LIMIT_80D_PARENTS,
   LIMIT_SECTION_24,
+  perAssesseeHouseholdTax,
 } from "@/lib/tax-deductions";
+import { householdTaxUnderRegime } from "@/lib/household-tax-regime";
 import { buildDonutSegments } from "@/lib/donut";
 import LeafPageHeader from "@/components/income-layout/LeafPageHeader.vue";
 import StatDashboard, { type KpiTile } from "@/components/income-layout/StatDashboard.vue";
@@ -166,17 +167,9 @@ const totalTaxable = computed(() =>
   incomeRows.value.filter((r) => r.isTaxable).reduce((s, r) => s + r.amount, 0),
 );
 
-// Let-out rent is taxed on NET house-property income (§24a 30% standard deduction +
-// §24b interest + municipal tax, §71 loss cap), NOT on gross rent. We keep totalTaxable
-// as the CASH-basis figure (drives take-home + the income bars — the landlord receives
-// full rent), and feed this §24a-collapsed base into computeTax. SAME shared helper
-// derive.ts uses, so this screen and the Cash-Flow/FIRE-model tax can never diverge (gh-issue #65).
-const rentalTaxDeduction = computed(
-  () => computeHousePropertyTax(fire.lensedOtherIncome.value).rentalTaxDeduction,
-);
-const taxableIncomeForTax = computed(() =>
-  Math.max(0, totalTaxable.value - rentalTaxDeduction.value),
-);
+// totalTaxable is the CASH-basis figure (take-home + the income bars — the landlord receives full
+// rent). The tax base nets let-out rent per person (§24a/§24b, §71) inside the per-assessee returns
+// below, the same helper derive.ts uses (gh-issue #65, #87).
 
 // Phase 4 Stage J — marginal-relief band detection (audit Entry #13 A13.2-4).
 // The MR band is a NEW-regime 87A rebate-cliff construct, so test it against the actual
@@ -214,24 +207,55 @@ const totalExempt = computed(() =>
   incomeRows.value.filter((r) => !r.isTaxable).reduce((s, r) => s + r.amount, 0),
 );
 
+/**
+ * #87 — THE PER-ASSESSEE RETURNS BEHIND EVERY FIGURE ON THIS SCREEN.
+ *
+ * India taxes each adult separately. This page used to run ONE `computeTax` over the POOLED
+ * household income for its Old/New comparison AND its headline total, while the per-earner table
+ * below ran a SECOND, per-member computation — so the household total and the sum of the cards
+ * could (and for every dual-earner seed did) disagree by lakhs, and the kernel's `annualTax`
+ * agreed with neither. `perAssesseeHouseholdTax` is the SINGLE derivation `derive.ts` now uses,
+ * so this page's total, its per-earner cards and the dashboard headline are one number.
+ */
+const perAssessee = computed(() =>
+  // #87 round 1 — RENDER the kernel's own per-assessee result (same pinned asOfDate, same member
+  // lens, same attribution), never a second derivation with its own clock and earner list. Only a
+  // forward FY picked on this page (the kernel always runs the current FY) re-runs the SAME helper
+  // with the kernel's own inputs at that FY.
+  selectedFY.value === ui.currentFY
+    ? fire.perAssesseeTax.value
+    : perAssesseeHouseholdTax(
+        household.data,
+        {
+          members: fire.lensedMembers.value,
+          businesses: fire.lensedBusinesses.value,
+          otherIncome: fire.lensedOtherIncome.value,
+        },
+        selectedFY.value,
+        assumptions.values.householdSplitPercent ?? 50,
+        new Date(todayIsoLocal()),
+      ),
+);
+
+// #87 round 3 — every figure comes from the ONE exported `householdTaxUnderRegime` (src/lib), the
+// same function the page-vs-kernel lock calls. Forcing OLD/NEW still goes assessee by assessee:
+// one pooled return would answer a question about a filer that does not exist.
 const oldResult = computed(() =>
-  computeTax({
-    grossIncome: taxableIncomeForTax.value,
-    regime: "OLD",
-    fy: selectedFY.value,
-    deductions: derivedDeductions.value.totalDeductions,
-    employerNpsByMember: derivedDeductions.value.employerNpsByMember,
-  }),
+  householdTaxUnderRegime(perAssessee.value.perAssessee, "OLD", selectedFY.value),
 );
 const newResult = computed(() =>
-  computeTax({
-    grossIncome: taxableIncomeForTax.value,
-    regime: "NEW",
-    fy: selectedFY.value,
-    employerNpsByMember: derivedDeductions.value.employerNpsByMember,
-  }),
+  householdTaxUnderRegime(perAssessee.value.perAssessee, "NEW", selectedFY.value),
 );
-const activeResult = computed(() => (effectiveRegime.value === "OLD" ? oldResult.value : newResult.value));
+// #87 round 4 — the headline is ONE direct binding to the kernel helper for the selected mode.
+// AUTO = each adult's OWN cheaper regime (= kernel `annualTax`), never min(all-Old, all-New).
+const activeResult = computed(() =>
+  householdTaxUnderRegime(perAssessee.value.perAssessee, mode.value, selectedFY.value),
+);
+const regimeFootnote = computed(() =>
+  mode.value === "AUTO"
+    ? "Each adult files their own return; each person's tax uses their own cheaper regime."
+    : `Each adult files their own return. Shown under the ${mode.value === "OLD" ? "Old" : "New"} regime for everyone.`,
+);
 const savings = computed(() => Math.abs(oldResult.value.totalTax - newResult.value.totalTax));
 
 // The cheaper regime per the displayed Old/New comparison. This supersedes
@@ -290,8 +314,23 @@ const monthlyTakeHome = computed(() => {
 // per-member attribution the headline computeIndividualFire() path uses
 // (src/lib/individual-fire.ts: deriveDeductions scoped to that member's own investments/
 // liabilities/insurance) — one shared attribution, not a second formula.
+/**
+ * #87 — the cards are now a RENDERING of `perAssessee` above, not a second computation. Each
+ * row's `gross` is that adult's ATTRIBUTED taxable income (own salary + own/Joint-split other
+ * income and business share − their share of the rental collapse), which is what they actually
+ * file on; it used to be salary CTC alone, so the card sum could never equal the household total
+ * for a household with business or rental income. `Σ row.tax === kernel annualTax` is spec-locked.
+ */
 const perEarner = computed(() =>
-  household.earners.map((m) => {
+  // #87 round 1 — every adult who FILES gets a card (an adult with only rent/interest income files
+  // too), so the card sum equals the headline; earners keep their card even at ₹0.
+  household.data.members
+    .filter(
+      (m) =>
+        household.earners.some((e) => e.id === m.id) ||
+        perAssessee.value.perAssessee.some((a) => a.memberId === m.id),
+    )
+    .map((m) => {
     // #204: own-owned (100%) + Joint-owned (× householdSplitPercent) — the SAME shared
     // `deductionsForMember` builder the headline path (`individual-fire.ts`) and the salary-form
     // preview (`previewEarnerTakeHome`) use, so a Joint PPF/ELSS/NPS or shared home loan is no
@@ -302,7 +341,8 @@ const perEarner = computed(() =>
       assumptions.values.householdSplitPercent ?? 50,
       { asOfDate: todayIsoLocal() },
     );
-    return computeEarnerTaxCard(
+    const assessee = perAssessee.value.perAssessee.find((a) => a.memberId === m.id);
+    const card = computeEarnerTaxCard(
       m,
       selectedFY.value,
       earnerDeductions.totalDeductions,
@@ -310,6 +350,28 @@ const perEarner = computed(() =>
       // gh #218 — that earner's OWN PF outflow, read from their EPF_VPF rows.
       pfFromInvestmentRows(scopedHousehold.value, m.id),
     );
+    if (!assessee) return card;
+    // #87 — override the card's salary-only gross/tax with this adult's REAL assessed position,
+    // so the table sums to the household total shown above it. `takeHome` keeps the #218 cash
+    // formula (CTC − PF − tax − professional tax) but on the real tax figure.
+    const pf = pfFromInvestmentRows(scopedHousehold.value, m.id);
+    const ctc = m.salary?.annualCTC ?? 0;
+    // #87 round 3 — a forced Old/New shows this person's tax under THAT regime, so the cards sum
+    // to the headline; "Better regime" stays their own cheaper one.
+    const tax = mode.value === "OLD" ? assessee.oldTax : mode.value === "NEW" ? assessee.newTax : assessee.tax;
+    return {
+      ...card,
+      gross: assessee.grossIncome,
+      tax,
+      rec: assessee.regime,
+      effRate: assessee.grossIncome > 0 ? (tax / assessee.grossIncome) * 100 : 0,
+      takeHome: netCashSalary({
+        annualCTC: ctc,
+        annualPf: pf,
+        annualTax: tax,
+        professionalTax: ctc > 0 ? PROFESSIONAL_TAX_ANNUAL_PER_EARNER : 0,
+      }).annual,
+    };
   }),
 );
 
@@ -608,7 +670,7 @@ const zeroTaxSectionVisible = computed(() => !isZeroTaxRecommended.value || show
           <RankedBars :bars="incomeBars" />
           <v-divider class="my-3" />
           <div class="row-line">
-            <span class="font-weight-bold">Total taxable</span>
+            <span class="font-weight-bold">Total income (before rental relief)</span>
             <span class="text-currency font-weight-bold">{{ formatINRCompact(totalTaxable) }}</span>
           </div>
           <div v-if="totalExempt > 0" class="row-line text-caption text-medium-emphasis mt-1">
@@ -712,7 +774,7 @@ const zeroTaxSectionVisible = computed(() => !isZeroTaxRecommended.value || show
 
     <!-- ───── Per earner (household view only — the whole-household breakdown; the lensed view
              already IS a single member, so this comparison table is hidden then). gh #86. ───── -->
-    <template v-if="!lensActive && household.earners.length >= 2">
+    <template v-if="!lensActive && perEarner.length >= 2">
       <div class="section-eyebrow">Per earner</div>
       <PanelCard>
         <v-table density="comfortable" class="bg-transparent earner-table">
@@ -723,7 +785,7 @@ const zeroTaxSectionVisible = computed(() => !isZeroTaxRecommended.value || show
               <th class="text-right">Tax</th>
               <th class="text-right">Eff. rate</th>
               <th class="text-right">Take-home</th>
-              <th class="text-center">Better regime</th>
+              <th class="text-center">Cheaper regime</th>
             </tr>
           </thead>
           <tbody>
@@ -745,11 +807,24 @@ const zeroTaxSectionVisible = computed(() => !isZeroTaxRecommended.value || show
           </tbody>
         </v-table>
         <div class="text-caption text-medium-emphasis mt-3">
-          Each earner files their own ITR in India. Demo treats the whole-household regime uniformly;
-          production would allow a per-earner override.
+          {{ regimeFootnote }}
         </div>
       </PanelCard>
     </template>
+
+    <!-- #87 round 5: shown whenever income moved, including when only one return remains (Mauryas). -->
+    <div v-if="!lensActive && perAssessee.attributedNonEarners.length > 0" data-testid="attributed-non-earners">
+      <div
+        v-for="a in perAssessee.attributedNonEarners"
+        :key="a.memberId"
+        class="text-caption text-medium-emphasis mt-1"
+      >
+        {{ a.name }}'s income is counted on {{ a.toName }}'s return (no own salary or business).<template
+          v-if="a.droppedHouseLoss > 0"
+        >
+          The {{ formatINRCompact(a.droppedHouseLoss) }} loss on {{ a.name }}'s let-out property is not counted.</template>
+      </div>
+    </div>
 
     <v-alert type="info" variant="tonal" density="compact" class="mt-5">
       This is an estimate — for filing, use your CA / Cleartax. Standard deduction, 80C (EPF + PPF + ELSS + life premium),

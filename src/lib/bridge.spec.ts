@@ -970,7 +970,9 @@ describe("#211 per-seed bounds through the real derive() path", () => {
 
   const EXPECT: Record<string, { propertyLabel: string | null; saleAge: number | null }> = {
     sharmas: { propertyLabel: null, saleAge: null },
-    mehtas: { propertyLabel: "3BHK Bandra Mumbai", saleAge: 54 },
+    // #87: per-assessee household tax (₹19,99,140 → ₹13,57,200) moves the Mehtas golden-master
+    // fireAge 50.83 → 50.08, so the corpus-only retirement age is 50 and the sale lands at 50 + 3.
+    mehtas: { propertyLabel: "3BHK Bandra Mumbai", saleAge: 53 },
     iyers: { propertyLabel: null, saleAge: null },
     mauryas: { propertyLabel: "2BHK (let out)", saleAge: 69 },
     ravi: { propertyLabel: null, saleAge: null },
