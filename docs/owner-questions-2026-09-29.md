@@ -6,8 +6,10 @@
 > - **Item 5 leftover folder: DELETED** 2026-10-08 (0 links inside; main 1,256 tracked files before = after).
 > - **#218 PR B: SHIP AFTER #87** (rebase, re-print seeds, Tier-A review, table in the PR).
 > - **#162 part 2: PARKED** (Δ0 on every seed, twice).
-> - Still open: **deploy window** (asked once #87 lands, with the full pre-deploy brief).
-> - #69 merged (PR #235, `3c23d48`). #87 in fix round 3 (two Tier-A rounds found and fixed: zero-earner ₹0 tax, rental relief to the wrong person, page/kernel drift, five stale fixtures; round 3 = spouse clubbing D-2026-10-08-02 + real coherence/conservation locks).
+> - **Deploy window (ruled 2026-10-10): DEFER, one bundle.** Wait for #239 (deduction caps), #232 (member-lens weights) and #218 PR B to merge, then ONE deploy in the 21:00-23:30 IST window: checksum UPDATEs → `prisma migrate deploy` → smoke. The pre-deploy brief carries the VPS disk %, the release count and a rollback plan.
+> - #69 merged (PR #235, `3c23d48`).
+> - **#87 MERGED 2026-10-10 (PR #237, `c191d74`), not deployed. HEADLINES MOVE EARLIER for dual earners:** tax Sharmas ₹11,65,840 → ₹7,16,560 (FIRE 52.00 → 50.08), Iyers ₹8,81,400 → ₹6,31,800 (56.25 → 54.83), Mehtas ₹19,99,140 → ₹13,57,200 (50.83 → 50.08). Mauryas ₹10,44,014 and Ravi ₹0 unchanged. Why: the app taxed a couple as ONE person on combined income; India taxes each adult separately. Edge rules (your ruling D-2026-10-10-01): a non-earning adult's or minor's income is taxed on the highest earner, and their deductions and rental losses count for no one, so these cases can only be over-taxed, never under-taxed. Six Tier-A review rounds; the last one's own independent calculation matched the code on 5,000 households per regime. Also closes #236 (the New regime no longer lets a rental loss reduce salary).
+> - **Open Tier-0 follow-up #239** (older bugs that also exist on main): standard deduction not capped at salary; shared home-loan interest over-claimed with 3+ adults; ₹2L combined house-property loss cap missing.
 
 
 > ## Morning summary (machine clock; times in this file after ~04:20 are approximate and may read ~2h late)
