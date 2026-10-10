@@ -242,11 +242,15 @@ describe("computeIndividualFire (#81 Phase 2 — standalone per-adult FIRE)", ()
       // instead of 100% on the owner (sharmas rohit 48→43 / priya 47→56, iyers ashwin 47→45 /
       // lakshmi 84→unreachable on ₹8L income, mauryas abhay 56→52); a single adult now carries 100%
       // of the shared pool instead of only `split` of it (ravi 41→89). Mehtas has no loan: unmoved.
-      ["sharmas", loadSeedPersona as never, [["rohit", 43], ["priya", 56]]],
-      ["mehtas", loadMehtasSeed as never, [["vikram", 45], ["aanya", 63]]],
+      // #232 round 1: the member projection now grows INCOME and recomputes the leftover (the
+      // household method) and a non-earner's shortfall is carried by the earner: ravi 89→63 (household
+      // 65; the gap is the family layer + glide path), priya 56→53, aanya 63→61 (income growth on
+      // a large income vs small leftover), abhay 52→55 (now carries madhu's ₹9.6L/yr shortfall).
+      ["sharmas", loadSeedPersona as never, [["rohit", 43], ["priya", 53]]],
+      ["mehtas", loadMehtasSeed as never, [["vikram", 45], ["aanya", 61]]],
       ["iyers", loadIyersSeed as never, [["ashwin", 45], ["lakshmi", null]]],
-      ["mauryas", loadMauryasSeed as never, [["abhay", 52], ["madhu", null]]],
-      ["ravi", loadRaviSeed as never, [["ravi", 89]]],
+      ["mauryas", loadMauryasSeed as never, [["abhay", 55], ["madhu", null]]],
+      ["ravi", loadRaviSeed as never, [["ravi", 63]]],
     ];
     for (const [seed, load, rows] of seeds) {
       setActivePinia(createPinia());

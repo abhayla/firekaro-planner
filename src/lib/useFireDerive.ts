@@ -183,7 +183,9 @@ export function useFireDerive() {
     const annualTax = adult ? adult.attributableAnnualTax : k.householdAnnualTax ?? 0;
     const annualExpenses = adult ? adult.attributableAnnualExpenses : k.annualExpensesToday;
     const annualTakeHome = annualIncome - annualTax;
-    const surplus = Math.max(0, annualTakeHome - annualExpenses);
+    // #232: a member's surplus is their CONSERVED attributable savings (a non-earner's shortfall is
+    // carried by the earner, Σ members == household), never their own leftover floored at 0.
+    const surplus = adult ? adult.attributableAnnualSavings : Math.max(0, annualTakeHome - annualExpenses);
     const adultMember = adult ? h.data.members.find((m) => m.id === adult.memberId) ?? null : null;
     return {
       isMemberView: adult != null,

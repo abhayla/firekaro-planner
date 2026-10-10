@@ -754,10 +754,10 @@ const featuresBySection = computed(() => {
             <!-- #81 Phase 2 — the household split % for the per-adult INDIVIDUAL FIRE view. -->
             <v-col cols="12" md="6">
               <v-text-field
-                label="Household split per adult (%)"
+                label="Household split: first earning adult's share (%)"
                 type="number"
                 :model-value="v.householdSplitPercent"
-                hint="Each adult's share of shared costs/assets in the individual-FIRE view. Default 50 (two-adult 50/50). Does NOT affect the household FIRE number."
+                hint="In the individual-FIRE view the first earning adult carries this % of every shared cost, asset, income and loan; the other adult carries the rest. Default 50. Does NOT affect the household FIRE number."
                 persistent-hint
                 variant="outlined"
                 density="comfortable"
