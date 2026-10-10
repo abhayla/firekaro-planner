@@ -1,7 +1,23 @@
 import { computeTax } from "@/lib/tax";
-import type { AssesseeTax } from "@/lib/tax-deductions";
+import type { AssesseeTax, PerAssesseeHouseholdTax } from "@/lib/tax-deductions";
 
 export type RegimePick = "AUTO" | "OLD" | "NEW";
+
+/** #239: the returns for one view — AUTO's own, or the forced view's (its own clubbing choice). */
+export function assesseesForView(
+  result: Pick<PerAssesseeHouseholdTax, "perAssessee" | "perAssesseeForView">,
+  pick: RegimePick,
+): AssesseeTax[] {
+  return pick === "AUTO" ? result.perAssessee : result.perAssesseeForView[pick];
+}
+
+/** #239: the "counted on <Earner>'s return" footnote for one view — it follows that view's clubbing. */
+export function attributedNonEarnersForView(
+  result: Pick<PerAssesseeHouseholdTax, "attributedNonEarners" | "attributedNonEarnersForView">,
+  pick: RegimePick,
+): PerAssesseeHouseholdTax["attributedNonEarners"] {
+  return pick === "AUTO" ? result.attributedNonEarners : result.attributedNonEarnersForView[pick];
+}
 
 /**
  * #87 round 3 — the household's tax with each adult's regime chosen by `pick`, summed assessee by
@@ -27,8 +43,10 @@ export function householdTaxUnderRegime(
       fy,
       deductions: a.deductions,
       employerNpsByMember: a.employerNpsByMember,
-      taxpayerAge: a.age,
+      taxpayerAge: a.exemptionAge,
       isSalaried: a.isSalaried,
+      salaryIncome: a.salaryIncome,
+      movedInIncome: a.movedInIncome,
     }),
   );
   const sum = (f: (r: (typeof rows)[number]) => number) => rows.reduce((t, r) => t + f(r), 0);

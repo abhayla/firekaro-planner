@@ -27,7 +27,11 @@ import {
   LIMIT_SECTION_24,
   perAssesseeHouseholdTax,
 } from "@/lib/tax-deductions";
-import { householdTaxUnderRegime } from "@/lib/household-tax-regime";
+import {
+  assesseesForView,
+  attributedNonEarnersForView,
+  householdTaxUnderRegime,
+} from "@/lib/household-tax-regime";
 import { buildDonutSegments } from "@/lib/donut";
 import LeafPageHeader from "@/components/income-layout/LeafPageHeader.vue";
 import StatDashboard, { type KpiTile } from "@/components/income-layout/StatDashboard.vue";
@@ -241,16 +245,18 @@ const perAssessee = computed(() =>
 // same function the page-vs-kernel lock calls. Forcing OLD/NEW still goes assessee by assessee:
 // one pooled return would answer a question about a filer that does not exist.
 const oldResult = computed(() =>
-  householdTaxUnderRegime(perAssessee.value.perAssessee, "OLD", selectedFY.value),
+  householdTaxUnderRegime(assesseesForView(perAssessee.value, "OLD"), "OLD", selectedFY.value),
 );
 const newResult = computed(() =>
-  householdTaxUnderRegime(perAssessee.value.perAssessee, "NEW", selectedFY.value),
+  householdTaxUnderRegime(assesseesForView(perAssessee.value, "NEW"), "NEW", selectedFY.value),
 );
 // #87 round 4 — the headline is ONE direct binding to the kernel helper for the selected mode.
 // AUTO = each adult's OWN cheaper regime (= kernel `annualTax`), never min(all-Old, all-New).
 const activeResult = computed(() =>
-  householdTaxUnderRegime(perAssessee.value.perAssessee, mode.value, selectedFY.value),
+  householdTaxUnderRegime(assesseesForView(perAssessee.value, mode.value), mode.value, selectedFY.value),
 );
+// #239: the clubbing footnote follows the SELECTED view (each view picks its own clubbing parent).
+const activeAttributedNonEarners = computed(() => attributedNonEarnersForView(perAssessee.value, mode.value));
 const regimeFootnote = computed(() =>
   mode.value === "AUTO"
     ? "Each adult files their own return; each person's tax uses their own cheaper regime."
@@ -328,7 +334,7 @@ const perEarner = computed(() =>
     .filter(
       (m) =>
         household.earners.some((e) => e.id === m.id) ||
-        perAssessee.value.perAssessee.some((a) => a.memberId === m.id),
+        assesseesForView(perAssessee.value, mode.value).some((a) => a.memberId === m.id),
     )
     .map((m) => {
     // #204: own-owned (100%) + Joint-owned (× householdSplitPercent) — the SAME shared
@@ -341,7 +347,7 @@ const perEarner = computed(() =>
       assumptions.values.householdSplitPercent ?? 50,
       { asOfDate: todayIsoLocal() },
     );
-    const assessee = perAssessee.value.perAssessee.find((a) => a.memberId === m.id);
+    const assessee = assesseesForView(perAssessee.value, mode.value).find((a) => a.memberId === m.id);
     const card = computeEarnerTaxCard(
       m,
       selectedFY.value,
@@ -813,9 +819,9 @@ const zeroTaxSectionVisible = computed(() => !isZeroTaxRecommended.value || show
     </template>
 
     <!-- #87 round 5: shown whenever income moved, including when only one return remains (Mauryas). -->
-    <div v-if="!lensActive && perAssessee.attributedNonEarners.length > 0" data-testid="attributed-non-earners">
+    <div v-if="!lensActive && activeAttributedNonEarners.length > 0" data-testid="attributed-non-earners">
       <div
-        v-for="a in perAssessee.attributedNonEarners"
+        v-for="a in activeAttributedNonEarners"
         :key="a.memberId"
         class="text-caption text-medium-emphasis mt-1"
       >

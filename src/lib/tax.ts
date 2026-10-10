@@ -419,6 +419,13 @@ export interface ComputeTaxArgs {
   // regime; "private"/omitted gets 10% OLD). gh-issue #4.
   employerNpsByMember?: { nps: number; basic: number; sector?: "private" | "government" }[];
   isSalaried?: boolean;
+  // #239: the salary part of `grossIncome`. The standard deduction (§16(ia)) is capped at it — a
+  // ₹20k salary gets ₹20k off, never ₹75k off other income. Omitted ⇒ `grossIncome` is all salary.
+  salaryIncome?: number;
+  // #239: the part of `grossIncome` moved in from another person (a non-earner's or minor's
+  // income). The taxpayer's OWN taxable (gross − moved − deductions) is floored at 0 first, then
+  // this is added — their own leftover deductions/losses never absorb someone else's income.
+  movedInIncome?: number;
   // Taxpayer's age in years (caller-resolved — FireKaro anchors it to the earner's current
   // age, consistent with the forward projection's age basis; historical-FY accuracy is out of
   // scope per ADR-0003). OLD regime only: raises the basic exemption to ₹3L at 60+ (senior) /
@@ -433,7 +440,9 @@ export function computeTax(args: ComputeTaxArgs): FullTaxResult {
 
   // Standard deduction applies only to salaried income (we treat all demo income as salaried-like
   // for the simplified UI; per D17 the user never sees this knob).
-  const sd = isSalaried ? regimeConfig.standardDeduction : 0;
+  const sd = isSalaried
+    ? Math.min(regimeConfig.standardDeduction, Math.max(0, args.salaryIncome ?? grossIncome))
+    : 0;
 
   // Old regime allows chapter VI-A; New regime ignores them — EXCEPT 80CCD(2) employer
   // NPS, which is deductible under both regimes and is passed separately (gh-issue #2).
@@ -458,7 +467,8 @@ export function computeTax(args: ComputeTaxArgs): FullTaxResult {
     employerNps = basicForCap > 0 ? Math.min(rawEmployerNps, npsCeiling * basicForCap) : rawEmployerNps;
   }
 
-  const taxableIncome = Math.max(0, grossIncome - sd - ded - employerNps);
+  const movedIn = Math.max(0, args.movedInIncome ?? 0);
+  const taxableIncome = Math.max(0, grossIncome - movedIn - sd - ded - employerNps) + movedIn;
 
   // OLD regime: apply the age-based basic-exemption variant (senior ₹3L / super-senior ₹5L).
   // NEW regime is age-agnostic, so its slabs pass through unchanged. gh-issue #6.

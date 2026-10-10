@@ -235,6 +235,7 @@ export function computeIndividualFire(
     employerNpsByMember: deductions.employerNpsByMember,
     taxpayerAge: anchorAge,
     isSalaried: memberIsSalaried,
+    salaryIncome: salary,
   });
   const fyTax = computeTax({
     grossIncome: attrTaxableIncome,
@@ -244,6 +245,7 @@ export function computeIndividualFire(
     employerNpsByMember: deductions.employerNpsByMember,
     taxpayerAge: anchorAge,
     isSalaried: memberIsSalaried,
+    salaryIncome: salary,
   });
   const attributableAnnualTax = Math.round(fyTax.totalTax);
 
