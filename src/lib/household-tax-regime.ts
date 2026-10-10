@@ -17,9 +17,12 @@ export function householdTaxUnderRegime(
   pick: RegimePick,
   fy: string,
 ) {
+  // #87 round 5: OLD and NEW differ in house property (no loss set-off under NEW, §115BAC(2)).
+  const grossOf = (a: AssesseeTax) =>
+    pick === "OLD" ? a.oldGrossIncome : pick === "NEW" ? a.newGrossIncome : a.grossIncome;
   const rows = perAssessee.map((a) =>
     computeTax({
-      grossIncome: a.grossIncome,
+      grossIncome: grossOf(a),
       regime: pick === "AUTO" ? a.regime : pick,
       fy,
       deductions: a.deductions,
@@ -29,7 +32,7 @@ export function householdTaxUnderRegime(
     }),
   );
   const sum = (f: (r: (typeof rows)[number]) => number) => rows.reduce((t, r) => t + f(r), 0);
-  const gross = perAssessee.reduce((t, a) => t + a.grossIncome, 0);
+  const gross = perAssessee.reduce((t, a) => t + grossOf(a), 0);
   const totalTax = sum((r) => r.totalTax);
   return {
     grossIncome: gross,

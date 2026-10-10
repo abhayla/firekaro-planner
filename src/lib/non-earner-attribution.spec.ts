@@ -85,6 +85,19 @@ const interest = (id: string, ownerId: string, amount: number) =>
     frequency: "A",
     isTaxExempt: false,
   }) as Household["otherIncome"][number];
+const rental = (id: string, ownerId: string, rent: number, homeLoanInterest: number) =>
+  ({
+    id,
+    type: "Rental",
+    source: "Direct",
+    label: "probe flat",
+    ownerId,
+    amount: rent,
+    frequency: "A",
+    isTaxExempt: false,
+    municipalTaxes: 0,
+    homeLoanInterest,
+  }) as Household["otherIncome"][number];
 const ppf = (id: string, ownerId: string, monthly: number) =>
   ({ id, type: "PPF", label: "probe PPF", value: 0, monthlyContribution: monthly, ownerId }) as never;
 
@@ -92,47 +105,64 @@ const ppf = (id: string, ownerId: string, monthly: number) =>
  * INDEPENDENT oracle — "every adult with income files separately on their own share with their own
  * deductions" (no attribution). Own rows 100%, Joint rows by `jointShareFor`, a minor's/unknown row on
  * the adult the rule also uses (highest own-gross earner, else the anchor), so the only difference
- * from the rule is the non-earners' attribution. Handles Interest-style and business rows (what the
- * generator and the reviewer fixture produce); rentals are not generated.
+ * from the rule is the non-earners' attribution. Handles Interest-style, business and let-out rental
+ * rows (round 5): each adult's house property is the sum of their rental shares, set off against
+ * other heads under OLD (§71, capped ₹2L) and floored at 0 under NEW (§115BAC(2)).
  */
 function separateFilingTax(d: Household, pick: RegimePick, split = 50): number {
   const adults = d.members.filter((m) => isAdultRole(m.role));
   const gross = new Map(adults.map((a) => [a.id, a.salary?.annualCTC ?? 0]));
+  const hp = new Map(adults.map((a) => [a.id, 0]));
   let orphan = 0;
-  const give = (ownerId: string, amount: number) => {
+  let orphanHp = 0;
+  const give = (ownerId: string, amount: number, into = gross) => {
     if (ownerId === JOINT_DEDUCTION_OWNER) {
-      for (const a of adults) gross.set(a.id, gross.get(a.id)! + amount * jointShareFor(d, a.id, split));
-    } else if (gross.has(ownerId)) gross.set(ownerId, gross.get(ownerId)! + amount);
+      for (const a of adults) into.set(a.id, into.get(a.id)! + amount * jointShareFor(d, a.id, split));
+    } else if (into.has(ownerId)) into.set(ownerId, into.get(ownerId)! + amount);
+    else if (into === hp) orphanHp += amount;
     else orphan += amount;
   };
   for (const o of d.otherIncome) {
     if (o.isTaxExempt) continue;
-    give(o.ownerId, toAnnual({ amount: o.amount, period: o.frequency }));
+    const annual = toAnnual({ amount: o.amount, period: o.frequency });
+    if (o.type === "Rental") {
+      give(o.ownerId, Math.max(0, annual - (o.municipalTaxes ?? 0)) * 0.7 - (o.homeLoanInterest ?? 0), hp);
+    } else give(o.ownerId, annual);
   }
   for (const b of d.businesses) {
     give(b.ownerId, toAnnual({ amount: b.annualProfit, period: b.frequency }) * (b.sharePercent / 100));
   }
   const earners = adults.filter((m) => isEarningMember(m, d.businesses));
   const anchor = earners[0]?.id ?? adults[0]?.id;
+  // Same target as the rule: highest OWN gross, house property included (OLD basis).
+  const own = (id: string) => {
+    const h = hp.get(id)!;
+    return gross.get(id)! + (h >= 0 ? h : -Math.min(-h, 200_000));
+  };
   const top = earners.length
-    ? earners.reduce((best, e) => (gross.get(e.id)! > gross.get(best.id)! ? e : best)).id
+    ? earners.reduce((best, e) => (own(e.id) > own(best.id) ? e : best)).id
     : anchor;
-  if (top) gross.set(top, gross.get(top)! + orphan);
+  if (top) {
+    gross.set(top, gross.get(top)! + orphan);
+    hp.set(top, hp.get(top)! + orphanHp);
+  }
   let total = 0;
   for (const a of adults) {
     const g = gross.get(a.id)!;
-    if (g === 0 && !isEarningMember(a, d.businesses)) continue;
+    const h = hp.get(a.id)!;
+    if (g === 0 && h === 0 && !isEarningMember(a, d.businesses)) continue;
     const ded = deductionsForMember(d, a.id, split, { asOfDate: AS_OF_ISO });
+    const oldHp = Math.round(h >= 0 ? h : -Math.min(-h, 200_000));
+    const newHp = Math.round(Math.max(0, h));
     const args = {
-      grossIncome: g,
       fy: FY,
       deductions: ded.totalDeductions,
       employerNpsByMember: ded.employerNpsByMember,
       taxpayerAge: ageAsOf(a.dateOfBirth, AS_OF_ISO),
       isSalaried: (a.salary?.annualCTC ?? 0) > 0,
     };
-    const o = computeTax({ ...args, regime: "OLD" }).totalTax;
-    const n = computeTax({ ...args, regime: "NEW" }).totalTax;
+    const o = computeTax({ ...args, grossIncome: g + oldHp, regime: "OLD" }).totalTax;
+    const n = computeTax({ ...args, grossIncome: g + newHp, regime: "NEW" }).totalTax;
     total += pick === "OLD" ? o : pick === "NEW" ? n : Math.min(o, n);
   }
   return total;
@@ -150,11 +180,18 @@ const adultArb = fc.record({
   relation: fc.constantFrom(...RELATIONS),
 });
 const rowArb = fc.record({ owner: fc.nat(), amount: fc.integer({ min: 0, max: 1_500_000 }) });
+// Round 5: let-out rentals, sole or Joint, profitable or loss-making (rent and §24(b) 0–₹6L).
+const rentalArb = fc.record({
+  owner: fc.nat(),
+  rent: fc.integer({ min: 0, max: 600_000 }),
+  interest: fc.integer({ min: 0, max: 600_000 }),
+});
 const dedArb = fc.record({ owner: fc.nat(), monthly: fc.integer({ min: 0, max: 15_000 }) });
 const householdArb = fc.record({
   adults: fc.array(adultArb, { minLength: 1, maxLength: 3 }),
   minors: fc.integer({ min: 0, max: 2 }),
   rows: fc.array(rowArb, { maxLength: 5 }),
+  rentals: fc.array(rentalArb, { maxLength: 3 }),
   deds: fc.array(dedArb, { maxLength: 4 }),
   split: fc.constantFrom(50, 60, 70),
 });
@@ -198,7 +235,13 @@ function build(base: Household, g: Gen): Household {
       : [],
   );
   const owners = [...adultIds, JOINT_DEDUCTION_OWNER, ...minorIds];
-  d.otherIncome = g.rows.map((r, i) => interest(`r${i}`, owners[r.owner % owners.length], r.amount));
+  const rentalOwners = [...adultIds, JOINT_DEDUCTION_OWNER];
+  d.otherIncome = [
+    ...g.rows.map((r, i) => interest(`r${i}`, owners[r.owner % owners.length], r.amount)),
+    ...g.rentals.map((r, i) =>
+      rental(`h${i}`, rentalOwners[r.owner % rentalOwners.length], r.rent, r.interest),
+    ),
+  ];
   const dedOwners = [...adultIds, JOINT_DEDUCTION_OWNER];
   d.investments = g.deds.map((x, i) => ppf(`p${i}`, dedOwners[x.owner % dedOwners.length], x.monthly));
   d.insurance = [];
@@ -222,7 +265,7 @@ describe("#87 round 4 — properties over generated households", () => {
           if (rule < sep - 1) throw new Error(`${pick}: rule ${rule} < separate ${sep}`);
         }
       }),
-      { numRuns: 400 },
+      { numRuns: 600 },
     );
   });
 
@@ -257,7 +300,7 @@ describe("#87 round 4 — the round-3 reviewer's Mauryas fixture", () => {
       expect(r.perAssessee.map((x) => x.memberId)).toEqual(["abhay"]);
       expect(who(r, "abhay")!.deductionRows["inv:madhu-ppf"]).toBeUndefined();
       expect(r.attributedNonEarners).toEqual([
-        { memberId: "madhu", name: "Madhu Kushwaha", toMemberId: "abhay", toName: "Abhay Maurya" },
+        { memberId: "madhu", name: "Madhu Kushwaha", toMemberId: "abhay", toName: "Abhay Maurya", droppedHouseLoss: 0 },
       ]);
       for (const pick of ["AUTO", "OLD"] as const) {
         expect(ruleTax(d, pick)).toBeGreaterThanOrEqual(separateFilingTax(d, pick));
@@ -358,5 +401,53 @@ describe("#87 round 4 — conservation PER ROW against the returns, real seeds a
     expect(r.perAssessee.length).toBe(2);
     const s = r.perAssessee.reduce((t, p) => t + (p.deductionRows["inv:joint-ppf"] ?? 0), 0);
     expect(s).toBeCloseTo(1, 12);
+  });
+});
+
+describe("#87 round 5 — house-property losses get no set-off a separate return would not get", () => {
+  // ₹15L earner (Abhay) + non-earner (Madhu); flat let at ₹1.2L with ₹4L §24(b) interest:
+  // net HP = 1.2L × 0.7 − 4L = −₹3.16L.
+  const withFlat = (ownerId: string) =>
+    mauryas((x) => {
+      x.members.find((m) => m.id === "abhay")!.salary!.annualCTC = 1_500_000;
+      x.otherIncome = ownerId ? [rental("flat", ownerId, 120_000, 400_000)] : [];
+    });
+
+  it("a non-earner's sole let-out loss is claimed by nobody: tax equals the no-flat household", () => {
+    for (const pick of ["AUTO", "OLD", "NEW"] as const) {
+      expect(ruleTax(withFlat("madhu"), pick)).toBe(ruleTax(withFlat(""), pick));
+    }
+    const r = tax(withFlat("madhu"));
+    expect(r.attributedNonEarners.find((a) => a.memberId === "madhu")!.droppedHouseLoss).toBe(316_000);
+  });
+
+  it("a Joint flat: the earner keeps their half of the loss (OLD set-off); the non-earner's half is dropped", () => {
+    const d = withFlat(JOINT_DEDUCTION_OWNER);
+    const r = tax(d);
+    expect(who(r, "abhay")!.incomeRows["inc:flat"]).toBeCloseTo(-158_000, 6);
+    expect(r.attributedNonEarners.find((a) => a.memberId === "madhu")!.droppedHouseLoss).toBe(158_000);
+    for (const pick of ["AUTO", "OLD", "NEW"] as const) {
+      expect(ruleTax(d, pick)).toBe(separateFilingTax(d, pick));
+    }
+  });
+
+  it("a non-earner's PROFITABLE flat still moves to the earner", () => {
+    const d = mauryas((x) => {
+      x.otherIncome = [rental("flat", "madhu", 600_000, 100_000)];
+    });
+    const r = tax(d);
+    expect(who(r, "abhay")!.incomeRows["inc:flat"]).toBeCloseTo(320_000, 6);
+    expect(r.attributedNonEarners.find((a) => a.memberId === "madhu")!.droppedHouseLoss).toBe(0);
+  });
+
+  it("NEW regime: an assessee's own let-out loss is not set off; tax on salary as if HP were 0 (#236)", () => {
+    const withLoss = who(tax(withFlat("abhay")), "abhay")!;
+    const noFlat = who(tax(withFlat("")), "abhay")!;
+    expect(withLoss.newGrossIncome).toBe(noFlat.newGrossIncome);
+    expect(withLoss.newTax).toBe(noFlat.newTax);
+    expect(ruleTax(withFlat("abhay"), "NEW")).toBe(ruleTax(withFlat(""), "NEW"));
+    // OLD keeps §71: −₹3.16L capped at −₹2L.
+    expect(withLoss.oldGrossIncome).toBe(noFlat.oldGrossIncome - 200_000);
+    expect(withLoss.oldTax).toBeLessThan(noFlat.oldTax);
   });
 });

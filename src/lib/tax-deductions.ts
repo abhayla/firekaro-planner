@@ -77,6 +77,12 @@ export interface HousePropertyTax {
  * CASH (and the home-loan EMI is a separate household expense), so callers MUST NOT
  * shrink cash income / savings by rentalTaxDeduction. gh-issue #29 / #32 / #65.
  */
+/** One let-out row's net house-property result: NAV x (1 - §24a 30%) - §24(b) interest. */
+function rentalNetOf(o: OtherIncomeLine): number {
+  const nav = Math.max(0, toAnnual({ amount: o.amount, period: o.frequency }) - (o.municipalTaxes ?? 0));
+  return nav * (1 - SEC_24A_DEDUCTION_RATE) - (o.homeLoanInterest ?? 0);
+}
+
 export function computeHousePropertyTax(otherIncome: OtherIncomeLine[]): HousePropertyTax {
   const taxableRentals = otherIncome.filter((o) => o.type === "Rental" && !o.isTaxExempt);
   const grossRentTotal = taxableRentals.reduce(
@@ -247,6 +253,7 @@ export function incomeRowShares(
   ownerId: string,
   householdSplitPercent: number,
   attribution: NonEarnerAttribution,
+  dropped: (memberId: string) => boolean = () => false,
 ): Map<string, number> {
   const { targetId, nonEarnerIds } = attribution;
   const base = new Map<string, number>();
@@ -259,7 +266,7 @@ export function incomeRowShares(
   }
   const shares = new Map<string, number>();
   for (const [id, w] of base) {
-    if (w === 0) continue;
+    if (w === 0 || dropped(id)) continue;
     const to = targetId && nonEarnerIds.has(id) ? targetId : id;
     shares.set(to, (shares.get(to) ?? 0) + w);
   }
@@ -731,6 +738,11 @@ export interface AssesseeTax {
   /** This adult's own taxable gross: own salary CTC + own/Joint-split other-taxable + business
    * share + their own share of each let-out property's §24a/§24b net (§71-capped on THIS return). */
   grossIncome: number;
+  /** #87 round 5: the gross under each regime; they differ only in house property. OLD sets a
+   * let-out loss off against other heads (§71, capped ₹2L); NEW floors it at 0 (§115BAC(2)).
+   * `grossIncome` is the one for `regime`. */
+  oldGrossIncome: number;
+  newGrossIncome: number;
   /** This adult's own OLD-regime deduction bundle (`deductionsForMember`). */
   deductions: number;
   /** This adult's own per-member 80CCD(2) basis (`deductionsForMember`). */
@@ -762,7 +774,14 @@ export interface PerAssesseeHouseholdTax {
   marginalAssessee: AssesseeTax | null;
   /** #87 round 4 — non-earning adults and minors whose income is counted on an earner's return
    * (the "<Name>'s income is counted on <Earner>'s return" footnote). Empty when nobody earns. */
-  attributedNonEarners: { memberId: string; name: string; toMemberId: string; toName: string }[];
+  attributedNonEarners: {
+    memberId: string;
+    name: string;
+    toMemberId: string;
+    toName: string;
+    /** #87 round 5: this non-earner's own net house-property LOSS, claimed by nobody (0 if none). */
+    droppedHouseLoss: number;
+  }[];
 }
 
 export interface PerAssesseeScope {
@@ -823,16 +842,33 @@ export function perAssesseeHouseholdTax(
   const asOfIso = todayIsoLocal(asOf);
 
   const attributeReturns = (attribution: NonEarnerAttribution) => {
-    const sharesCache = new Map<string, Map<string, number>>();
-    const sharesOf = (ownerId: string): Map<string, number> => {
-      let shares = sharesCache.get(ownerId);
-      if (!shares) {
-        shares = incomeRowShares(household, adults, anchorId, ownerId, householdSplitPercent, attribution);
-        sharesCache.set(ownerId, shares);
-      }
-      return shares;
+    const memo = (dropped?: (id: string) => boolean, rule = attribution) => {
+      const cache = new Map<string, Map<string, number>>();
+      return (ownerId: string): Map<string, number> => {
+        let shares = cache.get(ownerId);
+        if (!shares) {
+          shares = incomeRowShares(household, adults, anchorId, ownerId, householdSplitPercent, rule, dropped);
+          cache.set(ownerId, shares);
+        }
+        return shares;
+      };
     };
-    return adults.map((member) => {
+    const sharesOf = memo();
+    // Round 5: a non-earner's house-property RESULT moves to the target earner only when positive.
+    // Their net (their own share of every let-out row, BEFORE any move) is a loss -> claimed by
+    // nobody, like their deductions; otherwise §71 sets it off against the earner's salary.
+    const ownShares = memo(undefined, { ...attribution, nonEarnerIds: new Set<string>() });
+    const ownHouseProperty = new Map<string, number>();
+    for (const o of scope.otherIncome) {
+      if (o.type !== "Rental" || o.isTaxExempt) continue;
+      for (const [id, w] of ownShares(o.ownerId)) {
+        ownHouseProperty.set(id, (ownHouseProperty.get(id) ?? 0) + w * rentalNetOf(o));
+      }
+    }
+    const lossDropped = (id: string) =>
+      attribution.nonEarnerIds.has(id) && (ownHouseProperty.get(id) ?? 0) < 0;
+    const rentalSharesOf = memo(lossDropped);
+    const rows = adults.map((member) => {
       const weightOf = (ownerId: string): number => sharesOf(ownerId).get(member.id) ?? 0;
       const incomeRows: Record<string, number> = {};
       const salary = member.salary?.annualCTC ?? 0;
@@ -841,13 +877,13 @@ export function perAssesseeHouseholdTax(
       let hasIncome = salary > 0;
       for (const o of scope.otherIncome) {
         if (o.isTaxExempt) continue;
-        const w = weightOf(o.ownerId);
+        const w =
+          o.type === "Rental" ? (rentalSharesOf(o.ownerId).get(member.id) ?? 0) : weightOf(o.ownerId);
         if (w === 0) continue;
         const annual = toAnnual({ amount: o.amount, period: o.frequency });
         if (annual !== 0) hasIncome = true;
         if (o.type === "Rental") {
-          const nav = Math.max(0, annual - (o.municipalTaxes ?? 0));
-          const part = w * (nav * (1 - SEC_24A_DEDUCTION_RATE) - (o.homeLoanInterest ?? 0));
+          const part = w * rentalNetOf(o);
           incomeRows[`inc:${o.id}`] = part;
           rentalNet += part;
         } else {
@@ -865,26 +901,31 @@ export function perAssesseeHouseholdTax(
         incomeRows[`biz:${b.id}`] = share;
         businessShare += share;
       }
-      const houseProperty = Math.round(
+      const oldHouseProperty = Math.round(
         rentalNet >= 0 ? rentalNet : -Math.min(Math.abs(rentalNet), SEC_71_HP_LOSS_SETOFF_CAP),
       );
-      const grossIncome = salary + otherTaxable + businessShare + houseProperty;
+      const newHouseProperty = Math.round(Math.max(0, rentalNet));
+      const otherHeads = salary + otherTaxable + businessShare;
+      const grossIncome = otherHeads + oldHouseProperty;
+      const newGrossIncome = otherHeads + newHouseProperty;
       const files =
         !attribution.nonEarnerIds.has(member.id) &&
         (hasIncome || isEarningMember(member, household.businesses));
-      return { member, grossIncome, salary, files, incomeRows };
+      return { member, grossIncome, newGrossIncome, salary, files, incomeRows };
     });
+    return { rows, ownHouseProperty, lossDropped };
   };
 
   // Pass 1: each adult's OWN gross (no attribution) picks the target earner; pass 2 attributes.
-  const own = attributeReturns(OWN_ROWS_ONLY);
+  const own = attributeReturns(OWN_ROWS_ONLY).rows;
   const attribution = nonEarnerAttribution(
     household,
     adults,
     anchorId,
     (id) => own.find((r) => r.member.id === id)?.grossIncome ?? 0,
   );
-  const returns = attributeReturns(attribution);
+  const attributed = attributeReturns(attribution);
+  const returns = attributed.rows;
 
   let filers = returns.filter((r) => r.files);
   if (filers.length === 0) filers = returns.filter((r) => r.member.id === anchorId);
@@ -906,31 +947,35 @@ export function perAssesseeHouseholdTax(
         name: m.name || "Member",
         toMemberId: target.id,
         toName: target.name || "Adult",
+        droppedHouseLoss: attributed.lossDropped(m.id)
+          ? Math.round(-(attributed.ownHouseProperty.get(m.id) ?? 0))
+          : 0,
       }))
     : [];
 
-  const perAssessee: AssesseeTax[] = filers.map(({ member, grossIncome, salary, incomeRows }) => {
+  const perAssessee: AssesseeTax[] = filers.map(({ member, grossIncome, newGrossIncome, salary, incomeRows }) => {
     const deductions = deductionsForMember(household, member.id, householdSplitPercent, {
       asOfDate: asOfIso,
     });
     const isSalaried = salary > 0;
     const age = ageAsOf(member.dateOfBirth, asOfIso);
     const taxArgs = {
-      grossIncome,
       fy,
       deductions: deductions.totalDeductions,
       employerNpsByMember: deductions.employerNpsByMember,
       taxpayerAge: age,
       isSalaried,
     };
-    const oldR = computeTax({ ...taxArgs, regime: "OLD" });
-    const newR = computeTax({ ...taxArgs, regime: "NEW" });
+    const oldR = computeTax({ ...taxArgs, grossIncome, regime: "OLD" });
+    const newR = computeTax({ ...taxArgs, grossIncome: newGrossIncome, regime: "NEW" });
     const regime: "OLD" | "NEW" = oldR.totalTax <= newR.totalTax ? "OLD" : "NEW";
     const chosen = regime === "OLD" ? oldR : newR;
     return {
       memberId: member.id,
       name: member.name || "Adult",
-      grossIncome,
+      grossIncome: regime === "OLD" ? grossIncome : newGrossIncome,
+      oldGrossIncome: grossIncome,
+      newGrossIncome,
       deductions: deductions.totalDeductions,
       employerNpsByMember: deductions.employerNpsByMember,
       isSalaried,

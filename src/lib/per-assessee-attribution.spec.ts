@@ -161,7 +161,9 @@ describe("#87 — rental §24(a)/§24(b) relief follows the property's owner sha
       r.homeLoanInterest = 600_000; // 1,26,000 − 6,00,000 = −4,74,000 → capped −2,00,000
     });
     const noRental = run((d) => (d.otherIncome = d.otherIncome.filter((o) => o.type !== "Rental")));
-    expect(who(k, "priya")!.grossIncome - who(noRental, "priya")!.grossIncome).toBe(-200_000);
+    // OLD regime only: NEW allows no set-off (§115BAC(2), #236), so its gross ignores the loss.
+    expect(who(k, "priya")!.oldGrossIncome - who(noRental, "priya")!.oldGrossIncome).toBe(-200_000);
+    expect(who(k, "priya")!.newGrossIncome).toBe(who(noRental, "priya")!.newGrossIncome);
     expect(who(k, "rohit")!.grossIncome).toBe(who(noRental, "rohit")!.grossIncome);
   });
 });

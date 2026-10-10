@@ -627,8 +627,13 @@ describe("derive() — pure kernel", () => {
       ];
       const twoRentals = derive(h.data, a.values, lens);
 
-      expect(twoRentals.annualTax).toBeLessThan(noRental.annualTax); // a capped LOSS, not net profit
-      const saving = noRental.annualTax - twoRentals.annualTax;
+      // The set-off exists only under OLD (§71); NEW floors house property at 0 (§115BAC(2), #236),
+      // so the mechanic is read on the OLD-regime sum, and the household never pays MORE.
+      expect(twoRentals.annualTax).toBeLessThanOrEqual(noRental.annualTax);
+      const oldWith = twoRentals.householdTaxRecommendation.oldTax;
+      const oldWithout = noRental.householdTaxRecommendation.oldTax;
+      expect(oldWith).toBeLessThan(oldWithout); // a capped LOSS, not net profit
+      const saving = oldWithout - oldWith;
       expect(saving).toBeGreaterThan(0.28 * SEC_71_HP_LOSS_SETOFF_CAP); // ≈30%+cess on the ₹2L set-off
       expect(saving).toBeLessThanOrEqual(SEC_71_HP_LOSS_SETOFF_CAP); // can't save more than the capped loss
       // Cash unchanged: BOTH full rents (₹2L + ₹5L) flow to income regardless of the tax treatment.

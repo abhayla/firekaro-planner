@@ -809,15 +809,22 @@ const zeroTaxSectionVisible = computed(() => !isZeroTaxRecommended.value || show
         <div class="text-caption text-medium-emphasis mt-3">
           {{ regimeFootnote }}
         </div>
-        <div
-          v-for="a in perAssessee.attributedNonEarners"
-          :key="a.memberId"
-          class="text-caption text-medium-emphasis mt-1"
-        >
-          {{ a.name }}'s income is counted on {{ a.toName }}'s return (no own salary or business).
-        </div>
       </PanelCard>
     </template>
+
+    <!-- #87 round 5: shown whenever income moved, including when only one return remains (Mauryas). -->
+    <div v-if="!lensActive && perAssessee.attributedNonEarners.length > 0" data-testid="attributed-non-earners">
+      <div
+        v-for="a in perAssessee.attributedNonEarners"
+        :key="a.memberId"
+        class="text-caption text-medium-emphasis mt-1"
+      >
+        {{ a.name }}'s income is counted on {{ a.toName }}'s return (no own salary or business).<template
+          v-if="a.droppedHouseLoss > 0"
+        >
+          The {{ formatINRCompact(a.droppedHouseLoss) }} loss on {{ a.name }}'s let-out property is not counted.</template>
+      </div>
+    </div>
 
     <v-alert type="info" variant="tonal" density="compact" class="mt-5">
       This is an estimate — for filing, use your CA / Cleartax. Standard deduction, 80C (EPF + PPF + ELSS + life premium),
