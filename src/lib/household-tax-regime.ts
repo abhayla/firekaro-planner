@@ -11,6 +11,14 @@ export function assesseesForView(
   return pick === "AUTO" ? result.perAssessee : result.perAssesseeForView[pick];
 }
 
+/** #239: the "counted on <Earner>'s return" footnote for one view — it follows that view's clubbing. */
+export function attributedNonEarnersForView(
+  result: Pick<PerAssesseeHouseholdTax, "attributedNonEarners" | "attributedNonEarnersForView">,
+  pick: RegimePick,
+): PerAssesseeHouseholdTax["attributedNonEarners"] {
+  return pick === "AUTO" ? result.attributedNonEarners : result.attributedNonEarnersForView[pick];
+}
+
 /**
  * #87 round 3 — the household's tax with each adult's regime chosen by `pick`, summed assessee by
  * assessee: "AUTO" = each adult's OWN cheaper regime (what the household actually pays — equal to the

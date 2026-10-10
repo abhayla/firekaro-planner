@@ -27,7 +27,11 @@ import {
   LIMIT_SECTION_24,
   perAssesseeHouseholdTax,
 } from "@/lib/tax-deductions";
-import { assesseesForView, householdTaxUnderRegime } from "@/lib/household-tax-regime";
+import {
+  assesseesForView,
+  attributedNonEarnersForView,
+  householdTaxUnderRegime,
+} from "@/lib/household-tax-regime";
 import { buildDonutSegments } from "@/lib/donut";
 import LeafPageHeader from "@/components/income-layout/LeafPageHeader.vue";
 import StatDashboard, { type KpiTile } from "@/components/income-layout/StatDashboard.vue";
@@ -251,6 +255,8 @@ const newResult = computed(() =>
 const activeResult = computed(() =>
   householdTaxUnderRegime(assesseesForView(perAssessee.value, mode.value), mode.value, selectedFY.value),
 );
+// #239: the clubbing footnote follows the SELECTED view (each view picks its own clubbing parent).
+const activeAttributedNonEarners = computed(() => attributedNonEarnersForView(perAssessee.value, mode.value));
 const regimeFootnote = computed(() =>
   mode.value === "AUTO"
     ? "Each adult files their own return; each person's tax uses their own cheaper regime."
@@ -813,9 +819,9 @@ const zeroTaxSectionVisible = computed(() => !isZeroTaxRecommended.value || show
     </template>
 
     <!-- #87 round 5: shown whenever income moved, including when only one return remains (Mauryas). -->
-    <div v-if="!lensActive && perAssessee.attributedNonEarners.length > 0" data-testid="attributed-non-earners">
+    <div v-if="!lensActive && activeAttributedNonEarners.length > 0" data-testid="attributed-non-earners">
       <div
-        v-for="a in perAssessee.attributedNonEarners"
+        v-for="a in activeAttributedNonEarners"
         :key="a.memberId"
         class="text-caption text-medium-emphasis mt-1"
       >

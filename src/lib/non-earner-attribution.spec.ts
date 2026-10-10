@@ -34,7 +34,12 @@ import { loadIyersSeed } from "@/seeds/iyers";
 import { loadMauryasSeed } from "@/seeds/mauryas";
 import { loadRaviSeed } from "@/seeds/ravi";
 import { JOINT_DEDUCTION_OWNER, perAssesseeHouseholdTax } from "@/lib/tax-deductions";
-import { assesseesForView, householdTaxUnderRegime, type RegimePick } from "@/lib/household-tax-regime";
+import {
+  assesseesForView,
+  attributedNonEarnersForView,
+  householdTaxUnderRegime,
+  type RegimePick,
+} from "@/lib/household-tax-regime";
 import { toAnnual } from "@/lib/cashflow";
 import { isEarningMember } from "@/lib/member-earning";
 import { todayIsoLocal } from "@/lib/as-of-date";
@@ -703,6 +708,13 @@ describe("#239 — deduction caps (one focused case per class)", () => {
     // A: ₹5L − ₹50k − ₹1.5L = ₹3L (OLD); B: ₹4.6L − ₹50k = ₹4.1L → statute clubs on B: ₹5.1L, past 87A.
     expect(ruleTax(d, "OLD")).toBeGreaterThanOrEqual(15_080);
     assertNotBelowReference(d);
+    // The footnote follows each view's own clubbing: AUTO ties at ₹0 → anchor A; forced OLD → B.
+    const r = tax(d);
+    const minorTo = (pick: RegimePick) =>
+      attributedNonEarnersForView(r, pick).find((x) => x.memberId === "M")?.toMemberId;
+    expect(minorTo("AUTO")).toBe("A");
+    expect(minorTo("OLD")).toBe("B");
+    expect(assesseesForView(r, "OLD").find((x) => x.memberId === "B")!.incomeRows["inc:m"]).toBe(100_000);
   });
 
   it("class 3: OLD — self-occupied interest + let-out loss together set off at most ₹2L", () => {

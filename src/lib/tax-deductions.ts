@@ -802,6 +802,12 @@ export interface PerAssesseeHouseholdTax {
     /** #87 round 5: this non-earner's own net house-property LOSS, claimed by nobody (0 if none). */
     droppedHouseLoss: number;
   }[];
+  /** #239: the footnote under a FORCED view (its own minor-clubbing choice). Read through
+   * `attributedNonEarnersForView`. */
+  attributedNonEarnersForView: {
+    OLD: PerAssesseeHouseholdTax["attributedNonEarners"];
+    NEW: PerAssesseeHouseholdTax["attributedNonEarners"];
+  };
 }
 
 export interface PerAssesseeScope {
@@ -1094,12 +1100,10 @@ export function perAssesseeHouseholdTax(
   const bestFor = (f: (a: AssesseeTax) => number) =>
     options.reduce((best, o) => (sumOf(o.r.perAssessee, f) > sumOf(best.r.perAssessee, f) ? o : best));
   const autoPick = bestFor((a) => a.tax);
-  const clubOnId = autoPick.id;
-  const { attributed, perAssessee, totalTax } = autoPick.r;
-  const perAssesseeForView = {
-    OLD: bestFor((a) => a.oldTax).r.perAssessee,
-    NEW: bestFor((a) => a.newTax).r.perAssessee,
-  };
+  const oldPick = bestFor((a) => a.oldTax);
+  const newPick = bestFor((a) => a.newTax);
+  const { perAssessee, totalTax } = autoPick.r;
+  const perAssesseeForView = { OLD: oldPick.r.perAssessee, NEW: newPick.r.perAssessee };
 
   const target = adults.find((m) => m.id === attribution.targetId);
   const hasOwnIncomeRow = (id: string) =>
@@ -1107,7 +1111,9 @@ export function perAssesseeHouseholdTax(
       (o) =>
         o.ownerId === id && !o.isTaxExempt && toAnnual({ amount: o.amount, period: o.frequency }) !== 0,
     ) || scope.businesses.some((b) => b.ownerId === id && b.annualProfit !== 0);
-  const attributedNonEarners = target
+  // #239: the footnote follows a view's OWN clubbing choice (`pick.id`), never AUTO's for every view.
+  const footnoteFor = ({ id: clubOnId, r: { attributed } }: typeof autoPick) =>
+    target
     ? [
         ...own
           .filter((r) => attribution.nonEarnerIds.has(r.member.id) && r.grossIncome !== 0)
@@ -1134,5 +1140,14 @@ export function perAssesseeHouseholdTax(
     perAssessee.length === 0
       ? null
       : perAssessee.reduce((best, a) => (a.grossIncome > best.grossIncome ? a : best));
-  return { totalTax, perAssessee, perAssesseeForView, marginalAssessee, attributedNonEarners };
+  const attributedNonEarners = footnoteFor(autoPick);
+  const attributedNonEarnersForView = { OLD: footnoteFor(oldPick), NEW: footnoteFor(newPick) };
+  return {
+    totalTax,
+    perAssessee,
+    perAssesseeForView,
+    marginalAssessee,
+    attributedNonEarners,
+    attributedNonEarnersForView,
+  };
 }

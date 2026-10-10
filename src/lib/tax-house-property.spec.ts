@@ -162,7 +162,15 @@ describe("#87 round 3 — the tax page renders from householdTaxUnderRegime (pag
   );
 
   it("Index.vue imports the ONE exported function and keeps no local copy of it", () => {
-    expect(page).toMatch(/import \{ assesseesForView, householdTaxUnderRegime \} from "@\/lib\/household-tax-regime";/);
+    expect(page).toMatch(
+      /import \{\s*assesseesForView,\s*attributedNonEarnersForView,\s*householdTaxUnderRegime,\s*\} from "@\/lib\/household-tax-regime";/,
+    );
+    // #239: the clubbing footnote reads the SELECTED view's attribution, never AUTO's for every view.
+    expect(page).toMatch(
+      /const activeAttributedNonEarners = computed\(\(\) => attributedNonEarnersForView\(perAssessee\.value, mode\.value\)\);/,
+    );
+    expect(page).toMatch(/v-for="a in activeAttributedNonEarners"/);
+    expect(page).not.toMatch(/perAssessee\.attributedNonEarners/);
     expect(page).not.toMatch(/function householdTaxUnderRegime\(/);
     for (const pick of ["OLD", "NEW"]) {
       expect(page).toMatch(
