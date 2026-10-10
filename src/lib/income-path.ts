@@ -138,3 +138,37 @@ export function generalInflationWithCreep(
   const creep = Number.isFinite(creepPercent) ? Math.min(Math.max(creepPercent as number, 0), 5) : 0;
   return generalInflation + creep / 100;
 }
+
+/**
+ * gh #232 — the inputs of ONE scope's year-by-year surplus: a household (derive.ts) or one adult in
+ * the member lens (individual-fire.ts). Everything REAL, today's ₹/yr.
+ */
+export interface SurplusPathInput {
+  /** The scope's salaried earners — the only income that grows. */
+  paths: EarnerIncomePath[];
+  /** Non-salary income (rent, interest, business share) — flat in real terms. */
+  nonSalaryIncome0: number;
+  /** Year-0 effective tax rate on total income, held and applied to income(t). */
+  effectiveTaxRate0: number;
+  /** Year-0 annual expenses of the scope. */
+  annualExpenses0: number;
+  /** REAL annual expense drift (creep-adjusted basket deflated at general CPI). */
+  realExpenseDrift: number;
+}
+
+/**
+ * gh #232 — THE ONE surplus projection both scopes ride (ADR-0007 formula):
+ *   surplus(t) = income(t) + nonSalary₀ − tax₀·income(t)/income(0) − expenses₀·(1 + drift)^t
+ * INCOME grows and the leftover is recomputed every year; the leftover itself is never grown.
+ * SIGNED annual ₹ (not floored): a non-earner's negative surplus is a real cost someone in the
+ * household carries, so callers decide how to floor or redistribute it. Non-finite → 0.
+ */
+export function realAnnualSurplusAt(input: SurplusPathInput, yearIndex: number): number {
+  if (!Number.isFinite(yearIndex)) return 0;
+  const t = Math.max(0, yearIndex);
+  const income = householdRealIncomeAt(input.paths, t) + input.nonSalaryIncome0;
+  const tax = income * input.effectiveTaxRate0;
+  const expense = input.annualExpenses0 * Math.pow(1 + input.realExpenseDrift, t);
+  const surplus = income - tax - expense;
+  return Number.isFinite(surplus) ? surplus : 0;
+}

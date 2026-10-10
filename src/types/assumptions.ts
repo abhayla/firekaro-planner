@@ -135,13 +135,13 @@ export const assumptionsSchema = z.object({
    * deliberately. Shipping it at 1% would have made the headline rest on a guess.
    */
   expenseGrowthAboveInflationPercent: z.number().min(0).max(5).default(0),
-  // #81 Phase 2 — the unified "household split" %: the share of SHARED costs/assets (ring-2
-  // expenses + "Joint" corpus/debt + joint income streams) attributed to EACH adult when
-  // computing that adult's STANDALONE individual FIRE. Default 50 (a two-adult 50/50 split).
-  // DISPLAY-only for the per-adult individual view — it NEVER touches the household FIRE number
-  // (the primary, decision-driving figure). Clamped 0–100. With N adults a single % is an
-  // intentional simplification (each adult bears `split%` of shared); the household − Σ(adults)
-  // gap surfaces whatever is unsplit (dependents + remainder).
+  // #81 Phase 2 / #232 — the "household split" %: how SHARED rows (ring-2 expenses + "Joint"
+  // corpus/debt + joint income streams + a loan shared with the spouse) divide between the two
+  // adults in each adult's STANDALONE individual FIRE. The ANCHOR adult carries `split%` of every
+  // shared row and the other adult the rest (`100 − split`%), so each row's shares sum to exactly
+  // the row (`member-row-share.ts` over `jointShareFor`); 3+ adults share equally, a single adult
+  // carries 100%. Default 50. DISPLAY-only for the per-adult view — it NEVER touches the household
+  // FIRE number (the primary, decision-driving figure). Clamped 0–100.
   householdSplitPercent: z.number().min(0).max(100).default(50),
   /**
    * ADR-0006 Phase 1b — the one-shot migration STAMP for this document.

@@ -59,7 +59,7 @@ import { buildContributionResolver, scalarToSegments } from "@/lib/contribution-
 import {
   expectedRealGrowthPercent,
   generalInflationWithCreep,
-  householdRealIncomeAt,
+  realAnnualSurplusAt,
   realIncomeScaleAt,
   type EarnerIncomePath,
 } from "@/lib/income-path";
@@ -686,13 +686,20 @@ export function derive(
      * Floored at 0: a household whose expenses outrun its income does not contribute a negative
      * amount, it contributes nothing (and the FIRE date goes to Infinity via the solver).
      */
+    // gh #232: the formula lives in `income-path.ts` (`realAnnualSurplusAt`) — the member lens
+    // (`individual-fire.ts`) projects each adult with the SAME function, never a second method.
     const realMonthlySurplusAt = (yearIndex: number, paths: EarnerIncomePath[]): number => {
       if (!Number.isFinite(yearIndex)) return 0;
-      const t = Math.max(0, yearIndex);
-      const income = householdRealIncomeAt(paths, t) + nonSalaryIncome0;
-      const tax = income * effectiveTaxRate0;
-      const expense = annualExpensesToday * Math.pow(1 + realExpenseDrift, t);
-      const surplus = income - tax - expense;
+      const surplus = realAnnualSurplusAt(
+        {
+          paths,
+          nonSalaryIncome0,
+          effectiveTaxRate0,
+          annualExpenses0: annualExpensesToday,
+          realExpenseDrift,
+        },
+        yearIndex,
+      );
       const monthly = surplus / 12;
       return Number.isFinite(monthly) && monthly > 0 ? monthly : 0;
     };
@@ -1610,7 +1617,13 @@ export function derive(
   // "the family can stop". computeIndividualFire owns the attribution (single canonical helper).
   const individualFireByMember = members
     .filter((m) => isAdultRole(m.role))
-    .map((m) => computeIndividualFire(household, assumptions, m.id, lens.currentFY, overrides, pinnedAsOf))
+    .map((m) =>
+      computeIndividualFire(household, assumptions, m.id, lens.currentFY, overrides, pinnedAsOf, {
+        // #232: the members' surpluses are conserved to THIS household surplus, year by year.
+        householdRealMonthlySurplusAt: (t) =>
+          householdScope.realMonthlySurplusAt(t, householdScope.conservativePaths),
+      }),
+    )
     .filter((r): r is NonNullable<ReturnType<typeof computeIndividualFire>> => r != null);
   const sumAdultAttributableExpenses = individualFireByMember.reduce(
     (s, r) => s + r.attributableAnnualExpenses,

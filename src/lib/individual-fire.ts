@@ -3,10 +3,10 @@
  *
  * Treats one adult as a "mini-household": their attributable corpus grows (real frame, SWR) to
  * their attributable expenses. Attribution rules (contract §3, grilled 2026-06-08):
- *   - expenses: M's OWN itemised lines (ring 1) at 100% + the SHARED "Household" pool (ring 2,
- *     incl. avgMonthly) × the household split %. Ring 3 (dependent-owned / "Dependents") is
+ *   - expenses: M's OWN itemised lines (ring 1) at 100% + M's complementary share of the SHARED
+ *     "Household" pool (ring 2, incl. avgMonthly) and of a shared loan's EMI. Ring 3 (dependent-owned / "Dependents") is
  *     EXCLUDED — a child's cost is a household obligation, not one adult's personal FIRE.
- *   - corpus / income: member-owned at 100% + "Joint" × split; dependent-owned excluded.
+ *   - corpus / income: member-owned at 100% + M's complementary share of "Joint"; dependent-owned excluded.
  *   - tax: per-individual (India files individually) — computeTax on the adult's attributable
  *     taxable income with the adult's OWN deductions.
  *
@@ -26,9 +26,10 @@
  *     §24(a) 30% / §24(b) / §71 house-property collapse; the individual path does NOT). This
  *     OVER-taxes the individual → savings lower → individual FIRE LATER → conservative/safe; it only
  *     slightly widens the household-vs-individual gap. (FinTech #81 Phase 2, MED-1.)
- *   - the household split % is a single number applied to EACH adult: for the locked 2-adult persona
- *     (50/50) Σ = 100% of shared; for 3+ adults a single % can over-allocate shared costs (Σ > 100%)
- *     — a documented bound for the non-target N>2 case (assumptions.ts; FinTech MED-3).
+ *   - (RETIRED — gh #232) shared rows are no longer given `split` to EACH adult. CONSERVATION LAW:
+ *     for every row (asset, contribution, income, expense, loan balance, EMI) the adults' shares sum
+ *     to exactly the row — anchor adult `split`, the other `1 − split`, 3+ adults equal, a single
+ *     adult 100% (`member-row-share.ts` over `jointShareFor`).
  * The HOUSEHOLD FIRE number (which carries all of the above) stays the primary, decision-driving
  * figure; this is a clearly-caveated secondary view. This helper NEVER feeds the household number
  * (derive only ADDS it alongside).
@@ -39,11 +40,17 @@ import type { Assumptions } from "@/types/assumptions";
 import { isEarningMember } from "@/lib/member-earning";
 import { toMonthly, toAnnual } from "@/lib/cashflow";
 import { ageFromDOB } from "@/lib/age";
-import { realIncomeScaleAt, type EarnerIncomePath } from "@/lib/income-path";
+import {
+  realAnnualSurplusAt,
+  realIncomeScaleAt,
+  type EarnerIncomePath,
+  type SurplusPathInput,
+} from "@/lib/income-path";
 import { todayIsoLocal } from "@/lib/as-of-date";
 import { calculateFIRENumber, calculateFireTarget, calculateYearsToTarget } from "@/lib/fire-math";
 import { computeTax, recommendRegime, marginalSlabRate, getTaxConfigForFY } from "@/lib/tax";
-import { deductionsForMember } from "@/lib/tax-deductions";
+import { deductionsForMember, jointShareFor } from "@/lib/tax-deductions";
+import { ownedRowShare, liabilityShare, expenseRowShare } from "@/lib/member-row-share";
 import { epfBucketAfterTaxReturn } from "@/lib/epf-vpf";
 import { returnBucketKey } from "@/lib/investment-traits";
 import {
@@ -51,17 +58,16 @@ import {
   blendPortfolioReturn,
   resolveHouseholdBasket,
 } from "@/lib/assumption-math";
-import { EXPENSE_OWNER_HOUSEHOLD } from "@/lib/expense-attribution";
 
 export interface IndividualFireResult {
   memberId: string;
   name: string;
   anchorAge: number;
-  /** M's own (ring 1) + split × shared (ring 2); ring 3 excluded. ₹/yr today. */
+  /** M's own (ring 1) + M's complementary share of shared (ring 2); ring 3 excluded. ₹/yr today. */
   attributableAnnualExpenses: number;
-  /** M-owned + split × Joint investments (primary residence excluded). ₹ today. */
+  /** M-owned + M's complementary share of Joint investments (primary residence excluded). ₹ today. */
   attributableCorpus: number;
-  /** #160: M-owned + split × shared-with-spouse liabilities. ₹ outstanding today. */
+  /** #160/#232: M-owned + M's complementary share of shared-with-spouse liabilities. ₹ outstanding today. */
   attributableLiabilitiesValue: number;
   attributableAnnualIncome: number;
   attributableAnnualTax: number;
@@ -94,109 +100,43 @@ export interface IndividualFireResult {
 /** "Joint" asset/debt/income sentinel (distinct from the "Household" expense sentinel). */
 const JOINT = "Joint";
 
+/** gh #232 — one adult's year-0 cashflow and the inputs of their surplus projection. */
+interface MemberCashflow {
+  attributableAnnualExpenses: number;
+  attributableAnnualIncome: number;
+  attributableAnnualTax: number;
+  recommended: ReturnType<typeof recommendRegime>;
+  fyTax: ReturnType<typeof computeTax>;
+  surplus: SurplusPathInput;
+}
+
 /**
- * Standalone individual FIRE for ONE adult. Returns null for a non-adult or a missing member
- * (dependents have no standalone FIRE — they are funded by the household).
+ * One adult's attributable income, tax and expenses (own 100%, shared rows by the complementary
+ * share, ring 3 excluded) plus the `SurplusPathInput` the household projection formula runs on.
+ * Called for EVERY adult so a member's projection can carry the others' shortfalls (#232).
  */
-export function computeIndividualFire(
+function memberCashflow(
   household: Household,
   assumptions: Assumptions,
-  memberId: string,
+  member: Household["members"][number],
+  splitPercent: number,
   currentFY: string,
-  /** T-377 (QN-2): the same additive solver seam the household path honours — see derive-overrides.ts. */
-  overrides?: DeriveOverrides,
-  /**
-   * #176 follow-up: this used to call `ageFromDOB(member.dateOfBirth)` with NO reference date,
-   * so this member's age (hence their whole individual-FIRE solve) silently drifted with the
-   * real wall clock — the exact class #176 fixed in `derive.ts`'s household-scope `anchorAgeFor`,
-   * but never pinned here. Callers MUST pass the same reference date the household scope uses
-   * (`derive.ts`'s `pinnedAsOf`) so a member's individual and household ages agree and neither
-   * moves between two loads of the same data on different days.
-   */
-  asOf: Date = new Date(),
-): IndividualFireResult | null {
-  const member = household.members.find((m) => m.id === memberId);
-  if (!member || !isAdultRole(member.role)) return null;
-
-  const split = Math.min(100, Math.max(0, assumptions.householdSplitPercent ?? 50)) / 100;
+  asOf: Date,
+): MemberCashflow {
+  const memberId = member.id;
+  const jointShare = jointShareFor(household, memberId, splitPercent);
   const anchorAge = ageFromDOB(member.dateOfBirth, asOf);
-  const targetRetirementAge =
-    usableOverride(overrides?.targetRetirementAge, 1) ?? member.targetRetirementAge ?? 50;
-  const planToAge = member.planToAge ?? 90;
 
-  // ---- attributable expenses: own ring-1 (100%) + shared ring-2 (× split); ring-3 excluded ----
-  let ownMonthly = 0;
-  let sharedMonthly = household.expenses.avgMonthly; // avgMonthly is the shared lump (ring 2)
+  // ---- attributable expenses: own ring-1 (100%) + shared ring-2 (× this adult's joint share);
+  // a shared loan's EMI follows the loan's split; ring-3 excluded ----
+  let attributableMonthly = jointShare * household.expenses.avgMonthly; // avgMonthly is the shared lump (ring 2)
   for (const r of household.expenses.recurring) {
-    const owner = r.ownerId ?? EXPENSE_OWNER_HOUSEHOLD;
-    const monthly = toMonthly({ amount: r.amount, period: r.frequency });
-    if (owner === memberId) ownMonthly += monthly; // ring 1 (this adult's own)
-    else if (owner === EXPENSE_OWNER_HOUSEHOLD) sharedMonthly += monthly; // ring 2 (shared)
-    // else: another member's personal OR "Dependents"/dependent-owned (ring 3) → excluded
+    const share = expenseRowShare(household, memberId, splitPercent, r);
+    if (share > 0) attributableMonthly += share * toMonthly({ amount: r.amount, period: r.frequency });
   }
-  const attributableAnnualExpenses = Math.round((ownMonthly + split * sharedMonthly) * 12);
+  const attributableAnnualExpenses = Math.round(attributableMonthly * 12);
 
-  // ---- attributable corpus: M-owned (100%) + Joint (× split); primary residence excluded ----
-  // #211: a non-primary property STILL counts toward this member's attributable target — the fix
-  // changed WHEN its rupees become spendable in the household bridge, not whether the property
-  // funds retirement. The member path has no bridge gate at all (see the #162 part-2 note below),
-  // so there is no unlock timeline here to date a sale into; the caveat on that line is what tells
-  // the user this age carries no liquidity check.
-  const fireInvestments = household.investments.filter(
-    (i) => !(i.type === "RealEstate" && i.realEstateRole === "PrimaryResidence"),
-  );
-  const corpusWeightOf = (ownerId: string, value: number): number =>
-    ownerId === memberId ? value : ownerId === JOINT ? split * value : 0;
-  let attributableCorpus = 0;
-  const returnWeights = {
-    equity: 0, debt: 0, realEstate: 0, gold: 0, nps: 0, ppf: 0, epf: 0,
-    international: 0, reit: 0, crypto: 0, other: 0,
-  };
-  // gh #194 — the member-lens CONTRIBUTION-weighted fallback mix, mirroring derive.ts's household
-  // `contributionWeights` (l.686-693 there). Without this, `blendPortfolioReturn` below fell back to
-  // its OWN truly-empty debt default whenever this member's attributed VALUE weights totalled zero —
-  // which is every member whose only holding is an auto-flowed EPF line at `value: 0` (Ravi) — instead
-  // of using what this member is actually FUNDING, same as the household path does. Attributed by the
-  // SAME ownership split as the corpus value weights above (own full / joint × split).
-  const contributionWeights = {
-    equity: 0, debt: 0, realEstate: 0, gold: 0, nps: 0, ppf: 0, epf: 0,
-    international: 0, reit: 0, crypto: 0, other: 0,
-  };
-  let attributableEpfAnnualContribution = 0;
-  for (const inv of fireInvestments) {
-    const contribWeight = inv.ownerId === memberId ? 1 : inv.ownerId === JOINT ? split : 0;
-    if (contribWeight > 0) {
-      contributionWeights[returnBucketKey(inv)] += (inv.monthlyContribution ?? 0) * contribWeight;
-    }
-    const w = corpusWeightOf(inv.ownerId, inv.value);
-    if (w <= 0) continue;
-    attributableCorpus += w;
-    returnWeights[returnBucketKey(inv)] += w;
-    if (inv.type === "EPF_VPF") {
-      // EPF contribution is attributed the same way as its corpus weight (own full / joint split).
-      attributableEpfAnnualContribution += (inv.monthlyContribution ?? 0) * 12 * contribWeight;
-    }
-  }
-  attributableCorpus = Math.round(attributableCorpus);
-
-  // ---- attributable liabilities: own (100%) + shared-with-spouse (× split) ----
-  // #160: the dashboard's Liabilities tile showed the HOUSEHOLD balance beside a member-lensed
-  // loan count (same class as the Investments tile). Liabilities carry no "Joint" ownerId
-  // sentinel (unlike investments) — `isSharedWithSpouse` is the equivalent signal — so the
-  // weight mirrors `corpusWeightOf` above with that flag standing in for `ownerId === JOINT`.
-  let attributableLiabilitiesValue = 0;
-  for (const l of household.liabilities) {
-    const w =
-      l.ownerId === memberId
-        ? l.outstandingBalance
-        : l.isSharedWithSpouse
-          ? split * l.outstandingBalance
-          : 0;
-    attributableLiabilitiesValue += w;
-  }
-  attributableLiabilitiesValue = Math.round(attributableLiabilitiesValue);
-
-  // ---- attributable income: own (100%) + Joint (× split) ----
+  // ---- attributable income: own (100%) + Joint (× this adult's complementary share) ----
   const salary = isEarningMember(member, household.businesses)
     ? member.salary?.annualCTC ?? 0
     : 0;
@@ -213,8 +153,8 @@ export function computeIndividualFire(
     else if (b.ownerId === JOINT) jointBusiness += ann;
   }
   const attrTaxableIncome =
-    salary + ownTaxableOther + ownBusiness + split * (jointTaxableOther + jointBusiness);
-  const attrExemptIncome = ownExemptOther + split * jointExemptOther;
+    salary + ownTaxableOther + ownBusiness + jointShare * (jointTaxableOther + jointBusiness);
+  const attrExemptIncome = ownExemptOther + jointShare * jointExemptOther;
   const attributableAnnualIncome = Math.round(attrTaxableIncome + attrExemptIncome);
 
   // ---- attributable tax: per-individual, on the adult's OWN + Joint-split deductions (#204) ----
@@ -249,38 +189,207 @@ export function computeIndividualFire(
   });
   const attributableAnnualTax = Math.round(fyTax.totalTax);
 
-  // ---- savings + FIRE (real frame, like the household path) ----
-  const attributableAnnualSavings = Math.max(
-    0,
-    attributableAnnualIncome - attributableAnnualTax - attributableAnnualExpenses,
-  );
-  const monthlyContribution =
-    usableOverride(overrides?.monthlyContributionReal, 0) ?? Math.round(attributableAnnualSavings / 12);
-  /**
-   * gh #207 — THIS member's own REAL income path, and the scale factor the contribution rides.
-   *
-   * The household path (`derive.ts`) scales its inflow by `income(t)/income(0)`; before this fix the
-   * member-lens path did not, so the SAME single-earner household could be told two different
-   * prescriptions depending on which lens was selected (the household one fell 12.5% at #207 while
-   * the member one did not move at all — the cross-screen incoherence class
-   * `feedback_cross_screen_figure_coherence` names). Both scopes now ride the ONE
-   * `realIncomeScaleAt` formula in `income-path.ts`, on this member's own salary rather than the
-   * couple's, because this card funds only this member's lifestyle.
-   *
-   * A member with no salary (rental/pension only) scales by 1 — `realIncomeScaleAt` returns the
-   * neutral identity rather than dividing by a zero base.
-   */
-  const memberIncomePaths: EarnerIncomePath[] =
-    (member.salary?.annualCTC ?? 0) > 0
+
+  // The SAME conservative path derive.ts builds per earner (growth `?? 0`, taper `?? 50`), on this
+  // adult's own salary; a member with no salary has no growing income.
+  const paths: EarnerIncomePath[] =
+    salary > 0
       ? [
           {
-            annualAmount: member.salary?.annualCTC ?? 0,
+            annualAmount: salary,
             ageAtYear0: anchorAge,
-            realGrowthPercent: assumptions.salaryGrowthRealPercent ?? 2,
+            realGrowthPercent: assumptions.salaryGrowthRealPercent ?? 0,
             taperAge: assumptions.salaryGrowthTaperAge ?? 50,
           },
         ]
       : [];
+  const realExpenseDrift = (1 + resolveHouseholdBasket(assumptions)) / (1 + assumptions.inflation) - 1;
+  return {
+    attributableAnnualExpenses,
+    attributableAnnualIncome,
+    attributableAnnualTax,
+    recommended,
+    fyTax,
+    surplus: {
+      paths,
+      nonSalaryIncome0: Math.max(0, attributableAnnualIncome - salary),
+      effectiveTaxRate0: attributableAnnualIncome > 0 ? attributableAnnualTax / attributableAnnualIncome : 0,
+      annualExpenses0: attributableAnnualExpenses,
+      realExpenseDrift,
+    },
+  };
+}
+
+/**
+ * gh #232 — split a household surplus `total` across adults so the parts sum to it exactly.
+ * Adults with a positive own surplus keep it, less their complementary-share part of the gap
+ * between Σ positive surpluses and `total` (a non-earner's shortfall, dependants' costs). An adult
+ * pushed below 0 is set to 0 and the gap is re-spread over the rest (water-filling). Nobody positive
+ * but a positive total (the household's tax model came out lower) → spread by share over everyone.
+ */
+function conserveSurplus(
+  raws: { id: string; weight: number; raw: number }[],
+  total: number,
+): Map<string, number> {
+  const out = new Map(raws.map((r) => [r.id, 0]));
+  if (!(total > 0)) return out;
+  let active = raws.filter((r) => r.raw > 0);
+  if (active.length === 0) active = raws;
+  for (;;) {
+    const weightSum = active.reduce((s, r) => s + r.weight, 0);
+    const gap = active.reduce((s, r) => s + Math.max(0, r.raw), 0) - total;
+    const alloc = active.map((r) => ({
+      id: r.id,
+      value:
+        Math.max(0, r.raw) -
+        (weightSum > 0 ? r.weight / weightSum : 1 / active.length) * gap,
+    }));
+    const negative = alloc.filter((a) => a.value < 0);
+    if (negative.length === 0 || negative.length === active.length) {
+      for (const a of alloc) out.set(a.id, Math.max(0, a.value));
+      return out;
+    }
+    const dropped = new Set(negative.map((a) => a.id));
+    active = active.filter((r) => !dropped.has(r.id));
+  }
+}
+
+/**
+ * Standalone individual FIRE for ONE adult. Returns null for a non-adult or a missing member
+ * (dependents have no standalone FIRE — they are funded by the household).
+ */
+export function computeIndividualFire(
+  household: Household,
+  assumptions: Assumptions,
+  memberId: string,
+  currentFY: string,
+  /** T-377 (QN-2): the same additive solver seam the household path honours — see derive-overrides.ts. */
+  overrides?: DeriveOverrides,
+  /**
+   * #176 follow-up: this used to call `ageFromDOB(member.dateOfBirth)` with NO reference date,
+   * so this member's age (hence their whole individual-FIRE solve) silently drifted with the
+   * real wall clock — the exact class #176 fixed in `derive.ts`'s household-scope `anchorAgeFor`,
+   * but never pinned here. Callers MUST pass the same reference date the household scope uses
+   * (`derive.ts`'s `pinnedAsOf`) so a member's individual and household ages agree and neither
+   * moves between two loads of the same data on different days.
+   */
+  asOf: Date = new Date(),
+  /** #232: the household surplus the members' surpluses are conserved to (derive.ts passes it).
+   *  Omitted → the adults' own surpluses, a non-earner's shortfall carried by the earner(s). */
+  conservation?: { householdRealMonthlySurplusAt?: (yearIndex: number) => number },
+): IndividualFireResult | null {
+  const member = household.members.find((m) => m.id === memberId);
+  if (!member || !isAdultRole(member.role)) return null;
+
+  // #232: every shared row is split COMPLEMENTARILY across the adults (member-row-share.ts) — the
+  // members' shares of any row sum to exactly the row, at any split %.
+  const splitPercent = assumptions.householdSplitPercent ?? 50;
+  const ownedShare = (ownerId: string | undefined) =>
+    ownedRowShare(household, memberId, splitPercent, ownerId);
+  const anchorAge = ageFromDOB(member.dateOfBirth, asOf);
+  const targetRetirementAge =
+    usableOverride(overrides?.targetRetirementAge, 1) ?? member.targetRetirementAge ?? 50;
+  const planToAge = member.planToAge ?? 90;
+
+  const own = memberCashflow(household, assumptions, member, splitPercent, currentFY, asOf);
+  const {
+    attributableAnnualExpenses,
+    attributableAnnualIncome,
+    attributableAnnualTax,
+    recommended,
+    fyTax,
+  } = own;
+
+  // ---- attributable corpus: M-owned (100%) + Joint (complementary share); primary residence excluded ----
+  // #211: a non-primary property STILL counts toward this member's attributable target — the fix
+  // changed WHEN its rupees become spendable in the household bridge, not whether the property
+  // funds retirement. The member path has no bridge gate at all (see the #162 part-2 note below),
+  // so there is no unlock timeline here to date a sale into; the caveat on that line is what tells
+  // the user this age carries no liquidity check.
+  const fireInvestments = household.investments.filter(
+    (i) => !(i.type === "RealEstate" && i.realEstateRole === "PrimaryResidence"),
+  );
+  let attributableCorpus = 0;
+  const returnWeights = {
+    equity: 0, debt: 0, realEstate: 0, gold: 0, nps: 0, ppf: 0, epf: 0,
+    international: 0, reit: 0, crypto: 0, other: 0,
+  };
+  // gh #194 — the member-lens CONTRIBUTION-weighted fallback mix, mirroring derive.ts's household
+  // `contributionWeights` (l.686-693 there). Without this, `blendPortfolioReturn` below fell back to
+  // its OWN truly-empty debt default whenever this member's attributed VALUE weights totalled zero —
+  // which is every member whose only holding is an auto-flowed EPF line at `value: 0` (Ravi) — instead
+  // of using what this member is actually FUNDING, same as the household path does. Attributed by the
+  // SAME ownership share as the corpus value weights below (own full / joint complementary).
+  const contributionWeights = {
+    equity: 0, debt: 0, realEstate: 0, gold: 0, nps: 0, ppf: 0, epf: 0,
+    international: 0, reit: 0, crypto: 0, other: 0,
+  };
+  let attributableEpfAnnualContribution = 0;
+  for (const inv of fireInvestments) {
+    const contribWeight = ownedShare(inv.ownerId);
+    if (contribWeight > 0) {
+      contributionWeights[returnBucketKey(inv)] += (inv.monthlyContribution ?? 0) * contribWeight;
+    }
+    const w = contribWeight * inv.value;
+    if (w <= 0) continue;
+    attributableCorpus += w;
+    returnWeights[returnBucketKey(inv)] += w;
+    if (inv.type === "EPF_VPF") {
+      // EPF contribution is attributed the same way as its corpus weight (own full / joint split).
+      attributableEpfAnnualContribution += (inv.monthlyContribution ?? 0) * 12 * contribWeight;
+    }
+  }
+  attributableCorpus = Math.round(attributableCorpus);
+
+  // ---- attributable liabilities: own (100%) + shared-with-spouse (complementary share) ----
+  // #160: the dashboard's Liabilities tile reads this. #232: a shared loan used to give its owner
+  // 100% AND the spouse `split` (150% of the loan at the default 50); `liabilityShare` splits it.
+  let attributableLiabilitiesValue = 0;
+  for (const l of household.liabilities) {
+    attributableLiabilitiesValue += liabilityShare(household, memberId, splitPercent, l) * l.outstandingBalance;
+  }
+  attributableLiabilitiesValue = Math.round(attributableLiabilitiesValue);
+
+  /**
+   * gh #232 — THE MEMBER'S SURPLUS, projected and conserved.
+   *
+   * (1) Method: each adult's surplus comes from `realAnnualSurplusAt` — the SAME function the
+   * household path uses — so INCOME grows and the leftover is recomputed every year. The old
+   * method grew the year-0 leftover by the income scale; with income ≫ savings that put a
+   * one-adult household's member age 24 years after its household age (Ravi 89 vs 65).
+   * (2) Conservation: a non-earner's negative surplus is a real cost the earner(s) carry, so it is
+   * redistributed to the adults whose surplus is positive by their complementary shares, and the
+   * members' surpluses sum to the HOUSEHOLD surplus (derive passes it; any remainder — dependants'
+   * own costs, the per-assessee tax model's difference — is spread the same way). Flooring the
+   * non-earner at 0 while the earner kept their whole surplus made Σ member savings exceed the
+   * household's (Mauryas ₹24.85L vs ₹15.11L/yr) and every earner's member age optimistic.
+   */
+  const adults = household.members.filter((m) => isAdultRole(m.role));
+  const flows = adults.map((a) => ({
+    id: a.id,
+    weight: jointShareFor(household, a.id, splitPercent),
+    surplus:
+      a.id === memberId
+        ? own.surplus
+        : memberCashflow(household, assumptions, a, splitPercent, currentFY, asOf).surplus,
+  }));
+  const householdRealMonthlySurplusAt = conservation?.householdRealMonthlySurplusAt;
+  const memberAnnualSurplusAt = (yearIndex: number): number => {
+    const raws = flows.map((f) => ({
+      id: f.id,
+      weight: f.weight,
+      raw: realAnnualSurplusAt(f.surplus, yearIndex),
+    }));
+    const total = householdRealMonthlySurplusAt
+      ? householdRealMonthlySurplusAt(yearIndex) * 12
+      : Math.max(0, raws.reduce((s, r) => s + r.raw, 0));
+    return conserveSurplus(raws, total).get(memberId) ?? 0;
+  };
+
+  const attributableAnnualSavings = memberAnnualSurplusAt(0);
+  const monthlyContribution =
+    usableOverride(overrides?.monthlyContributionReal, 0) ?? Math.round(attributableAnnualSavings / 12);
+  const contributionIsOverride = usableOverride(overrides?.monthlyContributionReal, 0) != null;
 
   const cfg = getTaxConfigForFY(currentFY);
   const slabs = recommended.recommended === "NEW" ? cfg.newRegime.slabs : cfg.oldRegime.slabs;
@@ -375,13 +484,18 @@ export function computeIndividualFire(
   // Nominal frame: target grows at the household expense basket, corpus at the NOMINAL blended
   // return, the real contribution at general CPI. A non-positive scalar contribution is passed
   // through unchanged so the `<= 0 → Infinity` sentinel still fires.
+  // Organic: the conserved income-path surplus (see the #232 block above). Override (T-377/#207,
+  // same contract as derive.ts): the solver's starting amount rides this member's income scale.
   const nominalContribution =
     monthlyContribution <= 0
       ? monthlyContribution
-      : (yearIndex: number) =>
-          monthlyContribution *
-          realIncomeScaleAt(memberIncomePaths, yearIndex) *
-          Math.pow(1 + generalInflation, yearIndex);
+      : contributionIsOverride
+        ? (yearIndex: number) =>
+            monthlyContribution *
+            realIncomeScaleAt(own.surplus.paths, yearIndex) *
+            Math.pow(1 + generalInflation, yearIndex)
+        : (yearIndex: number) =>
+            (memberAnnualSurplusAt(yearIndex) / 12) * Math.pow(1 + generalInflation, yearIndex);
   const rawYearsToFire = hasTarget
     ? calculateYearsToTarget(
         attributableCorpus,
@@ -395,7 +509,7 @@ export function computeIndividualFire(
   const reachable = Number.isFinite(rawYearsToFire) && anchorAge + rawYearsToFire <= planToAge;
   const yearsToIndividualFire = reachable ? rawYearsToFire : Number.POSITIVE_INFINITY;
   const individualFireAge = reachable
-    ? Math.round(anchorAge + rawYearsToFire)
+    ? anchorAge + Math.ceil(rawYearsToFire)
     : Number.POSITIVE_INFINITY;
 
   return {

@@ -911,9 +911,9 @@ describe("gh #162 part 2 T7 — the member hero's FIRE age stays persona-sane af
         // rendered age past it is the exact rule-31 leak the HIGH-1 lock exists for.
         const planTo = member.planToAge ?? 90;
         expect(r.individualFireAge, `${label} <= planTo`).toBeLessThanOrEqual(planTo);
-        // Age and years must agree to the rounding step (cross-screen figure coherence).
+        // Age and years must agree (both round UP, like the household) (cross-screen figure coherence).
         expect(r.individualFireAge, `${label} coherence`).toBe(
-          Math.round(r.anchorAge + r.yearsToIndividualFire),
+          r.anchorAge + Math.ceil(r.yearsToIndividualFire),
         );
       }
     });
