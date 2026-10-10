@@ -3,6 +3,7 @@ import { computed, ref, watch } from "vue";
 import { useHouseholdStore } from "@/stores/household";
 import { useFireDerive } from "@/lib/useFireDerive";
 import { formatINRCompact } from "@/lib/formatters";
+import { monthlyEpfContributionFor } from "@/lib/salary-cash";
 import { canonicalizeSegments } from "@/lib/contribution-schedule";
 import type { Investment, InvestmentType } from "@/types/household";
 import { typeColor } from "@/lib/investment-traits";
@@ -402,10 +403,7 @@ const derivedMonthlyForEPF = computed(() => {
   if (draft.value.type !== "EPF_VPF") return null;
   const m = household.members.find((x) => x.id === draft.value.ownerId);
   if (!m?.salary?.annualCTC) return 0;
-  const basic = m.salary.annualCTC * 0.4;
-  const top = draft.value.vpfTopUp / 100;
-  const annual = basic * 0.12 * (1 + top) + basic * 0.12;
-  return Math.round(annual / 12);
+  return monthlyEpfContributionFor({ ...m.salary, vpfTopUpPercent: draft.value.vpfTopUp });
 });
 
 // Q4 (v3) — pencil-edit dialog pattern. EPF_VPF intentionally excluded — those are
@@ -602,7 +600,7 @@ function saveEdit() {
       </v-row>
       <div v-if="draft.type === 'EPF_VPF'" class="text-caption text-medium-emphasis mt-1">
         Derived monthly contribution: ~{{ formatINRCompact(derivedMonthlyForEPF ?? 0) }}/mo
-        (40% of CTC as basic × 12% employee + employer × (1 + VPF top-up)).
+        (your basic, or 50% of CTC if not recorded, × 12% employee + employer × (1 + VPF top-up)).
       </div>
 
       <!-- v5 P4 (A24.1/A24.2) — ESOP grant details: origin country + exercise economics. -->

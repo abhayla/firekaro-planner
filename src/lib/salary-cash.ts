@@ -32,12 +32,10 @@
  *     the identity `monthlyTakeHome × 12 === income − tax − PF − professionalTax` holds
  *     BY CONSTRUCTION — the money leaving the payslip and the money entering the corpus
  *     are the same number read from the same place.
- *   - Recomputing PF from a basic percentage would introduce a SECOND basic base. The app
- *     currently has two (`0.4 × CTC` in the store's auto-flow and in `quick-number.ts`,
- *     versus the salary form's 50% default). Unifying them is correct but it MOVES two
- *     personas' headline FIRE age, so it is split out to PR B
- *     (`chore/218b-basic-50pct-unification`) for an owner call. `resolveBasicAnnual` below
- *     is exported and specced for that PR; PR A does not wire the auto-flow to it.
+ *   - Those rows are themselves written off the ONE basic base (`resolveBasicAnnual`, gh #218
+ *     PR B): the store's `autoFlowSalaryToEPF`, the quick path's `autoEpfInvestment` and the
+ *     investment form's EPF hint all call `statutoryPfFor`, so there is no second basic base for
+ *     the payslip and the corpus to disagree about.
  *   - No EPF row ⇒ PF is zero for that earner. Nothing is being auto-flowed, so nothing is
  *     leaving their payslip, and the figure honestly collapses to `gross − tax`.
  *
@@ -81,22 +79,107 @@ export interface SalaryLike {
 const num = (x: unknown): number => (typeof x === "number" && Number.isFinite(x) ? x : 0);
 
 /**
- * The intended ONE answer to "what is this earner's annual Basic+DA?" — the user's stored
- * figure when present, else the law-grounded 50%-of-CTC default (Code on Wages 2019; see
- * `salary-percent.ts`).
+ * Unrecorded-basic fallbacks, one per direction of error. Both are "conservative" for their consumer:
+ * - EPF/PF reads 50% of CTC (Code on Wages 2019 "wages" floor): more PF = less take-home.
+ * - The 80CCD(2) cap reads 40% of CTC: the 50% "wages" floor is a labour-law definition, not the
+ *   payslip Basic+DA the tax cap is written on, and many CTCs carry basic near 40%; a lower basic
+ *   means a lower deduction cap, so tax is never understated.
+ */
+export const EPF_FALLBACK_BASIC_PERCENT_OF_CTC = DEFAULT_BASIC_PERCENT_OF_CTC;
+export const NPS_CAP_FALLBACK_BASIC_PERCENT_OF_CTC = 40;
+
+/**
+ * The ONE answer to "what is this earner's annual Basic+DA?" — the user's stored figure when
+ * present, else the law-grounded 50%-of-CTC default (Code on Wages 2019; see
+ * `salary-percent.ts`). The EPF auto-flow (`statutoryPfFor`) and the quick path read it here;
+ * the 80CCD(2) employer-NPS cap reads `basicForNpsCap` (lower fallback, see the constants above).
+ * gh #218 PR B removed the three local `0.4 × CTC` copies that disagreed with the salary form.
  *
- * NOT YET WIRED TO THE EPF AUTO-FLOW. The store's `autoFlowSalaryToEPF` and
- * `quick-number.ts` still use a local `0.4 × CTC`. Pointing them here is the right fix and
- * is PR B (`chore/218b-basic-50pct-unification`): it raises every EPF row by 25% and moves
- * two personas' headline FIRE age by one month, which is an owner-gated change. Exported
- * and specced here so PR B is a one-line rewire rather than a new module.
+ * Gratuity (`gratuity.ts`) deliberately does NOT use this: gratuity is a corpus ADDITION, so its
+ * unrecorded-basic estimate stays at a conservative 35% of CTC (a higher basic would inflate the
+ * corpus — the optimistic direction).
  */
 export function resolveBasicAnnual(salary: SalaryLike | undefined | null): number {
   const stored = num(salary?.basicAnnual);
   if (stored > 0) return stored;
   const ctc = num(salary?.annualCTC);
   if (ctc <= 0) return 0;
-  return basicAnnualFromPercent(ctc, DEFAULT_BASIC_PERCENT_OF_CTC);
+  return basicAnnualFromPercent(ctc, EPF_FALLBACK_BASIC_PERCENT_OF_CTC);
+}
+
+/**
+ * Basic+DA for the 80CCD(2) employer-NPS cap ONLY: the user's stored basic when present, else
+ * 40% of CTC (`NPS_CAP_FALLBACK_BASIC_PERCENT_OF_CTC`) — the lower basic, so the lower cap.
+ */
+export function basicForNpsCap(salary: SalaryLike | undefined | null): number {
+  const stored = num(salary?.basicAnnual);
+  if (stored > 0) return stored;
+  const ctc = num(salary?.annualCTC);
+  if (ctc <= 0) return 0;
+  return basicAnnualFromPercent(ctc, NPS_CAP_FALLBACK_BASIC_PERCENT_OF_CTC);
+}
+
+export interface StatutoryPf {
+  /** 12% of basic — the employee's own mandatory leg. */
+  employeePF: number;
+  /** The voluntary top-up, as a % of the employee leg (`vpfTopUpPercent`). */
+  vpf: number;
+  /** 12% of basic — the employer's matching leg, funded from inside CTC. */
+  employerPF: number;
+}
+
+/** The three annual PF legs for one earner, all off the ONE resolved basic. */
+export function statutoryPfFor(salary: SalaryLike | undefined | null): StatutoryPf {
+  const basic = resolveBasicAnnual(salary);
+  if (basic <= 0) return { employeePF: 0, vpf: 0, employerPF: 0 };
+  const employeePF = basic * EPF_STATUTORY_RATE;
+  const topUp = num(salary?.vpfTopUpPercent) / 100;
+  return { employeePF, vpf: employeePF * topUp, employerPF: basic * EPF_STATUTORY_RATE };
+}
+
+/** The whole monthly EPF·VPF contribution an EPF row carries for this earner (₹, rounded). */
+export function monthlyEpfContributionFor(salary: SalaryLike | undefined | null): number {
+  const { employeePF, vpf, employerPF } = statutoryPfFor(salary);
+  return Math.round((employeePF + vpf + employerPF) / 12);
+}
+
+/**
+ * The auto-flow's monthly EPF figure under the RETIRED pre-#218 rule (basic = 40% of CTC, the
+ * user's own basic ignored). Used only to RECOGNISE rows that rule wrote; never to write one.
+ */
+function retiredMonthlyEpfContribution(salary: SalaryLike | undefined | null): number {
+  const ctc = num(salary?.annualCTC);
+  if (ctc <= 0) return 0;
+  const basic = ctc * 0.4;
+  const topUp = num(salary?.vpfTopUpPercent) / 100;
+  return Math.round((basic * EPF_STATUTORY_RATE * (1 + topUp) + basic * EPF_STATUTORY_RATE) / 12);
+}
+
+/**
+ * Migration-on-hydrate (gh #218 PR B): re-derive each earner's auto-flowed EPF row with the
+ * current rule (`monthlyEpfContributionFor`). The row is the one the auto-flow owns (the FIRST
+ * EPF_VPF row for that member, same as `autoFlowSalaryToEPF`'s dedupe). A user edit is detected by
+ * VALUE: the row is rewritten only when its contribution equals, to the rupee, what the retired
+ * 40% rule would have written for that member's current salary; any other amount is the user's
+ * and is left alone. Idempotent: a rewritten row no longer matches the retired figure. Mutates
+ * `investments` in place; returns how many rows it rewrote.
+ */
+export function reDeriveRetiredAutoEpfRows(
+  members: Household["members"],
+  investments: Investment[],
+): number {
+  let rewritten = 0;
+  for (const m of members) {
+    if (m.role !== "ADULT" || !m.salary?.annualCTC || m.salary.hasEpf === false) continue;
+    const row = investments.find((i) => i.type === "EPF_VPF" && i.ownerId === m.id);
+    if (!row) continue;
+    const current = monthlyEpfContributionFor(m.salary);
+    if (row.monthlyContribution === retiredMonthlyEpfContribution(m.salary) && row.monthlyContribution !== current) {
+      row.monthlyContribution = current;
+      rewritten++;
+    }
+  }
+  return rewritten;
 }
 
 /**

@@ -13,6 +13,7 @@ import type {
 } from "@/types/household";
 import { genId } from "@/lib/id";
 import { dobFromAge } from "@/lib/age";
+import { monthlyEpfContributionFor, reDeriveRetiredAutoEpfRows } from "@/lib/salary-cash";
 import { isEarningMember } from "@/lib/member-earning";
 import { autoFlowOwnerId, EXPENSE_OWNER_HOUSEHOLD } from "@/lib/expense-attribution";
 import { toMonthly, toAnnual, legacyFreqToPeriod } from "@/lib/cashflow";
@@ -279,6 +280,9 @@ export const useHouseholdStore = defineStore("household", () => {
         if (!Array.isArray(data.value.estateChecklist)) {
           data.value.estateChecklist = [];
         }
+        // gh #218 PR B — EPF rows the auto-flow wrote under the retired 40%-of-CTC basic are
+        // re-derived on the ONE basic base; a row whose amount the user changed is left alone.
+        reDeriveRetiredAutoEpfRows(data.value.members, data.value.investments);
       }
     } catch {
       // ignore — start fresh
@@ -532,7 +536,7 @@ export const useHouseholdStore = defineStore("household", () => {
   }
   function autoFlowSalaryToEPF() {
     // For each earner with salary, ensure an EPF·VPF investment exists with derived monthly contribution.
-    // 12% statutory of basic (estimated as 40% of CTC) + 12% employer match; monthly = (annual × (1 + topUp%)) / 12
+    // 12% statutory of basic (`resolveBasicAnnual`) + 12% employer match; monthly = (annual × (1 + topUp%)) / 12
     for (const m of data.value.members) {
       // gh #67: EPF auto-flow is salary-driven — an adult with actual CTC. Earning is derived.
       if (m.role !== "ADULT" || !m.salary?.annualCTC) continue;
@@ -553,11 +557,9 @@ export const useHouseholdStore = defineStore("household", () => {
         }
         continue;
       }
-      const basic = m.salary.annualCTC * 0.4;
-      const topUp = (m.salary.vpfTopUpPercent ?? 0) / 100;
-      const annualEmpEmployee = basic * 0.12 * (1 + topUp);
-      const annualEmployer = basic * 0.12;
-      const monthly = Math.round((annualEmpEmployee + annualEmployer) / 12);
+      // gh #218 PR B — basic is the ONE base (`resolveBasicAnnual`: the user's own basic, else 50%
+      // of CTC per the Code on Wages floor), not a local 0.4 × CTC the salary form disagreed with.
+      const monthly = monthlyEpfContributionFor(m.salary);
 
       if (existing) {
         existing.monthlyContribution = monthly;

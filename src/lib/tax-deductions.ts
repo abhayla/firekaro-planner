@@ -27,7 +27,12 @@ import type {
 import { isAdultRole } from "@/types/household";
 import { isEarningMember } from "@/lib/member-earning";
 import { ageAsOf, todayIsoLocal } from "@/lib/as-of-date";
-import { netCashSalary, pfFromRows, PROFESSIONAL_TAX_ANNUAL_PER_EARNER } from "@/lib/salary-cash";
+import {
+  netCashSalary,
+  pfFromRows,
+  PROFESSIONAL_TAX_ANNUAL_PER_EARNER,
+  basicForNpsCap,
+} from "@/lib/salary-cash";
 import { toAnnual } from "@/lib/cashflow";
 import { computeTax, singleEarnerNpsArgs } from "@/lib/tax";
 
@@ -426,16 +431,19 @@ export function deriveDeductions(
     (s, m) => s + (m.salary?.employerNpsAnnual ?? 0),
     0,
   );
-  // Basic-salary total feeds the regime-aware 80CCD(2) cap in computeTax (gh-issue #3).
+  // Basic-salary total feeds the regime-aware 80CCD(2) cap in computeTax (gh-issue #3). gh #218
+  // PR B: basic is the ONE resolved base — an unrecorded basic used to read 0 here, which LEFT
+  // THE CAP OFF entirely (computeTax only caps when basic > 0), an optimistic deduction. The cap
+  // reads `basicForNpsCap` (40%-of-CTC fallback), not the EPF 50% base: lower basic, lower cap.
   const employerNpsBasicTotal = household.members.reduce(
-    (s, m) => s + (m.salary?.basicAnnual ?? 0),
+    (s, m) => s + basicForNpsCap(m.salary),
     0,
   );
   // Per-member {nps, basic} for the per-member 80CCD(2) cap (gh-issue #4).
   const employerNpsByMember = household.members
     .map((m) => ({
       nps: m.salary?.employerNpsAnnual ?? 0,
-      basic: m.salary?.basicAnnual ?? 0,
+      basic: basicForNpsCap(m.salary),
       sector: m.salary?.employerSector ?? "private", // govt → 14% OLD ceiling (gh-issue #4)
     }))
     .filter((e) => e.nps > 0 || e.basic > 0);
@@ -641,7 +649,7 @@ export function computeEarnerTaxCard(
 ): EarnerTaxCard {
   const gross = member.salary?.annualCTC ?? 0;
   const earnerNps = member.salary?.employerNpsAnnual ?? 0;
-  const earnerBasic = member.salary?.basicAnnual ?? 0;
+  const earnerBasic = basicForNpsCap(member.salary);
   const earnerNpsArgs = singleEarnerNpsArgs(earnerNps, earnerBasic, member.salary?.employerSector ?? "private");
   const earnerOld = computeTax({
     grossIncome: gross,

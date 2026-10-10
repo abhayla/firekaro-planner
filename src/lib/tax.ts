@@ -408,8 +408,8 @@ export interface ComputeTaxArgs {
   // (it is NOT inside `deductions`) to avoid double-counting in the old regime. gh-issue #2.
   employerNps?: number;
   // Member basic salary (Basic+DA) used to cap 80CCD(2) at the statutory ceiling
-  // (10% basic OLD / 14% basic NEW). When omitted, `employerNps` is used uncapped
-  // (we do not fabricate basic from CTC). gh-issue #3.
+  // (10% basic OLD / 14% basic NEW). When omitted or 0, `employerNps` is used uncapped; callers
+  // pass `basicForNpsCap` (salary-cash.ts), which falls back to 40% of CTC. gh-issue #3 / #218.
   employerNpsBasic?: number;
   // Per-member {nps, basic} pairs for the 80CCD(2) cap. When provided, each member's employer
   // NPS is capped at the regime ceiling of THEIR OWN basic and summed — an over-contributor
@@ -448,8 +448,8 @@ export function computeTax(args: ComputeTaxArgs): FullTaxResult {
   // NPS, which is deductible under both regimes and is passed separately (gh-issue #2).
   const ded = regime === "OLD" ? Math.max(0, args.deductions ?? 0) : 0;
   // 80CCD(2): cap the employer-NPS deduction at the statutory ceiling of basic salary
-  // (npsCeilingFor — the single source). Absent a basic we trust the entered figure rather
-  // than fabricate basic from CTC (gh-issue #3). Sector defaults to private (conservative).
+  // (npsCeilingFor — the single source). A basic of 0 leaves the entered figure uncapped; callers
+  // supply `basicForNpsCap` (gh-issue #3 / #218). Sector defaults to private (conservative).
   let employerNps: number;
   if (args.employerNpsByMember && args.employerNpsByMember.length > 0) {
     // Per-member cap (gh-issue #4): cap each member's employer NPS at the ceiling of their OWN

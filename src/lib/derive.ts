@@ -582,9 +582,8 @@ export function derive(
     //
     // WHERE THE PF NUMBER COMES FROM: the EPF_VPF rows ALREADY IN SCOPE (`scopeInvestments`) —
     // the exact rupees this same scope's corpus receives. Money leaving the payslip and money
-    // entering the corpus are therefore one number read from one place, so no SECOND basic base
-    // is introduced and nothing downstream of this figure moves. (Unifying the app's two basic
-    // bases is correct but MOVES headlines, so it is PR B: `chore/218b-basic-50pct-unification`.)
+    // entering the corpus are therefore one number read from one place. Those rows are written off
+    // the ONE basic base (`resolveBasicAnnual`, gh #218 PR B), so there is no second basic base.
     //
     // PF is deliberately NOT removed from `annualSavings`/`monthlyContribution` above: it is
     // funded out of that residual and already reaches the corpus through that same EPF row
