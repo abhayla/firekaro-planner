@@ -1008,7 +1008,12 @@ describe("seed-anchor regression locks (gh-issue #17 — catch silent adequacy-l
     // Rs 5,48,496 + Priya Rs 1,68,064 = Rs 7,16,560, not the pooled Rs 11,65,840 -- Rs 4,49,280/yr
     // of phantom tax that used to be subtracted from savings before it reached the corpus. The
     // direction is the honest one: a household that owes less tax reaches FIRE sooner.
-    expect(k.yearsToRegular).toBeCloseTo(19.0833, 2);
+    //
+    // RE-ANCHORED 2026-10-11 (#218 PR B, one basic base): 19.0833y -> 19.1667y, FIRE one month
+    // LATER, `fireNumber` again unchanged. The EPF auto-flow now uses basic = 50% of CTC (was a local
+    // 40%), so both EPF rows rise 25% (Rs 4,12,800 -> Rs 5,16,000/yr). The savings residual is the
+    // same, but more of it now sits in the EPF row's lower return - the conservative direction.
+    expect(k.yearsToRegular).toBeCloseTo(19.1667, 2);
     expect(Math.round(k.fireNumber)).toBe(87_372_837);
   });
 });

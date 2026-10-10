@@ -66,8 +66,14 @@ const r = (x: number, dp = 4) => (Number.isFinite(x) ? Math.round(x * 10 ** dp) 
 // gh #218 — `monthlyTakeHome` is ADDED to the snapshot below; NO existing field moves. The cash
 // figure is computed by subtracting the PF the household's EPF_VPF rows already carry (the same
 // rupees the corpus receives) plus professional tax, so it introduces no second basic base and
-// nothing downstream of it changes. Unifying the two basic bases DOES move two personas by one
-// month — that is split out to PR B (`chore/218b-basic-50pct-unification`) for an owner call.
+// nothing downstream of it changes.
+// gh #218 PR B — the EPF auto-flow now reads the ONE basic base (user's basic, else 50% of CTC; was
+// a local 40%), so every EPF row without a recorded basic rises 25% and take-home falls by the same
+// PF. sharmas: EPF ₹4.128L→₹5.16L/yr, take-home ₹3,36,303→₹3,27,703/mo, FIRE age 50.08→50.17 (more
+// of the same residual sits in lower-returning EPF). iyers: EPF ₹4.128L→₹5.16L/yr, take-home
+// ₹2,70,867→₹2,62,267/mo, FIRE age unchanged.
+// mehtas: EPF ₹7.008L→₹8.76L/yr, take-home ₹4,36,417→₹4,21,817/mo, fat-FIRE 7.50→7.58y. mauryas
+// records basic ₹16.8L explicitly, so nothing moves.
 describe("A7.2 golden-master — per-persona headline (DEFAULT lens)", () => {
   beforeEach(() => setActivePinia(createPinia()));
 

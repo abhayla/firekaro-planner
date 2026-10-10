@@ -13,7 +13,11 @@ import {
   pfFromInvestmentRows,
   pfFromRows,
   resolveBasicAnnual,
+  statutoryPfFor,
+  monthlyEpfContributionFor,
 } from "./salary-cash";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { DEFAULT_BASIC_PERCENT_OF_CTC } from "./salary-percent";
 import type { Household, Investment } from "@/types/household";
 
@@ -126,11 +130,10 @@ describe("netCashSalary — gross minus PF minus tax minus professional tax", ()
 });
 
 /**
- * `resolveBasicAnnual` is exported for PR B (`chore/218b-basic-50pct-unification`), which
- * rewires the EPF auto-flow to it. PR A does not call it from any product path — these
- * specs exist so PR B is a rewire, not a new module.
+ * gh #218 PR B — `resolveBasicAnnual` is the ONE basic base every consumer reads: the EPF
+ * auto-flow, the quick path, the investment form's EPF hint and the 80CCD(2) employer-NPS cap.
  */
-describe("resolveBasicAnnual — the ONE basic base (wired by PR B, not PR A)", () => {
+describe("resolveBasicAnnual — the ONE basic base", () => {
   it("uses the user's stored basicAnnual when present", () => {
     expect(resolveBasicAnnual({ annualCTC: 4_200_000, basicAnnual: 1_680_000 })).toBe(1_680_000);
   });
@@ -148,7 +151,52 @@ describe("resolveBasicAnnual — the ONE basic base (wired by PR B, not PR A)", 
     expect(resolveBasicAnnual({ annualCTC: 1_000_000, basicAnnual: -5 })).toBe(500_000);
   });
 
-  it("exposes the statutory 12% rate PR B will apply to that base", () => {
+  it("applies the statutory 12% rate to that base", () => {
     expect(EPF_STATUTORY_RATE).toBe(0.12);
   });
+});
+
+describe("statutoryPfFor / monthlyEpfContributionFor — PF off the ONE basic", () => {
+  it("defaults to 12% + 12% of 50% of CTC (₹25L CTC → ₹1.5L + ₹1.5L/yr, ₹25,000/mo)", () => {
+    expect(statutoryPfFor({ annualCTC: 2_500_000 })).toEqual({ employeePF: 150_000, vpf: 0, employerPF: 150_000 });
+    expect(monthlyEpfContributionFor({ annualCTC: 2_500_000 })).toBe(25_000);
+  });
+
+  it("uses the user's own basic when recorded (₹42L CTC, ₹16.8L basic → ₹33,600/mo)", () => {
+    expect(monthlyEpfContributionFor({ annualCTC: 4_200_000, basicAnnual: 1_680_000 })).toBe(33_600);
+  });
+
+  it("adds VPF as a % of the employee leg only", () => {
+    expect(statutoryPfFor({ annualCTC: 1_000_000, vpfTopUpPercent: 50 })).toEqual({
+      employeePF: 60_000,
+      vpf: 30_000,
+      employerPF: 60_000,
+    });
+  });
+
+  it("is zero without a salary", () => {
+    expect(monthlyEpfContributionFor(undefined)).toBe(0);
+    expect(monthlyEpfContributionFor({ annualCTC: 0 })).toBe(0);
+  });
+});
+
+/**
+ * Class lock (detection for #218 PR B): no consumer re-derives basic from CTC locally. Three
+ * copies of `0.4 × CTC` disagreed with the salary form's 50% for months with every gate green.
+ * `gratuity.ts` is the one deliberate exception (a conservative 35% for a corpus ADDITION).
+ */
+describe("no local basic-pay formula outside salary-cash.ts", () => {
+  const FILES = [
+    "src/stores/household.ts",
+    "src/lib/quick-number.ts",
+    "src/components/forms/InvestmentForm.vue",
+    "src/lib/tax-deductions.ts",
+  ];
+  for (const f of FILES) {
+    it(`${f} reads basic only through salary-cash.ts`, () => {
+      const src = readFileSync(resolve(__dirname, "../..", f), "utf8");
+      expect(src).not.toMatch(/(annualCTC|ctc)\s*\*\s*0\.\d+/i);
+      expect(src).not.toMatch(/basicAnnual\s*\?\?\s*0/);
+    });
+  }
 });

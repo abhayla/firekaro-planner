@@ -13,6 +13,7 @@ import type {
 } from "@/types/household";
 import { genId } from "@/lib/id";
 import { dobFromAge } from "@/lib/age";
+import { monthlyEpfContributionFor } from "@/lib/salary-cash";
 import { isEarningMember } from "@/lib/member-earning";
 import { autoFlowOwnerId, EXPENSE_OWNER_HOUSEHOLD } from "@/lib/expense-attribution";
 import { toMonthly, toAnnual, legacyFreqToPeriod } from "@/lib/cashflow";
@@ -553,11 +554,9 @@ export const useHouseholdStore = defineStore("household", () => {
         }
         continue;
       }
-      const basic = m.salary.annualCTC * 0.4;
-      const topUp = (m.salary.vpfTopUpPercent ?? 0) / 100;
-      const annualEmpEmployee = basic * 0.12 * (1 + topUp);
-      const annualEmployer = basic * 0.12;
-      const monthly = Math.round((annualEmpEmployee + annualEmployer) / 12);
+      // gh #218 PR B — basic is the ONE base (`resolveBasicAnnual`: the user's own basic, else 50%
+      // of CTC per the Code on Wages floor), not a local 0.4 × CTC the salary form disagreed with.
+      const monthly = monthlyEpfContributionFor(m.salary);
 
       if (existing) {
         existing.monthlyContribution = monthly;
