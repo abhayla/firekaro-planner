@@ -139,7 +139,7 @@ function autoLoanRecurringLine(loan: Liability): RecurringExpenseLine {
 }
 
 /**
- * Mirror of the store's salary→EPF auto-flow (12% of an estimated 40%-of-CTC basic, both sides).
+ * Mirror of the store's salary→EPF auto-flow (12% of `resolveBasicAnnual`, both sides).
  *
  * `hasEpf=false` (#223) is the quick path's own gate — a no-PF employee gets no EPF row, so the
  * fallback take-home solve below has nothing to invent PF against. Defaults true: this mirrors the

@@ -462,6 +462,20 @@ describe("applyQuickAnswers — the unaccounted rupee is spent, not deleted", ()
   });
 });
 
+describe("applyQuickAnswers — the quick EPF row sits on the ONE basic base (gh #218)", () => {
+  // Behaviour, not a source scan: whatever spelling a 40%-of-CTC basic takes (0.4, / 2.5, 40 / 100),
+  // the quick EPF row would stop being 12% employee + 12% employer of HALF the solved CTC.
+  it("monthly EPF = (12% + 12%) × 50% × CTC / 12 for the solved salary", () => {
+    for (const answers of [{ ...AMIT, sip: 0 }, AMIT]) {
+      const { household } = apply(answers);
+      const self = household.members.find((m) => m.role === "ADULT" && (m.salary?.annualCTC ?? 0) > 0)!;
+      const ctc = self.salary!.annualCTC!;
+      const row = household.investments.find((i) => i.type === "EPF_VPF" && i.ownerId === self.id)!;
+      expect(row.monthlyContribution).toBe(Math.round(((0.12 + 0.12) * 0.5 * ctc) / 12));
+    }
+  });
+});
+
 describe("applyQuickAnswers — re-entry safety", () => {
   it("keeps investments the user added by hand after the quick run", () => {
     const first = apply();

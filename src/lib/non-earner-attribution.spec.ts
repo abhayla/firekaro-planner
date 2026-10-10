@@ -695,9 +695,9 @@ describe("#239 — deduction caps (one focused case per class)", () => {
   });
 
   it("class 6 (review MAJOR): clubbing uses POST-deduction income — never the parent the code would under-tax", () => {
-    const a = { ...(adult("A", 5_100_000) as object), salary: { annualCTC: 5_100_000, hikePercent: 5, employerNpsAnnual: 300_000 } } as never;
+    const a = { ...(adult("A", 5_100_000) as object), salary: { annualCTC: 5_100_000, hikePercent: 5, employerNpsAnnual: 300_000, basicAnnual: 2_550_000 } } as never;
     const d = household([a, adult("B", 5_050_000), minor("M")], [interest("m", "M", 300_000)], []);
-    // A: ₹51L − ₹75k − ₹3L 80CCD(2) = ₹47.25L; B: ₹50.5L − ₹75k = ₹49.75L → the minor belongs on B
+    // A (basic ₹25.5L recorded, so the 14% cap ₹3.57L admits all ₹3L): ₹51L − ₹75k − ₹3L 80CCD(2) = ₹47.25L; B: ₹50.5L − ₹75k = ₹49.75L → the minor belongs on B
     // (₹52.75L, near full 10% surcharge). Before: clubbed on A (₹50.25L, marginal relief) → ₹22,64,600.
     const r = tax(d);
     expect(who(r, "B")!.incomeRows["inc:m"]).toBe(300_000);

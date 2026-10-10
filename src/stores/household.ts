@@ -13,7 +13,7 @@ import type {
 } from "@/types/household";
 import { genId } from "@/lib/id";
 import { dobFromAge } from "@/lib/age";
-import { monthlyEpfContributionFor } from "@/lib/salary-cash";
+import { monthlyEpfContributionFor, reDeriveRetiredAutoEpfRows } from "@/lib/salary-cash";
 import { isEarningMember } from "@/lib/member-earning";
 import { autoFlowOwnerId, EXPENSE_OWNER_HOUSEHOLD } from "@/lib/expense-attribution";
 import { toMonthly, toAnnual, legacyFreqToPeriod } from "@/lib/cashflow";
@@ -280,6 +280,9 @@ export const useHouseholdStore = defineStore("household", () => {
         if (!Array.isArray(data.value.estateChecklist)) {
           data.value.estateChecklist = [];
         }
+        // gh #218 PR B — EPF rows the auto-flow wrote under the retired 40%-of-CTC basic are
+        // re-derived on the ONE basic base; a row whose amount the user changed is left alone.
+        reDeriveRetiredAutoEpfRows(data.value.members, data.value.investments);
       }
     } catch {
       // ignore — start fresh
@@ -533,7 +536,7 @@ export const useHouseholdStore = defineStore("household", () => {
   }
   function autoFlowSalaryToEPF() {
     // For each earner with salary, ensure an EPF·VPF investment exists with derived monthly contribution.
-    // 12% statutory of basic (estimated as 40% of CTC) + 12% employer match; monthly = (annual × (1 + topUp%)) / 12
+    // 12% statutory of basic (`resolveBasicAnnual`) + 12% employer match; monthly = (annual × (1 + topUp%)) / 12
     for (const m of data.value.members) {
       // gh #67: EPF auto-flow is salary-driven — an adult with actual CTC. Earning is derived.
       if (m.role !== "ADULT" || !m.salary?.annualCTC) continue;
