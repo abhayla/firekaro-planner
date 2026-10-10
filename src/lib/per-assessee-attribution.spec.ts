@@ -115,8 +115,10 @@ describe("#87 — every adult with taxable income files (zero-earner households 
   });
 
   it("a non-salaried adult with capital income files WITHOUT the salaried standard deduction (M3)", () => {
+    // #87 round 4: with an earner present a non-earner no longer files (her income moves to the
+    // earner), so M3 is exercised in a zero-earner household, where she does file.
     const k = run((d) => {
-      d.members.find((m) => m.id === "priya")!.salary!.annualCTC = 0;
+      noSalaries(d);
       d.otherIncome.push(interest("priya", 1_400_000) as never);
     });
     const p = who(k, "priya")!;

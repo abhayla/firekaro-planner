@@ -246,13 +246,15 @@ const oldResult = computed(() =>
 const newResult = computed(() =>
   householdTaxUnderRegime(perAssessee.value.perAssessee, "NEW", selectedFY.value),
 );
-// #87 round 1 — AUTO's headline is the sum of each adult's OWN cheaper regime (= kernel
-// `annualTax`), never min(all-Old, all-New): two adults can each be cheaper under different regimes.
-const autoResult = computed(() =>
-  householdTaxUnderRegime(perAssessee.value.perAssessee, "AUTO", selectedFY.value),
-);
+// #87 round 4 — the headline is ONE direct binding to the kernel helper for the selected mode.
+// AUTO = each adult's OWN cheaper regime (= kernel `annualTax`), never min(all-Old, all-New).
 const activeResult = computed(() =>
-  mode.value === "AUTO" ? autoResult.value : mode.value === "OLD" ? oldResult.value : newResult.value,
+  householdTaxUnderRegime(perAssessee.value.perAssessee, mode.value, selectedFY.value),
+);
+const regimeFootnote = computed(() =>
+  mode.value === "AUTO"
+    ? "Each adult files their own return; each person's tax uses their own cheaper regime."
+    : `Each adult files their own return. Shown under the ${mode.value === "OLD" ? "Old" : "New"} regime for everyone.`,
 );
 const savings = computed(() => Math.abs(oldResult.value.totalTax - newResult.value.totalTax));
 
@@ -668,7 +670,7 @@ const zeroTaxSectionVisible = computed(() => !isZeroTaxRecommended.value || show
           <RankedBars :bars="incomeBars" />
           <v-divider class="my-3" />
           <div class="row-line">
-            <span class="font-weight-bold">Total taxable</span>
+            <span class="font-weight-bold">Total income (before rental relief)</span>
             <span class="text-currency font-weight-bold">{{ formatINRCompact(totalTaxable) }}</span>
           </div>
           <div v-if="totalExempt > 0" class="row-line text-caption text-medium-emphasis mt-1">
@@ -783,7 +785,7 @@ const zeroTaxSectionVisible = computed(() => !isZeroTaxRecommended.value || show
               <th class="text-right">Tax</th>
               <th class="text-right">Eff. rate</th>
               <th class="text-right">Take-home</th>
-              <th class="text-center">Better regime</th>
+              <th class="text-center">Cheaper regime</th>
             </tr>
           </thead>
           <tbody>
@@ -805,7 +807,14 @@ const zeroTaxSectionVisible = computed(() => !isZeroTaxRecommended.value || show
           </tbody>
         </v-table>
         <div class="text-caption text-medium-emphasis mt-3">
-          Each adult files their own return, and in AUTO each person's tax uses their own cheaper regime.
+          {{ regimeFootnote }}
+        </div>
+        <div
+          v-for="a in perAssessee.attributedNonEarners"
+          :key="a.memberId"
+          class="text-caption text-medium-emphasis mt-1"
+        >
+          {{ a.name }}'s income is counted on {{ a.toName }}'s return (no own salary or business).
         </div>
       </PanelCard>
     </template>
