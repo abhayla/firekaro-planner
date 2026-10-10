@@ -238,11 +238,15 @@ describe("computeIndividualFire (#81 Phase 2 — standalone per-adult FIRE)", ()
   // a reachable member, target byte-identical at t = 0, expenses/corpus non-negative).
   it("gh #162 part 2 T2 — per-seed member bounds on the measured post-fix ages", () => {
     const seeds: Array<[string, (h: never, a: never) => void, Array<[string, number | null]>]> = [
-      ["sharmas", loadSeedPersona as never, [["rohit", 48], ["priya", 47]]],
+      // #232 re-measure (split 50): a shared loan's EMI is now split between the co-borrowers
+      // instead of 100% on the owner (sharmas rohit 48→43 / priya 47→56, iyers ashwin 47→45 /
+      // lakshmi 84→unreachable on ₹8L income, mauryas abhay 56→52); a single adult now carries 100%
+      // of the shared pool instead of only `split` of it (ravi 41→89). Mehtas has no loan: unmoved.
+      ["sharmas", loadSeedPersona as never, [["rohit", 43], ["priya", 56]]],
       ["mehtas", loadMehtasSeed as never, [["vikram", 45], ["aanya", 63]]],
-      ["iyers", loadIyersSeed as never, [["ashwin", 47], ["lakshmi", 84]]],
-      ["mauryas", loadMauryasSeed as never, [["abhay", 56], ["madhu", null]]],
-      ["ravi", loadRaviSeed as never, [["ravi", 41]]],
+      ["iyers", loadIyersSeed as never, [["ashwin", 45], ["lakshmi", null]]],
+      ["mauryas", loadMauryasSeed as never, [["abhay", 52], ["madhu", null]]],
+      ["ravi", loadRaviSeed as never, [["ravi", 89]]],
     ];
     for (const [seed, load, rows] of seeds) {
       setActivePinia(createPinia());
@@ -388,14 +392,16 @@ describe("gh #204 — Iyers §24 rupee lock (real seed with a shared home loan)"
     expect(ashwin.section24 + lakshmi.section24).toBeLessThanOrEqual(2 * LIMIT_SECTION_24);
   });
 
-  it("Ashwin's and Lakshmi's individual FIRE ages are unmoved by the §24 payment-split fix (locked elsewhere at 47 / 84)", () => {
+  it("Ashwin's and Lakshmi's individual FIRE ages are unmoved by the §24 payment-split fix (re-measured by #232 at 45 / unreachable)", () => {
     const h = useHouseholdStore();
     const a = useAssumptionsStore();
     const asOf = new Date("2025-08-01T00:00:00.000Z");
     loadIyersSeed(h, a, asOf);
     const ashwin = computeIndividualFire(h.data, a.values, "ashwin", "2025-26", undefined, asOf)!;
     const lakshmi = computeIndividualFire(h.data, a.values, "lakshmi", "2025-26", undefined, asOf)!;
-    expect(ashwin.individualFireAge).toBe(47);
-    expect(lakshmi.individualFireAge).toBe(84);
+    // #232: the shared home loan's EMI is now split 50/50 instead of 100% on Ashwin (47 → 45); on
+    // her ₹8L income Lakshmi's half of the EMI leaves no surplus, so she is not within horizon.
+    expect(ashwin.individualFireAge).toBe(45);
+    expect(Number.isFinite(lakshmi.individualFireAge)).toBe(false);
   });
 });

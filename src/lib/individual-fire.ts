@@ -3,10 +3,10 @@
  *
  * Treats one adult as a "mini-household": their attributable corpus grows (real frame, SWR) to
  * their attributable expenses. Attribution rules (contract §3, grilled 2026-06-08):
- *   - expenses: M's OWN itemised lines (ring 1) at 100% + the SHARED "Household" pool (ring 2,
- *     incl. avgMonthly) × the household split %. Ring 3 (dependent-owned / "Dependents") is
+ *   - expenses: M's OWN itemised lines (ring 1) at 100% + M's complementary share of the SHARED
+ *     "Household" pool (ring 2, incl. avgMonthly) and of a shared loan's EMI. Ring 3 (dependent-owned / "Dependents") is
  *     EXCLUDED — a child's cost is a household obligation, not one adult's personal FIRE.
- *   - corpus / income: member-owned at 100% + "Joint" × split; dependent-owned excluded.
+ *   - corpus / income: member-owned at 100% + M's complementary share of "Joint"; dependent-owned excluded.
  *   - tax: per-individual (India files individually) — computeTax on the adult's attributable
  *     taxable income with the adult's OWN deductions.
  *
@@ -26,9 +26,10 @@
  *     §24(a) 30% / §24(b) / §71 house-property collapse; the individual path does NOT). This
  *     OVER-taxes the individual → savings lower → individual FIRE LATER → conservative/safe; it only
  *     slightly widens the household-vs-individual gap. (FinTech #81 Phase 2, MED-1.)
- *   - the household split % is a single number applied to EACH adult: for the locked 2-adult persona
- *     (50/50) Σ = 100% of shared; for 3+ adults a single % can over-allocate shared costs (Σ > 100%)
- *     — a documented bound for the non-target N>2 case (assumptions.ts; FinTech MED-3).
+ *   - (RETIRED — gh #232) shared rows are no longer given `split` to EACH adult. CONSERVATION LAW:
+ *     for every row (asset, contribution, income, expense, loan balance, EMI) the adults' shares sum
+ *     to exactly the row — anchor adult `split`, the other `1 − split`, 3+ adults equal, a single
+ *     adult 100% (`member-row-share.ts` over `jointShareFor`).
  * The HOUSEHOLD FIRE number (which carries all of the above) stays the primary, decision-driving
  * figure; this is a clearly-caveated secondary view. This helper NEVER feeds the household number
  * (derive only ADDS it alongside).
@@ -43,7 +44,8 @@ import { realIncomeScaleAt, type EarnerIncomePath } from "@/lib/income-path";
 import { todayIsoLocal } from "@/lib/as-of-date";
 import { calculateFIRENumber, calculateFireTarget, calculateYearsToTarget } from "@/lib/fire-math";
 import { computeTax, recommendRegime, marginalSlabRate, getTaxConfigForFY } from "@/lib/tax";
-import { deductionsForMember } from "@/lib/tax-deductions";
+import { deductionsForMember, jointShareFor } from "@/lib/tax-deductions";
+import { ownedRowShare, liabilityShare, expenseRowShare } from "@/lib/member-row-share";
 import { epfBucketAfterTaxReturn } from "@/lib/epf-vpf";
 import { returnBucketKey } from "@/lib/investment-traits";
 import {
@@ -51,17 +53,16 @@ import {
   blendPortfolioReturn,
   resolveHouseholdBasket,
 } from "@/lib/assumption-math";
-import { EXPENSE_OWNER_HOUSEHOLD } from "@/lib/expense-attribution";
 
 export interface IndividualFireResult {
   memberId: string;
   name: string;
   anchorAge: number;
-  /** M's own (ring 1) + split × shared (ring 2); ring 3 excluded. ₹/yr today. */
+  /** M's own (ring 1) + M's complementary share of shared (ring 2); ring 3 excluded. ₹/yr today. */
   attributableAnnualExpenses: number;
-  /** M-owned + split × Joint investments (primary residence excluded). ₹ today. */
+  /** M-owned + M's complementary share of Joint investments (primary residence excluded). ₹ today. */
   attributableCorpus: number;
-  /** #160: M-owned + split × shared-with-spouse liabilities. ₹ outstanding today. */
+  /** #160/#232: M-owned + M's complementary share of shared-with-spouse liabilities. ₹ outstanding today. */
   attributableLiabilitiesValue: number;
   attributableAnnualIncome: number;
   attributableAnnualTax: number;
@@ -118,25 +119,27 @@ export function computeIndividualFire(
   const member = household.members.find((m) => m.id === memberId);
   if (!member || !isAdultRole(member.role)) return null;
 
-  const split = Math.min(100, Math.max(0, assumptions.householdSplitPercent ?? 50)) / 100;
+  // #232: every shared row is split COMPLEMENTARILY across the adults (member-row-share.ts) — the
+  // members' shares of any row sum to exactly the row, at any split %.
+  const splitPercent = assumptions.householdSplitPercent ?? 50;
+  const jointShare = jointShareFor(household, memberId, splitPercent);
+  const ownedShare = (ownerId: string | undefined) =>
+    ownedRowShare(household, memberId, splitPercent, ownerId);
   const anchorAge = ageFromDOB(member.dateOfBirth, asOf);
   const targetRetirementAge =
     usableOverride(overrides?.targetRetirementAge, 1) ?? member.targetRetirementAge ?? 50;
   const planToAge = member.planToAge ?? 90;
 
-  // ---- attributable expenses: own ring-1 (100%) + shared ring-2 (× split); ring-3 excluded ----
-  let ownMonthly = 0;
-  let sharedMonthly = household.expenses.avgMonthly; // avgMonthly is the shared lump (ring 2)
+  // ---- attributable expenses: own ring-1 (100%) + shared ring-2 (× this adult's joint share);
+  // a shared loan's EMI follows the loan's split; ring-3 excluded ----
+  let attributableMonthly = jointShare * household.expenses.avgMonthly; // avgMonthly is the shared lump (ring 2)
   for (const r of household.expenses.recurring) {
-    const owner = r.ownerId ?? EXPENSE_OWNER_HOUSEHOLD;
-    const monthly = toMonthly({ amount: r.amount, period: r.frequency });
-    if (owner === memberId) ownMonthly += monthly; // ring 1 (this adult's own)
-    else if (owner === EXPENSE_OWNER_HOUSEHOLD) sharedMonthly += monthly; // ring 2 (shared)
-    // else: another member's personal OR "Dependents"/dependent-owned (ring 3) → excluded
+    const share = expenseRowShare(household, memberId, splitPercent, r);
+    if (share > 0) attributableMonthly += share * toMonthly({ amount: r.amount, period: r.frequency });
   }
-  const attributableAnnualExpenses = Math.round((ownMonthly + split * sharedMonthly) * 12);
+  const attributableAnnualExpenses = Math.round(attributableMonthly * 12);
 
-  // ---- attributable corpus: M-owned (100%) + Joint (× split); primary residence excluded ----
+  // ---- attributable corpus: M-owned (100%) + Joint (complementary share); primary residence excluded ----
   // #211: a non-primary property STILL counts toward this member's attributable target — the fix
   // changed WHEN its rupees become spendable in the household bridge, not whether the property
   // funds retirement. The member path has no bridge gate at all (see the #162 part-2 note below),
@@ -145,8 +148,6 @@ export function computeIndividualFire(
   const fireInvestments = household.investments.filter(
     (i) => !(i.type === "RealEstate" && i.realEstateRole === "PrimaryResidence"),
   );
-  const corpusWeightOf = (ownerId: string, value: number): number =>
-    ownerId === memberId ? value : ownerId === JOINT ? split * value : 0;
   let attributableCorpus = 0;
   const returnWeights = {
     equity: 0, debt: 0, realEstate: 0, gold: 0, nps: 0, ppf: 0, epf: 0,
@@ -157,18 +158,18 @@ export function computeIndividualFire(
   // its OWN truly-empty debt default whenever this member's attributed VALUE weights totalled zero —
   // which is every member whose only holding is an auto-flowed EPF line at `value: 0` (Ravi) — instead
   // of using what this member is actually FUNDING, same as the household path does. Attributed by the
-  // SAME ownership split as the corpus value weights above (own full / joint × split).
+  // SAME ownership share as the corpus value weights below (own full / joint complementary).
   const contributionWeights = {
     equity: 0, debt: 0, realEstate: 0, gold: 0, nps: 0, ppf: 0, epf: 0,
     international: 0, reit: 0, crypto: 0, other: 0,
   };
   let attributableEpfAnnualContribution = 0;
   for (const inv of fireInvestments) {
-    const contribWeight = inv.ownerId === memberId ? 1 : inv.ownerId === JOINT ? split : 0;
+    const contribWeight = ownedShare(inv.ownerId);
     if (contribWeight > 0) {
       contributionWeights[returnBucketKey(inv)] += (inv.monthlyContribution ?? 0) * contribWeight;
     }
-    const w = corpusWeightOf(inv.ownerId, inv.value);
+    const w = contribWeight * inv.value;
     if (w <= 0) continue;
     attributableCorpus += w;
     returnWeights[returnBucketKey(inv)] += w;
@@ -179,24 +180,16 @@ export function computeIndividualFire(
   }
   attributableCorpus = Math.round(attributableCorpus);
 
-  // ---- attributable liabilities: own (100%) + shared-with-spouse (× split) ----
-  // #160: the dashboard's Liabilities tile showed the HOUSEHOLD balance beside a member-lensed
-  // loan count (same class as the Investments tile). Liabilities carry no "Joint" ownerId
-  // sentinel (unlike investments) — `isSharedWithSpouse` is the equivalent signal — so the
-  // weight mirrors `corpusWeightOf` above with that flag standing in for `ownerId === JOINT`.
+  // ---- attributable liabilities: own (100%) + shared-with-spouse (complementary share) ----
+  // #160: the dashboard's Liabilities tile reads this. #232: a shared loan used to give its owner
+  // 100% AND the spouse `split` (150% of the loan at the default 50); `liabilityShare` splits it.
   let attributableLiabilitiesValue = 0;
   for (const l of household.liabilities) {
-    const w =
-      l.ownerId === memberId
-        ? l.outstandingBalance
-        : l.isSharedWithSpouse
-          ? split * l.outstandingBalance
-          : 0;
-    attributableLiabilitiesValue += w;
+    attributableLiabilitiesValue += liabilityShare(household, memberId, splitPercent, l) * l.outstandingBalance;
   }
   attributableLiabilitiesValue = Math.round(attributableLiabilitiesValue);
 
-  // ---- attributable income: own (100%) + Joint (× split) ----
+  // ---- attributable income: own (100%) + Joint (× this adult's complementary share) ----
   const salary = isEarningMember(member, household.businesses)
     ? member.salary?.annualCTC ?? 0
     : 0;
@@ -213,8 +206,8 @@ export function computeIndividualFire(
     else if (b.ownerId === JOINT) jointBusiness += ann;
   }
   const attrTaxableIncome =
-    salary + ownTaxableOther + ownBusiness + split * (jointTaxableOther + jointBusiness);
-  const attrExemptIncome = ownExemptOther + split * jointExemptOther;
+    salary + ownTaxableOther + ownBusiness + jointShare * (jointTaxableOther + jointBusiness);
+  const attrExemptIncome = ownExemptOther + jointShare * jointExemptOther;
   const attributableAnnualIncome = Math.round(attrTaxableIncome + attrExemptIncome);
 
   // ---- attributable tax: per-individual, on the adult's OWN + Joint-split deductions (#204) ----

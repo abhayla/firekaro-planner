@@ -21,6 +21,7 @@ import {
 } from "@/lib/required-contribution";
 import { runMonteCarloFire, headlineBandInputs } from "@/lib/monte-carlo";
 import { isEmergencyFundEligible } from "@/lib/investment-traits";
+import { ownedRowShare, liabilityShare } from "@/lib/member-row-share";
 import type { ProjectionPoint } from "@/lib/fire-math";
 import { DEFAULT_ASSUMPTIONS } from "@/types/assumptions";
 
@@ -135,22 +136,22 @@ export function useFireDerive() {
   // #81 Phase 3 — the SAME-SCOPE Financial-Health resolver. When an adult is selected in "Viewing
   // as", every figure is THAT member's own slice; on the default "Whole household" view it is the
   // full household (byte-identical). CRUCIAL: a member's share of "Joint"/shared assets, liquid,
-  // liabilities and EMI is taken at the SAME `householdSplitPercent` the income/expense attribution
+  // liabilities and EMI is taken at the SAME complementary share (#232) the income/expense attribution
   // uses (FinTech #81 Phase-3 HIGH-1/2 fix). So EVERY FH ratio — net worth (assets − liab), savings
   // rate, DTI (EMI ÷ take-home), emergency months (liquid ÷ burn), health score — divides figures
   // built on ONE identical Joint convention. Mixing a 100%-Joint numerator with a split denominator
   // (the deeper #23 trap) over-states a member's safety; unifying the split kills it. Member-owned =
-  // 100%; "Joint"/shared = × split; dependent-owned excluded. Same-scope enforced ONCE, here.
+  // 100%; "Joint"/shared = complementary share; dependent-owned excluded. Same-scope enforced ONCE, here.
   const memberFinancials = computed(() => {
     const k = d.value;
     const adult = k.individualFireByMember.find((r) => r.memberId === ui.viewingMemberId) ?? null;
-    const split = Math.min(100, Math.max(0, a.values.householdSplitPercent ?? 50)) / 100;
-    const memberId = adult?.memberId ?? null;
-    // The Joint weight applied to every member-scoped FH figure (1 by default = household view).
+    const splitPercent = a.values.householdSplitPercent ?? 50;
+    // The member's share applied to every member-scoped FH figure (1 by default = household view).
+    // #232: complementary shares (member-row-share.ts), the SAME ones computeIndividualFire uses.
     const invWeight = (ownerId: string): number =>
-      !adult ? 1 : ownerId === memberId ? 1 : ownerId === "Joint" ? split : 0;
+      !adult ? 1 : ownedRowShare(h.data, adult.memberId, splitPercent, ownerId);
     const liabWeight = (ownerId: string, isSharedWithSpouse: boolean): number =>
-      !adult ? 1 : ownerId === memberId ? 1 : ownerId === "Joint" || isSharedWithSpouse ? split : 0;
+      !adult ? 1 : liabilityShare(h.data, adult.memberId, splitPercent, { ownerId, isSharedWithSpouse });
 
     // Split-scoped lists — the member's SHARE of each holding/loan (own full, Joint × split). The
     // FH screens read these for both totals AND per-row breakdowns, so every screen uses one convention.

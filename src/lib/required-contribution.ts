@@ -48,6 +48,7 @@ import type { Assumptions } from "@/types/assumptions";
 import { derive, type DeriveLens } from "@/lib/derive";
 import { projectCorpus } from "@/lib/fire-math";
 import { toMonthly } from "@/lib/cashflow";
+import { expenseRowShare } from "@/lib/member-row-share";
 import {
   netCashSalary,
   pfFromInvestmentRows,
@@ -374,12 +375,15 @@ export function requiredMonthlyContributionFor(
     ? Math.max(0, atTargetAdult.attributableAnnualExpenses / 12)
     : Math.max(0, safe(atTarget.annualExpensesToday) / 12);
   // Contractual outflows already inside the expense base (auto-flowed by the household store).
-  const scopeSplit = atTargetAdult
-    ? Math.min(100, Math.max(0, assumptions.householdSplitPercent ?? 50)) / 100
-    : 1;
+  // #232: the member's share of each committed row is the SAME share their attributable expenses
+  // carry (own 100%, shared complementary, the other adult's 0) — never one split on every row.
+  const scopeShare = (r: (typeof snapshot.expenses.recurring)[number]): number =>
+    atTargetAdult
+      ? expenseRowShare(snapshot, atTargetAdult.memberId, assumptions.householdSplitPercent ?? 50, r)
+      : 1;
   const committedMonthly = snapshot.expenses.recurring
     .filter((r) => r.source === "auto-loan" || r.source === "auto-insurance")
-    .reduce((sum, r) => sum + toMonthly({ amount: r.amount, period: r.frequency }) * scopeSplit, 0);
+    .reduce((sum, r) => sum + toMonthly({ amount: r.amount, period: r.frequency }) * scopeShare(r), 0);
   const livingFloor = Math.max(committedMonthly, MIN_LIVING_RETENTION * monthlyExpenses);
   // The PF already committed is investable headroom by definition (it IS an investment), so it
   // is added back on top of the cash figure before the living floor is taken off.
