@@ -27,8 +27,10 @@ export function householdTaxUnderRegime(
       fy,
       deductions: a.deductions,
       employerNpsByMember: a.employerNpsByMember,
-      taxpayerAge: a.age,
+      taxpayerAge: a.exemptionAge,
       isSalaried: a.isSalaried,
+      salaryIncome: a.salaryIncome,
+      movedInIncome: a.movedInIncome,
     }),
   );
   const sum = (f: (r: (typeof rows)[number]) => number) => rows.reduce((t, r) => t + f(r), 0);

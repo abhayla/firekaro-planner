@@ -155,12 +155,18 @@ describe("#87 — rental §24(a)/§24(b) relief follows the property's owner sha
   });
 
   it("each person's rental loss set-off is capped at ₹2L on THEIR return (§71), never pooled", () => {
+    // #239: without the seed's self-occupied loan, whose §24(b) shares the same ₹2L HP-loss cap
+    // (combined case locked in non-earner-attribution.spec.ts class 3).
     const k = run((d) => {
+      d.liabilities = [];
       const r = d.otherIncome.find((o) => o.type === "Rental")!;
       r.ownerId = "priya";
       r.homeLoanInterest = 600_000; // 1,26,000 − 6,00,000 = −4,74,000 → capped −2,00,000
     });
-    const noRental = run((d) => (d.otherIncome = d.otherIncome.filter((o) => o.type !== "Rental")));
+    const noRental = run((d) => {
+      d.liabilities = [];
+      d.otherIncome = d.otherIncome.filter((o) => o.type !== "Rental");
+    });
     // OLD regime only: NEW allows no set-off (§115BAC(2), #236), so its gross ignores the loss.
     expect(who(k, "priya")!.oldGrossIncome - who(noRental, "priya")!.oldGrossIncome).toBe(-200_000);
     expect(who(k, "priya")!.newGrossIncome).toBe(who(noRental, "priya")!.newGrossIncome);
