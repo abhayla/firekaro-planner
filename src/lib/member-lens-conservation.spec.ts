@@ -66,10 +66,24 @@ describe("#232 member lens — one-adult household equals the household lens", (
     expect(k.familyLayerCorpus).toBe(0);
     expect(r.individualFireNumber).toBe(Math.round(k.fireNumber));
     expect(Number.isFinite(r.individualFireAge)).toBe(true);
-    // Same projection method now (round 0: member 89 vs household 64). The residual ≤ 1 year is
-    // the household solver's glide-path return schedule vs the member's scalar blended return —
-    // tracked on #232 as the remaining method gap, NOT closed by this round.
-    expect(Math.abs(r.individualFireAge - (k.householdFireAge as number))).toBeLessThanOrEqual(1);
+    // Same projection method, same target, same rounding: the RAW years are equal, not "within 1".
+    expect(Number.isFinite(r.yearsToIndividualFire)).toBe(true);
+    expect(Math.abs(r.yearsToIndividualFire - k.yearsToRegular)).toBeLessThan(1e-6);
+    expect(r.individualFireAge).toBe(k.householdFireAge);
+  });
+});
+
+describe("#232 member lens — the family layer is the ONLY gap to the household", () => {
+  beforeEach(() => setActivePinia(createPinia()));
+
+  it("Ravi with the family layer: member target and age never exceed the household's", () => {
+    const { h, a } = load("Ravi", 50);
+    const k = derive(h.data, a.values, LENS);
+    const r = k.individualFireByMember[0];
+    expect(k.familyLayerCorpus).toBeGreaterThan(0);
+    expect(r.individualFireNumber).toBeLessThan(Math.round(k.fireNumber));
+    expect(r.individualFireAge).toBeLessThanOrEqual(k.householdFireAge as number);
+    expect(r.yearsToIndividualFire).toBeLessThanOrEqual(k.yearsToRegular + 1e-6);
   });
 });
 
@@ -123,6 +137,45 @@ describe("#232 member lens — anchor orientation of a Joint row", () => {
     const otherId = s60.k.individualFireByMember.find((r) => r.memberId !== anchorId)!.memberId;
     expect(corpusOf(s60.k, anchorId!) - corpusOf(s50.k, anchorId!)).toBeCloseTo(0.1 * jointCorpus, -1);
     expect(corpusOf(s60.k, otherId) - corpusOf(s50.k, otherId)).toBeCloseTo(-0.1 * jointCorpus, -1);
+  });
+});
+
+describe("#232 member lens — anchor orientation of shared EXPENSES and Joint INCOME", () => {
+  beforeEach(() => setActivePinia(createPinia()));
+
+  const at = (split: number) => {
+    setActivePinia(createPinia());
+    const { h, a } = load("Sharmas", split);
+    // Two shared-expense paths: a recurring "Household" row (₹12L/yr) and the avgMonthly lump (₹6L/yr).
+    h.data.expenses.recurring = [
+      { id: "shared-row", label: "Shared", amount: 100_000, frequency: "M", source: "manual", ownerId: "Household" },
+    ];
+    h.data.expenses.avgMonthly = 50_000;
+    h.data.otherIncome = [
+      {
+        id: "joint-inc",
+        type: "Other",
+        source: "Direct",
+        amount: 1_000_000,
+        frequency: "A",
+        ownerId: "Joint",
+        isTaxExempt: true,
+      },
+    ];
+    return { h, k: derive(h.data, a.values, LENS) };
+  };
+
+  it("at split 60 the ANCHOR adult carries 60% of shared expenses and gets 60% of Joint income", () => {
+    const s50 = at(50);
+    const s60 = at(60);
+    const anchorId = jointAnchorMemberId(s60.h.data)!;
+    const otherId = s60.k.individualFireByMember.find((r) => r.memberId !== anchorId)!.memberId;
+    const row = (x: typeof s50, id: string) => x.k.individualFireByMember.find((r) => r.memberId === id)!;
+    expect(row(s60, anchorId).attributableAnnualExpenses - row(s50, anchorId).attributableAnnualExpenses).toBe(180_000);
+    expect(row(s60, otherId).attributableAnnualExpenses - row(s50, otherId).attributableAnnualExpenses).toBe(-180_000);
+    expect(row(s60, anchorId).attributableAnnualExpenses).toBeGreaterThan(row(s60, otherId).attributableAnnualExpenses);
+    expect(row(s60, anchorId).attributableAnnualIncome - row(s50, anchorId).attributableAnnualIncome).toBeCloseTo(100_000, -1);
+    expect(row(s60, otherId).attributableAnnualIncome - row(s50, otherId).attributableAnnualIncome).toBeCloseTo(-100_000, -1);
   });
 });
 

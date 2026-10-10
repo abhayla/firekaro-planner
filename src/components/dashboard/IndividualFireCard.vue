@@ -48,7 +48,7 @@ function ageLabel(age: number | null): string {
       data-testid="individual-fire-caveat"
     >
       <strong>{{ selected.name }}'s personal FIRE</strong> funds only their own lifestyle — it
-      excludes the children and their split of the shared costs. The <strong>household FIRE</strong>
+      excludes the children's costs and the family-level goals and contingencies. The <strong>household FIRE</strong>
       ({{ formatINRCompact(householdFireNumber) }}<template v-if="householdFireAge != null">,
       {{ ageLabel(householdFireAge) }}</template>) decides when the family can actually stop.
     </v-alert>
@@ -78,7 +78,7 @@ function ageLabel(age: number | null): string {
         <div class="text-body-2 font-weight-medium">
           {{ r.name }} <span class="text-caption text-medium-emphasis">· personal</span>
         </div>
-        <div class="text-caption text-medium-emphasis">own lifestyle + their split of shared (excl. children)</div>
+        <div class="text-caption text-medium-emphasis">own lifestyle + their split of shared; excludes children’s costs and family-level goals and contingencies</div>
       </div>
       <div class="text-right">
         <div class="text-body-1">{{ formatINRCompact(r.individualFireNumber) }}</div>

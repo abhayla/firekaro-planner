@@ -246,11 +246,14 @@ describe("computeIndividualFire (#81 Phase 2 — standalone per-adult FIRE)", ()
       // household method) and a non-earner's shortfall is carried by the earner: ravi 89→63 (household
       // 65; the gap is the family layer + glide path), priya 56→53, aanya 63→61 (income growth on
       // a large income vs small leftover), abhay 52→55 (now carries madhu's ₹9.6L/yr shortfall).
+      // #232 round 2: the member age now rounds UP like the household (anchor + ceil(years)), not to
+      // nearest. Each lock can only move later by <= 1: abhay 55->56, ravi 63->64; the other seven
+      // (rohit 43, priya 53, vikram 45, aanya 61, ashwin 45, madhu/lakshmi unreachable) did not move.
       ["sharmas", loadSeedPersona as never, [["rohit", 43], ["priya", 53]]],
       ["mehtas", loadMehtasSeed as never, [["vikram", 45], ["aanya", 61]]],
       ["iyers", loadIyersSeed as never, [["ashwin", 45], ["lakshmi", null]]],
-      ["mauryas", loadMauryasSeed as never, [["abhay", 55], ["madhu", null]]],
-      ["ravi", loadRaviSeed as never, [["ravi", 63]]],
+      ["mauryas", loadMauryasSeed as never, [["abhay", 56], ["madhu", null]]],
+      ["ravi", loadRaviSeed as never, [["ravi", 64]]],
     ];
     for (const [seed, load, rows] of seeds) {
       setActivePinia(createPinia());
@@ -272,11 +275,10 @@ describe("computeIndividualFire (#81 Phase 2 — standalone per-adult FIRE)", ()
           continue;
         }
         expect(Number.isFinite(r.individualFireAge), `${seed}/${memberId} reachable`).toBe(true);
-        expect(r.individualFireAge, `${seed}/${memberId} lo`).toBeGreaterThanOrEqual(expectedAge - 1);
-        expect(r.individualFireAge, `${seed}/${memberId} hi`).toBeLessThanOrEqual(expectedAge + 1);
+        expect(r.individualFireAge, `${seed}/${memberId} age`).toBe(expectedAge);
         // Age and years must never disagree (the cross-screen-coherence class).
         expect(r.individualFireAge, `${seed}/${memberId} coherence`).toBe(
-          Math.round(r.anchorAge + r.yearsToIndividualFire),
+          r.anchorAge + Math.ceil(r.yearsToIndividualFire),
         );
       }
     }

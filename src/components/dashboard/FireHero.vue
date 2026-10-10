@@ -652,8 +652,8 @@ function yearsLabel(years: number): string {
            healthcare reserve to the individual target itself, so it is no longer an exclusion). -->
       <p v-if="hh.isMember" class="fire-hero__subline" data-testid="fire-hero-member-caveat">
         This is <b>{{ hh.memberName }}'s individual</b> FIRE — it funds only their own lifestyle
-        (excludes the children + their split of shared costs) and skips the locked-money bridge
-        check the household plan includes.
+        (excludes the children's costs and the family-level goals and contingencies) and skips the
+        locked-money bridge check the household plan includes.
         <template v-if="fire.householdFireAge.value != null">
           The <b>whole household</b> can stop at <b>age {{ fire.householdFireAge.value }}</b>
           ({{ formatINRCompact(fire.fireNumber.value) }}).

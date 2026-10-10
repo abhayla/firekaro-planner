@@ -507,7 +507,7 @@ export function computeIndividualFire(
   const reachable = Number.isFinite(rawYearsToFire) && anchorAge + rawYearsToFire <= planToAge;
   const yearsToIndividualFire = reachable ? rawYearsToFire : Number.POSITIVE_INFINITY;
   const individualFireAge = reachable
-    ? Math.round(anchorAge + rawYearsToFire)
+    ? anchorAge + Math.ceil(rawYearsToFire)
     : Number.POSITIVE_INFINITY;
 
   return {
