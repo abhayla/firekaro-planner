@@ -614,6 +614,9 @@ describe("derive() — pure kernel", () => {
     it("(e) §71 cap is AGGREGATE: one loss + one profitable rental net BEFORE the ₹2L cap bites", () => {
       const { h, a, lens, baseLine } = thirtyPctSlabHousehold();
       h.data.otherIncome = [];
+      // #239: no self-occupied loan here — it shares the same ₹2L HP-loss cap (locked in
+      // non-earner-attribution.spec.ts class 3); this case isolates the let-out §71 netting.
+      h.data.liabilities = [];
       const noRental = derive(h.data, a.values, lens);
 
       // A: rent ₹2L, interest ₹15L → houseProperty = 2L·0.7 − 15L = −13.6L (loss)

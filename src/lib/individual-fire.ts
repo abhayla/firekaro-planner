@@ -175,6 +175,7 @@ function memberCashflow(
     employerNpsByMember: deductions.employerNpsByMember,
     taxpayerAge: anchorAge,
     isSalaried: memberIsSalaried,
+    salaryIncome: salary,
   });
   const fyTax = computeTax({
     grossIncome: attrTaxableIncome,
@@ -184,6 +185,7 @@ function memberCashflow(
     employerNpsByMember: deductions.employerNpsByMember,
     taxpayerAge: anchorAge,
     isSalaried: memberIsSalaried,
+    salaryIncome: salary,
   });
   const attributableAnnualTax = Math.round(fyTax.totalTax);
 
