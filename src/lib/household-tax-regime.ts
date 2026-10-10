@@ -1,7 +1,15 @@
 import { computeTax } from "@/lib/tax";
-import type { AssesseeTax } from "@/lib/tax-deductions";
+import type { AssesseeTax, PerAssesseeHouseholdTax } from "@/lib/tax-deductions";
 
 export type RegimePick = "AUTO" | "OLD" | "NEW";
+
+/** #239: the returns for one view — AUTO's own, or the forced view's (its own clubbing choice). */
+export function assesseesForView(
+  result: Pick<PerAssesseeHouseholdTax, "perAssessee" | "perAssesseeForView">,
+  pick: RegimePick,
+): AssesseeTax[] {
+  return pick === "AUTO" ? result.perAssessee : result.perAssesseeForView[pick];
+}
 
 /**
  * #87 round 3 — the household's tax with each adult's regime chosen by `pick`, summed assessee by

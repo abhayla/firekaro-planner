@@ -786,6 +786,10 @@ export interface PerAssesseeHouseholdTax {
   /** Σ over assessees of that adult's own tax — the household's real annual income tax. */
   totalTax: number;
   perAssessee: AssesseeTax[];
+  /** #239: the returns under a FORCED regime view. A minor's clubbing parent is chosen per view
+   * (the one giving the higher household tax in that view), so these can differ from `perAssessee`
+   * (the AUTO view). Read through `assesseesForView`. */
+  perAssesseeForView: { OLD: AssesseeTax[]; NEW: AssesseeTax[] };
   /** The assessee whose slab rate drives household marginal-rate-sensitive math (largest gross). */
   marginalAssessee: AssesseeTax | null;
   /** #87 round 4 — non-earning adults and minors whose income is counted on an earner's return
@@ -981,8 +985,21 @@ export function perAssesseeHouseholdTax(
         movedHeads += v;
         movedOrigins.add(origin);
       }
-      const movedIn = movedHeads + Math.round(movedInHp);
-      return { member, grossIncome, newGrossIncome, salary, files, incomeRows, ownHeads, ownHp, movedIn, movedOrigins };
+      const movedIn = movedHeads + movedInHp;
+      return {
+        member,
+        grossIncome,
+        newGrossIncome,
+        salary,
+        files,
+        incomeRows,
+        ownHeads,
+        ownHp,
+        movedHeads,
+        movedInHp,
+        movedIn,
+        movedOrigins,
+      };
     });
     return { rows, ownHouseProperty, lossDropped };
   };
@@ -991,69 +1008,19 @@ export function perAssesseeHouseholdTax(
   const own = attributeReturns(OWN_ROWS_ONLY).rows;
   const ownGross = (id: string | undefined) => own.find((r) => r.member.id === id)?.grossIncome ?? 0;
   const attribution = nonEarnerAttribution(household, adults, anchorId, ownGross);
-  // #239 (SPEC CHANGE to D-2026-10-10-01), §64(1A): a minor's (or unknown owner's) income is clubbed
-  // on the filing adult with the higher TOTAL income — computed after non-earner income is
-  // attributed, with the combined-capped house-property result — with or without earners. Ties: the
-  // anchor adult.
-  const beforeMinors = attributeReturns({ ...attribution, ownRowsOnly: true }).rows;
-  const totalIncomeOf = (r: (typeof beforeMinors)[number]) => {
-    const so = deductionsForMember(household, r.member.id, householdSplitPercent, { asOfDate: asOfIso }).section24;
-    const hp = r.ownHp - so;
-    return r.ownHeads + r.movedIn + (hp >= 0 ? hp : -Math.min(-hp, SEC_71_HP_LOSS_SETOFF_CAP));
-  };
-  const candidates = beforeMinors.filter((r) => !attribution.nonEarnerIds.has(r.member.id));
-  const anchorRow = candidates.find((r) => r.member.id === anchorId);
-  let clubOnId = anchorRow?.member.id ?? candidates[0]?.member.id ?? anchorId;
-  let best = anchorRow ? totalIncomeOf(anchorRow) : candidates[0] ? totalIncomeOf(candidates[0]) : 0;
-  for (const r of candidates) {
-    const t = totalIncomeOf(r);
-    if (t > best) [best, clubOnId] = [t, r.member.id];
-  }
-  const attributed = attributeReturns(attribution, clubOnId);
-  const returns = attributed.rows;
-
-  let filers = returns.filter((r) => r.files);
-  if (filers.length === 0) filers = returns.filter((r) => r.member.id === anchorId);
-
-  const target = adults.find((m) => m.id === attribution.targetId);
-  const hasOwnIncomeRow = (id: string) =>
-    scope.otherIncome.some(
-      (o) =>
-        o.ownerId === id && !o.isTaxExempt && toAnnual({ amount: o.amount, period: o.frequency }) !== 0,
-    ) || scope.businesses.some((b) => b.ownerId === id && b.annualProfit !== 0);
-  const attributedNonEarners = target
-    ? [
-        ...own
-          .filter((r) => attribution.nonEarnerIds.has(r.member.id) && r.grossIncome !== 0)
-          .map((r) => r.member),
-        ...scope.members.filter((m) => !isAdultRole(m.role) && hasOwnIncomeRow(m.id)),
-      ].map((m) => {
-        // #239: a minor is clubbed on the higher-total-income filer, who need not be the target.
-        const to = (!isAdultRole(m.role) && adults.find((a) => a.id === clubOnId)) || target;
-        return {
-          memberId: m.id,
-          name: m.name || "Member",
-          toMemberId: to.id,
-          toName: to.name || "Adult",
-          droppedHouseLoss: attributed.lossDropped(m.id)
-            ? Math.round(-(attributed.ownHouseProperty.get(m.id) ?? 0))
-            : 0,
-        };
-      })
-    : [];
-
-  const perAssessee: AssesseeTax[] = filers.map((row) => {
-    const { member, salary, incomeRows, ownHeads, ownHp, movedIn } = row;
+  type ReturnRow = ReturnType<typeof attributeReturns>["rows"][number];
+  const assessReturn = (row: ReturnRow): AssesseeTax => {
+    const { member, salary, incomeRows, ownHeads, ownHp, movedHeads, movedInHp, movedIn } = row;
     const deductions = deductionsForMember(household, member.id, householdSplitPercent, {
       asOfDate: asOfIso,
     });
     // #239: OLD regime — the TOTAL house-property loss set off against other heads is ₹2L per
     // assessee: self-occupied §24(b) interest (inside `deductions`) plus the own let-out loss
-    // together, never ₹2L each.
+    // together, never ₹2L each. House property (own + moved-in) is rounded ONCE, as a sum.
     const letOutLossRoom = Math.max(0, SEC_71_HP_LOSS_SETOFF_CAP - deductions.section24);
     const grossIncome =
-      ownHeads + Math.round(ownHp >= 0 ? ownHp : -Math.min(-ownHp, letOutLossRoom)) + movedIn;
-    const newGrossIncome = ownHeads + Math.round(Math.max(0, ownHp)) + movedIn;
+      ownHeads + movedHeads + Math.round((ownHp >= 0 ? ownHp : -Math.min(-ownHp, letOutLossRoom)) + movedInHp);
+    const newGrossIncome = ownHeads + movedHeads + Math.round(Math.max(0, ownHp) + movedInHp);
     const isSalaried = salary > 0;
     const age = ageAsOf(member.dateOfBirth, asOfIso);
     // #239 class 5: moved-in income never rides a senior's higher OLD-regime exemption — the
@@ -1100,14 +1067,72 @@ export function perAssesseeHouseholdTax(
       incomeRows,
       deductionRows: deductions.rowShares,
     };
-  });
+  };
+  const assess = (clubOn: string | undefined) => {
+    const attributed = attributeReturns(attribution, clubOn);
+    let filers = attributed.rows.filter((r) => r.files);
+    if (filers.length === 0) filers = attributed.rows.filter((r) => r.member.id === anchorId);
+    const perAssessee = filers.map(assessReturn);
+    return { attributed, perAssessee, totalTax: perAssessee.reduce((s, a) => s + a.tax, 0) };
+  };
 
-  const totalTax = perAssessee.reduce((s, a) => s + a.tax, 0);
+  // #239 (orchestrator decision, SPEC CHANGE to D-2026-10-10-01), §64(1A): a minor's (or unknown
+  // owner's) income is clubbed on whichever filing adult gives the HIGHER household tax — every
+  // candidate is evaluated; ties: the anchor. By construction this is never below the statutory
+  // "parent with the higher total income" choice.
+  const isAdultOwner = (id: string) => id === JOINT_DEDUCTION_OWNER || adults.some((a) => a.id === id);
+  const needsClubbing =
+    scope.otherIncome.some((o) => !o.isTaxExempt && !isAdultOwner(o.ownerId)) ||
+    scope.businesses.some((b) => !isAdultOwner(b.ownerId));
+  const candidates = needsClubbing
+    ? adults.filter((a) => !attribution.nonEarnerIds.has(a.id)).map((a) => a.id)
+    : [];
+  // Each view (AUTO, forced OLD, forced NEW) picks its own clubbing parent — never reusing AUTO's.
+  const firstId = anchorId && candidates.includes(anchorId) ? anchorId : (candidates[0] ?? anchorId);
+  const options = [firstId, ...candidates.filter((id) => id !== firstId)].map((id) => ({ id, r: assess(id) }));
+  const sumOf = (list: AssesseeTax[], f: (a: AssesseeTax) => number) => list.reduce((s, a) => s + f(a), 0);
+  const bestFor = (f: (a: AssesseeTax) => number) =>
+    options.reduce((best, o) => (sumOf(o.r.perAssessee, f) > sumOf(best.r.perAssessee, f) ? o : best));
+  const autoPick = bestFor((a) => a.tax);
+  const clubOnId = autoPick.id;
+  const { attributed, perAssessee, totalTax } = autoPick.r;
+  const perAssesseeForView = {
+    OLD: bestFor((a) => a.oldTax).r.perAssessee,
+    NEW: bestFor((a) => a.newTax).r.perAssessee,
+  };
+
+  const target = adults.find((m) => m.id === attribution.targetId);
+  const hasOwnIncomeRow = (id: string) =>
+    scope.otherIncome.some(
+      (o) =>
+        o.ownerId === id && !o.isTaxExempt && toAnnual({ amount: o.amount, period: o.frequency }) !== 0,
+    ) || scope.businesses.some((b) => b.ownerId === id && b.annualProfit !== 0);
+  const attributedNonEarners = target
+    ? [
+        ...own
+          .filter((r) => attribution.nonEarnerIds.has(r.member.id) && r.grossIncome !== 0)
+          .map((r) => r.member),
+        ...scope.members.filter((m) => !isAdultRole(m.role) && hasOwnIncomeRow(m.id)),
+      ].map((m) => {
+        // #239: a minor is clubbed on the higher-total-income filer, who need not be the target.
+        const to = (!isAdultRole(m.role) && adults.find((a) => a.id === clubOnId)) || target;
+        return {
+          memberId: m.id,
+          name: m.name || "Member",
+          toMemberId: to.id,
+          toName: to.name || "Adult",
+          droppedHouseLoss: attributed.lossDropped(m.id)
+            ? Math.round(-(attributed.ownHouseProperty.get(m.id) ?? 0))
+            : 0,
+        };
+      })
+    : [];
+
   // Marginal rate is a per-assessee notion; household-level marginal-rate consumers (the NPS
   // annuity post-tax offset, the EPF after-tax yield drag) read the LARGEST assessee's slab.
   const marginalAssessee =
     perAssessee.length === 0
       ? null
       : perAssessee.reduce((best, a) => (a.grossIncome > best.grossIncome ? a : best));
-  return { totalTax, perAssessee, marginalAssessee, attributedNonEarners };
+  return { totalTax, perAssessee, perAssesseeForView, marginalAssessee, attributedNonEarners };
 }

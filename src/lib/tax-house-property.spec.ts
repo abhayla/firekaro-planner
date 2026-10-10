@@ -162,18 +162,19 @@ describe("#87 round 3 — the tax page renders from householdTaxUnderRegime (pag
   );
 
   it("Index.vue imports the ONE exported function and keeps no local copy of it", () => {
-    expect(page).toMatch(/import \{ householdTaxUnderRegime \} from "@\/lib\/household-tax-regime";/);
+    expect(page).toMatch(/import \{ assesseesForView, householdTaxUnderRegime \} from "@\/lib\/household-tax-regime";/);
     expect(page).not.toMatch(/function householdTaxUnderRegime\(/);
     for (const pick of ["OLD", "NEW"]) {
       expect(page).toMatch(
-        new RegExp(`householdTaxUnderRegime\\(\\s*perAssessee\\.value\\.perAssessee, "${pick}", selectedFY\\.value,?\\s*\\)`),
+        // #239: each forced view reads its OWN returns (its own minor-clubbing choice).
+        new RegExp(`householdTaxUnderRegime\\(assesseesForView\\(perAssessee\\.value, "${pick}"\\), "${pick}", selectedFY\\.value,?\\s*\\)`),
       );
     }
     // #87 round 4 — the headline is ONE direct binding for the selected mode (no per-mode ternary a
     // page edit could reroute), and nothing else assigns activeResult. Still a source lock: a fully
     // rendered lock needs the DOM test environment tracked in #234.
     expect(page).toMatch(
-      /const activeResult = computed\(\(\) =>\s*householdTaxUnderRegime\(perAssessee\.value\.perAssessee, mode\.value, selectedFY\.value\),?\s*\);/,
+      /const activeResult = computed\(\(\) =>\s*householdTaxUnderRegime\(assesseesForView\(perAssessee\.value, mode\.value\), mode\.value, selectedFY\.value\),?\s*\);/,
     );
     expect(page.match(/activeResult\s*=/g)).toHaveLength(1);
     // At the current FY the page's perAssessee IS the kernel's own result.

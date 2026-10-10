@@ -20,8 +20,8 @@
  * filer's OWN taxable income (own income − own deductions − own capped HP loss) is floored at 0
  * BEFORE income moved in from non-earners/minors is added, in every regime: moved-in income is never
  * reduced by the target's own leftover deductions or losses. (Class 5) moved-in income never
- * rides the target's senior OLD-regime exemption. The property tolerates ₹2 per return of rounding
- * (each return rounds slab tax and cess; a ₹1 tie can club a minor on the other parent).
+ * rides the target's senior OLD-regime exemption. The property tolerates ₹1 per return of rounding
+ * (each return rounds its own tax; house property is rounded once, as a sum). (Class 6) a minor is clubbed on the parent giving the HIGHER household tax; the oracle uses the statute (higher post-deduction total income).
  */
 import fc from "fast-check";
 import { describe, it, expect, beforeEach } from "vitest";
@@ -34,7 +34,7 @@ import { loadIyersSeed } from "@/seeds/iyers";
 import { loadMauryasSeed } from "@/seeds/mauryas";
 import { loadRaviSeed } from "@/seeds/ravi";
 import { JOINT_DEDUCTION_OWNER, perAssesseeHouseholdTax } from "@/lib/tax-deductions";
-import { householdTaxUnderRegime, type RegimePick } from "@/lib/household-tax-regime";
+import { assesseesForView, householdTaxUnderRegime, type RegimePick } from "@/lib/household-tax-regime";
 import { toAnnual } from "@/lib/cashflow";
 import { isEarningMember } from "@/lib/member-earning";
 import { todayIsoLocal } from "@/lib/as-of-date";
@@ -75,7 +75,7 @@ const tax = (d: Household, split = 50) =>
     AS_OF,
   );
 const ruleTax = (d: Household, pick: RegimePick, split = 50) =>
-  householdTaxUnderRegime(tax(d, split).perAssessee, pick, FY).totalTax;
+  householdTaxUnderRegime(assesseesForView(tax(d, split), pick), pick, FY).totalTax;
 const who = (r: ReturnType<typeof tax>, id: string) => r.perAssessee.find((x) => x.memberId === id);
 
 const interest = (id: string, ownerId: string, amount: number) =>
@@ -209,28 +209,11 @@ function separateFilingTaxReference(d: Household, pick: RegimePick, split = 50):
   // OLD: the TOTAL house-property loss (self-occupied + let-out) set off against other heads ≤ ₹2L.
   const capOld = (h: number) => (h >= 0 ? h : -Math.min(-h, 200_000));
   const oldHpOf = (id: string) => capOld((hp.get(id) ?? 0) - soOf(id));
-  const totalIncome = (id: string) => (heads.get(id) ?? 0) + oldHpOf(id);
-  // §64(1A): every non-adult origin is clubbed on the adult with the higher total income.
-  // Ties: the anchor adult (D-2026-10-10-01 as amended by #239).
-  const clubOn = adults.reduce<string | undefined>(
-    (best, a) => (best === undefined || totalIncome(a.id) > totalIncome(best) ? a.id : best),
-    anchor,
-  );
-  const clubbedHeads = new Map<string, number>();
-  const clubbedHp = new Map<string, number>();
-  const isAdultId = (id: string) => adults.some((a) => a.id === id);
-  for (const id of new Set([...heads.keys(), ...hp.keys()])) {
-    if (isAdultId(id) || !clubOn) continue;
-    add(clubbedHeads, clubOn, heads.get(id) ?? 0);
-    add(clubbedHp, clubOn, Math.max(0, hp.get(id) ?? 0));
-  }
   const [ay, am, ad] = AS_OF_ISO.split("-").map(Number);
-  let total = 0;
-  for (const a of adults) {
-    const other = (heads.get(a.id) ?? 0) + (clubbedHeads.get(a.id) ?? 0);
+  // One adult's return: taxable income + tax under each regime, given their other heads and the
+  // (non-negative) house property clubbed onto them.
+  const returnOf = (a: Household["members"][number], other: number, moved: number) => {
     const ownHp = hp.get(a.id) ?? 0;
-    const moved = clubbedHp.get(a.id) ?? 0;
-    if (other === 0 && ownHp === 0 && moved === 0 && !earns(a)) continue;
     const [by, bm, bd] = (a.dateOfBirth ?? "").split("-").map(Number);
     const age = ay - by - (am < bm || (am === bm && ad < bd) ? 1 : 0);
     const own = (type: string) =>
@@ -251,12 +234,36 @@ function separateFilingTaxReference(d: Household, pick: RegimePick, split = 50):
     const newGross = other + Math.round(Math.max(0, ownHp) + moved);
     // §16(ia): the standard deduction is capped at the salary itself (#239).
     const sd = (limit: number) => Math.min(limit, a.salary?.annualCTC ?? 0);
-    const o = refTax(
-      Math.max(0, oldGross - (salaried ? sd(50_000) : 0) - sec80C - sec80CCD1B - employerNps("OLD")),
-      "OLD",
-      age,
-    );
-    const n = refTax(Math.max(0, newGross - (salaried ? sd(75_000) : 0) - employerNps("NEW")), "NEW", age);
+    const oldTaxable = Math.max(0, oldGross - (salaried ? sd(50_000) : 0) - sec80C - sec80CCD1B - employerNps("OLD"));
+    const newTaxable = Math.max(0, newGross - (salaried ? sd(75_000) : 0) - employerNps("NEW"));
+    return { oldTaxable, newTaxable, o: refTax(oldTaxable, "OLD", age), n: refTax(newTaxable, "NEW", age) };
+  };
+  // §64(1A): every non-adult origin is clubbed on the parent with the higher TOTAL income — after
+  // the standard deduction, Chapter VI-A and 80CCD(2), under that parent's own cheaper regime (AUTO)
+  // or the forced regime (forced views). Ties: the anchor adult (D-2026-10-10-01 as amended by #239).
+  const totalIncome = (id: string) => {
+    const r = returnOf(adults.find((a) => a.id === id)!, heads.get(id) ?? 0, 0);
+    const regime = pick === "AUTO" ? (r.o <= r.n ? "OLD" : "NEW") : pick;
+    return regime === "OLD" ? r.oldTaxable : r.newTaxable;
+  };
+  const clubOn = adults.reduce<string | undefined>(
+    (best, a) => (best === undefined || totalIncome(a.id) > totalIncome(best) ? a.id : best),
+    anchor,
+  );
+  const clubbedHeads = new Map<string, number>();
+  const clubbedHp = new Map<string, number>();
+  const isAdultId = (id: string) => adults.some((a) => a.id === id);
+  for (const id of new Set([...heads.keys(), ...hp.keys()])) {
+    if (isAdultId(id) || !clubOn) continue;
+    add(clubbedHeads, clubOn, heads.get(id) ?? 0);
+    add(clubbedHp, clubOn, Math.max(0, hp.get(id) ?? 0));
+  }
+  let total = 0;
+  for (const a of adults) {
+    const other = (heads.get(a.id) ?? 0) + (clubbedHeads.get(a.id) ?? 0);
+    const moved = clubbedHp.get(a.id) ?? 0;
+    if (other === 0 && (hp.get(a.id) ?? 0) === 0 && moved === 0 && !earns(a)) continue;
+    const { o, n } = returnOf(a, other, moved);
     total += pick === "OLD" ? o : pick === "NEW" ? n : Math.min(o, n);
   }
   return total;
@@ -360,10 +367,10 @@ describe("#87 round 4 — properties over generated households", () => {
         for (const pick of ["AUTO", "OLD", "NEW"] as const) {
           const rule = ruleTax(d, pick, g.split);
           const sep = separateFilingTaxReference(d, pick, g.split);
-          if (rule < sep - 2 * g.adults.length) throw new Error(`${pick}: rule ${rule} < separate ${sep}`);
+          if (rule < sep - g.adults.length) throw new Error(`${pick}: rule ${rule} < separate ${sep}`);
         }
       }),
-      { numRuns: 1000 },
+      { numRuns: 1000, ...(process.env.FC_SEED ? { seed: Number(process.env.FC_SEED) } : {}) },
     );
   });
 
@@ -668,16 +675,33 @@ describe("#239 — deduction caps (one focused case per class)", () => {
     assertNotBelowReference(d);
   });
 
-  it("class 6: a minor is clubbed on the filer with the higher TOTAL income (§64(1A)), not the target", () => {
+  it("class 6: higher own gross but lower total income (a §24 claim) — household tax ≥ the statute in every view", () => {
     const d = household(
       [adult("A", 2_000_000), adult("B", 1_900_000), minor("M")],
       [interest("m", "M", 100_000)],
       [homeLoan("l", "A", 200_000, false)],
     );
-    // A has the higher own gross (₹20L) but the lower total income (₹20L − ₹2L §24 = ₹18L < ₹19L).
+    // A: ₹20L gross but ₹18L total income after §24; B: ₹19L. Both parents sit in the 30% band, so
+    // either choice gives the same tax — the lock is on the household TAX, not who carries the minor.
+    assertNotBelowReference(d);
+  });
+
+  it("class 6 (review MAJOR): clubbing uses POST-deduction income — never the parent the code would under-tax", () => {
+    const a = { ...(adult("A", 5_100_000) as object), salary: { annualCTC: 5_100_000, hikePercent: 5, employerNpsAnnual: 300_000 } } as never;
+    const d = household([a, adult("B", 5_050_000), minor("M")], [interest("m", "M", 300_000)], []);
+    // A: ₹51L − ₹75k − ₹3L 80CCD(2) = ₹47.25L; B: ₹50.5L − ₹75k = ₹49.75L → the minor belongs on B
+    // (₹52.75L, near full 10% surcharge). Before: clubbed on A (₹50.25L, marginal relief) → ₹22,64,600.
     const r = tax(d);
-    expect(who(r, "B")!.incomeRows["inc:m"]).toBe(100_000);
-    expect(who(r, "A")!.incomeRows["inc:m"]).toBeUndefined();
+    expect(who(r, "B")!.incomeRows["inc:m"]).toBe(300_000);
+    expect(ruleTax(d, "AUTO")).toBe(2_367_300);
+    assertNotBelowReference(d);
+  });
+
+  it("class 6: near the OLD-regime 87A ₹5L threshold the minor lands where it costs more tax", () => {
+    const d = household([adult("A", 500_000), adult("B", 460_000), minor("M")], [interest("m", "M", 100_000)], []);
+    d.investments = [ppf("p", "A", 12_500)];
+    // A: ₹5L − ₹50k − ₹1.5L = ₹3L (OLD); B: ₹4.6L − ₹50k = ₹4.1L → statute clubs on B: ₹5.1L, past 87A.
+    expect(ruleTax(d, "OLD")).toBeGreaterThanOrEqual(15_080);
     assertNotBelowReference(d);
   });
 
