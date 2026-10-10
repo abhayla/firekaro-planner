@@ -824,8 +824,12 @@ export interface PerAssesseeScope {
  *   - business        → `annualProfit × sharePercent` by the same owner rule.
  *   - let-out rental  → rent, municipal tax, the §24(a) 30% and the §24(b) interest ALL follow the
  *                       SAME owner share as the rent (round-1 CRITICAL: the relief used to be split
- *                       by the Joint share even for a one-owner property). Each adult's net
- *                       house-property figure is §71-capped (₹2L loss set-off) on THEIR OWN return.
+ *                       by the Joint share even for a one-owner property). Round 6: each PERSON's
+ *                       result (own rows + own Joint share; a minor is their own person) is computed
+ *                       separately. A filer's own result is §71-capped (OLD, ₹2L set-off) or floored
+ *                       at 0 (NEW); a result moved in from a non-earner or minor adds max(0, result)
+ *                       on top, so a moved profit never absorbs the filer's loss and a moved loss is
+ *                       claimed by nobody (`droppedHouseLoss`).
  *   - deductions      → `deductionsForMember` (the #204 helper).
  *   - standard ded.   → only for an adult who draws a salary (`isSalaried`).
  */
@@ -841,55 +845,82 @@ export function perAssesseeHouseholdTax(
   const anchorId = adults.some((m) => m.id === householdAnchor) ? householdAnchor : adults[0]?.id;
   const asOfIso = todayIsoLocal(asOf);
 
-  const attributeReturns = (attribution: NonEarnerAttribution) => {
-    const memo = (dropped?: (id: string) => boolean, rule = attribution) => {
+  // `clubOnId`: who carries a minor's (§64(1A)) or unknown owner's rows when nobody earns.
+  const attributeReturns = (attribution: NonEarnerAttribution, clubOnId = anchorId) => {
+    const memo = () => {
       const cache = new Map<string, Map<string, number>>();
       return (ownerId: string): Map<string, number> => {
         let shares = cache.get(ownerId);
         if (!shares) {
-          shares = incomeRowShares(household, adults, anchorId, ownerId, householdSplitPercent, rule, dropped);
+          shares = incomeRowShares(household, adults, clubOnId, ownerId, householdSplitPercent, attribution);
           cache.set(ownerId, shares);
         }
         return shares;
       };
     };
     const sharesOf = memo();
-    // Round 5: a non-earner's house-property RESULT moves to the target earner only when positive.
-    // Their net (their own share of every let-out row, BEFORE any move) is a loss -> claimed by
-    // nobody, like their deductions; otherwise §71 sets it off against the earner's salary.
-    const ownShares = memo(undefined, { ...attribution, nonEarnerIds: new Set<string>() });
+    // Round 6: house property is composed PER ORIGIN PERSON, never netted across people. Each
+    // person's own let-out result (own rows + own Joint share; a minor's or unknown owner's rows are
+    // their own person) is computed first. The filer keeps their OWN result under the regime's rule
+    // (OLD §71 capped set-off, NEW floored at 0); a result moved in from anyone else (non-earner,
+    // minor) adds only max(0, result) on top. A moved loss is claimed by nobody.
+    const isAdult = (id: string) => adults.some((a) => a.id === id);
+    const fallbackId = attribution.targetId ?? clubOnId;
+    const rentalOrigins = (ownerId: string): [string, number][] =>
+      ownerId === JOINT_DEDUCTION_OWNER
+        ? adults.map((a) => [a.id, jointShareFor(household, a.id, householdSplitPercent)])
+        : isAdult(ownerId) || (!attribution.ownRowsOnly && fallbackId)
+          ? [[ownerId, 1]]
+          : [];
+    const destinationOf = (origin: string): string | undefined =>
+      isAdult(origin)
+        ? attribution.targetId && attribution.nonEarnerIds.has(origin)
+          ? attribution.targetId
+          : origin
+        : fallbackId;
     const ownHouseProperty = new Map<string, number>();
     for (const o of scope.otherIncome) {
       if (o.type !== "Rental" || o.isTaxExempt) continue;
-      for (const [id, w] of ownShares(o.ownerId)) {
+      for (const [id, w] of rentalOrigins(o.ownerId)) {
+        if (w === 0) continue;
         ownHouseProperty.set(id, (ownHouseProperty.get(id) ?? 0) + w * rentalNetOf(o));
       }
     }
     const lossDropped = (id: string) =>
-      attribution.nonEarnerIds.has(id) && (ownHouseProperty.get(id) ?? 0) < 0;
-    const rentalSharesOf = memo(lossDropped);
+      destinationOf(id) !== id && (ownHouseProperty.get(id) ?? 0) < 0;
     const rows = adults.map((member) => {
       const weightOf = (ownerId: string): number => sharesOf(ownerId).get(member.id) ?? 0;
       const incomeRows: Record<string, number> = {};
       const salary = member.salary?.annualCTC ?? 0;
       let otherTaxable = 0;
-      let rentalNet = 0;
       let hasIncome = salary > 0;
       for (const o of scope.otherIncome) {
         if (o.isTaxExempt) continue;
-        const w =
-          o.type === "Rental" ? (rentalSharesOf(o.ownerId).get(member.id) ?? 0) : weightOf(o.ownerId);
-        if (w === 0) continue;
         const annual = toAnnual({ amount: o.amount, period: o.frequency });
-        if (annual !== 0) hasIncome = true;
         if (o.type === "Rental") {
-          const part = w * rentalNetOf(o);
+          let part = 0;
+          let carried = false;
+          for (const [origin, w] of rentalOrigins(o.ownerId)) {
+            if (w === 0 || destinationOf(origin) !== member.id || lossDropped(origin)) continue;
+            carried = true;
+            part += w * rentalNetOf(o);
+          }
+          if (!carried) continue;
+          if (annual !== 0) hasIncome = true;
           incomeRows[`inc:${o.id}`] = part;
-          rentalNet += part;
-        } else {
-          incomeRows[`inc:${o.id}`] = annual * w;
-          otherTaxable += annual * w;
+          continue;
         }
+        const w = weightOf(o.ownerId);
+        if (w === 0) continue;
+        if (annual !== 0) hasIncome = true;
+        incomeRows[`inc:${o.id}`] = annual * w;
+        otherTaxable += annual * w;
+      }
+      // Own result under each regime's rule, then every moved-in person's non-negative result.
+      const ownHp = destinationOf(member.id) === member.id ? (ownHouseProperty.get(member.id) ?? 0) : 0;
+      let movedInHp = 0;
+      for (const [origin, net] of ownHouseProperty) {
+        if (origin !== member.id && destinationOf(origin) === member.id) movedInHp += Math.max(0, net);
       }
       let businessShare = 0;
       for (const b of scope.businesses) {
@@ -902,9 +933,9 @@ export function perAssesseeHouseholdTax(
         businessShare += share;
       }
       const oldHouseProperty = Math.round(
-        rentalNet >= 0 ? rentalNet : -Math.min(Math.abs(rentalNet), SEC_71_HP_LOSS_SETOFF_CAP),
+        (ownHp >= 0 ? ownHp : -Math.min(-ownHp, SEC_71_HP_LOSS_SETOFF_CAP)) + movedInHp,
       );
-      const newHouseProperty = Math.round(Math.max(0, rentalNet));
+      const newHouseProperty = Math.round(Math.max(0, ownHp) + movedInHp);
       const otherHeads = salary + otherTaxable + businessShare;
       const grossIncome = otherHeads + oldHouseProperty;
       const newGrossIncome = otherHeads + newHouseProperty;
@@ -918,13 +949,14 @@ export function perAssesseeHouseholdTax(
 
   // Pass 1: each adult's OWN gross (no attribution) picks the target earner; pass 2 attributes.
   const own = attributeReturns(OWN_ROWS_ONLY).rows;
-  const attribution = nonEarnerAttribution(
-    household,
-    adults,
-    anchorId,
-    (id) => own.find((r) => r.member.id === id)?.grossIncome ?? 0,
-  );
-  const attributed = attributeReturns(attribution);
+  const ownGross = (id: string | undefined) => own.find((r) => r.member.id === id)?.grossIncome ?? 0;
+  const attribution = nonEarnerAttribution(household, adults, anchorId, ownGross);
+  // Round 6, §64(1A): with no earner, a minor's income is clubbed on the adult with the higher own
+  // income (ties: the anchor), not on the anchor regardless of income.
+  const clubOnId =
+    attribution.targetId ??
+    adults.reduce<string | undefined>((best, a) => (ownGross(a.id) > ownGross(best) ? a.id : best), anchorId);
+  const attributed = attributeReturns(attribution, clubOnId);
   const returns = attributed.rows;
 
   let filers = returns.filter((r) => r.files);
